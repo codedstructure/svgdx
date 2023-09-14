@@ -1,7 +1,5 @@
-//use xmltree::{Element, EmitterConfig};
-
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesEnd, BytesStart, Event};
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::io::{BufReader, BufWriter};
@@ -19,9 +17,31 @@ fn fstr(x: f32) -> String {
     x.to_string()
 }
 
+struct SvgElement {
+    name: String,
+    attrs: Vec<(String, String)>,
+}
+
+impl SvgElement {
+    fn new(name: &str, attrs: &[(String, String)]) -> Self {
+        Self {
+            name: name.to_string(),
+            attrs: attrs.to_vec(),
+        }
+    }
+}
+
+enum SvgEvent {
+    Text(String),
+    Start(SvgElement),
+    Empty(SvgElement),
+    End(String),
+}
+
 #[derive(Default)]
 struct TransformerContext {
     vars: HashMap<String, HashMap<String, String>>,
+    last_indent: String,
 }
 
 impl TransformerContext {
@@ -50,6 +70,10 @@ impl TransformerContext {
                         }
                     }
                     if let Some(id) = id_opt {
+                        attr_map.insert(
+                            String::from("_element_name"),
+                            String::from_utf8(e.name().into_inner().to_vec()).unwrap(),
+                        );
                         vars.insert(id, attr_map);
                     }
                 }
@@ -61,7 +85,57 @@ impl TransformerContext {
 
         println!("CONTEXT: {:?}", vars);
 
-        Self { vars }
+        Self {
+            vars,
+            last_indent: String::from(""),
+        }
+    }
+
+    fn set_indent(&mut self, indent: String) {
+        self.last_indent = indent;
+    }
+
+    fn attr_map(&self, element: &BytesStart) -> Vec<(String, String)> {
+        element
+            .attributes()
+            .filter_map(|s| s.ok())
+            .map(|s| {
+                (
+                    String::from_utf8(s.key.into_inner().to_vec()).unwrap(),
+                    s.unescape_value().unwrap().into_owned(),
+                )
+            })
+            .collect()
+    }
+
+    fn center(&self, element_id: &str) -> (String, String) {
+        let mut cx = String::from("0");
+        let mut cy = String::from("0");
+
+        let attrs = self.vars.get(element_id).unwrap();
+
+        let elem_name = attrs.get("_element_name").unwrap();
+
+        match elem_name.as_str() {
+            "rect" | "tbox" => {
+                let x: f32 = attrs.get("x").unwrap().to_string().parse().unwrap();
+                let y: f32 = attrs.get("y").unwrap().to_string().parse().unwrap();
+                let w: f32 = attrs.get("width").unwrap().to_string().parse().unwrap();
+                let h: f32 = attrs.get("height").unwrap().to_string().parse().unwrap();
+
+                cx = fstr(x + w / 2.);
+                cy = fstr(y + h / 2.);
+            }
+            "circle" => {
+                cx = attrs.get("cx").unwrap().to_string();
+                cy = attrs.get("cy").unwrap().to_string();
+            }
+            _ => {
+                todo!("Implement...");
+            }
+        }
+
+        (cx, cy)
     }
 
     fn evaluate(&self, input: &str) -> String {
@@ -96,14 +170,13 @@ impl TransformerContext {
     fn split_pair(&self, input: &str) -> (String, Option<String>) {
         let mut in_iter = input.split(' ');
         let a: String = self.evaluate(in_iter.next().expect("Empty"));
-        let b: Option<String> = in_iter.next().and_then(|x| Some(self.evaluate(x)));
+        let b: Option<String> = in_iter.next().map(|x| self.evaluate(x));
 
         (a, b)
     }
 
-    fn handle_element<'a>(&self, e: &'a BytesStart, empty: bool) -> Vec<Event<'a>> {
+    fn handle_element(&self, e: &BytesStart, empty: bool) -> Vec<SvgEvent> {
         let elem_name: String = String::from_utf8(e.name().into_inner().to_vec()).unwrap();
-        let mut new_elem = BytesStart::new(elem_name.clone());
         let mut new_attrs: Vec<(String, String)> = vec![];
 
         let mut omit = false;
@@ -111,8 +184,10 @@ impl TransformerContext {
 
         match elem_name.as_str() {
             "tbox" => {
-                let mut rect_elem = BytesStart::new("rect");
-                let mut text_start = BytesStart::new("text");
+                let mut rect_attrs = vec![];
+                let mut text_attrs = vec![];
+
+                let mut text = None;
 
                 for a in e.attributes() {
                     let aa = a.unwrap();
@@ -120,15 +195,38 @@ impl TransformerContext {
                     let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
                     let value = aa.unescape_value().unwrap().into_owned();
 
-                    rect_elem.push_attribute(Attribute::from((key.as_bytes(), value.as_bytes())));
+                    rect_attrs.push((key.clone(), value.clone()));
                     if key == "x" || key == "y" {
-                        text_start
-                            .push_attribute(Attribute::from((key.as_bytes(), value.as_bytes())));
+                        text_attrs.push((key, value));
+                    } else if key == "text" {
+                        // allows an empty element to contain text content directly as an attribute
+                        text = Some(value);
                     }
                 }
 
-                new_elems.push(Event::Empty(rect_elem));
-                new_elems.push(Event::Start(text_start));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("rect", &rect_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Start(SvgElement::new("text", &text_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Start(SvgElement::new(
+                    "tspan",
+                    &[
+                        ("dx".to_string(), "1".to_string()),
+                        ("dy".to_string(), "8".to_string()),
+                    ],
+                )));
+                // if this *isn't* empty, we'll now expect a text event, which will be passed through.
+                // the corresponding </tbox> will be converted into a pair of </tspan> and </text> elements.
+                if empty {
+                    if let Some(tt) = text {
+                        new_elems.push(SvgEvent::Text(format!(
+                            "\n{}  {}\n{}",
+                            self.last_indent, tt, self.last_indent
+                        )));
+                        new_elems.push(SvgEvent::End("tspan".to_string()));
+                        new_elems.push(SvgEvent::End("text".to_string()));
+                    }
+                }
                 omit = true;
             }
             _ => {}
@@ -176,7 +274,7 @@ impl TransformerContext {
                         _ => new_attrs.push((key, value)),
                     }
                 }
-                "xy1" | "start" => match elem_name.as_str() {
+                "xy1" => match elem_name.as_str() {
                     "line" => {
                         let (x, opt_y) = self.split_pair(&value);
                         let y = opt_y.unwrap();
@@ -185,7 +283,16 @@ impl TransformerContext {
                     }
                     _ => new_attrs.push((key, value)),
                 },
-                "xy2" | "end" => match elem_name.as_str() {
+                "start" => match elem_name.as_str() {
+                    "line" => {
+                        let (start_center_x, start_center_y) = self.center(&value);
+
+                        new_attrs.push(("x1".into(), start_center_x));
+                        new_attrs.push(("y1".into(), start_center_y));
+                    }
+                    _ => new_attrs.push((key, value)),
+                },
+                "xy2" => match elem_name.as_str() {
                     "line" => {
                         let (x, opt_y) = self.split_pair(&value);
                         let y = opt_y.unwrap();
@@ -194,18 +301,30 @@ impl TransformerContext {
                     }
                     _ => new_attrs.push((key, value)),
                 },
+                "end" => match elem_name.as_str() {
+                    "line" => {
+                        let (end_center_x, end_center_y) = self.center(&value);
+
+                        new_attrs.push(("x2".into(), end_center_x));
+                        new_attrs.push(("y2".into(), end_center_y));
+                    }
+                    _ => new_attrs.push((key, value)),
+                },
                 _ => new_attrs.push((key, value)),
             }
         }
 
-        for (new_k, new_v) in new_attrs.into_iter() {
-            new_elem.push_attribute(Attribute::from((new_k.as_bytes(), new_v.as_bytes())));
-        }
         if !omit {
             if empty {
-                new_elems.push(Event::Empty(new_elem));
+                new_elems.push(SvgEvent::Empty(SvgElement {
+                    name: elem_name,
+                    attrs: new_attrs,
+                }));
             } else {
-                new_elems.push(Event::Start(new_elem));
+                new_elems.push(SvgEvent::Start(SvgElement {
+                    name: elem_name,
+                    attrs: new_attrs,
+                }));
             }
         }
         new_elems
@@ -241,24 +360,96 @@ impl Transformer {
                     let ee = self.context.handle_element(&e, false);
                     let mut result = Ok(());
                     for ev in ee.into_iter() {
-                        result = self.writer.write_event(ev)
+                        match ev {
+                            SvgEvent::Empty(e) => {
+                                let mut bs = BytesStart::new(e.name);
+                                for (k, v) in e.attrs.into_iter() {
+                                    bs.push_attribute(Attribute::from((
+                                        k.as_bytes(),
+                                        v.as_bytes(),
+                                    )));
+                                }
+                                result = self.writer.write_event(Event::Empty(bs));
+                            }
+                            SvgEvent::Start(e) => {
+                                let mut bs = BytesStart::new(e.name);
+                                for (k, v) in e.attrs.into_iter() {
+                                    bs.push_attribute(Attribute::from((
+                                        k.as_bytes(),
+                                        v.as_bytes(),
+                                    )));
+                                }
+                                result = self.writer.write_event(Event::Start(bs));
+                            }
+                            SvgEvent::Text(t) => {
+                                result = self.writer.write_event(Event::Text(BytesText::new(&t)));
+                            }
+                            SvgEvent::End(name) => {
+                                result = self.writer.write_event(Event::End(BytesEnd::new(name)));
+                            }
+                        }
                     }
                     result
                 }
                 Ok(Event::Empty(e)) => {
                     let ee = self.context.handle_element(&e, true);
                     let mut result = Ok(());
-                    for ev in ee {
-                        result = self.writer.write_event(ev)
+                    for ev in ee.into_iter() {
+                        match ev {
+                            SvgEvent::Empty(e) => {
+                                let mut bs = BytesStart::new(e.name);
+                                for (k, v) in e.attrs.into_iter() {
+                                    bs.push_attribute(Attribute::from((
+                                        k.as_bytes(),
+                                        v.as_bytes(),
+                                    )));
+                                }
+                                result = self.writer.write_event(Event::Empty(bs));
+                            }
+                            SvgEvent::Start(e) => {
+                                let mut bs = BytesStart::new(e.name);
+                                for (k, v) in e.attrs.into_iter() {
+                                    bs.push_attribute(Attribute::from((
+                                        k.as_bytes(),
+                                        v.as_bytes(),
+                                    )));
+                                }
+                                result = self.writer.write_event(Event::Start(bs));
+                            }
+                            SvgEvent::Text(t) => {
+                                result = self.writer.write_event(Event::Text(BytesText::new(&t)));
+                            }
+                            SvgEvent::End(name) => {
+                                result = self.writer.write_event(Event::End(BytesEnd::new(name)));
+                            }
+                        }
                     }
                     result
                 }
                 Ok(Event::End(e)) => {
                     let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
                     if ee_name.as_str() == "tbox" {
+                        self.writer.write_event(Event::Text(BytesText::new(&format!(
+                            "\n{}",
+                            self.context.last_indent
+                        ))));
+                        self.writer.write_event(Event::End(BytesEnd::new("tspan")));
                         ee_name = String::from("text");
                     }
                     self.writer.write_event(Event::End(BytesEnd::new(ee_name)))
+                }
+                Ok(Event::Text(e)) => {
+                    // Extract any trailing whitespace following newlines as the current indentation level
+                    let re = Regex::new(r"(?ms)\n.*^(\s+)*").unwrap();
+                    let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
+                    if let Some(captures) = re.captures(&text) {
+                        let indent = captures
+                            .get(1)
+                            .map_or(String::from(""), |m| m.as_str().into());
+                        self.context.set_indent(indent);
+                    }
+
+                    self.writer.write_event(Event::Text(e))
                 }
                 Ok(event) => {
                     //println!("EVENT: {:?}", event);

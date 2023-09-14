@@ -9,29 +9,25 @@
             tspan {
                 font-size: 6px;
             }
+            line {
+                stroke-width: 1px;
+                stroke: black;
+            }
         ]]>
     </style>
 
-    <tbox x="10" y="10" width="100" height="80">
-      <tspan dx="1" dy="8">This is a title</tspan>
-    </tbox>
+    <tbox x="10" y="10" width="100" height="80">This is a title</tbox>
 
-    <!--rect class="outline" x="20" y="20" width="80" height="60" /-->
-    <!--rect class="outlineg" x="20" y="50" width="80" height="30" /-->
+    <line start="b1" end="b3"/>
+    <line start="b2" end="b3"/>
+    <line start="b3" end="b4"/>
 
-    <tbox x="20" y="20" width="80" height="20">
-      <tspan dx="1" dy="12">Box 1</tspan>
-    </tbox>
+    <tbox id="b1" x="20" y="20" width="80" height="20">Box 1</tbox>
 
-    <tbox x="20" y="50" width="20" height="30">
-      <tspan dx="1" dy="12">Box 2</tspan>
-    </tbox>
+    <tbox id="b2" x="20" y="50" width="20" height="30" text="Box 2"/>
 
-    <tbox x="50" y="50" width="20" height="30">
-      <tspan dx="1" dy="12">Box 3</tspan>
-    </tbox>
+    <tbox id="b3" x="50" y="50" width="20" height="30" text="Box 3"/>
 
-    <tbox x="80" y="50" width="20" height="30" />
-      <tspan dx="1" dy="12">Box 4</tspan>
-    </tbox>
+    <tbox id="b4" x="80" y="50" width="20" height="30">Box 4</tbox>
+
 </svg>
