@@ -1,0 +1,14 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:d="http://blob.org">
+
+<d:c id="thing" xy="10 100" x="222" />
+
+<d:p id="p1" xy1="20 50" xy2="70 #thing:x" />
+<d:p id="p2" xy1="20 50" xy2="70 70" />
+
+<rect xy="80 90" size="20 20" style="fill:black;"/>
+<rect x="40" y="10" width="20" height="20" style="fill:black;"/>
+<circle xy="30 80" size="7" style="fill:black;"/>
+<rect xy="#thing:xy" width="20" height="20" style="fill:black;"/>
+<line xy1="#p1:xy1" xy2="#p1:xy2" style="stroke:black;"/>
+
+</svg>
