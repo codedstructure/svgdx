@@ -18,7 +18,7 @@
   <line x1="30" y1="7" x2="40" y2="7" />
 
   <rect x="40" y="2" width="20" height="10" />
-  <text x="41" y="8">process</text>
+  <text x="40" y="2"><tspan dx="1" dy="6">process</tspan></text>
 
   <line x1="60" y1="7" x2="70" y2="7" />
 

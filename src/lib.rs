@@ -1,7 +1,7 @@
 //use xmltree::{Element, EmitterConfig};
 
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesStart, Event};
+use quick_xml::events::{BytesEnd, BytesStart, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::io::{BufReader, BufWriter};
@@ -101,10 +101,38 @@ impl TransformerContext {
         (a, b)
     }
 
-    fn handle_element<'a>(&self, e: &'a BytesStart) -> BytesStart<'a> {
+    fn handle_element<'a>(&self, e: &'a BytesStart, empty: bool) -> Vec<Event<'a>> {
         let elem_name: String = String::from_utf8(e.name().into_inner().to_vec()).unwrap();
         let mut new_elem = BytesStart::new(elem_name.clone());
         let mut new_attrs: Vec<(String, String)> = vec![];
+
+        let mut omit = false;
+        let mut new_elems = vec![];
+
+        match elem_name.as_str() {
+            "tbox" => {
+                let mut rect_elem = BytesStart::new("rect");
+                let mut text_start = BytesStart::new("text");
+
+                for a in e.attributes() {
+                    let aa = a.unwrap();
+
+                    let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
+                    let value = aa.unescape_value().unwrap().into_owned();
+
+                    rect_elem.push_attribute(Attribute::from((key.as_bytes(), value.as_bytes())));
+                    if key == "x" || key == "y" {
+                        text_start
+                            .push_attribute(Attribute::from((key.as_bytes(), value.as_bytes())));
+                    }
+                }
+
+                new_elems.push(Event::Empty(rect_elem));
+                new_elems.push(Event::Start(text_start));
+                omit = true;
+            }
+            _ => {}
+        }
 
         for a in e.attributes() {
             let aa = a.unwrap();
@@ -148,28 +176,24 @@ impl TransformerContext {
                         _ => new_attrs.push((key, value)),
                     }
                 }
-                "xy1" | "start" => {
-                    match elem_name.as_str() {
-                        "line" => {
-                            let (x, opt_y) = self.split_pair(&value);
-                            let y = opt_y.unwrap();
-                            new_attrs.push(("x1".into(), x));
-                            new_attrs.push(("y1".into(), y));
-                        }
-                        _ => new_attrs.push((key, value)),
+                "xy1" | "start" => match elem_name.as_str() {
+                    "line" => {
+                        let (x, opt_y) = self.split_pair(&value);
+                        let y = opt_y.unwrap();
+                        new_attrs.push(("x1".into(), x));
+                        new_attrs.push(("y1".into(), y));
                     }
-                }
-                "xy2" | "end" => {
-                    match elem_name.as_str() {
-                        "line" => {
-                            let (x, opt_y) = self.split_pair(&value);
-                            let y = opt_y.unwrap();
-                            new_attrs.push(("x2".into(), x));
-                            new_attrs.push(("y2".into(), y));
-                        }
-                        _ => new_attrs.push((key, value)),
+                    _ => new_attrs.push((key, value)),
+                },
+                "xy2" | "end" => match elem_name.as_str() {
+                    "line" => {
+                        let (x, opt_y) = self.split_pair(&value);
+                        let y = opt_y.unwrap();
+                        new_attrs.push(("x2".into(), x));
+                        new_attrs.push(("y2".into(), y));
                     }
-                }
+                    _ => new_attrs.push((key, value)),
+                },
                 _ => new_attrs.push((key, value)),
             }
         }
@@ -177,7 +201,14 @@ impl TransformerContext {
         for (new_k, new_v) in new_attrs.into_iter() {
             new_elem.push_attribute(Attribute::from((new_k.as_bytes(), new_v.as_bytes())));
         }
-        new_elem
+        if !omit {
+            if empty {
+                new_elems.push(Event::Empty(new_elem));
+            } else {
+                new_elems.push(Event::Start(new_elem));
+            }
+        }
+        new_elems
     }
 }
 
@@ -207,14 +238,28 @@ impl Transformer {
             match ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Ok(Event::Start(e)) => {
-                    let ee = self.context.handle_element(&e);
-                    self.writer.write_event(Event::Start(ee))
+                    let ee = self.context.handle_element(&e, false);
+                    let mut result = Ok(());
+                    for ev in ee.into_iter() {
+                        result = self.writer.write_event(ev)
+                    }
+                    result
                 }
                 Ok(Event::Empty(e)) => {
-                    let ee = self.context.handle_element(&e);
-                    self.writer.write_event(Event::Empty(ee))
+                    let ee = self.context.handle_element(&e, true);
+                    let mut result = Ok(());
+                    for ev in ee {
+                        result = self.writer.write_event(ev)
+                    }
+                    result
                 }
-                Ok(Event::End(e)) => self.writer.write_event(Event::End(e)),
+                Ok(Event::End(e)) => {
+                    let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
+                    if ee_name.as_str() == "tbox" {
+                        ee_name = String::from("text");
+                    }
+                    self.writer.write_event(Event::End(BytesEnd::new(ee_name)))
+                }
                 Ok(event) => {
                     //println!("EVENT: {:?}", event);
                     self.writer.write_event(event)

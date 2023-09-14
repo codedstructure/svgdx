@@ -51,7 +51,7 @@ Out of these, text is the most tricky, but it's still straightforward to make si
 
 renders as:
 
-![](simple.png)
+![](simple.svg)
 
 
 Not too tricky, but there are a lot of fiddly coordinate values, and I've omitted some boilerplate for styling and XML processing instructions. See the underlying file [here](simple.svg).
