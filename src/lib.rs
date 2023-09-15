@@ -2,7 +2,7 @@ use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, Write};
 
 use std::collections::HashMap;
 
@@ -82,8 +82,6 @@ impl TransformerContext {
             }
             buf.clear();
         }
-
-        println!("CONTEXT: {:?}", vars);
 
         Self {
             vars,
@@ -167,7 +165,7 @@ impl TransformerContext {
         // evaluate
     }
 
-    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item=String> + '_ {
+    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
         input.split(' ').map(|v| self.evaluate(v))
     }
 
@@ -326,17 +324,26 @@ impl TransformerContext {
 pub struct Transformer {
     context: TransformerContext,
     reader: Reader<BufReader<File>>,
-    writer: Writer<BufWriter<File>>,
+    writer: Writer<Box<dyn Write>>,
 }
 
 impl Transformer {
-    pub fn new(filename: &str) -> Self {
+    pub fn new(filename: &str, output_file_path: &Option<String>) -> Self {
         let mut pre_reader = Reader::from_file(filename).unwrap();
         let reader = Reader::from_file(filename).unwrap();
+
+        let out_writer = match output_file_path {
+            Some(x) => {
+                let path = std::path::Path::new(x);
+                Box::new(File::create(&path).unwrap()) as Box<dyn Write>
+            }
+            None => Box::new(std::io::stdout()) as Box<dyn Write>,
+        };
+
         Self {
             context: TransformerContext::new(&mut pre_reader),
             reader,
-            writer: Writer::new(BufWriter::new(File::create("out.svg").unwrap())),
+            writer: Writer::new(out_writer),
         }
     }
 

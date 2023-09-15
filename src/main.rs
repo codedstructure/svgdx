@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::fs;
+use std::{fs, process::Output};
 
 use svgd::Transformer;
 
@@ -19,13 +19,13 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
+    let input_file_path: String = args.input_file_path;
+    let output_file_path: Option<String> = args.output_file_path;
 
-    if path_exists(&args.input_file_path) == false {
+    if path_exists(&input_file_path) == false {
         panic!("File does not exist");
     }
 
-    println!("{}", args.input_file_path);
-
-    let mut t = Transformer::new(&args.input_file_path);
+    let mut t = Transformer::new(&input_file_path, &output_file_path);
     let _ = t.transform();
 }
