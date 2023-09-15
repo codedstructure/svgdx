@@ -167,12 +167,8 @@ impl TransformerContext {
         // evaluate
     }
 
-    fn split_pair(&self, input: &str) -> (String, Option<String>) {
-        let mut in_iter = input.split(' ');
-        let a: String = self.evaluate(in_iter.next().expect("Empty"));
-        let b: Option<String> = in_iter.next().map(|x| self.evaluate(x));
-
-        (a, b)
+    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item=String> + '_ {
+        input.split(' ').map(|v| self.evaluate(v))
     }
 
     fn handle_element(&self, e: &BytesStart, empty: bool) -> Vec<SvgEvent> {
@@ -242,44 +238,41 @@ impl TransformerContext {
 
             match key.as_str() {
                 "xy" => {
-                    let (x, opt_y) = self.split_pair(&value);
-                    let y = opt_y.unwrap();
+                    let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
                         "rect" => {
-                            new_attrs.push(("x".into(), x));
-                            new_attrs.push(("y".into(), y));
+                            new_attrs.push(("x".into(), parts.next().unwrap()));
+                            new_attrs.push(("y".into(), parts.next().unwrap()));
                         }
                         "circle" => {
-                            new_attrs.push(("cx".into(), x));
-                            new_attrs.push(("cy".into(), y));
+                            new_attrs.push(("cx".into(), parts.next().unwrap()));
+                            new_attrs.push(("cy".into(), parts.next().unwrap()));
                         }
-                        _ => new_attrs.push((key, value)),
+                        _ => new_attrs.push((key, value.clone())),
                     }
                 }
                 "size" => {
-                    let (w, h_opt) = self.split_pair(&value);
+                    let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
                         "rect" => {
-                            let h = h_opt.unwrap();
-                            new_attrs.push(("width".into(), w));
-                            new_attrs.push(("height".into(), h));
+                            new_attrs.push(("width".into(), parts.next().unwrap()));
+                            new_attrs.push(("height".into(), parts.next().unwrap()));
                         }
                         "circle" => {
                             // TBD: arguably size should map to diameter, for consistency
                             // with width/height on rects - i.e. use 'fstr(w.parse::<f32>*2)'
-                            new_attrs.push(("r".into(), w));
+                            new_attrs.push(("r".into(), parts.next().unwrap()));
                         }
-                        _ => new_attrs.push((key, value)),
+                        _ => new_attrs.push((key, value.clone())),
                     }
                 }
                 "xy1" => match elem_name.as_str() {
                     "line" => {
-                        let (x, opt_y) = self.split_pair(&value);
-                        let y = opt_y.unwrap();
-                        new_attrs.push(("x1".into(), x));
-                        new_attrs.push(("y1".into(), y));
+                        let mut parts = self.attr_split(&value);
+                        new_attrs.push(("x1".into(), parts.next().unwrap()));
+                        new_attrs.push(("y1".into(), parts.next().unwrap()));
                     }
                     _ => new_attrs.push((key, value)),
                 },
@@ -294,10 +287,9 @@ impl TransformerContext {
                 },
                 "xy2" => match elem_name.as_str() {
                     "line" => {
-                        let (x, opt_y) = self.split_pair(&value);
-                        let y = opt_y.unwrap();
-                        new_attrs.push(("x2".into(), x));
-                        new_attrs.push(("y2".into(), y));
+                        let mut parts = self.attr_split(&value);
+                        new_attrs.push(("x2".into(), parts.next().unwrap()));
+                        new_attrs.push(("y2".into(), parts.next().unwrap()));
                     }
                     _ => new_attrs.push((key, value)),
                 },
