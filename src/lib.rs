@@ -14,19 +14,84 @@ fn fstr(x: f32) -> String {
     if x == (x as u32) as f32 {
         return (x as u32).to_string();
     }
-    x.to_string()
+    format!("{:.4}", x.to_string())
+}
+
+fn strp(s: &str) -> f32 {
+    s.parse().unwrap()
 }
 
 struct SvgElement {
     name: String,
     attrs: Vec<(String, String)>,
+    attr_map: HashMap<String, String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
+        let mut attr_map: HashMap<String, String> = HashMap::new();
+
+        for (key, value) in attrs {
+            attr_map.insert(key.to_string(), value.to_string());
+        }
+
         Self {
             name: name.to_string(),
             attrs: attrs.to_vec(),
+            attr_map,
+        }
+    }
+
+    fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
+        match self.name.as_str() {
+            "rect" => {
+                let (x, y, w, h) = (
+                    strp(self.attr_map.get("x").unwrap()),
+                    strp(self.attr_map.get("y").unwrap()),
+                    strp(self.attr_map.get("width").unwrap()),
+                    strp(self.attr_map.get("height").unwrap()),
+                );
+                Some((x, y, x + w, y + h))
+            }
+            "line" => {
+                let (x1, y1, x2, y2) = (
+                    strp(self.attr_map.get("x1").unwrap()),
+                    strp(self.attr_map.get("y1").unwrap()),
+                    strp(self.attr_map.get("x2").unwrap()),
+                    strp(self.attr_map.get("y2").unwrap()),
+                );
+                Some((x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
+            }
+            "circle" => {
+                let (cx, cy, r) = (
+                    strp(self.attr_map.get("cx").unwrap()),
+                    strp(self.attr_map.get("cy").unwrap()),
+                    strp(self.attr_map.get("r").unwrap()),
+                );
+                Some((cx - r, cy - r, cx + r, cy + r))
+            }
+
+            _ => None,
+        }
+    }
+
+    fn coord(&self, loc: &str) -> Option<(f32, f32)> {
+        // This assumes a rectangular bounding box
+        if let Some((x1, y1, x2, y2)) = self.bbox() {
+            match loc {
+                "tl" => Some((x1, y1)),
+                "t" => Some(((x1 + x2) / 2., y1)),
+                "tr" => Some((x2, y1)),
+                "r" => Some((x2, (y1 + y2) / 2.)),
+                "br" => Some((x2, y2)),
+                "b" => Some(((x1 + x2) / 2., y2)),
+                "bl" => Some((x1, y2)),
+                "l" => Some((x1, (y1 + y2) / 2.)),
+                "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -223,6 +288,73 @@ impl TransformerContext {
                 }
                 omit = true;
             }
+            "person" => {
+                let mut h: f32 = 100.;
+                let mut x1: f32 = 0.;
+                let mut y1: f32 = 0.;
+                let mut head_attrs = vec![];
+                let mut body_attrs = vec![];
+                let mut arms_attrs = vec![];
+                let mut leg1_attrs: Vec<(String, String)> = vec![];
+                let mut leg2_attrs: Vec<(String, String)> = vec![];
+
+                for a in e.attributes() {
+                    let aa = a.unwrap();
+
+                    let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
+                    let value = aa.unescape_value().unwrap().into_owned();
+
+                    println!("{}: {}", key, value);
+                    if key == "x" {
+                        x1 = value.clone().parse().unwrap();
+                    }
+                    if key == "y" {
+                        y1 = value.clone().parse().unwrap();
+                    }
+                    if key == "height" {
+                        h = value.clone().parse().unwrap();
+                    }
+                }
+
+                head_attrs.push(("cx".into(), fstr(x1 + h/6.)));
+                head_attrs.push(("cy".into(), fstr(y1 + h/9.)));
+                head_attrs.push(("r".into(), fstr(h/9.)));
+                head_attrs.push(("style".into(),"fill:none; stroke:black; stroke-width:0.5".into()));
+
+                body_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                body_attrs.push(("y1".into(), fstr(y1 + h/9.*2.)));
+                body_attrs.push(("x2".into(), fstr(x1 + h/6.)));
+                body_attrs.push(("y2".into(), fstr(y1 + (5.5*h)/9.)));
+
+                arms_attrs.push(("x1".into(), fstr(x1)));
+                arms_attrs.push(("y1".into(), fstr(y1 + h/3.)));
+                arms_attrs.push(("x2".into(), fstr(x1 + h/3.)));
+                arms_attrs.push(("y2".into(), fstr(y1 + h/3.)));
+
+                leg1_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                leg1_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
+                leg1_attrs.push(("x2".into(), fstr(x1)));
+                leg1_attrs.push(("y2".into(), fstr(y1 + h)));
+
+                leg2_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                leg2_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
+                leg2_attrs.push(("x2".into(), fstr(x1 + h/3.)));
+                leg2_attrs.push(("y2".into(), fstr(y1 + h)));
+
+                new_elems.push(SvgEvent::Empty(SvgElement::new("circle", &head_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &body_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &arms_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg1_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg2_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+
+                omit = true;
+                
+            }
             _ => {}
         }
 
@@ -306,15 +438,9 @@ impl TransformerContext {
 
         if !omit {
             if empty {
-                new_elems.push(SvgEvent::Empty(SvgElement {
-                    name: elem_name,
-                    attrs: new_attrs,
-                }));
+                new_elems.push(SvgEvent::Empty(SvgElement::new(&elem_name, &new_attrs)));
             } else {
-                new_elems.push(SvgEvent::Start(SvgElement {
-                    name: elem_name,
-                    attrs: new_attrs,
-                }));
+                new_elems.push(SvgEvent::Start(SvgElement::new(&elem_name, &new_attrs)));
             }
         }
         new_elems
