@@ -21,6 +21,7 @@ fn strp(s: &str) -> f32 {
     s.parse().unwrap()
 }
 
+#[derive(Clone, Debug)]
 struct SvgElement {
     name: String,
     attrs: Vec<(String, String)>,
@@ -44,7 +45,7 @@ impl SvgElement {
 
     fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
         match self.name.as_str() {
-            "rect" => {
+            "rect" | "tbox" => {
                 let (x, y, w, h) = (
                     strp(self.attr_map.get("x").unwrap()),
                     strp(self.attr_map.get("y").unwrap()),
@@ -106,12 +107,14 @@ enum SvgEvent {
 #[derive(Default)]
 struct TransformerContext {
     vars: HashMap<String, HashMap<String, String>>,
+    elem_map: HashMap<String, SvgElement>,
     last_indent: String,
 }
 
 impl TransformerContext {
     fn new(reader: &mut Reader<BufReader<File>>) -> Self {
         let mut vars: HashMap<String, HashMap<String, String>> = HashMap::new();
+        let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
         let mut buf = Vec::new();
 
         loop {
@@ -121,6 +124,7 @@ impl TransformerContext {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let mut attr_map = HashMap::new();
+                    let mut attr_list = vec![];
                     let mut id_opt = None;
                     for a in e.attributes() {
                         let aa = a.unwrap();
@@ -131,7 +135,8 @@ impl TransformerContext {
                         if &key == "id" {
                             id_opt = Some(value);
                         } else {
-                            attr_map.insert(key.clone(), value);
+                            attr_map.insert(key.clone(), value.clone());
+                            attr_list.push((key, value.clone()));
                         }
                     }
                     if let Some(id) = id_opt {
@@ -139,7 +144,10 @@ impl TransformerContext {
                             String::from("_element_name"),
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap(),
                         );
-                        vars.insert(id, attr_map);
+                        vars.insert(id.clone(), attr_map);
+                        let elem_name: String =
+                            String::from_utf8(e.name().into_inner().to_vec()).unwrap();
+                        elem_map.insert(id.clone(), SvgElement::new(&elem_name, &attr_list));
                     }
                 }
                 Ok(_) => {}
@@ -150,6 +158,7 @@ impl TransformerContext {
 
         Self {
             vars,
+            elem_map,
             last_indent: String::from(""),
         }
     }
@@ -169,6 +178,20 @@ impl TransformerContext {
                 )
             })
             .collect()
+    }
+
+    fn eval_ref(&self, attr: &str) -> Option<(f32, f32)> {
+        // Example: "#thing@tl" => top left coordinate of element id="thing"
+        let re = Regex::new(r"^#(?<id>\w+)(@(?<loc>\S+))?$").unwrap();
+
+        let input = String::from(attr);
+
+        let caps = re.captures(&input)?;
+        let name = &caps["id"];
+        let loc = caps.name("loc").map_or("c", |v| v.as_str());
+
+        let element = self.elem_map.get(name)?;
+        element.coord(loc)
     }
 
     fn center(&self, element_id: &str) -> (String, String) {
@@ -408,10 +431,10 @@ impl TransformerContext {
                 },
                 "start" => match elem_name.as_str() {
                     "line" => {
-                        let (start_center_x, start_center_y) = self.center(&value);
+                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
 
-                        new_attrs.push(("x1".into(), start_center_x));
-                        new_attrs.push(("y1".into(), start_center_y));
+                        new_attrs.push(("x1".into(), fstr(start_x)));
+                        new_attrs.push(("y1".into(), fstr(start_y)));
                     }
                     _ => new_attrs.push((key, value)),
                 },
@@ -425,10 +448,10 @@ impl TransformerContext {
                 },
                 "end" => match elem_name.as_str() {
                     "line" => {
-                        let (end_center_x, end_center_y) = self.center(&value);
+                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
 
-                        new_attrs.push(("x2".into(), end_center_x));
-                        new_attrs.push(("y2".into(), end_center_y));
+                        new_attrs.push(("x2".into(), fstr(end_x)));
+                        new_attrs.push(("y2".into(), fstr(end_y)));
                     }
                     _ => new_attrs.push((key, value)),
                 },

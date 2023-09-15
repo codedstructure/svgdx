@@ -18,16 +18,12 @@
 
     <tbox x="10" y="10" width="100" height="80">This is a title</tbox>
 
-    <line start="b1" end="b3"/>
-    <line start="b2" end="b3"/>
-    <line start="b3" end="b4"/>
-
     <tbox id="b1" x="20" y="20" width="80" height="20">Box 1</tbox>
-
+    <line start="#b1@b" end="#b3@t"/>
     <tbox id="b2" x="20" y="50" width="20" height="30" text="Box 2"/>
-
+    <line start="#b2@r" end="#b3@l"/>
     <tbox id="b3" x="50" y="50" width="20" height="30" text="Box 3"/>
-
+    <line start="#b3@r" end="#b4@l"/>
     <tbox id="b4" x="80" y="50" width="20" height="30">Box 4</tbox>
 
 </svg>
