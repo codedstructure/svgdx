@@ -4,7 +4,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::io::{BufReader, Write};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use std::fs::File;
 
@@ -26,21 +26,37 @@ struct SvgElement {
     name: String,
     attrs: Vec<(String, String)>,
     attr_map: HashMap<String, String>,
+    classes: HashSet<String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
         let mut attr_map: HashMap<String, String> = HashMap::new();
+        let mut classes: HashSet<String> = HashSet::new();
 
         for (key, value) in attrs {
-            attr_map.insert(key.to_string(), value.to_string());
+            if key == "class" {
+                for c in value.split(' ') {
+                    classes.insert(c.to_string());
+                }
+            } else {
+                attr_map.insert(key.to_string(), value.to_string());
+            }
         }
+        println!("{:?}", attr_map);
+        println!("{:?}", classes);
 
         Self {
             name: name.to_string(),
             attrs: attrs.to_vec(),
             attr_map,
+            classes,
         }
+    }
+
+    fn add_class(&mut self, class: &str) -> Self {
+        self.classes.insert(class.to_string());
+        self.clone()
     }
 
     fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
@@ -70,6 +86,14 @@ impl SvgElement {
                     strp(self.attr_map.get("r").unwrap()),
                 );
                 Some((cx - r, cy - r, cx + r, cy + r))
+            }
+            "person" => {
+                let (x, y, h) = (
+                    strp(self.attr_map.get("x").unwrap()),
+                    strp(self.attr_map.get("y").unwrap()),
+                    strp(self.attr_map.get("height").unwrap()),
+                );
+                Some((x, y, x + h / 3., y + h))
             }
 
             _ => None,
@@ -315,6 +339,7 @@ impl TransformerContext {
                 let mut h: f32 = 100.;
                 let mut x1: f32 = 0.;
                 let mut y1: f32 = 0.;
+                let mut common_attrs = vec![];
                 let mut head_attrs = vec![];
                 let mut body_attrs = vec![];
                 let mut arms_attrs = vec![];
@@ -327,56 +352,75 @@ impl TransformerContext {
                     let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
                     let value = aa.unescape_value().unwrap().into_owned();
 
-                    println!("{}: {}", key, value);
-                    if key == "x" {
-                        x1 = value.clone().parse().unwrap();
-                    }
-                    if key == "y" {
-                        y1 = value.clone().parse().unwrap();
-                    }
-                    if key == "height" {
-                        h = value.clone().parse().unwrap();
+                    match key.as_str() {
+                        "x" => {
+                            x1 = value.clone().parse().unwrap();
+                        }
+                        "y" => {
+                            y1 = value.clone().parse().unwrap();
+                        }
+                        "height" => {
+                            h = value.clone().parse().unwrap();
+                        }
+                        _ => {
+                            common_attrs.push((key, value));
+                        }
                     }
                 }
 
-                head_attrs.push(("cx".into(), fstr(x1 + h/6.)));
-                head_attrs.push(("cy".into(), fstr(y1 + h/9.)));
-                head_attrs.push(("r".into(), fstr(h/9.)));
-                head_attrs.push(("style".into(),"fill:none; stroke:black; stroke-width:0.5".into()));
+                head_attrs.push(("cx".into(), fstr(x1 + h / 6.)));
+                head_attrs.push(("cy".into(), fstr(y1 + h / 9.)));
+                head_attrs.push(("r".into(), fstr(h / 9.)));
+                head_attrs.push(("style".into(), "fill:none; stroke-width:0.5".into()));
+                head_attrs.extend(common_attrs.clone());
+                println!("{:?}", head_attrs);
 
-                body_attrs.push(("x1".into(), fstr(x1 + h/6.)));
-                body_attrs.push(("y1".into(), fstr(y1 + h/9.*2.)));
-                body_attrs.push(("x2".into(), fstr(x1 + h/6.)));
-                body_attrs.push(("y2".into(), fstr(y1 + (5.5*h)/9.)));
+                body_attrs.push(("x1".into(), fstr(x1 + h / 6.)));
+                body_attrs.push(("y1".into(), fstr(y1 + h / 9. * 2.)));
+                body_attrs.push(("x2".into(), fstr(x1 + h / 6.)));
+                body_attrs.push(("y2".into(), fstr(y1 + (5.5 * h) / 9.)));
+                body_attrs.extend(common_attrs.clone());
 
                 arms_attrs.push(("x1".into(), fstr(x1)));
-                arms_attrs.push(("y1".into(), fstr(y1 + h/3.)));
-                arms_attrs.push(("x2".into(), fstr(x1 + h/3.)));
-                arms_attrs.push(("y2".into(), fstr(y1 + h/3.)));
+                arms_attrs.push(("y1".into(), fstr(y1 + h / 3.)));
+                arms_attrs.push(("x2".into(), fstr(x1 + h / 3.)));
+                arms_attrs.push(("y2".into(), fstr(y1 + h / 3.)));
+                arms_attrs.extend(common_attrs.clone());
 
-                leg1_attrs.push(("x1".into(), fstr(x1 + h/6.)));
-                leg1_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
+                leg1_attrs.push(("x1".into(), fstr(x1 + h / 6.)));
+                leg1_attrs.push(("y1".into(), fstr(y1 + (5.5 * h) / 9.)));
                 leg1_attrs.push(("x2".into(), fstr(x1)));
                 leg1_attrs.push(("y2".into(), fstr(y1 + h)));
+                leg1_attrs.extend(common_attrs.clone());
 
-                leg2_attrs.push(("x1".into(), fstr(x1 + h/6.)));
-                leg2_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
-                leg2_attrs.push(("x2".into(), fstr(x1 + h/3.)));
+                leg2_attrs.push(("x1".into(), fstr(x1 + h / 6.)));
+                leg2_attrs.push(("y1".into(), fstr(y1 + (5.5 * h) / 9.)));
+                leg2_attrs.push(("x2".into(), fstr(x1 + h / 3.)));
                 leg2_attrs.push(("y2".into(), fstr(y1 + h)));
+                leg2_attrs.extend(common_attrs.clone());
 
-                new_elems.push(SvgEvent::Empty(SvgElement::new("circle", &head_attrs)));
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("circle", &head_attrs).add_class("person"),
+                ));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &body_attrs)));
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("line", &body_attrs).add_class("person"),
+                ));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &arms_attrs)));
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("line", &arms_attrs).add_class("person"),
+                ));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg1_attrs)));
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("line", &leg1_attrs).add_class("person"),
+                ));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg2_attrs)));
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("line", &leg2_attrs).add_class("person"),
+                ));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
 
                 omit = true;
-                
             }
             _ => {}
         }
@@ -512,21 +556,41 @@ impl Transformer {
                             SvgEvent::Empty(e) => {
                                 let mut bs = BytesStart::new(e.name);
                                 for (k, v) in e.attrs.into_iter() {
-                                    bs.push_attribute(Attribute::from((
-                                        k.as_bytes(),
-                                        v.as_bytes(),
-                                    )));
+                                    if k != "class" {
+                                        bs.push_attribute(Attribute::from((
+                                            k.as_bytes(),
+                                            v.as_bytes(),
+                                        )));
+                                    }
                                 }
+                                bs.push_attribute(Attribute::from((
+                                    "class".as_bytes(),
+                                    e.classes
+                                        .into_iter()
+                                        .collect::<Vec<String>>()
+                                        .join(" ")
+                                        .as_bytes(),
+                                )));
                                 result = self.writer.write_event(Event::Empty(bs));
                             }
                             SvgEvent::Start(e) => {
                                 let mut bs = BytesStart::new(e.name);
                                 for (k, v) in e.attrs.into_iter() {
-                                    bs.push_attribute(Attribute::from((
-                                        k.as_bytes(),
-                                        v.as_bytes(),
-                                    )));
+                                    if k != "class" {
+                                        bs.push_attribute(Attribute::from((
+                                            k.as_bytes(),
+                                            v.as_bytes(),
+                                        )));
+                                    }
                                 }
+                                bs.push_attribute(Attribute::from((
+                                    "class".as_bytes(),
+                                    e.classes
+                                        .into_iter()
+                                        .collect::<Vec<String>>()
+                                        .join(" ")
+                                        .as_bytes(),
+                                )));
                                 result = self.writer.write_event(Event::Start(bs));
                             }
                             SvgEvent::Text(t) => {
@@ -547,21 +611,41 @@ impl Transformer {
                             SvgEvent::Empty(e) => {
                                 let mut bs = BytesStart::new(e.name);
                                 for (k, v) in e.attrs.into_iter() {
-                                    bs.push_attribute(Attribute::from((
-                                        k.as_bytes(),
-                                        v.as_bytes(),
-                                    )));
+                                    if k != "class" {
+                                        bs.push_attribute(Attribute::from((
+                                            k.as_bytes(),
+                                            v.as_bytes(),
+                                        )));
+                                    }
                                 }
+                                bs.push_attribute(Attribute::from((
+                                    "class".as_bytes(),
+                                    e.classes
+                                        .into_iter()
+                                        .collect::<Vec<String>>()
+                                        .join(" ")
+                                        .as_bytes(),
+                                )));
                                 result = self.writer.write_event(Event::Empty(bs));
                             }
                             SvgEvent::Start(e) => {
                                 let mut bs = BytesStart::new(e.name);
                                 for (k, v) in e.attrs.into_iter() {
-                                    bs.push_attribute(Attribute::from((
-                                        k.as_bytes(),
-                                        v.as_bytes(),
-                                    )));
+                                    if k != "class" {
+                                        bs.push_attribute(Attribute::from((
+                                            k.as_bytes(),
+                                            v.as_bytes(),
+                                        )));
+                                    }
                                 }
+                                bs.push_attribute(Attribute::from((
+                                    "class".as_bytes(),
+                                    e.classes
+                                        .into_iter()
+                                        .collect::<Vec<String>>()
+                                        .join(" ")
+                                        .as_bytes(),
+                                )));
                                 result = self.writer.write_event(Event::Start(bs));
                             }
                             SvgEvent::Text(t) => {
