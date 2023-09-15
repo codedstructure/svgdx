@@ -17,16 +17,81 @@ fn fstr(x: f32) -> String {
     x.to_string()
 }
 
+fn strp(s: &str) -> f32 {
+    s.parse().unwrap()
+}
+
 struct SvgElement {
     name: String,
     attrs: Vec<(String, String)>,
+    attr_map: HashMap<String, String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
+        let mut attr_map: HashMap<String, String> = HashMap::new();
+
+        for (key, value) in attrs {
+            attr_map.insert(key.to_string(), value.to_string());
+        }
+
         Self {
             name: name.to_string(),
             attrs: attrs.to_vec(),
+            attr_map,
+        }
+    }
+
+    fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
+        match self.name.as_str() {
+            "rect" => {
+                let (x, y, w, h) = (
+                    strp(self.attr_map.get("x").unwrap()),
+                    strp(self.attr_map.get("y").unwrap()),
+                    strp(self.attr_map.get("width").unwrap()),
+                    strp(self.attr_map.get("height").unwrap()),
+                );
+                Some((x, y, x + w, y + h))
+            }
+            "line" => {
+                let (x1, y1, x2, y2) = (
+                    strp(self.attr_map.get("x1").unwrap()),
+                    strp(self.attr_map.get("y1").unwrap()),
+                    strp(self.attr_map.get("x2").unwrap()),
+                    strp(self.attr_map.get("y2").unwrap()),
+                );
+                Some((x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
+            }
+            "circle" => {
+                let (cx, cy, r) = (
+                    strp(self.attr_map.get("cx").unwrap()),
+                    strp(self.attr_map.get("cy").unwrap()),
+                    strp(self.attr_map.get("r").unwrap()),
+                );
+                Some((cx - r, cy - r, cx + r, cy + r))
+            }
+
+            _ => None,
+        }
+    }
+
+    fn coord(&self, loc: &str) -> Option<(f32, f32)> {
+        // This assumes a rectangular bounding box
+        if let Some((x1, y1, x2, y2)) = self.bbox() {
+            match loc {
+                "tl" => Some((x1, y1)),
+                "t" => Some(((x1 + x2) / 2., y1)),
+                "tr" => Some((x2, y1)),
+                "r" => Some((x2, (y1 + y2) / 2.)),
+                "br" => Some((x2, y2)),
+                "b" => Some(((x1 + x2) / 2., y2)),
+                "bl" => Some((x1, y2)),
+                "l" => Some((x1, (y1 + y2) / 2.)),
+                "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 }
@@ -167,7 +232,7 @@ impl TransformerContext {
         // evaluate
     }
 
-    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item=String> + '_ {
+    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
         input.split(' ').map(|v| self.evaluate(v))
     }
 
@@ -308,15 +373,9 @@ impl TransformerContext {
 
         if !omit {
             if empty {
-                new_elems.push(SvgEvent::Empty(SvgElement {
-                    name: elem_name,
-                    attrs: new_attrs,
-                }));
+                new_elems.push(SvgEvent::Empty(SvgElement::new(&elem_name, &new_attrs)));
             } else {
-                new_elems.push(SvgEvent::Start(SvgElement {
-                    name: elem_name,
-                    attrs: new_attrs,
-                }));
+                new_elems.push(SvgEvent::Start(SvgElement::new(&elem_name, &new_attrs)));
             }
         }
         new_elems
