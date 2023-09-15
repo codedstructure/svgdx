@@ -14,7 +14,7 @@ fn fstr(x: f32) -> String {
     if x == (x as u32) as f32 {
         return (x as u32).to_string();
     }
-    x.to_string()
+    format!("{:.4}", x.to_string())
 }
 
 fn strp(s: &str) -> f32 {
@@ -289,6 +289,73 @@ impl TransformerContext {
                     }
                 }
                 omit = true;
+            }
+            "person" => {
+                let mut h: f32 = 100.;
+                let mut x1: f32 = 0.;
+                let mut y1: f32 = 0.;
+                let mut head_attrs = vec![];
+                let mut body_attrs = vec![];
+                let mut arms_attrs = vec![];
+                let mut leg1_attrs: Vec<(String, String)> = vec![];
+                let mut leg2_attrs: Vec<(String, String)> = vec![];
+
+                for a in e.attributes() {
+                    let aa = a.unwrap();
+
+                    let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
+                    let value = aa.unescape_value().unwrap().into_owned();
+
+                    println!("{}: {}", key, value);
+                    if key == "x" {
+                        x1 = value.clone().parse().unwrap();
+                    }
+                    if key == "y" {
+                        y1 = value.clone().parse().unwrap();
+                    }
+                    if key == "height" {
+                        h = value.clone().parse().unwrap();
+                    }
+                }
+
+                head_attrs.push(("cx".into(), fstr(x1 + h/6.)));
+                head_attrs.push(("cy".into(), fstr(y1 + h/9.)));
+                head_attrs.push(("r".into(), fstr(h/9.)));
+                head_attrs.push(("style".into(),"fill:none; stroke:black; stroke-width:0.5".into()));
+
+                body_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                body_attrs.push(("y1".into(), fstr(y1 + h/9.*2.)));
+                body_attrs.push(("x2".into(), fstr(x1 + h/6.)));
+                body_attrs.push(("y2".into(), fstr(y1 + (5.5*h)/9.)));
+
+                arms_attrs.push(("x1".into(), fstr(x1)));
+                arms_attrs.push(("y1".into(), fstr(y1 + h/3.)));
+                arms_attrs.push(("x2".into(), fstr(x1 + h/3.)));
+                arms_attrs.push(("y2".into(), fstr(y1 + h/3.)));
+
+                leg1_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                leg1_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
+                leg1_attrs.push(("x2".into(), fstr(x1)));
+                leg1_attrs.push(("y2".into(), fstr(y1 + h)));
+
+                leg2_attrs.push(("x1".into(), fstr(x1 + h/6.)));
+                leg2_attrs.push(("y1".into(), fstr(y1 + (5.5*h)/9.)));
+                leg2_attrs.push(("x2".into(), fstr(x1 + h/3.)));
+                leg2_attrs.push(("y2".into(), fstr(y1 + h)));
+
+                new_elems.push(SvgEvent::Empty(SvgElement::new("circle", &head_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &body_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &arms_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg1_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new("line", &leg2_attrs)));
+                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+
+                omit = true;
+                
             }
             _ => {}
         }
