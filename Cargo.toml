@@ -9,3 +9,4 @@ edition = "2021"
 # xmltree = {version = "0.10.3", features=["attribute-order"]}
 quick-xml = "0.30.0"
 regex = "1.9.4"
+clap = { version = "4.0", features = ["derive"] }
