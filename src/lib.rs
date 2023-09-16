@@ -118,6 +118,23 @@ impl SvgElement {
     }
 }
 
+impl From<&BytesStart<'_>> for SvgElement {
+    fn from(e: &BytesStart) -> Self {
+        let elem_name: String = String::from_utf8(e.name().into_inner().to_vec()).unwrap();
+
+        let attrs: Vec<(String, String)> = e
+            .attributes()
+            .map(move |a| {
+                let aa = a.unwrap();
+                let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
+                let value = aa.unescape_value().unwrap().into_owned();
+                (key, value)
+            })
+            .collect();
+        SvgElement::new(&elem_name, &attrs)
+    }
+}
+
 enum SvgEvent {
     Text(String),
     Start(SvgElement),
@@ -188,19 +205,6 @@ impl TransformerContext {
         self.last_indent = indent;
     }
 
-    fn attr_map(&self, element: &BytesStart) -> Vec<(String, String)> {
-        element
-            .attributes()
-            .filter_map(|s| s.ok())
-            .map(|s| {
-                (
-                    String::from_utf8(s.key.into_inner().to_vec()).unwrap(),
-                    s.unescape_value().unwrap().into_owned(),
-                )
-            })
-            .collect()
-    }
-
     fn eval_ref(&self, attr: &str) -> Option<(f32, f32)> {
         // Example: "#thing@tl" => top left coordinate of element id="thing"
         let re = Regex::new(r"^#(?<id>\w+)(@(?<loc>\S+))?$").unwrap();
@@ -213,36 +217,6 @@ impl TransformerContext {
 
         let element = self.elem_map.get(name)?;
         element.coord(loc)
-    }
-
-    fn center(&self, element_id: &str) -> (String, String) {
-        let mut cx = String::from("0");
-        let mut cy = String::from("0");
-
-        let attrs = self.vars.get(element_id).unwrap();
-
-        let elem_name = attrs.get("_element_name").unwrap();
-
-        match elem_name.as_str() {
-            "rect" | "tbox" => {
-                let x: f32 = attrs.get("x").unwrap().to_string().parse().unwrap();
-                let y: f32 = attrs.get("y").unwrap().to_string().parse().unwrap();
-                let w: f32 = attrs.get("width").unwrap().to_string().parse().unwrap();
-                let h: f32 = attrs.get("height").unwrap().to_string().parse().unwrap();
-
-                cx = fstr(x + w / 2.);
-                cy = fstr(y + h / 2.);
-            }
-            "circle" => {
-                cx = attrs.get("cx").unwrap().to_string();
-                cy = attrs.get("cy").unwrap().to_string();
-            }
-            _ => {
-                todo!("Implement...");
-            }
-        }
-
-        (cx, cy)
     }
 
     fn evaluate(&self, input: &str) -> String {
@@ -278,8 +252,8 @@ impl TransformerContext {
         input.split(' ').map(|v| self.evaluate(v))
     }
 
-    fn handle_element(&self, e: &BytesStart, empty: bool) -> Vec<SvgEvent> {
-        let elem_name: String = String::from_utf8(e.name().into_inner().to_vec()).unwrap();
+    fn handle_element(&self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
+        let elem_name = &e.name;
         let mut new_attrs: Vec<(String, String)> = vec![];
 
         let mut omit = false;
@@ -292,15 +266,10 @@ impl TransformerContext {
 
                 let mut text = None;
 
-                for a in e.attributes() {
-                    let aa = a.unwrap();
-
-                    let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
-                    let value = aa.unescape_value().unwrap().into_owned();
-
+                for (key, value) in &e.attrs {
                     rect_attrs.push((key.clone(), value.clone()));
                     if key == "x" || key == "y" {
-                        text_attrs.push((key, value));
+                        text_attrs.push((key.clone(), value.clone()));
                     } else if key == "text" {
                         // allows an empty element to contain text content directly as an attribute
                         text = Some(value);
@@ -343,12 +312,7 @@ impl TransformerContext {
                 let mut leg1_attrs: Vec<(String, String)> = vec![];
                 let mut leg2_attrs: Vec<(String, String)> = vec![];
 
-                for a in e.attributes() {
-                    let aa = a.unwrap();
-
-                    let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
-                    let value = aa.unescape_value().unwrap().into_owned();
-
+                for (key, value) in &e.attrs {
                     match key.as_str() {
                         "x" => {
                             x1 = value.clone().parse().unwrap();
@@ -360,7 +324,7 @@ impl TransformerContext {
                             h = value.clone().parse().unwrap();
                         }
                         _ => {
-                            common_attrs.push((key, value));
+                            common_attrs.push((key.clone(), value.clone()));
                         }
                     }
                 }
@@ -422,12 +386,7 @@ impl TransformerContext {
             _ => {}
         }
 
-        for a in e.attributes() {
-            let aa = a.unwrap();
-
-            let key = String::from_utf8(aa.key.into_inner().to_vec()).unwrap();
-            let value = aa.unescape_value().unwrap().into_owned();
-
+        for (key, value) in &e.attrs {
             let value = self.evaluate(value.as_str());
 
             match key.as_str() {
@@ -443,7 +402,7 @@ impl TransformerContext {
                             new_attrs.push(("cx".into(), parts.next().unwrap()));
                             new_attrs.push(("cy".into(), parts.next().unwrap()));
                         }
-                        _ => new_attrs.push((key, value.clone())),
+                        _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
                 "size" => {
@@ -459,7 +418,7 @@ impl TransformerContext {
                             // with width/height on rects - i.e. use 'fstr(w.parse::<f32>*2)'
                             new_attrs.push(("r".into(), parts.next().unwrap()));
                         }
-                        _ => new_attrs.push((key, value.clone())),
+                        _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
                 "xy1" => match elem_name.as_str() {
@@ -468,7 +427,7 @@ impl TransformerContext {
                         new_attrs.push(("x1".into(), parts.next().unwrap()));
                         new_attrs.push(("y1".into(), parts.next().unwrap()));
                     }
-                    _ => new_attrs.push((key, value)),
+                    _ => new_attrs.push((key.clone(), value)),
                 },
                 "start" => match elem_name.as_str() {
                     "line" => {
@@ -477,7 +436,7 @@ impl TransformerContext {
                         new_attrs.push(("x1".into(), fstr(start_x)));
                         new_attrs.push(("y1".into(), fstr(start_y)));
                     }
-                    _ => new_attrs.push((key, value)),
+                    _ => new_attrs.push((key.clone(), value)),
                 },
                 "xy2" => match elem_name.as_str() {
                     "line" => {
@@ -485,7 +444,7 @@ impl TransformerContext {
                         new_attrs.push(("x2".into(), parts.next().unwrap()));
                         new_attrs.push(("y2".into(), parts.next().unwrap()));
                     }
-                    _ => new_attrs.push((key, value)),
+                    _ => new_attrs.push((key.clone(), value)),
                 },
                 "end" => match elem_name.as_str() {
                     "line" => {
@@ -494,9 +453,9 @@ impl TransformerContext {
                         new_attrs.push(("x2".into(), fstr(end_x)));
                         new_attrs.push(("y2".into(), fstr(end_y)));
                     }
-                    _ => new_attrs.push((key, value)),
+                    _ => new_attrs.push((key.clone(), value)),
                 },
-                _ => new_attrs.push((key, value)),
+                _ => new_attrs.push((key.clone(), value)),
             }
         }
 
@@ -548,7 +507,7 @@ impl Transformer {
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
                     let ee = self
                         .context
-                        .handle_element(&e, matches!(ev, Ok(Event::Empty(_))));
+                        .handle_element(&SvgElement::from(e), matches!(ev, Ok(Event::Empty(_))));
                     let mut result = Ok(());
                     for ev in ee.into_iter() {
                         match ev {
