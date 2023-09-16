@@ -1,5 +1,5 @@
 use clap::Parser;
-use std::{fs, process::Output};
+use std::fs;
 
 use svgd::Transformer;
 
@@ -22,7 +22,7 @@ fn main() {
     let input_file_path: String = args.input_file_path;
     let output_file_path: Option<String> = args.output_file_path;
 
-    if path_exists(&input_file_path) == false {
+    if !path_exists(&input_file_path) {
         panic!("File does not exist");
     }
 

@@ -461,9 +461,9 @@ impl TransformerContext {
 
         if !omit {
             if empty {
-                new_elems.push(SvgEvent::Empty(SvgElement::new(&elem_name, &new_attrs)));
+                new_elems.push(SvgEvent::Empty(SvgElement::new(elem_name, &new_attrs)));
             } else {
-                new_elems.push(SvgEvent::Start(SvgElement::new(&elem_name, &new_attrs)));
+                new_elems.push(SvgEvent::Start(SvgElement::new(elem_name, &new_attrs)));
             }
         }
         new_elems
@@ -484,7 +484,7 @@ impl Transformer {
         let out_writer = match output_file_path {
             Some(x) => {
                 let path = std::path::Path::new(x);
-                Box::new(File::create(&path).unwrap()) as Box<dyn Write>
+                Box::new(File::create(path).unwrap()) as Box<dyn Write>
             }
             None => Box::new(std::io::stdout()) as Box<dyn Write>,
         };
