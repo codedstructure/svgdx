@@ -43,9 +43,6 @@ impl SvgElement {
                 attr_map.insert(key.to_string(), value.to_string());
             }
         }
-        println!("{:?}", attr_map);
-        println!("{:?}", classes);
-
         Self {
             name: name.to_string(),
             attrs: attrs.to_vec(),
@@ -546,65 +543,12 @@ impl Transformer {
         loop {
             let ev = self.reader.read_event_into(&mut buf);
 
-            match ev {
+            match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(Event::Start(e)) => {
-                    let ee = self.context.handle_element(&e, false);
-                    let mut result = Ok(());
-                    for ev in ee.into_iter() {
-                        match ev {
-                            SvgEvent::Empty(e) => {
-                                let mut bs = BytesStart::new(e.name);
-                                for (k, v) in e.attrs.into_iter() {
-                                    if k != "class" {
-                                        bs.push_attribute(Attribute::from((
-                                            k.as_bytes(),
-                                            v.as_bytes(),
-                                        )));
-                                    }
-                                }
-                                bs.push_attribute(Attribute::from((
-                                    "class".as_bytes(),
-                                    e.classes
-                                        .into_iter()
-                                        .collect::<Vec<String>>()
-                                        .join(" ")
-                                        .as_bytes(),
-                                )));
-                                result = self.writer.write_event(Event::Empty(bs));
-                            }
-                            SvgEvent::Start(e) => {
-                                let mut bs = BytesStart::new(e.name);
-                                for (k, v) in e.attrs.into_iter() {
-                                    if k != "class" {
-                                        bs.push_attribute(Attribute::from((
-                                            k.as_bytes(),
-                                            v.as_bytes(),
-                                        )));
-                                    }
-                                }
-                                bs.push_attribute(Attribute::from((
-                                    "class".as_bytes(),
-                                    e.classes
-                                        .into_iter()
-                                        .collect::<Vec<String>>()
-                                        .join(" ")
-                                        .as_bytes(),
-                                )));
-                                result = self.writer.write_event(Event::Start(bs));
-                            }
-                            SvgEvent::Text(t) => {
-                                result = self.writer.write_event(Event::Text(BytesText::new(&t)));
-                            }
-                            SvgEvent::End(name) => {
-                                result = self.writer.write_event(Event::End(BytesEnd::new(name)));
-                            }
-                        }
-                    }
-                    result
-                }
-                Ok(Event::Empty(e)) => {
-                    let ee = self.context.handle_element(&e, true);
+                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                    let ee = self
+                        .context
+                        .handle_element(&e, matches!(ev, Ok(Event::Empty(_))));
                     let mut result = Ok(());
                     for ev in ee.into_iter() {
                         match ev {
@@ -681,7 +625,7 @@ impl Transformer {
                         self.context.set_indent(indent);
                     }
 
-                    self.writer.write_event(Event::Text(e))
+                    self.writer.write_event(Event::Text(e.borrow()))
                 }
                 Ok(event) => {
                     //println!("EVENT: {:?}", event);
