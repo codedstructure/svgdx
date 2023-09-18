@@ -56,6 +56,26 @@ impl SvgElement {
         self.clone()
     }
 
+    fn has_attr(&self, key: &str) -> bool {
+        self.attr_map.contains_key(key)
+    }
+
+    fn with_attr(&self, key: &str, value: &str) -> Self {
+        let mut attrs = self.attrs.clone();
+        attrs.push((key.into(), value.into()));
+        SvgElement::new(self.name.as_str(), &attrs)
+    }
+
+    fn without_attr(&self, key: &str) -> Self {
+        let attrs: Vec<(String, String)> = self
+            .attrs
+            .clone()
+            .into_iter()
+            .filter(|(k, _v)| k != key)
+            .collect();
+        SvgElement::new(self.name.as_str(), &attrs)
+    }
+
     fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
         match self.name.as_str() {
             "rect" | "tbox" => {
@@ -116,6 +136,34 @@ impl SvgElement {
             None
         }
     }
+
+    fn translated(&self, dx: f32, dy: f32) -> Self {
+        let mut attrs = vec![];
+        for (key, mut value) in self.attrs.clone() {
+            match key.as_str() {
+                "x" | "cx" | "x1" | "x2" => {
+                    value = fstr(strp(&value) + dx);
+                }
+                "y" | "cy" | "y1" | "y2" => {
+                    value = fstr(strp(&value) + dy);
+                }
+                _ => ()
+            }
+            attrs.push((key.clone(), value.clone()));
+        }
+        SvgElement::new(self.name.as_str(), &attrs)
+    }
+
+    fn positioned(&self, x: f32, y: f32) -> Self {
+        let mut result = self.clone();
+        match self.name.as_str() {
+            "rect" | "tbox"=> {
+                result = result.with_attr("x", &fstr(x)).with_attr("y",&fstr(y));
+            }
+            _ => { todo!() }
+        }
+        result
+    }
 }
 
 impl From<&BytesStart<'_>> for SvgElement {
@@ -144,14 +192,13 @@ enum SvgEvent {
 
 #[derive(Default)]
 struct TransformerContext {
-    vars: HashMap<String, HashMap<String, String>>,
     elem_map: HashMap<String, SvgElement>,
+    prev_element: Option<SvgElement>,
     last_indent: String,
 }
 
 impl TransformerContext {
     fn new(reader: &mut Reader<BufReader<File>>) -> Self {
-        let mut vars: HashMap<String, HashMap<String, String>> = HashMap::new();
         let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
         let mut buf = Vec::new();
 
@@ -182,7 +229,6 @@ impl TransformerContext {
                             String::from("_element_name"),
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap(),
                         );
-                        vars.insert(id.clone(), attr_map);
                         let elem_name: String =
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap();
                         elem_map.insert(id.clone(), SvgElement::new(&elem_name, &attr_list));
@@ -195,8 +241,8 @@ impl TransformerContext {
         }
 
         Self {
-            vars,
             elem_map,
+            prev_element: None,
             last_indent: String::from(""),
         }
     }
@@ -231,8 +277,8 @@ impl TransformerContext {
             let attr = caps.get(2).unwrap().as_str();
             //println!("{} / {}", name, attr);
 
-            if let Some(attr_map) = self.vars.get(name) {
-                if let Some(value) = attr_map.get(attr) {
+            if let Some(el) = self.elem_map.get(name) {
+                if let Some(value) = el.attr_map.get(attr) {
                     //return value.to_owned();
                     input = value.to_owned();
                 }
@@ -252,13 +298,16 @@ impl TransformerContext {
         input.split(' ').map(|v| self.evaluate(v))
     }
 
-    fn handle_element(&self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
+    fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
         let elem_name = &e.name;
         let mut new_attrs: Vec<(String, String)> = vec![];
+
+        let mut prev_element = self.prev_element.clone();
 
         let mut omit = false;
         let mut new_elems = vec![];
 
+        // Expand any custom element types
         match elem_name.as_str() {
             "tbox" => {
                 let mut rect_attrs = vec![];
@@ -276,7 +325,9 @@ impl TransformerContext {
                     }
                 }
 
-                new_elems.push(SvgEvent::Empty(SvgElement::new("rect", &rect_attrs)));
+                let rect_elem = SvgElement::new("rect", &rect_attrs);
+                prev_element = Some(rect_elem.clone());
+                new_elems.push(SvgEvent::Empty(rect_elem));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
                 new_elems.push(SvgEvent::Start(SvgElement::new("text", &text_attrs)));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
@@ -334,7 +385,6 @@ impl TransformerContext {
                 head_attrs.push(("r".into(), fstr(h / 9.)));
                 head_attrs.push(("style".into(), "fill:none; stroke-width:0.5".into()));
                 head_attrs.extend(common_attrs.clone());
-                println!("{:?}", head_attrs);
 
                 body_attrs.push(("x1".into(), fstr(x1 + h / 6.)));
                 body_attrs.push(("y1".into(), fstr(y1 + h / 9. * 2.)));
@@ -386,15 +436,33 @@ impl TransformerContext {
             _ => {}
         }
 
+        // Process and expand attributes as needed
         for (key, value) in &e.attrs {
             let value = self.evaluate(value.as_str());
 
             match key.as_str() {
+                "rel" => {
+                    let mut parts = self.attr_split(&value);
+                    if let Some(prev) = &self.prev_element {
+                        // Example: rel="tr 2 0"  -> next element top-left starts at prev@tr+(2,0)
+                        let loc = parts.next().unwrap();
+                        let dx = strp(parts.next().unwrap().as_str());
+                        let dy = strp(parts.next().unwrap().as_str());
+
+                        let (mut prev_x, mut prev_y) = prev.coord(&loc).expect("Cannot use rel on this element");
+                        prev_x += dx;
+                        prev_y += dy;
+                        let new_elem = e.without_attr("rel").positioned(prev_x, prev_y);
+                        new_elems.push(SvgEvent::Empty(new_elem.clone()));
+                        prev_element = Some(new_elem.clone());
+                        omit = true;
+                    }
+                }
                 "xy" => {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
-                        "rect" => {
+                        "rect" | "tbox" => {
                             new_attrs.push(("x".into(), parts.next().unwrap()));
                             new_attrs.push(("y".into(), parts.next().unwrap()));
                         }
@@ -409,7 +477,7 @@ impl TransformerContext {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
-                        "rect" => {
+                        "rect" | "tbox"=> {
                             new_attrs.push(("width".into(), parts.next().unwrap()));
                             new_attrs.push(("height".into(), parts.next().unwrap()));
                         }
@@ -459,13 +527,18 @@ impl TransformerContext {
             }
         }
 
+
         if !omit {
+            let new_elem = SvgElement::new(elem_name, &new_attrs);
             if empty {
-                new_elems.push(SvgEvent::Empty(SvgElement::new(elem_name, &new_attrs)));
+                new_elems.push(SvgEvent::Empty(new_elem.clone()));
             } else {
-                new_elems.push(SvgEvent::Start(SvgElement::new(elem_name, &new_attrs)));
+                new_elems.push(SvgEvent::Start(new_elem.clone()));
             }
+            prev_element = Some(new_elem.clone());
         }
+        self.prev_element = prev_element;
+
         new_elems
     }
 }
@@ -505,14 +578,16 @@ impl Transformer {
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let ee = self
-                        .context
-                        .handle_element(&SvgElement::from(e), matches!(ev, Ok(Event::Empty(_))));
+                    let is_empty = matches!(ev, Ok(Event::Empty(_)));
+                    let ee = self.context.handle_element(&SvgElement::from(e), is_empty);
                     let mut result = Ok(());
-                    for ev in ee.into_iter() {
-                        match ev {
-                            SvgEvent::Empty(e) => {
+                    for svg_ev in ee.into_iter() {
+                        // re-calculate is_empty for each generated event
+                        let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
+                        match svg_ev {
+                            SvgEvent::Empty(e) | SvgEvent::Start(e) => {
                                 let mut bs = BytesStart::new(e.name);
+                                // Collect non-'class' attributes
                                 for (k, v) in e.attrs.into_iter() {
                                     if k != "class" {
                                         bs.push_attribute(Attribute::from((
@@ -521,35 +596,23 @@ impl Transformer {
                                         )));
                                     }
                                 }
-                                bs.push_attribute(Attribute::from((
-                                    "class".as_bytes(),
-                                    e.classes
-                                        .into_iter()
-                                        .collect::<Vec<String>>()
-                                        .join(" ")
-                                        .as_bytes(),
-                                )));
-                                result = self.writer.write_event(Event::Empty(bs));
-                            }
-                            SvgEvent::Start(e) => {
-                                let mut bs = BytesStart::new(e.name);
-                                for (k, v) in e.attrs.into_iter() {
-                                    if k != "class" {
-                                        bs.push_attribute(Attribute::from((
-                                            k.as_bytes(),
-                                            v.as_bytes(),
-                                        )));
-                                    }
+                                // Any 'class' attribute values are stored separately as a HashSet;
+                                // collect those into the BytesStart object
+                                if !e.classes.is_empty() {
+                                    bs.push_attribute(Attribute::from((
+                                        "class".as_bytes(),
+                                        e.classes
+                                            .into_iter()
+                                            .collect::<Vec<String>>()
+                                            .join(" ")
+                                            .as_bytes(),
+                                    )));
                                 }
-                                bs.push_attribute(Attribute::from((
-                                    "class".as_bytes(),
-                                    e.classes
-                                        .into_iter()
-                                        .collect::<Vec<String>>()
-                                        .join(" ")
-                                        .as_bytes(),
-                                )));
-                                result = self.writer.write_event(Event::Start(bs));
+                                result = self.writer.write_event(if is_empty {
+                                    Event::Empty(bs)
+                                } else {
+                                    Event::Start(bs)
+                                });
                             }
                             SvgEvent::Text(t) => {
                                 result = self.writer.write_event(Event::Text(BytesText::new(&t)));
@@ -587,7 +650,7 @@ impl Transformer {
                     self.writer.write_event(Event::Text(e.borrow()))
                 }
                 Ok(event) => {
-                    //println!("EVENT: {:?}", event);
+                    // This covers XML processing instructions, comments etc
                     self.writer.write_event(event)
                 }
                 Err(e) => panic!(
