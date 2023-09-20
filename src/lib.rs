@@ -78,7 +78,7 @@ impl SvgElement {
 
     fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
         match self.name.as_str() {
-            "rect" | "tbox" => {
+            "rect" | "tbox" | "pipeline" => {
                 let (x, y, w, h) = (
                     strp(self.attr_map.get("x").unwrap()),
                     strp(self.attr_map.get("y").unwrap()),
@@ -119,6 +119,7 @@ impl SvgElement {
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
         // This assumes a rectangular bounding box
+        // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
         if let Some((x1, y1, x2, y2)) = self.bbox() {
             match loc {
                 "tl" => Some((x1, y1)),
@@ -147,7 +148,7 @@ impl SvgElement {
                 "y" | "cy" | "y1" | "y2" => {
                     value = fstr(strp(&value) + dy);
                 }
-                _ => ()
+                _ => (),
             }
             attrs.push((key.clone(), value.clone()));
         }
@@ -157,10 +158,12 @@ impl SvgElement {
     fn positioned(&self, x: f32, y: f32) -> Self {
         let mut result = self.clone();
         match self.name.as_str() {
-            "rect" | "tbox"=> {
-                result = result.with_attr("x", &fstr(x)).with_attr("y",&fstr(y));
+            "rect" | "tbox" | "pipeline" => {
+                result = result.with_attr("x", &fstr(x)).with_attr("y", &fstr(y));
             }
-            _ => { todo!() }
+            _ => {
+                todo!()
+            }
         }
         result
     }
@@ -334,8 +337,8 @@ impl TransformerContext {
                 new_elems.push(SvgEvent::Start(SvgElement::new(
                     "tspan",
                     &[
-                        ("dx".to_string(), "1".to_string()),
-                        ("dy".to_string(), "8".to_string()),
+                        ("dx".to_string(), "2".to_string()),
+                        ("dy".to_string(), "6".to_string()),
                     ],
                 )));
                 // if this *isn't* empty, we'll now expect a text event, which will be passed through.
@@ -433,13 +436,75 @@ impl TransformerContext {
 
                 omit = true;
             }
+            "pipeline" => {
+                let mut x = 0.;
+                let mut y = 0.;
+                let mut width = 0.;
+                let mut height = 0.;
+                let mut common_attrs = vec![];
+                for (key, value) in &e.attrs {
+                    match key.as_str() {
+                        "x" => {
+                            x = value.clone().parse().unwrap();
+                        }
+                        "y" => {
+                            y = value.clone().parse().unwrap();
+                        }
+                        "height" => {
+                            height = value.clone().parse().unwrap();
+                        }
+                        "width" => {
+                            width = value.clone().parse().unwrap();
+                        }
+                        _ => {
+                            common_attrs.push((key.clone(), value.clone()));
+                        }
+                    }
+                }
+
+                if width < height {
+                    // Vertical pipeline
+                    let w_by2 = width / 2.;
+                    let w_by4 = width / 4.;
+
+                    common_attrs.push((
+                        "d".to_string(),
+                        format!(
+                    "M {} {} a {},{} 0 0,0 {},0 a {},{} 0 0,0 -{},0 v {} a {},{} 0 0,0 {},0 v -{}",
+                    x, y + w_by4,
+                    w_by2, w_by4, width,
+                    w_by2, w_by4, width,
+                    height - w_by2,
+                    w_by2, w_by4, width,
+                    height - w_by2),
+                    ));
+                } else {
+                    // Horizontal pipeline
+                    let h_by2 = height / 2.;
+                    let h_by4 = height / 4.;
+
+                    common_attrs.push((
+                        "d".to_string(),
+                        format!(
+                    "M {} {} a {},{} 0 0,0 0,{} a {},{} 0 0,0 0,-{} h {} a {},{} 0 0,1 0,{} h -{}",
+                    x + h_by4, y,
+                    h_by4, h_by2, height,
+                    h_by4, h_by2, height,
+                    width - h_by2,
+                    h_by4, h_by2, height,
+                    width - h_by2),
+                    ));
+                }
+                new_elems.push(SvgEvent::Empty(
+                    SvgElement::new("path", &common_attrs).add_class("pipeline"),
+                ));
+            }
             _ => {}
         }
 
         // Process and expand attributes as needed
         for (key, value) in &e.attrs {
             let value = self.evaluate(value.as_str());
-
             match key.as_str() {
                 "rel" => {
                     let mut parts = self.attr_split(&value);
@@ -449,7 +514,8 @@ impl TransformerContext {
                         let dx = strp(parts.next().unwrap().as_str());
                         let dy = strp(parts.next().unwrap().as_str());
 
-                        let (mut prev_x, mut prev_y) = prev.coord(&loc).expect("Cannot use rel on this element");
+                        let (mut prev_x, mut prev_y) =
+                            prev.coord(&loc).expect("Cannot use rel on this element");
                         prev_x += dx;
                         prev_y += dy;
                         let new_elem = e.without_attr("rel").positioned(prev_x, prev_y);
@@ -462,7 +528,7 @@ impl TransformerContext {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
-                        "rect" | "tbox" => {
+                        "rect" | "tbox" | "pipeline" => {
                             new_attrs.push(("x".into(), parts.next().unwrap()));
                             new_attrs.push(("y".into(), parts.next().unwrap()));
                         }
@@ -477,7 +543,7 @@ impl TransformerContext {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
-                        "rect" | "tbox"=> {
+                        "rect" | "tbox" | "pipeline" => {
                             new_attrs.push(("width".into(), parts.next().unwrap()));
                             new_attrs.push(("height".into(), parts.next().unwrap()));
                         }
@@ -526,7 +592,6 @@ impl TransformerContext {
                 _ => new_attrs.push((key.clone(), value)),
             }
         }
-
 
         if !omit {
             let new_elem = SvgElement::new(elem_name, &new_attrs);
