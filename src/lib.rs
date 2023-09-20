@@ -156,6 +156,9 @@ impl SvgElement {
     }
 
     fn positioned(&self, x: f32, y: f32) -> Self {
+        // TODO: should allow specifying which loc this positions; this currently
+        // sets the top-left (for rect/tbox), but for some scenarios it might be
+        // necessary to set e.g. the bottom-right loc.
         let mut result = self.clone();
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
@@ -309,6 +312,100 @@ impl TransformerContext {
 
         let mut omit = false;
         let mut new_elems = vec![];
+
+        let mut e = e.clone();
+
+        // Compute any updated geometry from rel attributes
+        for (key, value) in &e.attrs.clone() {
+            if key.as_str() == "rel" {
+                let mut parts = self.attr_split(value);
+                if let Some(prev) = &self.prev_element {
+                    // Example: rel="tr 2 0"  -> next element top-left starts at prev@tr+(2,0)
+                    let loc = parts.next().unwrap();
+                    let dx = strp(parts.next().unwrap().as_str());
+                    let dy = strp(parts.next().unwrap().as_str());
+
+                    let (prev_x, prev_y) =
+                        prev.coord(&loc).expect("Cannot use rel on this element");
+                    let rel_x = prev_x + dx;
+                    let rel_y = prev_y + dy;
+                    e = e.without_attr("rel").positioned(rel_x, rel_y);
+                }
+            }
+        }
+
+        // Process and expand attributes as needed
+        for (key, value) in &e.attrs {
+            let value = self.evaluate(value.as_str());
+            match key.as_str() {
+                "xy" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match elem_name.as_str() {
+                        "rect" | "tbox" | "pipeline" => {
+                            new_attrs.push(("x".into(), parts.next().unwrap()));
+                            new_attrs.push(("y".into(), parts.next().unwrap()));
+                        }
+                        "circle" => {
+                            new_attrs.push(("cx".into(), parts.next().unwrap()));
+                            new_attrs.push(("cy".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "size" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match elem_name.as_str() {
+                        "rect" | "tbox" | "pipeline" => {
+                            new_attrs.push(("width".into(), parts.next().unwrap()));
+                            new_attrs.push(("height".into(), parts.next().unwrap()));
+                        }
+                        "circle" => {
+                            // TBD: arguably size should map to diameter, for consistency
+                            // with width/height on rects - i.e. use 'fstr(w.parse::<f32>*2)'
+                            new_attrs.push(("r".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "xy1" => match elem_name.as_str() {
+                    "line" => {
+                        let mut parts = self.attr_split(&value);
+                        new_attrs.push(("x1".into(), parts.next().unwrap()));
+                        new_attrs.push(("y1".into(), parts.next().unwrap()));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                "start" => match elem_name.as_str() {
+                    "line" => {
+                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
+
+                        new_attrs.push(("x1".into(), fstr(start_x)));
+                        new_attrs.push(("y1".into(), fstr(start_y)));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                "xy2" => match elem_name.as_str() {
+                    "line" => {
+                        let mut parts = self.attr_split(&value);
+                        new_attrs.push(("x2".into(), parts.next().unwrap()));
+                        new_attrs.push(("y2".into(), parts.next().unwrap()));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                "end" => match elem_name.as_str() {
+                    "line" => {
+                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
+
+                        new_attrs.push(("x2".into(), fstr(end_x)));
+                        new_attrs.push(("y2".into(), fstr(end_y)));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                _ => new_attrs.push((key.clone(), value)),
+            }
+        }
 
         // Expand any custom element types
         match elem_name.as_str() {
@@ -502,97 +599,6 @@ impl TransformerContext {
             _ => {}
         }
 
-        // Process and expand attributes as needed
-        for (key, value) in &e.attrs {
-            let value = self.evaluate(value.as_str());
-            match key.as_str() {
-                "rel" => {
-                    let mut parts = self.attr_split(&value);
-                    if let Some(prev) = &self.prev_element {
-                        // Example: rel="tr 2 0"  -> next element top-left starts at prev@tr+(2,0)
-                        let loc = parts.next().unwrap();
-                        let dx = strp(parts.next().unwrap().as_str());
-                        let dy = strp(parts.next().unwrap().as_str());
-
-                        let (mut prev_x, mut prev_y) =
-                            prev.coord(&loc).expect("Cannot use rel on this element");
-                        prev_x += dx;
-                        prev_y += dy;
-                        let new_elem = e.without_attr("rel").positioned(prev_x, prev_y);
-                        new_elems.push(SvgEvent::Empty(new_elem.clone()));
-                        prev_element = Some(new_elem.clone());
-                        omit = true;
-                    }
-                }
-                "xy" => {
-                    let mut parts = self.attr_split(&value);
-
-                    match elem_name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("x".into(), parts.next().unwrap()));
-                            new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        "circle" => {
-                            new_attrs.push(("cx".into(), parts.next().unwrap()));
-                            new_attrs.push(("cy".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "size" => {
-                    let mut parts = self.attr_split(&value);
-
-                    match elem_name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("width".into(), parts.next().unwrap()));
-                            new_attrs.push(("height".into(), parts.next().unwrap()));
-                        }
-                        "circle" => {
-                            // TBD: arguably size should map to diameter, for consistency
-                            // with width/height on rects - i.e. use 'fstr(w.parse::<f32>*2)'
-                            new_attrs.push(("r".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "xy1" => match elem_name.as_str() {
-                    "line" => {
-                        let mut parts = self.attr_split(&value);
-                        new_attrs.push(("x1".into(), parts.next().unwrap()));
-                        new_attrs.push(("y1".into(), parts.next().unwrap()));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "start" => match elem_name.as_str() {
-                    "line" => {
-                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
-
-                        new_attrs.push(("x1".into(), fstr(start_x)));
-                        new_attrs.push(("y1".into(), fstr(start_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "xy2" => match elem_name.as_str() {
-                    "line" => {
-                        let mut parts = self.attr_split(&value);
-                        new_attrs.push(("x2".into(), parts.next().unwrap()));
-                        new_attrs.push(("y2".into(), parts.next().unwrap()));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "end" => match elem_name.as_str() {
-                    "line" => {
-                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
-
-                        new_attrs.push(("x2".into(), fstr(end_x)));
-                        new_attrs.push(("y2".into(), fstr(end_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                _ => new_attrs.push((key.clone(), value)),
-            }
-        }
-
         if !omit {
             let new_elem = SvgElement::new(elem_name, &new_attrs);
             if empty {
@@ -600,7 +606,11 @@ impl TransformerContext {
             } else {
                 new_elems.push(SvgEvent::Start(new_elem.clone()));
             }
-            prev_element = Some(new_elem.clone());
+            if new_elem.bbox().is_some() {
+                // prev_element is only used for relative positioning, so
+                // only makes sense if it has a bounding box.
+                prev_element = Some(new_elem.clone());
+            }
         }
         self.prev_element = prev_element;
 
