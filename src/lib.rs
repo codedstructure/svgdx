@@ -10,6 +10,9 @@ use std::fs::File;
 
 use regex::Regex;
 
+mod types;
+use types::BoundingBox;
+
 fn fstr(x: f32) -> String {
     if x == (x as u32) as f32 {
         return (x as u32).to_string();
@@ -20,6 +23,7 @@ fn fstr(x: f32) -> String {
 fn strp(s: &str) -> f32 {
     s.parse().unwrap()
 }
+
 
 #[derive(Clone, Debug)]
 struct SvgElement {
@@ -76,7 +80,7 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs)
     }
 
-    fn bbox(&self) -> Option<(f32, f32, f32, f32)> {
+    fn bbox(&self) -> BoundingBox {
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
                 let (x, y, w, h) = (
@@ -85,7 +89,7 @@ impl SvgElement {
                     strp(self.attr_map.get("width").unwrap()),
                     strp(self.attr_map.get("height").unwrap()),
                 );
-                Some((x, y, x + w, y + h))
+                BoundingBox::BBox(x, y, x + w, y + h)
             }
             "line" => {
                 let (x1, y1, x2, y2) = (
@@ -94,7 +98,7 @@ impl SvgElement {
                     strp(self.attr_map.get("x2").unwrap()),
                     strp(self.attr_map.get("y2").unwrap()),
                 );
-                Some((x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
+                BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2))
             }
             "circle" => {
                 let (cx, cy, r) = (
@@ -102,7 +106,7 @@ impl SvgElement {
                     strp(self.attr_map.get("cy").unwrap()),
                     strp(self.attr_map.get("r").unwrap()),
                 );
-                Some((cx - r, cy - r, cx + r, cy + r))
+                BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)
             }
             "person" => {
                 let (x, y, h) = (
@@ -110,17 +114,17 @@ impl SvgElement {
                     strp(self.attr_map.get("y").unwrap()),
                     strp(self.attr_map.get("height").unwrap()),
                 );
-                Some((x, y, x + h / 3., y + h))
+                BoundingBox::BBox(x, y, x + h / 3., y + h)
             }
 
-            _ => None,
+            _ => BoundingBox::Unknown,
         }
     }
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
-        if let Some((x1, y1, x2, y2)) = self.bbox() {
+        if let BoundingBox::BBox(x1, y1, x2, y2) = self.bbox() {
             match loc {
                 "tl" => Some((x1, y1)),
                 "t" => Some(((x1 + x2) / 2., y1)),
@@ -606,7 +610,7 @@ impl TransformerContext {
             } else {
                 new_elems.push(SvgEvent::Start(new_elem.clone()));
             }
-            if new_elem.bbox().is_some() {
+            if !matches!(new_elem.bbox(), BoundingBox::Unknown) {
                 // prev_element is only used for relative positioning, so
                 // only makes sense if it has a bounding box.
                 prev_element = Some(new_elem.clone());
