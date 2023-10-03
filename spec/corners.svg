@@ -1,0 +1,46 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="70mm" height="50mm" viewBox="-2 -2 70 50">
+  <defs>
+   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+   </marker>
+  </defs>
+  <style>
+    <![CDATA[
+        rect, line {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 4px;
+        }
+        /* prior to top/bottom/left/right so they can override this */
+        text.middle { 
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+        text.top {
+            dominant-baseline: text-before-edge;
+        }
+        text.bottom {
+            dominant-baseline: text-after-edge;
+        }
+        text.left {
+            text-anchor: start;
+        }
+        text.right {
+            text-anchor: end;
+        }
+    ]]>
+  </style>
+
+  <rect x="0" y="0" width="60" height="40" />
+
+  <text class="top left" x="0" y="0">xy1/xy</text>
+  <text class="bottom right" x="60" y="40">xy2</text>
+  <text class="middle" x="30" y="20">cxy</text>
+  <line x1="0" y1="45" x2="60" y2="45" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <text class="middle" x="65" y="45">wh</text>
+  <line x1="65" y1="0" x2="65" y2="40" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+</svg>

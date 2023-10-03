@@ -1,0 +1,33 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="-8 -8 100 100">
+  <style>
+    <![CDATA[
+        rect, line {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 4px;
+        }
+        text.centered {
+            dominant-baseline: text-before-edge;
+            text-anchor: middle;
+        }
+    ]]>
+  </style>
+
+  <rect x="0" y="0" width="30" height="40" />
+  
+  <rect x="-5" y="5" width="10" height="5" style="fill:white"/>
+  <text class="centered" x="0" y="5">a</text>
+
+  <rect x="-5" y="18" width="10" height="5" style="fill:white"/>
+  <text class="centered" x="0" y="18">b</text>
+  
+  <rect x="-5" y="30" width="10" height="5" style="fill:white"/>
+  <text class="centered" x="0" y="30">c</text>
+
+  <rect x="25" y="18" width="10" height="5" style="fill:white"/>
+  <text class="centered" x="30" y="18">out</text>
+</svg>
