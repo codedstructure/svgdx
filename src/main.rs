@@ -1,5 +1,8 @@
 use clap::Parser;
-use std::fs;
+use std::{
+    fs::{self, File},
+    io::{BufReader, Write},
+};
 
 use svgd::Transformer;
 
@@ -26,6 +29,16 @@ fn main() {
         panic!("File does not exist");
     }
 
-    let mut t = Transformer::new(&input_file_path, &output_file_path);
-    let _ = t.transform();
+    let mut out_writer = match output_file_path {
+        Some(x) => {
+            let path = std::path::Path::new(&x);
+            Box::new(File::create(path).unwrap()) as Box<dyn Write>
+        }
+        None => Box::new(std::io::stdout()) as Box<dyn Write>,
+    };
+
+    let mut in_reader = Box::new(BufReader::new(File::open(input_file_path).unwrap()));
+
+    let mut t = Transformer::new();
+    let _ = t.transform(&mut in_reader, &mut out_writer);
 }

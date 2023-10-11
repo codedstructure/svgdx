@@ -2,11 +2,9 @@ use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
-use std::io::{BufReader, Write};
+use std::io::{BufReader, Read, Write};
 
 use std::collections::{HashMap, HashSet};
-
-use std::fs::File;
 
 use regex::Regex;
 
@@ -23,7 +21,6 @@ fn fstr(x: f32) -> String {
 fn strp(s: &str) -> f32 {
     s.parse().unwrap()
 }
-
 
 #[derive(Clone, Debug)]
 struct SvgElement {
@@ -208,8 +205,10 @@ struct TransformerContext {
 }
 
 impl TransformerContext {
-    fn new(reader: &mut Reader<BufReader<File>>) -> Self {
-        let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
+    fn new() -> Self {
+        //reader: &mut Reader<BufReader<File>>) -> Self {
+        let elem_map: HashMap<String, SvgElement> = HashMap::new();
+        /*
         let mut buf = Vec::new();
 
         loop {
@@ -249,6 +248,7 @@ impl TransformerContext {
             }
             buf.clear();
         }
+        */
 
         Self {
             elem_map,
@@ -341,6 +341,7 @@ impl TransformerContext {
         // Process and expand attributes as needed
         for (key, value) in &e.attrs {
             let value = self.evaluate(value.as_str());
+            // TODO: should expand in a given order to avoid repetition?
             match key.as_str() {
                 "xy" => {
                     let mut parts = self.attr_split(&value);
@@ -357,7 +358,7 @@ impl TransformerContext {
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
-                "size" => {
+                "size" | "wh" => {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
@@ -373,14 +374,20 @@ impl TransformerContext {
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
-                "xy1" => match elem_name.as_str() {
-                    "line" => {
-                        let mut parts = self.attr_split(&value);
-                        new_attrs.push(("x1".into(), parts.next().unwrap()));
-                        new_attrs.push(("y1".into(), parts.next().unwrap()));
+                "xy1" => {
+                    let mut parts = self.attr_split(&value);
+                    match elem_name.as_str() {
+                        "line" => {
+                            new_attrs.push(("x1".into(), parts.next().unwrap()));
+                            new_attrs.push(("y1".into(), parts.next().unwrap()));
+                        }
+                        "rect" => {
+                            new_attrs.push(("x".into(), parts.next().unwrap()));
+                            new_attrs.push(("y".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
                     }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
+                }
                 "start" => match elem_name.as_str() {
                     "line" => {
                         let (start_x, start_y) = self.eval_ref(&value).unwrap();
@@ -390,14 +397,46 @@ impl TransformerContext {
                     }
                     _ => new_attrs.push((key.clone(), value)),
                 },
-                "xy2" => match elem_name.as_str() {
-                    "line" => {
-                        let mut parts = self.attr_split(&value);
-                        new_attrs.push(("x2".into(), parts.next().unwrap()));
-                        new_attrs.push(("y2".into(), parts.next().unwrap()));
+                "xy2" => {
+                    let mut parts = self.attr_split(&value);
+                    match elem_name.as_str() {
+                        "line" => {
+                            new_attrs.push(("x2".into(), parts.next().unwrap()));
+                            new_attrs.push(("y2".into(), parts.next().unwrap()));
+                        }
+                        "rect" => {
+                            // must have xy1 (/ x&y) or wh (/ width&height)
+                            let wh = e.attr_map.get("wh").map(|z| z.to_string());
+                            let xy1 = e.attr_map.get("xy1").map(|z| z.to_string());
+                            let mut width = e.attr_map.get("width").map(|z| strp(z));
+                            let mut height = e.attr_map.get("height").map(|z| strp(z));
+                            let mut x = e.attr_map.get("x").map(|z| strp(z));
+                            let mut y = e.attr_map.get("y").map(|z| strp(z));
+                            let x2 = strp(&parts.next().unwrap());
+                            let y2 = strp(&parts.next().unwrap());
+                            if let Some(wh_inner) = wh {
+                                let mut wh_parts = self.attr_split(&wh_inner);
+                                width = Some(strp(&wh_parts.next().unwrap()));
+                                height = Some(strp(&wh_parts.next().unwrap()));
+                            }
+                            if let Some(xy1_inner) = xy1 {
+                                let mut xy1_parts = self.attr_split(&xy1_inner);
+                                x = Some(strp(&xy1_parts.next().unwrap()));
+                                y = Some(strp(&xy1_parts.next().unwrap()));
+                            }
+                            if let (Some(w), Some(h)) = (width, height) {
+                                new_attrs.push(("x".into(), fstr(x2 - w)));
+                                new_attrs.push(("y".into(), fstr(y2 - h)));
+                                // width / height either already exist in the target or will be expanded from a wh.
+                            } else if let (Some(x), Some(y)) = (x, y) {
+                                new_attrs.push(("width".into(), fstr(x2 - x)));
+                                new_attrs.push(("height".into(), fstr(y2 - y)));
+                                // x/y either already exist in the target or will be expanded from a xy1.
+                            }
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
                     }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
+                }
                 "end" => match elem_name.as_str() {
                     "line" => {
                         let (end_x, end_y) = self.eval_ref(&value).unwrap();
@@ -622,37 +661,30 @@ impl TransformerContext {
     }
 }
 
+#[derive(Default)]
 pub struct Transformer {
     context: TransformerContext,
-    reader: Reader<BufReader<File>>,
-    writer: Writer<Box<dyn Write>>,
 }
 
 impl Transformer {
-    pub fn new(filename: &str, output_file_path: &Option<String>) -> Self {
-        let mut pre_reader = Reader::from_file(filename).unwrap();
-        let reader = Reader::from_file(filename).unwrap();
-
-        let out_writer = match output_file_path {
-            Some(x) => {
-                let path = std::path::Path::new(x);
-                Box::new(File::create(path).unwrap()) as Box<dyn Write>
-            }
-            None => Box::new(std::io::stdout()) as Box<dyn Write>,
-        };
-
+    pub fn new() -> Self {
         Self {
-            context: TransformerContext::new(&mut pre_reader),
-            reader,
-            writer: Writer::new(out_writer),
+            context: TransformerContext::new(),
         }
     }
 
-    pub fn transform(&mut self) -> Result<(), String> {
+    pub fn transform(
+        &mut self,
+        reader: &mut dyn Read,
+        writer: &mut dyn Write,
+    ) -> Result<(), String> {
         let mut buf = Vec::new();
 
+        let mut reader = Reader::from_reader(BufReader::new(reader));
+        let mut writer = Writer::new(writer);
+
         loop {
-            let ev = self.reader.read_event_into(&mut buf);
+            let ev = reader.read_event_into(&mut buf);
 
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
@@ -687,17 +719,17 @@ impl Transformer {
                                             .as_bytes(),
                                     )));
                                 }
-                                result = self.writer.write_event(if is_empty {
+                                result = writer.write_event(if is_empty {
                                     Event::Empty(bs)
                                 } else {
                                     Event::Start(bs)
                                 });
                             }
                             SvgEvent::Text(t) => {
-                                result = self.writer.write_event(Event::Text(BytesText::new(&t)));
+                                result = writer.write_event(Event::Text(BytesText::new(&t)));
                             }
                             SvgEvent::End(name) => {
-                                result = self.writer.write_event(Event::End(BytesEnd::new(name)));
+                                result = writer.write_event(Event::End(BytesEnd::new(name)));
                             }
                         }
                     }
@@ -706,14 +738,14 @@ impl Transformer {
                 Ok(Event::End(e)) => {
                     let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
                     if ee_name.as_str() == "tbox" {
-                        self.writer.write_event(Event::Text(BytesText::new(&format!(
+                        writer.write_event(Event::Text(BytesText::new(&format!(
                             "\n{}",
                             self.context.last_indent
                         ))));
-                        self.writer.write_event(Event::End(BytesEnd::new("tspan")));
+                        writer.write_event(Event::End(BytesEnd::new("tspan")));
                         ee_name = String::from("text");
                     }
-                    self.writer.write_event(Event::End(BytesEnd::new(ee_name)))
+                    writer.write_event(Event::End(BytesEnd::new(ee_name)))
                 }
                 Ok(Event::Text(e)) => {
                     // Extract any trailing whitespace following newlines as the current indentation level
@@ -726,17 +758,13 @@ impl Transformer {
                         self.context.set_indent(indent);
                     }
 
-                    self.writer.write_event(Event::Text(e.borrow()))
+                    writer.write_event(Event::Text(e.borrow()))
                 }
                 Ok(event) => {
                     // This covers XML processing instructions, comments etc
-                    self.writer.write_event(event)
+                    writer.write_event(event)
                 }
-                Err(e) => panic!(
-                    "Error at position {}: {:?}",
-                    self.reader.buffer_position(),
-                    e
-                ),
+                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             }
             .expect("Failed to parse XML");
 
