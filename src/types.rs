@@ -46,6 +46,14 @@ impl BoundingBox {
         }
     }
 
+    pub fn center(&self) -> Option<(f32, f32)> {
+        if let Self::BBox(x1, y1, x2, y2) = self {
+            Some((x1 + (x2 - x1) / 2., y1 + (y2 - y1) / 2.))
+        } else {
+            None
+        }
+    }
+
     /// Scale the bounding box by the given amount with origin at the center
     pub fn scale(&mut self, amount: f32) -> &Self {
         if let BoundingBox::BBox(x1, y1, x2, y2) = &self {

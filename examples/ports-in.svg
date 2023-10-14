@@ -1,0 +1,30 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="-8 -8 100 100">
+  <style>
+    <![CDATA[
+        rect, line {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 4px;
+        }
+        text.tbox {
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+    ]]>
+  </style>
+
+  <rect x="0" y="0" width="20" height="30" />
+
+  <tbox cxy="0 5" wh="10 5" text="a"/>
+
+  <tbox cxy="0 15" wh="10 5" text="b"/>
+
+  <tbox cxy="0 25" wh="10 5" text="c"/>
+
+  <!-- text can be given as a 'text' attribute or as element text -->
+  <tbox cxy="20 15" wh="10 5">out</tbox>
+</svg>

@@ -171,6 +171,195 @@ impl SvgElement {
         }
         result
     }
+
+    fn evaluate(&self, input: &str) -> String {
+        // TODO - re-use context::evaluate()
+        input.to_owned()
+    }
+
+    /// Returns iterator cycling over whitespace-separated values
+    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
+        input.split_whitespace().map(|v| self.evaluate(v)).cycle()
+    }
+
+    fn expand_attributes(&mut self) {
+        let mut new_attrs = vec![];
+
+        // Process and expand attributes as needed
+        for (key, value) in self.attrs.clone() {
+            let value = self.evaluate(value.as_str());
+            // TODO: should expand in a given order to avoid repetition?
+            match key.as_str() {
+                "xy" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match self.name.as_str() {
+                        "text" | "rect" | "tbox" | "pipeline" => {
+                            new_attrs.push(("x".into(), parts.next().unwrap()));
+                            new_attrs.push(("y".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "size" | "wh" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match self.name.as_str() {
+                        "rect" | "tbox" | "pipeline" => {
+                            new_attrs.push(("width".into(), parts.next().unwrap()));
+                            new_attrs.push(("height".into(), parts.next().unwrap()));
+                        }
+                        "circle" => {
+                            let diameter: f32 = strp(&parts.next().unwrap());
+                            new_attrs.push(("r".into(), fstr(diameter / 2.)));
+                        }
+                        "ellipse" => {
+                            let dia_x: f32 = strp(&parts.next().unwrap());
+                            let dia_y: f32 = strp(&parts.next().unwrap());
+                            new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
+                            new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "cxy" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match self.name.as_str() {
+                        "rect" | "tbox" | "pipeline" => {
+                            // Requires wh (/ width&height) be specified in order to evaluate
+                            // the centre point.
+                            // TODO: also support specifying other attributes; xy+cxy should be sufficient
+                            let wh = self.attr_map.get("wh").map(|z| z.to_string());
+                            let mut width = self.attr_map.get("width").map(|z| strp(z));
+                            let mut height = self.attr_map.get("height").map(|z| strp(z));
+                            let cx = strp(&parts.next().unwrap());
+                            let cy = strp(&parts.next().unwrap());
+                            if let Some(wh_inner) = wh {
+                                let mut wh_parts = self.attr_split(&wh_inner);
+                                width = Some(strp(&wh_parts.next().unwrap()));
+                                height = Some(strp(&wh_parts.next().unwrap()));
+                            }
+                            if let (Some(width), Some(height)) = (width, height) {
+                                new_attrs.push(("x".into(), fstr(cx - width / 2.)));
+                                new_attrs.push(("y".into(), fstr(cy - height / 2.)));
+                                // wh / width&height will be handled separately
+                            }
+                        }
+                        "circle" | "ellipse" => {
+                            new_attrs.push(("cx".into(), parts.next().unwrap()));
+                            new_attrs.push(("cy".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "rxy" => match self.name.as_str() {
+                    "ellipse" => {
+                        let mut parts = self.attr_split(&value);
+
+                        new_attrs.push(("rx".into(), parts.next().unwrap()));
+                        new_attrs.push(("ry".into(), parts.next().unwrap()));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                "xy1" => {
+                    let mut parts = self.attr_split(&value);
+                    match self.name.as_str() {
+                        "line" => {
+                            new_attrs.push(("x1".into(), parts.next().unwrap()));
+                            new_attrs.push(("y1".into(), parts.next().unwrap()));
+                        }
+                        "rect" => {
+                            new_attrs.push(("x".into(), parts.next().unwrap()));
+                            new_attrs.push(("y".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "start" => match self.name.as_str() {
+                    "line" => {
+                        todo!("re-implement eval_ref");
+                        /*
+                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
+
+                        new_attrs.push(("x1".into(), fstr(start_x)));
+                        new_attrs.push(("y1".into(), fstr(start_y)));
+                        */
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                "xy2" => {
+                    let mut parts = self.attr_split(&value);
+                    match self.name.as_str() {
+                        "line" => {
+                            new_attrs.push(("x2".into(), parts.next().unwrap()));
+                            new_attrs.push(("y2".into(), parts.next().unwrap()));
+                        }
+                        "rect" => {
+                            // must have xy1 (/ x&y) or wh (/ width&height)
+                            let wh = self.attr_map.get("wh").map(|z| z.to_string());
+                            let xy1 = self.attr_map.get("xy1").map(|z| z.to_string());
+                            let mut width = self.attr_map.get("width").map(|z| strp(z));
+                            let mut height = self.attr_map.get("height").map(|z| strp(z));
+                            let mut x = self.attr_map.get("x").map(|z| strp(z));
+                            let mut y = self.attr_map.get("y").map(|z| strp(z));
+                            let x2 = strp(&parts.next().unwrap());
+                            let y2 = strp(&parts.next().unwrap());
+                            if let Some(wh_inner) = wh {
+                                let mut wh_parts = self.attr_split(&wh_inner);
+                                width = Some(strp(&wh_parts.next().unwrap()));
+                                height = Some(strp(&wh_parts.next().unwrap()));
+                            }
+                            if let Some(xy1_inner) = xy1 {
+                                let mut xy1_parts = self.attr_split(&xy1_inner);
+                                x = Some(strp(&xy1_parts.next().unwrap()));
+                                y = Some(strp(&xy1_parts.next().unwrap()));
+                            }
+                            if let (Some(w), Some(h)) = (width, height) {
+                                new_attrs.push(("x".into(), fstr(x2 - w)));
+                                new_attrs.push(("y".into(), fstr(y2 - h)));
+                                // width / height either already exist in the target or will be expanded from a wh.
+                            } else if let (Some(x), Some(y)) = (x, y) {
+                                new_attrs.push(("width".into(), fstr(x2 - x)));
+                                new_attrs.push(("height".into(), fstr(y2 - y)));
+                                // x/y either already exist in the target or will be expanded from a xy1.
+                            }
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "end" => match self.name.as_str() {
+                    "line" => {
+                        todo!("re-implement eval_ref");
+                        /*
+                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
+
+                        new_attrs.push(("x2".into(), fstr(end_x)));
+                        new_attrs.push(("y2".into(), fstr(end_y)));
+                        */
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
+                _ => new_attrs.push((key.clone(), value)),
+            }
+        }
+
+        let mut attr_map: HashMap<String, String> = HashMap::new();
+        let mut classes: HashSet<String> = HashSet::new();
+
+        for (key, value) in new_attrs.clone() {
+            if key == "class" {
+                for c in value.split(' ') {
+                    classes.insert(c.to_string());
+                }
+            } else {
+                attr_map.insert(key.to_string(), value.to_string());
+            }
+        }
+        self.attrs = new_attrs;
+        self.attr_map = attr_map;
+        self.classes = classes;
+    }
 }
 
 impl From<&BytesStart<'_>> for SvgElement {
@@ -339,158 +528,7 @@ impl TransformerContext {
             }
         }
 
-        // Process and expand attributes as needed
-        for (key, value) in &e.attrs {
-            let value = self.evaluate(value.as_str());
-            // TODO: should expand in a given order to avoid repetition?
-            match key.as_str() {
-                "xy" => {
-                    let mut parts = self.attr_split(&value);
-
-                    match elem_name.as_str() {
-                        "text" | "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("x".into(), parts.next().unwrap()));
-                            new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "size" | "wh" => {
-                    let mut parts = self.attr_split(&value);
-
-                    match elem_name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("width".into(), parts.next().unwrap()));
-                            new_attrs.push(("height".into(), parts.next().unwrap()));
-                        }
-                        "circle" => {
-                            let diameter: f32 = strp(&parts.next().unwrap());
-                            new_attrs.push(("r".into(), fstr(diameter / 2.)));
-                        }
-                        "ellipse" => {
-                            let dia_x: f32 = strp(&parts.next().unwrap());
-                            let dia_y: f32 = strp(&parts.next().unwrap());
-                            new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
-                            new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "cxy" => {
-                    let mut parts = self.attr_split(&value);
-
-                    match elem_name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            // Requires wh (/ width&height) be specified in order to evaluate
-                            // the centre point.
-                            // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                            let wh = e.attr_map.get("wh").map(|z| z.to_string());
-                            let mut width = e.attr_map.get("width").map(|z| strp(z));
-                            let mut height = e.attr_map.get("height").map(|z| strp(z));
-                            let cx = strp(&parts.next().unwrap());
-                            let cy = strp(&parts.next().unwrap());
-                            if let Some(wh_inner) = wh {
-                                let mut wh_parts = self.attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()));
-                                height = Some(strp(&wh_parts.next().unwrap()));
-                            }
-                            if let (Some(width), Some(height)) = (width, height) {
-                                new_attrs.push(("x".into(), fstr(cx - width / 2.)));
-                                new_attrs.push(("y".into(), fstr(cy - height / 2.)));
-                                // wh / width&height will be handled separately
-                            }
-                        }
-                        "circle" | "ellipse" => {
-                            new_attrs.push(("cx".into(), parts.next().unwrap()));
-                            new_attrs.push(("cy".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "rxy" => match elem_name.as_str() {
-                    "ellipse" => {
-                        let mut parts = self.attr_split(&value);
-
-                        new_attrs.push(("rx".into(), parts.next().unwrap()));
-                        new_attrs.push(("ry".into(), parts.next().unwrap()));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "xy1" => {
-                    let mut parts = self.attr_split(&value);
-                    match elem_name.as_str() {
-                        "line" => {
-                            new_attrs.push(("x1".into(), parts.next().unwrap()));
-                            new_attrs.push(("y1".into(), parts.next().unwrap()));
-                        }
-                        "rect" => {
-                            new_attrs.push(("x".into(), parts.next().unwrap()));
-                            new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "start" => match elem_name.as_str() {
-                    "line" => {
-                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
-
-                        new_attrs.push(("x1".into(), fstr(start_x)));
-                        new_attrs.push(("y1".into(), fstr(start_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "xy2" => {
-                    let mut parts = self.attr_split(&value);
-                    match elem_name.as_str() {
-                        "line" => {
-                            new_attrs.push(("x2".into(), parts.next().unwrap()));
-                            new_attrs.push(("y2".into(), parts.next().unwrap()));
-                        }
-                        "rect" => {
-                            // must have xy1 (/ x&y) or wh (/ width&height)
-                            let wh = e.attr_map.get("wh").map(|z| z.to_string());
-                            let xy1 = e.attr_map.get("xy1").map(|z| z.to_string());
-                            let mut width = e.attr_map.get("width").map(|z| strp(z));
-                            let mut height = e.attr_map.get("height").map(|z| strp(z));
-                            let mut x = e.attr_map.get("x").map(|z| strp(z));
-                            let mut y = e.attr_map.get("y").map(|z| strp(z));
-                            let x2 = strp(&parts.next().unwrap());
-                            let y2 = strp(&parts.next().unwrap());
-                            if let Some(wh_inner) = wh {
-                                let mut wh_parts = self.attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()));
-                                height = Some(strp(&wh_parts.next().unwrap()));
-                            }
-                            if let Some(xy1_inner) = xy1 {
-                                let mut xy1_parts = self.attr_split(&xy1_inner);
-                                x = Some(strp(&xy1_parts.next().unwrap()));
-                                y = Some(strp(&xy1_parts.next().unwrap()));
-                            }
-                            if let (Some(w), Some(h)) = (width, height) {
-                                new_attrs.push(("x".into(), fstr(x2 - w)));
-                                new_attrs.push(("y".into(), fstr(y2 - h)));
-                                // width / height either already exist in the target or will be expanded from a wh.
-                            } else if let (Some(x), Some(y)) = (x, y) {
-                                new_attrs.push(("width".into(), fstr(x2 - x)));
-                                new_attrs.push(("height".into(), fstr(y2 - y)));
-                                // x/y either already exist in the target or will be expanded from a xy1.
-                            }
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
-                }
-                "end" => match elem_name.as_str() {
-                    "line" => {
-                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
-
-                        new_attrs.push(("x2".into(), fstr(end_x)));
-                        new_attrs.push(("y2".into(), fstr(end_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                _ => new_attrs.push((key.clone(), value)),
-            }
-        }
+        e.expand_attributes();
 
         // Expand any custom element types
         match elem_name.as_str() {
@@ -501,37 +539,31 @@ impl TransformerContext {
                 let mut text = None;
 
                 for (key, value) in &e.attrs {
-                    rect_attrs.push((key.clone(), value.clone()));
-                    if key == "x" || key == "y" {
-                        text_attrs.push((key.clone(), value.clone()));
-                    } else if key == "text" {
+                    if key == "text" {
                         // allows an empty element to contain text content directly as an attribute
                         text = Some(value);
+                    } else {
+                        rect_attrs.push((key.clone(), value.clone()));
                     }
                 }
 
-                let rect_elem = SvgElement::new("rect", &rect_attrs);
+                let rect_elem = SvgElement::new("rect", &rect_attrs).add_class("tbox");
+                // Assumption is that text should be centered within the rect,
+                // and has styling via CSS to reflect this, e.g.:
+                //  text.tbox { dominant-baseline: central; text-anchor: middle; }
+                let cxy = rect_elem.bbox().center().unwrap();
+                text_attrs.push(("x".into(), fstr(cxy.0).into()));
+                text_attrs.push(("y".into(), fstr(cxy.1).into()));
                 prev_element = Some(rect_elem.clone());
                 new_elems.push(SvgEvent::Empty(rect_elem));
                 new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Start(SvgElement::new("text", &text_attrs)));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Start(SvgElement::new(
-                    "tspan",
-                    &[
-                        ("dx".to_string(), "2".to_string()),
-                        ("dy".to_string(), "6".to_string()),
-                    ],
-                )));
+                let text_elem = SvgElement::new("text", &text_attrs).add_class("tbox");
+                new_elems.push(SvgEvent::Start(text_elem));
                 // if this *isn't* empty, we'll now expect a text event, which will be passed through.
-                // the corresponding </tbox> will be converted into a pair of </tspan> and </text> elements.
+                // the corresponding </tbox> will be converted into a </text> element.
                 if empty {
                     if let Some(tt) = text {
-                        new_elems.push(SvgEvent::Text(format!(
-                            "\n{}  {}\n{}",
-                            self.last_indent, tt, self.last_indent
-                        )));
-                        new_elems.push(SvgEvent::End("tspan".to_string()));
+                        new_elems.push(SvgEvent::Text(tt.to_string()));
                         new_elems.push(SvgEvent::End("text".to_string()));
                     }
                 }
@@ -685,7 +717,7 @@ impl TransformerContext {
         }
 
         if !omit {
-            let new_elem = SvgElement::new(elem_name, &new_attrs);
+            let new_elem = e.clone(); // = SvgElement::new(elem_name, &new_attrs);
             if empty {
                 new_elems.push(SvgEvent::Empty(new_elem.clone()));
             } else {
@@ -780,11 +812,6 @@ impl Transformer {
                 Ok(Event::End(e)) => {
                     let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
                     if ee_name.as_str() == "tbox" {
-                        writer.write_event(Event::Text(BytesText::new(&format!(
-                            "\n{}",
-                            self.context.last_indent
-                        ))));
-                        writer.write_event(Event::End(BytesEnd::new("tspan")));
                         ee_name = String::from("text");
                     }
                     writer.write_event(Event::End(BytesEnd::new(ee_name)))
