@@ -23,8 +23,8 @@
 * Relative positioning - including percentage along a bounding box line
 * Element aware attribute broadcasting
 * ‘Standard library’
-* Extensibility 
-* Ubiquitous text - every element can have attached text with context-dependent placement 
+* Extensibility
+* Ubiquitous text - every element can have attached text with context-dependent placement
 
 # Geometry & Placement
 
@@ -71,3 +71,22 @@ See the following diagram:
 The corresponding *locations* (for relative positioning) are given by the following diagram.
 
 ![locations.svg](locations.svg)
+
+## Attribute expansion
+
+Many attributes which are pairs in SVG may be combined for more concise specification.
+
+|Attribute|Maps to|
+|-|-|
+| `xy` | `x` and `y` |
+| `rxy` | `rx` and `ry` |
+| `wh` | `width` and `height` |
+| `cxy` | `cx` and `cy` |
+| `xy1` | `x1` and `y1` |
+| `xy2` | `x2` and `y2` |
+
+
+> **Notes**
+> * If a single value is given for any of these 'pair' attributes, it is used for both of the resulting values.
+> * `rxy` is only valid for ellipses
+> * For `circle`, `wh` maps to 2*`r`; for `ellipse` maps to 2*`rx` & 2*`ry`

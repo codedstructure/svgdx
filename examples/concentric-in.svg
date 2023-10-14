@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="50mm" height="50mm" viewBox="0 0 50 50">
+  <style>
+    <![CDATA[
+    * {
+        stroke-width: 0.5;
+        fill: none;
+    }
+    rect { stroke: blue; }
+    circle { stroke: red; }
+    ellipse { stroke: green; }
+    ]]>
+  </style>
+  <rect cxy="25 25" wh="2"/>
+  <rect cxy="25 25" wh="4"/>
+  <rect cxy="25 25" wh="6"/>
+  <rect cxy="25 25" wh="8"/>
+  <rect cxy="25 25" wh="12"/>
+  <rect cxy="25 25" wh="16"/>
+  <rect cxy="25 25" wh="20"/>
+  <circle cxy="25 25" wh="2"/>
+  <circle cxy="25 25" wh="4"/>
+  <circle cxy="25 25" wh="6"/>
+  <circle cxy="25 25" wh="8"/>
+  <circle cxy="25 25" wh="12"/>
+  <circle cxy="25 25" wh="16"/>
+  <circle cxy="25 25" wh="20"/>
+  <circle cxy="25 25" wh="40"/>
+  <ellipse cxy="10 25" rxy="2 4"/>
+  <ellipse cxy="10 25" rxy="4 6"/>
+  <ellipse cxy="40 25" rxy="2 4"/>
+  <ellipse cxy="40 25" rxy="4 6"/>
+  <ellipse cxy="25 10" rxy="4 2"/>
+  <ellipse cxy="25 10" rxy="6 4"/>
+  <ellipse cxy="25 40" rxy="4 2"/>
+  <ellipse cxy="25 40" rxy="6 4"/>
+</svg>

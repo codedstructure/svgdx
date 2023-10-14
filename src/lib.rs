@@ -304,8 +304,9 @@ impl TransformerContext {
         // evaluate
     }
 
+    /// Returns iterator cycling over whitespace-separated values
     fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
-        input.split(' ').map(|v| self.evaluate(v))
+        input.split_whitespace().map(|v| self.evaluate(v)).cycle()
     }
 
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
@@ -347,13 +348,9 @@ impl TransformerContext {
                     let mut parts = self.attr_split(&value);
 
                     match elem_name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
+                        "text" | "rect" | "tbox" | "pipeline" => {
                             new_attrs.push(("x".into(), parts.next().unwrap()));
                             new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        "circle" => {
-                            new_attrs.push(("cx".into(), parts.next().unwrap()));
-                            new_attrs.push(("cy".into(), parts.next().unwrap()));
                         }
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
@@ -367,13 +364,58 @@ impl TransformerContext {
                             new_attrs.push(("height".into(), parts.next().unwrap()));
                         }
                         "circle" => {
-                            // TBD: arguably size should map to diameter, for consistency
-                            // with width/height on rects - i.e. use 'fstr(w.parse::<f32>*2)'
-                            new_attrs.push(("r".into(), parts.next().unwrap()));
+                            let diameter: f32 = strp(&parts.next().unwrap());
+                            new_attrs.push(("r".into(), fstr(diameter / 2.)));
+                        }
+                        "ellipse" => {
+                            let dia_x: f32 = strp(&parts.next().unwrap());
+                            let dia_y: f32 = strp(&parts.next().unwrap());
+                            new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
+                            new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
                         }
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
+                "cxy" => {
+                    let mut parts = self.attr_split(&value);
+
+                    match elem_name.as_str() {
+                        "rect" | "tbox" | "pipeline" => {
+                            // Requires wh (/ width&height) be specified in order to evaluate
+                            // the centre point.
+                            // TODO: also support specifying other attributes; xy+cxy should be sufficient
+                            let wh = e.attr_map.get("wh").map(|z| z.to_string());
+                            let mut width = e.attr_map.get("width").map(|z| strp(z));
+                            let mut height = e.attr_map.get("height").map(|z| strp(z));
+                            let cx = strp(&parts.next().unwrap());
+                            let cy = strp(&parts.next().unwrap());
+                            if let Some(wh_inner) = wh {
+                                let mut wh_parts = self.attr_split(&wh_inner);
+                                width = Some(strp(&wh_parts.next().unwrap()));
+                                height = Some(strp(&wh_parts.next().unwrap()));
+                            }
+                            if let (Some(width), Some(height)) = (width, height) {
+                                new_attrs.push(("x".into(), fstr(cx - width / 2.)));
+                                new_attrs.push(("y".into(), fstr(cy - height / 2.)));
+                                // wh / width&height will be handled separately
+                            }
+                        }
+                        "circle" | "ellipse" => {
+                            new_attrs.push(("cx".into(), parts.next().unwrap()));
+                            new_attrs.push(("cy".into(), parts.next().unwrap()));
+                        }
+                        _ => new_attrs.push((key.clone(), value.clone())),
+                    }
+                }
+                "rxy" => match elem_name.as_str() {
+                    "ellipse" => {
+                        let mut parts = self.attr_split(&value);
+
+                        new_attrs.push(("rx".into(), parts.next().unwrap()));
+                        new_attrs.push(("ry".into(), parts.next().unwrap()));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
                 "xy1" => {
                     let mut parts = self.attr_split(&value);
                     match elem_name.as_str() {

@@ -51,3 +51,11 @@ fn test_expand_rect_wh_xy2() {
 
     compare(input, expected);
 }
+
+#[test]
+fn test_expand_rect_cxy_wh() {
+    let input = r#"<svg><rect cxy="5 7" wh="3 4"/></svg>"#;
+    let expected = r#"<svg><rect x="3.5" y="5" width="3" height="4"/></svg>"#;
+
+    compare(input, expected);
+}
