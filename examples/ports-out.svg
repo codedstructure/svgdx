@@ -19,14 +19,17 @@
 
   <rect x="0" y="0" width="20" height="30"/>
 
-  <rect x="-5" y="2.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="5" class="tbox">a</text>
+  <tbox x="-5" y="2.5" width="10" height="5"/>
+  <text x="0" y="5" class="tbox">a</text><rect x="-5" y="2.5" width="10" height="5" class="tbox"/>
+  <text x="0" y="5" class="tbox">
 
-  <rect x="-5" y="12.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="15" class="tbox">b</text>
+  <tbox x="-5" y="12.5" width="10" height="5"/>
+  <text x="0" y="15" class="tbox">b</text><rect x="-5" y="12.5" width="10" height="5" class="tbox"/>
+  <text x="0" y="15" class="tbox">
 
-  <rect x="-5" y="22.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="25" class="tbox">c</text>
+  <tbox x="-5" y="22.5" width="10" height="5"/>
+  <text x="0" y="25" class="tbox">c</text><rect x="-5" y="22.5" width="10" height="5" class="tbox"/>
+  <text x="0" y="25" class="tbox">
 
   <!-- text can be given as a 'text' attribute or as element text -->
   <rect x="15" y="12.5" width="10" height="5" class="tbox"/>

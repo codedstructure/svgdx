@@ -1,0 +1,37 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="-8 -8 100 100">
+  <style>
+    <![CDATA[
+        * {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        circle, ellipse { stroke-width: 0.1; }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 3px;
+            stroke: none;
+            fill: black;
+        }
+        text.tbox {
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+    ]]>
+  </style>
+
+  <rect x="0" y="0" width="20" height="30" />
+  <ellipse cxy="10 0" rxy="6 3" text="ports"/>
+
+  <rect cxy="0 5" wh="10 5" text="a"/>
+  <circle cxy="5 7.5" r="2" text="1"/>
+
+  <rect cxy="0 15" wh="10 5" text="b"/>
+  <circle cxy="5 17.5" r="2" text="2"/>
+
+  <rect cxy="0 25" wh="10 5" text="c"/>
+  <circle cxy="5 27.5" r="2" text="3"/>
+
+  <rect cxy="20 15" wh="10 5" text="out"/>
+  <circle cxy="15 17.5" r="2" text="4"/>
+</svg>

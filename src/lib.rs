@@ -77,6 +77,11 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs)
     }
 
+    fn pop_attr(&mut self, key: &str) -> Option<String> {
+        self.attrs.retain(|x| x.0 != key);
+        self.attr_map.remove(key)
+    }
+
     fn bbox(&self) -> BoundingBox {
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
@@ -104,6 +109,15 @@ impl SvgElement {
                     strp(self.attr_map.get("r").unwrap()),
                 );
                 BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)
+            }
+            "ellipse" => {
+                let (cx, cy, rx, ry) = (
+                    strp(self.attr_map.get("cx").unwrap()),
+                    strp(self.attr_map.get("cy").unwrap()),
+                    strp(self.attr_map.get("rx").unwrap()),
+                    strp(self.attr_map.get("ry").unwrap()),
+                );
+                BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)
             }
             "person" => {
                 let (x, y, h) = (
@@ -500,12 +514,11 @@ impl TransformerContext {
 
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
         let elem_name = &e.name;
-        let mut new_attrs: Vec<(String, String)> = vec![];
 
         let mut prev_element = self.prev_element.clone();
 
         let mut omit = false;
-        let mut new_elems = vec![];
+        let mut events = vec![];
 
         let mut e = e.clone();
 
@@ -530,6 +543,25 @@ impl TransformerContext {
 
         e.expand_attributes();
 
+        if let Some(text_attr) = e.pop_attr("text") {
+            let mut text_attrs = vec![];
+
+            // Assumption is that text should be centered within the rect,
+            // and has styling via CSS to reflect this, e.g.:
+            //  text.tbox { dominant-baseline: central; text-anchor: middle; }
+            let cxy = e.bbox().center().unwrap();
+            text_attrs.push(("x".into(), fstr(cxy.0)));
+            text_attrs.push(("y".into(), fstr(cxy.1)));
+            prev_element = Some(e.clone());
+            events.push(SvgEvent::Empty(e.clone()));
+            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+            let text_elem = SvgElement::new("text", &text_attrs).add_class("tbox");
+            events.push(SvgEvent::Start(text_elem));
+            events.push(SvgEvent::Text(text_attr.to_string()));
+            events.push(SvgEvent::End("text".to_string()));
+            omit = true;
+        }
+
         // Expand any custom element types
         match elem_name.as_str() {
             "tbox" => {
@@ -552,19 +584,19 @@ impl TransformerContext {
                 // and has styling via CSS to reflect this, e.g.:
                 //  text.tbox { dominant-baseline: central; text-anchor: middle; }
                 let cxy = rect_elem.bbox().center().unwrap();
-                text_attrs.push(("x".into(), fstr(cxy.0).into()));
-                text_attrs.push(("y".into(), fstr(cxy.1).into()));
+                text_attrs.push(("x".into(), fstr(cxy.0)));
+                text_attrs.push(("y".into(), fstr(cxy.1)));
                 prev_element = Some(rect_elem.clone());
-                new_elems.push(SvgEvent::Empty(rect_elem));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Empty(rect_elem));
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
                 let text_elem = SvgElement::new("text", &text_attrs).add_class("tbox");
-                new_elems.push(SvgEvent::Start(text_elem));
+                events.push(SvgEvent::Start(text_elem));
                 // if this *isn't* empty, we'll now expect a text event, which will be passed through.
                 // the corresponding </tbox> will be converted into a </text> element.
                 if empty {
                     if let Some(tt) = text {
-                        new_elems.push(SvgEvent::Text(tt.to_string()));
-                        new_elems.push(SvgEvent::End("text".to_string()));
+                        events.push(SvgEvent::Text(tt.to_string()));
+                        events.push(SvgEvent::End("text".to_string()));
                     }
                 }
                 omit = true;
@@ -627,26 +659,26 @@ impl TransformerContext {
                 leg2_attrs.push(("y2".into(), fstr(y1 + h)));
                 leg2_attrs.extend(common_attrs.clone());
 
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Empty(
                     SvgElement::new("circle", &head_attrs).add_class("person"),
                 ));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Empty(
                     SvgElement::new("line", &body_attrs).add_class("person"),
                 ));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Empty(
                     SvgElement::new("line", &arms_attrs).add_class("person"),
                 ));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Empty(
                     SvgElement::new("line", &leg1_attrs).add_class("person"),
                 ));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Empty(
                     SvgElement::new("line", &leg2_attrs).add_class("person"),
                 ));
-                new_elems.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
 
                 omit = true;
             }
@@ -709,7 +741,7 @@ impl TransformerContext {
                     width - h_by2),
                     ));
                 }
-                new_elems.push(SvgEvent::Empty(
+                events.push(SvgEvent::Empty(
                     SvgElement::new("path", &common_attrs).add_class("pipeline"),
                 ));
             }
@@ -717,11 +749,11 @@ impl TransformerContext {
         }
 
         if !omit {
-            let new_elem = e.clone(); // = SvgElement::new(elem_name, &new_attrs);
+            let new_elem = e.clone();
             if empty {
-                new_elems.push(SvgEvent::Empty(new_elem.clone()));
+                events.push(SvgEvent::Empty(new_elem.clone()));
             } else {
-                new_elems.push(SvgEvent::Start(new_elem.clone()));
+                events.push(SvgEvent::Start(new_elem.clone()));
             }
             if !matches!(new_elem.bbox(), BoundingBox::Unknown) {
                 // prev_element is only used for relative positioning, so
@@ -731,7 +763,7 @@ impl TransformerContext {
         }
         self.prev_element = prev_element;
 
-        new_elems
+        events
     }
 }
 

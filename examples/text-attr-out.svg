@@ -1,0 +1,46 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="-8 -8 100 100">
+  <style>
+    <![CDATA[
+        * {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        circle, ellipse { stroke-width: 0.1; }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 3px;
+            stroke: none;
+            fill: black;
+        }
+        text.tbox {
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+    ]]>
+  </style>
+
+  <rect x="0" y="0" width="20" height="30"/>
+  <ellipse cx="10" cy="0" rx="6" ry="3"/>
+  <text x="10" y="0" class="tbox">ports</text>
+
+  <rect x="-5" y="2.5" width="10" height="5"/>
+  <text x="0" y="5" class="tbox">a</text>
+  <circle cx="5" cy="7.5" r="2"/>
+  <text x="5" y="7.5" class="tbox">1</text>
+
+  <rect x="-5" y="12.5" width="10" height="5"/>
+  <text x="0" y="15" class="tbox">b</text>
+  <circle cx="5" cy="17.5" r="2"/>
+  <text x="5" y="17.5" class="tbox">2</text>
+
+  <rect x="-5" y="22.5" width="10" height="5"/>
+  <text x="0" y="25" class="tbox">c</text>
+  <circle cx="5" cy="27.5" r="2"/>
+  <text x="5" y="27.5" class="tbox">3</text>
+
+  <rect x="15" y="12.5" width="10" height="5"/>
+  <text x="20" y="15" class="tbox">out</text>
+  <circle cx="15" cy="17.5" r="2"/>
+  <text x="15" y="17.5" class="tbox">4</text>
+</svg>
