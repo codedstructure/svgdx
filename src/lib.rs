@@ -11,11 +11,28 @@ use regex::Regex;
 mod types;
 use types::BoundingBox;
 
+/// Return a 'minimal' representation of the given number
 fn fstr(x: f32) -> String {
     if x == (x as u32) as f32 {
         return (x as u32).to_string();
     }
-    format!("{:.4}", x.to_string())
+    let result = format!("{:.3}", x);
+    if result.contains(".") {
+        result.trim_end_matches(|ch| ch == '0' || ch == '.').into()
+    } else {
+        result
+    }
+}
+
+#[test]
+fn test_fstr() {
+    assert_eq!(fstr(1.0), "1");
+    // Large-ish integers should be fine
+    assert_eq!(fstr(12345678.0), "12345678");
+    assert_eq!(fstr(12340000.0), "12340000");
+    assert_eq!(fstr(1.2345678), "1.235");
+    assert_eq!(fstr(-1.2345678), "-1.235");
+    assert_eq!(fstr(91.0004), "91");
 }
 
 fn strp(s: &str) -> f32 {
@@ -810,6 +827,23 @@ impl EventList<'_> {
         self.events.iter()
     }
 
+    fn to_elements(&self) -> Vec<SvgElement> {
+        let mut result = vec![];
+        let mut event_iter = self.iter();
+        loop {
+            match event_iter.next() {
+                Some(Event::Empty(e)) | Some(Event::Start(e)) => {
+                    result.push(e.into());
+                }
+                None => {
+                    break;
+                }
+                _ => (),
+            }
+        }
+        result
+    }
+
     fn push(&mut self, ev: &Event) {
         self.events.push(ev.clone().into_owned());
     }
@@ -903,6 +937,45 @@ impl Transformer {
                 }
                 _ => {
                     output.push(ev);
+                }
+            }
+        }
+
+        // Calculate bounding box of diagram and use as new viewBox for the image.
+        // This also allows just using `<svg>` as the root element.
+        // TODO: preserve other attributes from a given svg root.
+        let mut extent = BoundingBox::Unknown;
+        for el in output.to_elements() {
+            extent.extend(&el.bbox());
+        }
+        // Expand by 10, then add 10%. Ensures small images get more than a couple
+        // of pixels border, and large images still get a (relatively) decent border.
+        extent.expand(10.);
+        extent.scale(1.1);
+
+        if let BoundingBox::BBox(minx, miny, maxx, maxy) = extent {
+            let width = fstr(maxx - minx);
+            let height = fstr(maxy - miny);
+            let mut bs = BytesStart::new("svg");
+            bs.push_attribute(Attribute::from(("version", "1.1")));
+            bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
+            bs.push_attribute(Attribute::from(("width", format!("{}mm", width).as_str())));
+            bs.push_attribute(Attribute::from((
+                "height",
+                format!("{}mm", height).as_str(),
+            )));
+            bs.push_attribute(Attribute::from((
+                "viewBox",
+                format!("{} {} {} {}", fstr(minx), fstr(miny), width, height).as_str(),
+            )));
+            let new_svg = Event::Start(bs);
+
+            for item in &mut output.events.iter_mut() {
+                if let Event::Start(x) = item {
+                    if x.name().into_inner() == "svg".as_bytes() {
+                        *item = new_svg.clone().into_owned();
+                        break;
+                    }
                 }
             }
         }
