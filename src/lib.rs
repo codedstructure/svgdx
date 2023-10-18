@@ -772,6 +772,49 @@ pub struct Transformer {
     context: TransformerContext,
 }
 
+struct EventList<'a> {
+    events: Vec<Event<'a>>,
+}
+
+impl EventList<'_> {
+    fn from_reader(reader: &mut dyn Read) -> Self {
+        let mut reader = Reader::from_reader(BufReader::new(reader));
+
+        let mut events = Vec::new();
+        let mut buf = Vec::new();
+
+        loop {
+            let ev = reader.read_event_into(&mut buf);
+            match &ev {
+                Ok(Event::Eof) => break, // exits the loop when reaching end of file
+                Ok(e) => events.push(e.clone().into_owned()),
+                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+            };
+
+            buf.clear();
+        }
+
+        Self { events }
+    }
+
+    fn write_to(&self, writer: &mut dyn Write) -> Result<(), String> {
+        let mut writer = Writer::new(writer);
+
+        for event in &self.events {
+            writer.write_event(event).map_err(|e| e.to_string())?
+        }
+        Ok(())
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &Event> + '_ {
+        self.events.iter()
+    }
+
+    fn push(&mut self, ev: &Event) {
+        self.events.push(ev.clone().into_owned());
+    }
+}
+
 impl Transformer {
     pub fn new() -> Self {
         Self {
@@ -784,20 +827,18 @@ impl Transformer {
         reader: &mut dyn Read,
         writer: &mut dyn Write,
     ) -> Result<(), String> {
-        let mut buf = Vec::new();
+        let input = EventList::from_reader(reader);
+        let mut output = EventList { events: vec![] };
 
-        let mut reader = Reader::from_reader(BufReader::new(reader));
-        let mut writer = Writer::new(writer);
-
-        loop {
-            let ev = reader.read_event_into(&mut buf);
-
-            match &ev {
-                Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
-                    let is_empty = matches!(ev, Ok(Event::Empty(_)));
+        for ev in input.iter() {
+            match ev {
+                Event::Eof => {
+                    // should never happen, as handled in EventList::from_reader()
+                    break;
+                }
+                Event::Start(e) | Event::Empty(e) => {
+                    let is_empty = matches!(ev, Event::Empty(_));
                     let ee = self.context.handle_element(&SvgElement::from(e), is_empty);
-                    let mut result = Ok(());
                     for svg_ev in ee.into_iter() {
                         // re-calculate is_empty for each generated event
                         let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
@@ -825,30 +866,29 @@ impl Transformer {
                                             .as_bytes(),
                                     )));
                                 }
-                                result = writer.write_event(if is_empty {
-                                    Event::Empty(bs)
+                                if is_empty {
+                                    output.push(&Event::Empty(bs));
                                 } else {
-                                    Event::Start(bs)
-                                });
+                                    output.push(&Event::Start(bs));
+                                }
                             }
                             SvgEvent::Text(t) => {
-                                result = writer.write_event(Event::Text(BytesText::new(&t)));
+                                output.push(&Event::Text(BytesText::new(&t)));
                             }
                             SvgEvent::End(name) => {
-                                result = writer.write_event(Event::End(BytesEnd::new(name)));
+                                output.push(&Event::End(BytesEnd::new(name)));
                             }
                         }
                     }
-                    result
                 }
-                Ok(Event::End(e)) => {
+                Event::End(e) => {
                     let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    writer.write_event(Event::End(BytesEnd::new(ee_name)))
+                    output.push(&Event::End(BytesEnd::new(ee_name)))
                 }
-                Ok(Event::Text(e)) => {
+                Event::Text(e) => {
                     // Extract any trailing whitespace following newlines as the current indentation level
                     let re = Regex::new(r"(?ms)\n.*^(\s+)*").unwrap();
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
@@ -859,19 +899,14 @@ impl Transformer {
                         self.context.set_indent(indent);
                     }
 
-                    writer.write_event(Event::Text(e.borrow()))
+                    output.push(&Event::Text(e.borrow()))
                 }
-                Ok(event) => {
-                    // This covers XML processing instructions, comments etc
-                    writer.write_event(event)
+                _ => {
+                    output.push(ev);
                 }
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             }
-            .expect("Failed to parse XML");
-
-            buf.clear();
         }
 
-        Ok(())
+        output.write_to(writer).map_err(|e| e.to_string())
     }
 }
