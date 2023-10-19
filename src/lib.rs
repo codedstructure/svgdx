@@ -17,8 +17,8 @@ fn fstr(x: f32) -> String {
         return (x as u32).to_string();
     }
     let result = format!("{:.3}", x);
-    if result.contains(".") {
-        result.trim_end_matches(|ch| ch == '0' || ch == '.').into()
+    if result.contains('.') {
+        result.trim_end_matches('0').trim_end_matches('.').into()
     } else {
         result
     }
@@ -27,12 +27,13 @@ fn fstr(x: f32) -> String {
 #[test]
 fn test_fstr() {
     assert_eq!(fstr(1.0), "1");
-    // Large-ish integers should be fine
-    assert_eq!(fstr(12345678.0), "12345678");
-    assert_eq!(fstr(12340000.0), "12340000");
+    assert_eq!(fstr(-100.0), "-100");
     assert_eq!(fstr(1.2345678), "1.235");
     assert_eq!(fstr(-1.2345678), "-1.235");
     assert_eq!(fstr(91.0004), "91");
+    // Large-ish integers should be fine
+    assert_eq!(fstr(12345678.0), "12345678");
+    assert_eq!(fstr(12340000.0), "12340000");
 }
 
 fn strp(s: &str) -> f32 {
@@ -213,7 +214,7 @@ impl SvgElement {
         input.split_whitespace().map(|v| self.evaluate(v)).cycle()
     }
 
-    fn expand_attributes(&mut self) {
+    fn expand_attributes(&mut self, context: &TransformerContext) {
         let mut new_attrs = vec![];
 
         // Process and expand attributes as needed
@@ -307,18 +308,6 @@ impl SvgElement {
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
-                "start" => match self.name.as_str() {
-                    "line" => {
-                        todo!("re-implement eval_ref");
-                        /*
-                        let (start_x, start_y) = self.eval_ref(&value).unwrap();
-
-                        new_attrs.push(("x1".into(), fstr(start_x)));
-                        new_attrs.push(("y1".into(), fstr(start_y)));
-                        */
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
                 "xy2" => {
                     let mut parts = self.attr_split(&value);
                     match self.name.as_str() {
@@ -359,15 +348,21 @@ impl SvgElement {
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
+                "start" => match self.name.as_str() {
+                    "line" => {
+                        let (start_x, start_y) = context.eval_ref(&value).unwrap();
+
+                        new_attrs.push(("x1".into(), fstr(start_x)));
+                        new_attrs.push(("y1".into(), fstr(start_y)));
+                    }
+                    _ => new_attrs.push((key.clone(), value)),
+                },
                 "end" => match self.name.as_str() {
                     "line" => {
-                        todo!("re-implement eval_ref");
-                        /*
-                        let (end_x, end_y) = self.eval_ref(&value).unwrap();
+                        let (end_x, end_y) = context.eval_ref(&value).unwrap();
 
                         new_attrs.push(("x2".into(), fstr(end_x)));
                         new_attrs.push(("y2".into(), fstr(end_y)));
-                        */
                     }
                     _ => new_attrs.push((key.clone(), value)),
                 },
@@ -417,7 +412,7 @@ enum SvgEvent {
     End(String),
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
@@ -426,17 +421,25 @@ struct TransformerContext {
 
 impl TransformerContext {
     fn new() -> Self {
-        //reader: &mut Reader<BufReader<File>>) -> Self {
         let elem_map: HashMap<String, SvgElement> = HashMap::new();
-        /*
-        let mut buf = Vec::new();
 
-        loop {
-            let ev = reader.read_event_into(&mut buf);
+        Self {
+            elem_map,
+            prev_element: None,
+            last_indent: String::from(""),
+        }
+    }
 
+    fn populate(&mut self, events: &EventList) {
+        let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
+
+        for ev in events.iter() {
             match ev {
-                Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(Event::Start(e)) | Ok(Event::Empty(e)) => {
+                Event::Eof => {
+                    // should never happen, as handled in EventList::from_reader()
+                    break;
+                }
+                Event::Start(e) | Event::Empty(e) => {
                     let mut attr_map = HashMap::new();
                     let mut attr_list = vec![];
                     let mut id_opt = None;
@@ -463,18 +466,10 @@ impl TransformerContext {
                         elem_map.insert(id.clone(), SvgElement::new(&elem_name, &attr_list));
                     }
                 }
-                Ok(_) => {}
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                _ => {}
             }
-            buf.clear();
         }
-        */
-
-        Self {
-            elem_map,
-            prev_element: None,
-            last_indent: String::from(""),
-        }
+        self.elem_map = elem_map;
     }
 
     fn set_indent(&mut self, indent: String) {
@@ -505,7 +500,6 @@ impl TransformerContext {
         if let Some(caps) = re.captures(&input) {
             let name = caps.get(1).unwrap().as_str();
             let attr = caps.get(2).unwrap().as_str();
-            //println!("{} / {}", name, attr);
 
             if let Some(el) = self.elem_map.get(name) {
                 if let Some(value) = el.attr_map.get(attr) {
@@ -558,7 +552,7 @@ impl TransformerContext {
             }
         }
 
-        e.expand_attributes();
+        e.expand_attributes(self);
 
         if let Some(text_attr) = e.pop_attr("text") {
             let mut text_attrs = vec![];
@@ -784,7 +778,7 @@ impl TransformerContext {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Transformer {
     context: TransformerContext,
 }
@@ -863,6 +857,8 @@ impl Transformer {
     ) -> Result<(), String> {
         let input = EventList::from_reader(reader);
         let mut output = EventList { events: vec![] };
+
+        self.context.populate(&input);
 
         for ev in input.iter() {
             match ev {
@@ -944,7 +940,7 @@ impl Transformer {
         // Calculate bounding box of diagram and use as new viewBox for the image.
         // This also allows just using `<svg>` as the root element.
         // TODO: preserve other attributes from a given svg root.
-        let mut extent = BoundingBox::Unknown;
+        let mut extent = BoundingBox::new();
         for el in output.to_elements() {
             extent.extend(&el.bbox());
         }
