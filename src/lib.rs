@@ -204,6 +204,10 @@ impl SvgElement {
         result
     }
 
+    fn locations(&self) -> &[&str] {
+        &["t", "b", "l", "r", "tl", "bl", "tr", "br"]
+    }
+
     fn evaluate(&self, input: &str) -> String {
         // TODO - re-use context::evaluate()
         input.to_owned()
@@ -350,16 +354,30 @@ impl SvgElement {
                 }
                 "start" => match self.name.as_str() {
                     "line" => {
-                        let (start_x, start_y) = context.eval_ref(&value).unwrap();
+                        if self.has_attr("end") {
+                            let start_x: f32;
+                            let start_y: f32;
+                            if self.has_attr("end") {
+                                ((start_x, start_y), (_, _)) = self.evaluate_endpoints(context);
+                            } else {
+                                (start_x, start_y) = context.eval_ref(&value).unwrap();
+                            }
 
-                        new_attrs.push(("x1".into(), fstr(start_x)));
-                        new_attrs.push(("y1".into(), fstr(start_y)));
+                            new_attrs.push(("x1".into(), fstr(start_x)));
+                            new_attrs.push(("y1".into(), fstr(start_y)));
+                        }
                     }
                     _ => new_attrs.push((key.clone(), value)),
                 },
                 "end" => match self.name.as_str() {
                     "line" => {
-                        let (end_x, end_y) = context.eval_ref(&value).unwrap();
+                        let end_x: f32;
+                        let end_y: f32;
+                        if self.has_attr("start") {
+                            ((_, _), (end_x, end_y)) = self.evaluate_endpoints(context);
+                        } else {
+                            (end_x, end_y) = context.eval_ref(&value).unwrap();
+                        }
 
                         new_attrs.push(("x2".into(), fstr(end_x)));
                         new_attrs.push(("y2".into(), fstr(end_y)));
@@ -385,6 +403,37 @@ impl SvgElement {
         self.attrs = new_attrs;
         self.attr_map = attr_map;
         self.classes = classes;
+    }
+
+    fn evaluate_endpoints(&self, context: &TransformerContext) -> ((f32, f32), (f32, f32)) {
+        let start_ref = self.attr_map.get("start").unwrap();
+        let end_ref = self.attr_map.get("end").unwrap();
+
+        // Example: "#thing@tl" => top left coordinate of element id="thing"
+        let re = Regex::new(r"^#(?<id>\w+)(@(?<loc>\S+))?$").unwrap();
+
+        let caps = re.captures(start_ref).unwrap();
+        let name = &caps["id"];
+        let mut start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+        let start_el = context.elem_map.get(name).unwrap();
+
+        let caps = re.captures(end_ref).unwrap();
+        let name = &caps["id"];
+        let mut end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+        let end_el = context.elem_map.get(name).unwrap();
+
+        if start_loc.is_empty() && end_loc.is_empty() {
+            (start_loc, end_loc) = context.shortest_link(start_el, end_el);
+        } else if start_loc.is_empty() {
+            start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
+        } else if end_loc.is_empty() {
+            end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
+        }
+
+        (
+            start_el.coord(&start_loc).unwrap(),
+            end_el.coord(&end_loc).unwrap(),
+        )
     }
 }
 
@@ -487,10 +536,51 @@ impl TransformerContext {
 
         let caps = re.captures(&input)?;
         let name = &caps["id"];
-        let loc = caps.name("loc").map_or("c", |v| v.as_str());
+        let loc = caps.name("loc").map_or("", |v| v.as_str());
+        if loc.is_empty() {
+            // find nearest location to us
+        }
 
         let element = self.elem_map.get(name)?;
         element.coord(loc)
+    }
+
+    fn closest_loc(&self, this: &SvgElement, point: (f32, f32)) -> String {
+        let mut min_dist_sq = f32::MAX;
+        let mut min_loc = "c";
+
+        for loc in this.locations() {
+            let this_coord = this.coord(loc);
+            if let (Some((x1, y1)), (x2, y2)) = (this_coord, point) {
+                let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+                if dist_sq < min_dist_sq {
+                    min_dist_sq = dist_sq;
+                    min_loc = loc;
+                }
+            }
+        }
+        min_loc.to_string()
+    }
+
+    fn shortest_link(&self, this: &SvgElement, that: &SvgElement) -> (String, String) {
+        let mut min_dist_sq = f32::MAX;
+        let mut this_min_loc = "c";
+        let mut that_min_loc = "c";
+        for this_loc in this.locations() {
+            for that_loc in that.locations() {
+                let this_coord = this.coord(this_loc);
+                let that_coord = that.coord(that_loc);
+                if let (Some((x1, y1)), Some((x2, y2))) = (this_coord, that_coord) {
+                    let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+                    if dist_sq < min_dist_sq {
+                        min_dist_sq = dist_sq;
+                        this_min_loc = this_loc;
+                        that_min_loc = that_loc;
+                    }
+                }
+            }
+        }
+        (this_min_loc.to_owned(), that_min_loc.to_owned())
     }
 
     fn evaluate(&self, input: &str) -> String {
