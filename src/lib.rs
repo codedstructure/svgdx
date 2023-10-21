@@ -463,7 +463,10 @@ impl TransformerContext {
                         );
                         let elem_name: String =
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap();
-                        elem_map.insert(id.clone(), SvgElement::new(&elem_name, &attr_list));
+                        let mut elem = SvgElement::new(&elem_name, &attr_list);
+                        // Expand anything we can given the current context
+                        elem.expand_attributes(self);
+                        elem_map.insert(id.clone(), elem);
                     }
                 }
                 _ => {}
