@@ -1,0 +1,49 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="70mm" height="50mm" viewBox="-2 -2 70 50">
+  <defs>
+   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+   </marker>
+  </defs>
+  <style>
+    <![CDATA[
+        rect, line {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 3px;
+        }
+        /* prior to top/bottom/left/right so they can override this */
+        text { 
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+        text.text-top {
+            dominant-baseline: text-before-edge;
+        }
+        text.text-bottom {
+            dominant-baseline: text-after-edge;
+        }
+        text.text-left {
+            text-anchor: start;
+        }
+        text.text-right {
+            text-anchor: end;
+        }
+    ]]>
+  </style>
+
+  <rect xy="0" wh="15" text="Hi!" text-loc="tl" />
+  <rect xy="20 0" wh="15" text="Hi!" text-loc="t" />
+  <rect xy="40 0" wh="15" text="Hi!" text-loc="tr" />
+
+  <rect xy="0 20" wh="15" text="Hi!" text-loc="l" />
+  <rect xy="20 20" wh="15" text="Hi!" text-loc="c" />
+  <rect xy="40 20" wh="15" text="Hi!" text-loc="r" />
+
+  <rect xy="0 40" wh="15" text="Hi!" text-loc="bl" />
+  <rect xy="20 40" wh="15" text="Hi!" text-loc="b" />
+  <rect xy="40 40" wh="15" text="Hi!" text-loc="br" />
+</svg>

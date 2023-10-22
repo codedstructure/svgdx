@@ -151,6 +151,9 @@ impl SvgElement {
     }
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
+        if self.name == "line" {
+            todo!("support 'start', 'end' locations for lines");
+        }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
         if let BoundingBox::BBox(x1, y1, x2, y2) = self.bbox() {
@@ -205,6 +208,7 @@ impl SvgElement {
     }
 
     fn locations(&self) -> &[&str] {
+        // TODO: support start & end for lines
         &["t", "b", "l", "r", "tl", "bl", "tr", "br"]
     }
 
@@ -649,17 +653,55 @@ impl TransformerContext {
 
         if let Some(text_attr) = e.pop_attr("text") {
             let mut text_attrs = vec![];
+            let mut text_classes = vec!["tbox"];
+            let mut text_loc = "c".to_owned();
+            // Default dx/dy to push it in slightly from the edge;
+            // Without inset text squishes to the edge and can be unreadable
+            // Any specified dx/dy override this behaviour.
+            let text_inset = 1.0;
+            let mut dx = e.pop_attr("dx").map(|dx| strp(&dx));
+            let mut dy = e.pop_attr("dy").map(|dy| strp(&dy));
+
+            if let Some(text_loc_attr) = e.pop_attr("text-loc") {
+                text_loc = text_loc_attr.to_owned();
+                // relies on t/b/l/r being disjoint and t/b & l/r being mutually exclusive
+                if text_loc.contains('t') {
+                    text_classes.push("text-top");
+                    if dy.is_none() {
+                        dy = Some(text_inset);
+                    }
+                } else if text_loc.contains('b') {
+                    text_classes.push("text-bottom");
+                    dy = Some(-text_inset);
+                }
+                if text_loc.contains('l') {
+                    text_classes.push("text-left");
+                    dx = Some(text_inset);
+                } else if text_loc.contains('r') {
+                    text_classes.push("text-right");
+                    dx = Some(-text_inset);
+                }
+            }
 
             // Assumption is that text should be centered within the rect,
             // and has styling via CSS to reflect this, e.g.:
             //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-            let cxy = e.bbox().center().unwrap();
-            text_attrs.push(("x".into(), fstr(cxy.0)));
-            text_attrs.push(("y".into(), fstr(cxy.1)));
+            let txy = e.coord(&text_loc).unwrap();
+            text_attrs.push(("x".into(), fstr(txy.0)));
+            text_attrs.push(("y".into(), fstr(txy.1)));
+            if let Some(dx) = dx {
+                text_attrs.push(("dx".into(), fstr(dx)));
+            }
+            if let Some(dy) = dy {
+                text_attrs.push(("dy".into(), fstr(dy)));
+            }
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(e.clone()));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-            let text_elem = SvgElement::new("text", &text_attrs).add_class("tbox");
+            let mut text_elem = SvgElement::new("text", &text_attrs);
+            for class in text_classes {
+                text_elem.add_class(class);
+            }
             events.push(SvgEvent::Start(text_elem));
             events.push(SvgEvent::Text(text_attr.to_string()));
             events.push(SvgEvent::End("text".to_string()));
