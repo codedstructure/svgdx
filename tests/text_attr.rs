@@ -1,16 +1,5 @@
-use std::io::Cursor;
-use svgd::Transformer;
-
-fn compare(input: &str, expected: &str) {
-    let mut t = Transformer::new();
-    let mut output: Vec<u8> = vec![];
-
-    let mut input = Cursor::new(input);
-    t.transform(&mut input, &mut output);
-    let output = String::from_utf8(output).unwrap();
-
-    assert_eq!(output, expected);
-}
+mod utils;
+use utils::compare;
 
 #[test]
 fn test_expand_rect_xy_wh() {

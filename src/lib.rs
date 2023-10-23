@@ -4,7 +4,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::io::{BufReader, Read, Write};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 
 use regex::Regex;
 
@@ -45,13 +45,14 @@ struct SvgElement {
     name: String,
     attrs: Vec<(String, String)>,
     attr_map: HashMap<String, String>,
-    classes: HashSet<String>,
+    classes: BTreeSet<String>,
+    content: Option<String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
         let mut attr_map: HashMap<String, String> = HashMap::new();
-        let mut classes: HashSet<String> = HashSet::new();
+        let mut classes: BTreeSet<String> = BTreeSet::new();
 
         for (key, value) in attrs {
             if key == "class" {
@@ -67,6 +68,7 @@ impl SvgElement {
             attrs: attrs.to_vec(),
             attr_map,
             classes,
+            content: None,
         }
     }
 
@@ -151,9 +153,6 @@ impl SvgElement {
     }
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
-        if self.name == "line" {
-            todo!("support 'start', 'end' locations for lines");
-        }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
         if let BoundingBox::BBox(x1, y1, x2, y2) = self.bbox() {
@@ -167,7 +166,21 @@ impl SvgElement {
                 "bl" => Some((x1, y2)),
                 "l" => Some((x1, (y1 + y2) / 2.)),
                 "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
-                _ => None,
+                _ => {
+                    if self.name == "line" {
+                        let x1 = strp(self.attr_map.get("x1").unwrap());
+                        let y1 = strp(self.attr_map.get("y1").unwrap());
+                        let x2 = strp(self.attr_map.get("x2").unwrap());
+                        let y2 = strp(self.attr_map.get("y2").unwrap());
+                        match loc {
+                            "xy1" | "start" => Some((x1, y1)),
+                            "xy2" | "end" => Some((x2, y2)),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                }
             }
         } else {
             None
@@ -208,8 +221,74 @@ impl SvgElement {
     }
 
     fn locations(&self) -> &[&str] {
-        // TODO: support start & end for lines
-        &["t", "b", "l", "r", "tl", "bl", "tr", "br"]
+        if self.name == "line" {
+            &[
+                "xy1", "start", "xy2", "end", "t", "b", "l", "r", "tl", "bl", "tr", "br",
+            ]
+        } else {
+            &["t", "b", "l", "r", "tl", "bl", "tr", "br"]
+        }
+    }
+
+    fn process_text_attr(&self) -> Option<(SvgElement, SvgElement)> {
+        let mut orig_elem = self.clone();
+        let text_value = orig_elem.pop_attr("text")?;
+        let mut text_attrs = vec![];
+        let mut text_classes = vec!["tbox"];
+        let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
+        let mut dx = orig_elem.pop_attr("dx").map(|dx| strp(&dx));
+        let mut dy = orig_elem.pop_attr("dy").map(|dy| strp(&dy));
+
+        // Default dx/dy to push it in slightly from the edge (or out for lines);
+        // Without inset text squishes to the edge and can be unreadable
+        // Any specified dx/dy override this behaviour.
+        let text_inset = 1.;
+
+        let is_line = orig_elem.name == "line";
+        // text associated with a line is pushed 'outside' the line,
+        // where with other shapes it's pulled 'inside'. The classes
+        // and dx/dy values are opposite.
+        if ["t", "tl", "tr"].iter().any(|&s| s == text_loc) {
+            text_classes.push(if is_line { "text-bottom" } else { "text-top" });
+            if dy.is_none() {
+                dy = Some(if is_line { -text_inset } else { text_inset });
+            }
+        } else if ["b", "bl", "br"].iter().any(|&s| s == text_loc) {
+            text_classes.push(if is_line { "text-top" } else { "text-bottom" });
+            if dy.is_none() {
+                dy = Some(if is_line { text_inset } else { -text_inset });
+            }
+        }
+        if ["l", "tl", "bl"].iter().any(|&s| s == text_loc) {
+            text_classes.push(if is_line { "text-right" } else { "text-left" });
+            if dx.is_none() {
+                dx = Some(if is_line { -text_inset } else { text_inset });
+            }
+        } else if ["r", "br", "tr"].iter().any(|&s| s == text_loc) {
+            text_classes.push(if is_line { "text-left" } else { "text-right" });
+            if dx.is_none() {
+                dx = Some(if is_line { text_inset } else { -text_inset });
+            }
+        }
+
+        // Assumption is that text should be centered within the rect,
+        // and has styling via CSS to reflect this, e.g.:
+        //  text.tbox { dominant-baseline: central; text-anchor: middle; }
+        let txy = orig_elem.coord(&text_loc).unwrap();
+        text_attrs.push(("x".into(), fstr(txy.0)));
+        text_attrs.push(("y".into(), fstr(txy.1)));
+        if let Some(dx) = dx {
+            text_attrs.push(("dx".into(), fstr(dx)));
+        }
+        if let Some(dy) = dy {
+            text_attrs.push(("dy".into(), fstr(dy)));
+        }
+        let mut text_elem = SvgElement::new("text", &text_attrs);
+        for class in text_classes {
+            text_elem.add_class(class);
+        }
+        text_elem.content = Some(text_value);
+        Some((orig_elem, text_elem))
     }
 
     fn evaluate(&self, input: &str) -> String {
@@ -393,7 +472,7 @@ impl SvgElement {
         }
 
         let mut attr_map: HashMap<String, String> = HashMap::new();
-        let mut classes: HashSet<String> = HashSet::new();
+        let mut classes: BTreeSet<String> = BTreeSet::new();
 
         for (key, value) in new_attrs.clone() {
             if key == "class" {
@@ -651,59 +730,12 @@ impl TransformerContext {
 
         e.expand_attributes(self);
 
-        if let Some(text_attr) = e.pop_attr("text") {
-            let mut text_attrs = vec![];
-            let mut text_classes = vec!["tbox"];
-            let mut text_loc = "c".to_owned();
-            // Default dx/dy to push it in slightly from the edge;
-            // Without inset text squishes to the edge and can be unreadable
-            // Any specified dx/dy override this behaviour.
-            let text_inset = 1.0;
-            let mut dx = e.pop_attr("dx").map(|dx| strp(&dx));
-            let mut dy = e.pop_attr("dy").map(|dy| strp(&dy));
-
-            if let Some(text_loc_attr) = e.pop_attr("text-loc") {
-                text_loc = text_loc_attr.to_owned();
-                // relies on t/b/l/r being disjoint and t/b & l/r being mutually exclusive
-                if text_loc.contains('t') {
-                    text_classes.push("text-top");
-                    if dy.is_none() {
-                        dy = Some(text_inset);
-                    }
-                } else if text_loc.contains('b') {
-                    text_classes.push("text-bottom");
-                    dy = Some(-text_inset);
-                }
-                if text_loc.contains('l') {
-                    text_classes.push("text-left");
-                    dx = Some(text_inset);
-                } else if text_loc.contains('r') {
-                    text_classes.push("text-right");
-                    dx = Some(-text_inset);
-                }
-            }
-
-            // Assumption is that text should be centered within the rect,
-            // and has styling via CSS to reflect this, e.g.:
-            //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-            let txy = e.coord(&text_loc).unwrap();
-            text_attrs.push(("x".into(), fstr(txy.0)));
-            text_attrs.push(("y".into(), fstr(txy.1)));
-            if let Some(dx) = dx {
-                text_attrs.push(("dx".into(), fstr(dx)));
-            }
-            if let Some(dy) = dy {
-                text_attrs.push(("dy".into(), fstr(dy)));
-            }
+        if let Some((orig_elem, text_elem)) = e.process_text_attr() {
             prev_element = Some(e.clone());
-            events.push(SvgEvent::Empty(e.clone()));
+            events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-            let mut text_elem = SvgElement::new("text", &text_attrs);
-            for class in text_classes {
-                text_elem.add_class(class);
-            }
-            events.push(SvgEvent::Start(text_elem));
-            events.push(SvgEvent::Text(text_attr.to_string()));
+            events.push(SvgEvent::Start(text_elem.clone()));
+            events.push(SvgEvent::Text(text_elem.content.unwrap()));
             events.push(SvgEvent::End("text".to_string()));
             omit = true;
         }

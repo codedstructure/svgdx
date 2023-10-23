@@ -1,0 +1,43 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="-8 -8 100 100">
+  <style>
+    <![CDATA[
+        * {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 3px;
+            stroke: none;
+            fill: black;
+        }
+        text.tbox {
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+        /* prior to top/bottom/left/right so they can override this */
+        text {
+            dominant-baseline: central;
+            text-anchor: middle;
+        }
+        text.text-top {
+            dominant-baseline: text-before-edge;
+        }
+        text.text-bottom {
+            dominant-baseline: text-after-edge;
+        }
+        text.text-left {
+            text-anchor: start;
+        }
+        text.text-right {
+            text-anchor: end;
+        }
+    ]]>
+  </style>
+
+  <rect xy="0" wh="20 30" text="left" />
+  <line xy1="25 0" xy2="25 30" text="top" text-loc="t" />
+  <rect xy="30 0" wh="20 30" text="right" />
+  <line xy1="0 35" xy2="50 35" text="bottom" text-loc="b" />
+</svg>
