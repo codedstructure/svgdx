@@ -37,7 +37,8 @@ fn test_fstr() {
 }
 
 fn strp(s: &str) -> f32 {
-    s.parse().unwrap()
+    s.parse()
+        .unwrap_or_else(|_| panic!("Could not convert {} into f32", s))
 }
 
 #[derive(Clone, Debug)]
@@ -81,6 +82,11 @@ impl SvgElement {
         self.attr_map.contains_key(key)
     }
 
+    fn add_attr(&mut self, key: &str, value: &str) {
+        self.attrs.push((key.into(), value.into()));
+        self.attr_map.insert(key.to_owned(), value.to_owned());
+    }
+
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
         attrs.push((key.into(), value.into()));
@@ -100,6 +106,10 @@ impl SvgElement {
     fn pop_attr(&mut self, key: &str) -> Option<String> {
         self.attrs.retain(|x| x.0 != key);
         self.attr_map.remove(key)
+    }
+
+    fn get_attr(&mut self, key: &str) -> Option<String> {
+        self.attr_map.get(key).map(|x| x.to_owned())
     }
 
     fn bbox(&self) -> BoundingBox {
@@ -284,6 +294,11 @@ impl SvgElement {
             text_attrs.push(("dy".into(), fstr(dy)));
         }
         let mut text_elem = SvgElement::new("text", &text_attrs);
+        // Copy style and class(es) from original element
+        if let Some(style) = orig_elem.get_attr("style") {
+            text_elem.add_attr("style", &style);
+        }
+        text_elem.classes = orig_elem.classes.clone();
         for class in text_classes {
             text_elem.add_class(class);
         }
@@ -437,18 +452,16 @@ impl SvgElement {
                 }
                 "start" => match self.name.as_str() {
                     "line" => {
+                        let start_x: f32;
+                        let start_y: f32;
                         if self.has_attr("end") {
-                            let start_x: f32;
-                            let start_y: f32;
-                            if self.has_attr("end") {
-                                ((start_x, start_y), (_, _)) = self.evaluate_endpoints(context);
-                            } else {
-                                (start_x, start_y) = context.eval_ref(&value).unwrap();
-                            }
-
-                            new_attrs.push(("x1".into(), fstr(start_x)));
-                            new_attrs.push(("y1".into(), fstr(start_y)));
+                            ((start_x, start_y), (_, _)) = self.evaluate_endpoints(context);
+                        } else {
+                            (start_x, start_y) = context.eval_ref(&value).unwrap();
                         }
+
+                        new_attrs.push(("x1".into(), fstr(start_x)));
+                        new_attrs.push(("y1".into(), fstr(start_y)));
                     }
                     _ => new_attrs.push((key.clone(), value)),
                 },
@@ -493,7 +506,7 @@ impl SvgElement {
         let end_ref = self.attr_map.get("end").unwrap();
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>\w+)(@(?<loc>\S+))?$").unwrap();
+        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
 
         let caps = re.captures(start_ref).unwrap();
         let name = &caps["id"];
@@ -613,7 +626,7 @@ impl TransformerContext {
 
     fn eval_ref(&self, attr: &str) -> Option<(f32, f32)> {
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>\w+)(@(?<loc>\S+))?$").unwrap();
+        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
 
         let input = String::from(attr);
 
