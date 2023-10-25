@@ -1,4 +1,4 @@
-use clap::Parser;
+use clap::{Args, Parser};
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{
@@ -16,20 +16,27 @@ fn path_exists(path: &str) -> bool {
 }
 
 /// Transform given file to SVG
-#[derive(Parser, Debug)]
+#[derive(Parser)]
 #[command(author, version, about, long_about=None)]
-struct Args {
-    /// input file to read
-    #[arg(short, long)]
-    input: Option<String>,
-
-    /// file to watch for changes
-    #[arg(short, long)]
-    watch: Option<String>,
+struct Arguments {
+    #[command(flatten)]
+    input_type: InputArgs,
 
     /// target output file; omit for stdout
     #[arg(short, long)]
     output: Option<String>,
+}
+
+#[derive(Args)]
+#[group(required = true, multiple = false)]
+struct InputArgs {
+    /// input file to read
+    #[arg(short, long, group = "input-type")]
+    input: Option<String>,
+
+    /// file to watch for changes
+    #[arg(short, long, group = "input-type")]
+    watch: Option<String>,
 }
 
 fn transform(input: &str, output: Option<String>) {
@@ -50,11 +57,12 @@ fn transform(input: &str, output: Option<String>) {
 }
 
 fn main() {
-    let args = Args::parse();
+    let args = Arguments::parse();
+    let input_type = args.input_type;
 
-    if let Some(input) = args.input {
+    if let Some(input) = input_type.input {
         transform(&input, args.output.clone());
-    } else if let Some(watch) = args.watch {
+    } else if let Some(watch) = input_type.watch {
         let (tx, rx) = channel();
         let mut watcher =
             new_debouncer(Duration::from_millis(250), tx).expect("Could not create watcher");
@@ -79,8 +87,5 @@ fn main() {
                 Err(e) => eprintln!("Channel error: {:?}", e),
             }
         }
-    } else {
-        eprintln!("Must provide --watch or --input value");
-        std::process::exit(1);
     }
 }
