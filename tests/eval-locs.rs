@@ -45,6 +45,18 @@ fn test_loc_select() {
     contains(&input, expected_line);
 }
 
+/// Should support mixture of explicit and loc-based endpoints
+#[test]
+fn test_loc_mixed() {
+    let input = format!(r##"{}<line start="#a@tr" end="12 23" />"##, RECT_SVG);
+    let expected_line = r#"<line x1="5" y1="0" x2="12" y2="23"/>"#;
+    contains(&input, expected_line);
+
+    let input = format!(r##"{}<line start="3 7" end="#a" />"##, RECT_SVG);
+    let expected_line = r#"<line x1="3" y1="7" x2="2.5" y2="5"/>"#;
+    contains(&input, expected_line);
+}
+
 #[test]
 fn test_loc_shape() {
     let input = format!(r##"{}<circle cxy="#a@r" r="2" />"##, RECT_SVG);

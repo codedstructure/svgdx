@@ -517,31 +517,68 @@ impl SvgElement {
         let start_ref = self.attr_map.get("start").unwrap();
         let end_ref = self.attr_map.get("end").unwrap();
 
+        // This could probably be tidier, trying to deal with lots of combinations.
+        // Needs to support explicit coordinate pairs or element references, and
+        // for element references support given locations or not (in which case
+        // the location is determined automatically to give the shortest distance)
+        let mut start_el = None;
+        let mut end_el = None;
+        let mut start_loc = String::from("");
+        let mut end_loc = String::from("");
+        let mut start_point: Option<(f32, f32)> = None;
+        let mut end_point: Option<(f32, f32)> = None;
+
         // Example: "#thing@tl" => top left coordinate of element id="thing"
         let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
 
-        let caps = re.captures(start_ref).unwrap();
-        let name = &caps["id"];
-        let mut start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-        let start_el = context.elem_map.get(name).unwrap();
-
-        let caps = re.captures(end_ref).unwrap();
-        let name = &caps["id"];
-        let mut end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-        let end_el = context.elem_map.get(name).unwrap();
-
-        if start_loc.is_empty() && end_loc.is_empty() {
-            (start_loc, end_loc) = context.shortest_link(start_el, end_el);
-        } else if start_loc.is_empty() {
-            start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
-        } else if end_loc.is_empty() {
-            end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
+        if let Some(caps) = re.captures(start_ref) {
+            let name = &caps["id"];
+            start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+            start_el = context.elem_map.get(name);
+        } else {
+            let mut parts = self.attr_split(start_ref).map(|v| strp(&v));
+            start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
+        }
+        if let Some(caps) = re.captures(end_ref) {
+            let name = &caps["id"];
+            end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+            end_el = context.elem_map.get(name);
+        } else {
+            let mut parts = self.attr_split(end_ref).map(|v| strp(&v));
+            end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
 
-        (
-            start_el.coord(&start_loc).unwrap(),
-            end_el.coord(&end_loc).unwrap(),
-        )
+        match (start_point, end_point) {
+            (Some(start_point), Some(end_point)) => (start_point, end_point),
+            (Some(start_point), None) => {
+                let end_el = end_el.unwrap();
+                if end_loc.is_empty() {
+                    end_loc = context.closest_loc(end_el, start_point);
+                }
+                (start_point, end_el.coord(&end_loc).unwrap())
+            }
+            (None, Some(end_point)) => {
+                let start_el = start_el.unwrap();
+                if start_loc.is_empty() {
+                    start_loc = context.closest_loc(start_el, end_point);
+                }
+                (start_el.coord(&start_loc).unwrap(), end_point)
+            }
+            (None, None) => {
+                let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
+                if start_loc.is_empty() && end_loc.is_empty() {
+                    (start_loc, end_loc) = context.shortest_link(start_el, end_el);
+                } else if start_loc.is_empty() {
+                    start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
+                } else if end_loc.is_empty() {
+                    end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
+                }
+                (
+                    start_el.coord(&start_loc).unwrap(),
+                    end_el.coord(&end_loc).unwrap(),
+                )
+            }
+        }
     }
 }
 
