@@ -20,26 +20,26 @@
     ]]>
   </style>
 
-  <rect x="0" y="0" width="20" height="30"/>
+  <rect x="0" y="0" width="20" height="30" id="outline"/>
   <ellipse cx="10" cy="0" rx="6" ry="3"/>
   <text x="10" y="0" class="tbox">ports</text>
 
-  <rect x="-5" y="2.5" width="10" height="5"/>
+  <rect x="-5" y="2.5" width="10" height="5" id="a"/>
   <text x="0" y="5" class="tbox">a</text>
   <circle cx="5" cy="7.5" r="2"/>
   <text x="5" y="7.5" class="tbox">1</text>
 
-  <rect x="-5" y="12.5" width="10" height="5"/>
+  <rect x="-5" y="12.5" width="10" height="5" id="b"/>
   <text x="0" y="15" class="tbox">b</text>
   <circle cx="5" cy="17.5" r="2"/>
   <text x="5" y="17.5" class="tbox">2</text>
 
-  <rect x="-5" y="22.5" width="10" height="5"/>
+  <rect x="-5" y="22.5" width="10" height="5" id="c"/>
   <text x="0" y="25" class="tbox">c</text>
   <circle cx="5" cy="27.5" r="2"/>
   <text x="5" y="27.5" class="tbox">3</text>
 
-  <rect x="15" y="12.5" width="10" height="5"/>
+  <rect x="15" y="12.5" width="10" height="5" id="d"/>
   <text x="20" y="15" class="tbox">out</text>
   <circle cx="15" cy="17.5" r="2"/>
   <text x="15" y="17.5" class="tbox">4</text>

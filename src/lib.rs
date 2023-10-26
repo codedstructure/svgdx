@@ -306,14 +306,26 @@ impl SvgElement {
         Some((orig_elem, text_elem))
     }
 
-    fn evaluate(&self, input: &str) -> String {
-        // TODO - re-use context::evaluate()
+    fn evaluate(&self, input: &str, context: &TransformerContext) -> String {
+        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
+
+        if let Some(caps) = re.captures(input) {
+            let name = &caps["id"];
+            let loc = caps.name("loc").map(|v| v.as_str());
+            let ref_el = context.elem_map.get(name).unwrap();
+
+            if let Some(loc) = loc {
+                if let Some(pos) = ref_el.coord(loc) {
+                    return format!("{} {}", pos.0, pos.1);
+                }
+            }
+        }
         input.to_owned()
     }
 
     /// Returns iterator cycling over whitespace-separated values
     fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
-        input.split_whitespace().map(|v| self.evaluate(v)).cycle()
+        input.split_whitespace().map(|v| v.to_string()).cycle()
     }
 
     fn expand_attributes(&mut self, context: &TransformerContext) {
@@ -321,7 +333,7 @@ impl SvgElement {
 
         // Process and expand attributes as needed
         for (key, value) in self.attrs.clone() {
-            let value = self.evaluate(value.as_str());
+            let value = self.evaluate(value.as_str(), context);
             // TODO: should expand in a given order to avoid repetition?
             match key.as_str() {
                 "xy" => {
@@ -679,39 +691,6 @@ impl TransformerContext {
         (this_min_loc.to_owned(), that_min_loc.to_owned())
     }
 
-    fn evaluate(&self, input: &str) -> String {
-        let re = Regex::new(r"#(\S+):(\S+)").unwrap();
-
-        let mut input = String::from(input);
-
-        // <p id="blob" xy="40 50"/>
-        // #blob:xy -> 40 50
-        if let Some(caps) = re.captures(&input) {
-            let name = caps.get(1).unwrap().as_str();
-            let attr = caps.get(2).unwrap().as_str();
-
-            if let Some(el) = self.elem_map.get(name) {
-                if let Some(value) = el.attr_map.get(attr) {
-                    //return value.to_owned();
-                    input = value.to_owned();
-                }
-            }
-        }
-
-        input.to_owned()
-
-        // tokenise
-
-        // substitute
-
-        // evaluate
-    }
-
-    /// Returns iterator cycling over whitespace-separated values
-    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
-        input.split_whitespace().map(|v| self.evaluate(v)).cycle()
-    }
-
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
         let elem_name = &e.name;
 
@@ -725,15 +704,14 @@ impl TransformerContext {
         // Compute any updated geometry from rel attributes
         for (key, value) in &e.attrs.clone() {
             if key.as_str() == "rel" {
-                let mut parts = self.attr_split(value);
+                let mut parts = value.split_whitespace();
                 if let Some(prev) = &self.prev_element {
                     // Example: rel="tr 2 0"  -> next element top-left starts at prev@tr+(2,0)
                     let loc = parts.next().unwrap();
-                    let dx = strp(parts.next().unwrap().as_str());
-                    let dy = strp(parts.next().unwrap().as_str());
+                    let dx = strp(parts.next().unwrap());
+                    let dy = strp(parts.next().unwrap());
 
-                    let (prev_x, prev_y) =
-                        prev.coord(&loc).expect("Cannot use rel on this element");
+                    let (prev_x, prev_y) = prev.coord(loc).expect("Cannot use rel on this element");
                     let rel_x = prev_x + dx;
                     let rel_y = prev_y + dy;
                     e = e.without_attr("rel").positioned(rel_x, rel_y);
@@ -940,6 +918,7 @@ impl TransformerContext {
         }
 
         if !omit {
+            e.expand_attributes(self);
             let new_elem = e.clone();
             if empty {
                 events.push(SvgEvent::Empty(new_elem.clone()));

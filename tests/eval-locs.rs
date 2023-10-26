@@ -44,3 +44,10 @@ fn test_loc_select() {
     let expected_line = r#"<line x1="0" y1="0" x2="25" y2="25"/>"#;
     contains(&input, expected_line);
 }
+
+#[test]
+fn test_loc_shape() {
+    let input = format!(r##"{}<circle cxy="#a@r" r="2" />"##, RECT_SVG);
+    let expected_circle = r#"<circle cx="5" cy="2.5" r="2"/>"#;
+    contains(&input, expected_circle);
+}

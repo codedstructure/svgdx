@@ -71,6 +71,8 @@ fn main() {
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)
             .unwrap_or_else(|_| panic!("Could not establish watch on {}", watch));
+        // Convert first, don't wait for a file update
+        transform(&watch, args.output.clone());
         eprintln!("Watching {} for changes", watch);
         loop {
             match rx.recv() {

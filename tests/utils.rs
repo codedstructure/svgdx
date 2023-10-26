@@ -22,5 +22,10 @@ pub fn contains(input: &str, expected: &str) {
         .expect("Transform failure");
     let output = String::from_utf8(output).unwrap();
 
-    assert!(output.contains(expected), "\n {}\nnot found in\n {}", expected, output);
+    assert!(
+        output.contains(expected),
+        "\n {}\nnot found in\n {}",
+        expected,
+        output
+    );
 }
