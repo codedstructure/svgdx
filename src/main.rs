@@ -3,11 +3,12 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{
     fs::{self, File},
-    io::{BufReader, Write},
+    io::BufReader,
     path::Path,
     sync::mpsc::channel,
     time::Duration,
 };
+use tempfile::NamedTempFile;
 
 use svgd::Transformer;
 
@@ -43,17 +44,20 @@ fn transform(input: &str, output: Option<String>) {
     if !path_exists(input) {
         panic!("File does not exist");
     }
-    let mut out_writer = match output {
-        Some(x) => {
-            let path = std::path::Path::new(&x);
-            Box::new(File::create(path).unwrap()) as Box<dyn Write>
-        }
-        None => Box::new(std::io::stdout()) as Box<dyn Write>,
-    };
 
     let mut t = Transformer::new();
     let mut in_reader = Box::new(BufReader::new(File::open(input).unwrap()));
-    let _ = t.transform(&mut in_reader, &mut out_writer);
+
+    match output {
+        Some(x) => {
+            let mut out_temp = NamedTempFile::new().unwrap();
+            let _ = t.transform(&mut in_reader, &mut out_temp);
+            out_temp.persist(x).expect("Could not persist temp file");
+        }
+        None => {
+            let _ = t.transform(&mut in_reader, &mut std::io::stdout());
+        }
+    }
 }
 
 fn main() {
@@ -71,8 +75,6 @@ fn main() {
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)
             .unwrap_or_else(|_| panic!("Could not establish watch on {}", watch));
-        // Convert first, don't wait for a file update
-        transform(&watch, args.output.clone());
         eprintln!("Watching {} for changes", watch);
         loop {
             match rx.recv() {
