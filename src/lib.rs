@@ -307,17 +307,41 @@ impl SvgElement {
     }
 
     fn evaluate(&self, input: &str, context: &TransformerContext) -> String {
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
+        // Relative positioning:
+        //   ID LOC DX DY
+        // (relv|relh|[#id])[@loc] [dx] [dy]
+        // Defaults:
+        //   #id = previous element
+        //   @loc = tr; equivalent to @tr for relh, @bl for relv)
+        //   dx, dy - offset from the @loc
+        // Examples:
+        //   xy="relv"       - position immediately below previous element
+        //   xy="relh"       - position immediately to right of previous element
+        //   xy="@tr 10 0"   - position to right of previous element with gap of 10
+        //   cxy="@b"        - position centre at bottom of previous element
+        // TODO - extend to allow referencing earlier elements beyond previous
+        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)(\s+(?<dx>[-0-9\.]+))?(\s+(?<dy>[-0-9\.]+))?$").unwrap();
+        if let Some(caps) = rel_re.captures(input) {
+            let default_rel = match input {
+                "relv" => "bl",
+                "relh" => "tr",
+                _ => "tr",
+            };
+            let dx = strp(caps.name("dx").map_or("0", |v| v.as_str()));
+            let dy = strp(caps.name("dy").map_or("0", |v| v.as_str()));
 
-        if let Some(caps) = re.captures(input) {
-            let name = &caps["id"];
-            let loc = caps.name("loc").map(|v| v.as_str());
-            let ref_el = context.elem_map.get(name).unwrap();
-
-            if let Some(loc) = loc {
-                if let Some(pos) = ref_el.coord(loc) {
-                    return format!("{} {}", pos.0, pos.1);
-                }
+            let mut ref_el = context.prev_element.as_ref();
+            let opt_id = caps
+                .name("id")
+                .map(|v| v.as_str().strip_prefix('#').unwrap());
+            let loc = caps
+                .name("loc")
+                .map(|v| v.as_str().strip_prefix('@').unwrap());
+            if let Some(name) = opt_id {
+                ref_el = Some(context.elem_map.get(name).unwrap());
+            }
+            if let Some(pos) = ref_el.unwrap().coord(loc.unwrap_or(default_rel)) {
+                return format!("{} {}", pos.0 + dx, pos.1 + dy);
             }
         }
         input.to_owned()
@@ -328,12 +352,15 @@ impl SvgElement {
         input.split_whitespace().map(|v| v.to_string()).cycle()
     }
 
-    fn expand_attributes(&mut self, context: &TransformerContext) {
+    fn expand_attributes(&mut self, simple: bool, context: &TransformerContext) {
         let mut new_attrs = vec![];
 
         // Process and expand attributes as needed
         for (key, value) in self.attrs.clone() {
-            let value = self.evaluate(value.as_str(), context);
+            let mut value = value.clone();
+            if !simple {
+                value = self.evaluate(value.as_str(), context);
+            }
             // TODO: should expand in a given order to avoid repetition?
             match key.as_str() {
                 "xy" => {
@@ -659,7 +686,7 @@ impl TransformerContext {
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap();
                         let mut elem = SvgElement::new(&elem_name, &attr_list);
                         // Expand anything we can given the current context
-                        elem.expand_attributes(self);
+                        elem.expand_attributes(true, self);
                         elem_map.insert(id.clone(), elem);
                     }
                 }
@@ -738,25 +765,7 @@ impl TransformerContext {
 
         let mut e = e.clone();
 
-        // Compute any updated geometry from rel attributes
-        for (key, value) in &e.attrs.clone() {
-            if key.as_str() == "rel" {
-                let mut parts = value.split_whitespace();
-                if let Some(prev) = &self.prev_element {
-                    // Example: rel="tr 2 0"  -> next element top-left starts at prev@tr+(2,0)
-                    let loc = parts.next().unwrap();
-                    let dx = strp(parts.next().unwrap());
-                    let dy = strp(parts.next().unwrap());
-
-                    let (prev_x, prev_y) = prev.coord(loc).expect("Cannot use rel on this element");
-                    let rel_x = prev_x + dx;
-                    let rel_y = prev_y + dy;
-                    e = e.without_attr("rel").positioned(rel_x, rel_y);
-                }
-            }
-        }
-
-        e.expand_attributes(self);
+        e.expand_attributes(false, self);
 
         if let Some((orig_elem, text_elem)) = e.process_text_attr() {
             prev_element = Some(e.clone());
@@ -950,12 +959,26 @@ impl TransformerContext {
                 events.push(SvgEvent::Empty(
                     SvgElement::new("path", &common_attrs).add_class("pipeline"),
                 ));
+
+                omit = true;
+                // Since we're omitting the original element we need to set a separate
+                // element to act as the previous element for relative positioning
+                let bbox = SvgElement::new(
+                    "rect",
+                    &[
+                        ("x".into(), fstr(x)),
+                        ("y".into(), fstr(y)),
+                        ("width".into(), fstr(width)),
+                        ("height".into(), fstr(height)),
+                    ],
+                );
+                prev_element = Some(bbox);
             }
             _ => {}
         }
 
         if !omit {
-            e.expand_attributes(self);
+            e.expand_attributes(true, self);
             let new_elem = e.clone();
             if empty {
                 events.push(SvgEvent::Empty(new_elem.clone()));

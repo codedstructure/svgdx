@@ -63,3 +63,10 @@ fn test_loc_shape() {
     let expected_circle = r#"<circle cx="5" cy="2.5" r="2"/>"#;
     contains(&input, expected_circle);
 }
+
+#[test]
+fn test_loc_shape_offset() {
+    let input = format!(r##"{}<circle cxy="#a@r 1.5 2.3" r="2" />"##, RECT_SVG);
+    let expected_circle = r#"<circle cx="6.5" cy="4.8" r="2"/>"#;
+    contains(&input, expected_circle);
+}
