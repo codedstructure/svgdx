@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use regex::Regex;
 
 mod types;
-use types::BoundingBox;
+use types::{AttrMap, BoundingBox};
 
 /// Return a 'minimal' representation of the given number
 fn fstr(x: f32) -> String {
@@ -23,19 +23,6 @@ fn fstr(x: f32) -> String {
         result
     }
 }
-
-#[test]
-fn test_fstr() {
-    assert_eq!(fstr(1.0), "1");
-    assert_eq!(fstr(-100.0), "-100");
-    assert_eq!(fstr(1.2345678), "1.235");
-    assert_eq!(fstr(-1.2345678), "-1.235");
-    assert_eq!(fstr(91.0004), "91");
-    // Large-ish integers should be fine
-    assert_eq!(fstr(12345678.0), "12345678");
-    assert_eq!(fstr(12340000.0), "12340000");
-}
-
 fn strp(s: &str) -> f32 {
     s.parse()
         .unwrap_or_else(|_| panic!("Could not convert {} into f32", s))
@@ -44,15 +31,14 @@ fn strp(s: &str) -> f32 {
 #[derive(Clone, Debug)]
 struct SvgElement {
     name: String,
-    attrs: Vec<(String, String)>,
-    attr_map: HashMap<String, String>,
+    attrs: AttrMap,
     classes: BTreeSet<String>,
     content: Option<String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
-        let mut attr_map: HashMap<String, String> = HashMap::new();
+        let mut attr_map = AttrMap::new();
         let mut classes: BTreeSet<String> = BTreeSet::new();
 
         for (key, value) in attrs {
@@ -66,8 +52,7 @@ impl SvgElement {
         }
         Self {
             name: name.to_string(),
-            attrs: attrs.to_vec(),
-            attr_map,
+            attrs: attr_map,
             classes,
             content: None,
         }
@@ -79,18 +64,17 @@ impl SvgElement {
     }
 
     fn has_attr(&self, key: &str) -> bool {
-        self.attr_map.contains_key(key)
+        self.attrs.contains_key(key)
     }
 
     fn add_attr(&mut self, key: &str, value: &str) {
-        self.attrs.push((key.into(), value.into()));
-        self.attr_map.insert(key.to_owned(), value.to_owned());
+        self.attrs.insert(key, value);
     }
 
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
-        attrs.push((key.into(), value.into()));
-        SvgElement::new(self.name.as_str(), &attrs)
+        attrs.insert(key, value);
+        SvgElement::new(self.name.as_str(), &attrs.to_vec())
     }
 
     fn without_attr(&self, key: &str) -> Self {
@@ -104,56 +88,55 @@ impl SvgElement {
     }
 
     fn pop_attr(&mut self, key: &str) -> Option<String> {
-        self.attrs.retain(|x| x.0 != key);
-        self.attr_map.remove(key)
+        self.attrs.remove(key)
     }
 
     fn get_attr(&mut self, key: &str) -> Option<String> {
-        self.attr_map.get(key).map(|x| x.to_owned())
+        self.attrs.get(key).map(|x| x.to_owned())
     }
 
     fn bbox(&self) -> BoundingBox {
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
                 let (x, y, w, h) = (
-                    strp(self.attr_map.get("x").unwrap()),
-                    strp(self.attr_map.get("y").unwrap()),
-                    strp(self.attr_map.get("width").unwrap()),
-                    strp(self.attr_map.get("height").unwrap()),
+                    strp(self.attrs.get("x").unwrap()),
+                    strp(self.attrs.get("y").unwrap()),
+                    strp(self.attrs.get("width").unwrap()),
+                    strp(self.attrs.get("height").unwrap()),
                 );
                 BoundingBox::BBox(x, y, x + w, y + h)
             }
             "line" => {
                 let (x1, y1, x2, y2) = (
-                    strp(self.attr_map.get("x1").unwrap()),
-                    strp(self.attr_map.get("y1").unwrap()),
-                    strp(self.attr_map.get("x2").unwrap()),
-                    strp(self.attr_map.get("y2").unwrap()),
+                    strp(self.attrs.get("x1").unwrap()),
+                    strp(self.attrs.get("y1").unwrap()),
+                    strp(self.attrs.get("x2").unwrap()),
+                    strp(self.attrs.get("y2").unwrap()),
                 );
                 BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2))
             }
             "circle" => {
                 let (cx, cy, r) = (
-                    strp(self.attr_map.get("cx").unwrap()),
-                    strp(self.attr_map.get("cy").unwrap()),
-                    strp(self.attr_map.get("r").unwrap()),
+                    strp(self.attrs.get("cx").unwrap()),
+                    strp(self.attrs.get("cy").unwrap()),
+                    strp(self.attrs.get("r").unwrap()),
                 );
                 BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)
             }
             "ellipse" => {
                 let (cx, cy, rx, ry) = (
-                    strp(self.attr_map.get("cx").unwrap()),
-                    strp(self.attr_map.get("cy").unwrap()),
-                    strp(self.attr_map.get("rx").unwrap()),
-                    strp(self.attr_map.get("ry").unwrap()),
+                    strp(self.attrs.get("cx").unwrap()),
+                    strp(self.attrs.get("cy").unwrap()),
+                    strp(self.attrs.get("rx").unwrap()),
+                    strp(self.attrs.get("ry").unwrap()),
                 );
                 BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)
             }
             "person" => {
                 let (x, y, h) = (
-                    strp(self.attr_map.get("x").unwrap()),
-                    strp(self.attr_map.get("y").unwrap()),
-                    strp(self.attr_map.get("height").unwrap()),
+                    strp(self.attrs.get("x").unwrap()),
+                    strp(self.attrs.get("y").unwrap()),
+                    strp(self.attrs.get("height").unwrap()),
                 );
                 BoundingBox::BBox(x, y, x + h / 3., y + h)
             }
@@ -178,10 +161,10 @@ impl SvgElement {
                 "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
                 _ => {
                     if self.name == "line" {
-                        let x1 = strp(self.attr_map.get("x1").unwrap());
-                        let y1 = strp(self.attr_map.get("y1").unwrap());
-                        let x2 = strp(self.attr_map.get("x2").unwrap());
-                        let y2 = strp(self.attr_map.get("y2").unwrap());
+                        let x1 = strp(self.attrs.get("x1").unwrap());
+                        let y1 = strp(self.attrs.get("y1").unwrap());
+                        let x2 = strp(self.attrs.get("x2").unwrap());
+                        let y2 = strp(self.attrs.get("y2").unwrap());
                         match loc {
                             "xy1" | "start" => Some((x1, y1)),
                             "xy2" | "end" => Some((x2, y2)),
@@ -403,9 +386,9 @@ impl SvgElement {
                             // Requires wh (/ width&height) be specified in order to evaluate
                             // the centre point.
                             // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                            let wh = self.attr_map.get("wh").map(|z| z.to_string());
-                            let mut width = self.attr_map.get("width").map(|z| strp(z));
-                            let mut height = self.attr_map.get("height").map(|z| strp(z));
+                            let wh = self.attrs.get("wh").map(|z| z.to_string());
+                            let mut width = self.attrs.get("width").map(|z| strp(z));
+                            let mut height = self.attrs.get("height").map(|z| strp(z));
                             let cx = strp(&parts.next().unwrap());
                             let cy = strp(&parts.next().unwrap());
                             if let Some(wh_inner) = wh {
@@ -458,12 +441,12 @@ impl SvgElement {
                         }
                         "rect" => {
                             // must have xy1 (/ x&y) or wh (/ width&height)
-                            let wh = self.attr_map.get("wh").map(|z| z.to_string());
-                            let xy1 = self.attr_map.get("xy1").map(|z| z.to_string());
-                            let mut width = self.attr_map.get("width").map(|z| strp(z));
-                            let mut height = self.attr_map.get("height").map(|z| strp(z));
-                            let mut x = self.attr_map.get("x").map(|z| strp(z));
-                            let mut y = self.attr_map.get("y").map(|z| strp(z));
+                            let wh = self.attrs.get("wh").map(|z| z.to_string());
+                            let xy1 = self.attrs.get("xy1").map(|z| z.to_string());
+                            let mut width = self.attrs.get("width").map(|z| strp(z));
+                            let mut height = self.attrs.get("height").map(|z| strp(z));
+                            let mut x = self.attrs.get("x").map(|z| strp(z));
+                            let mut y = self.attrs.get("y").map(|z| strp(z));
                             let x2 = strp(&parts.next().unwrap());
                             let y2 = strp(&parts.next().unwrap());
                             if let Some(wh_inner) = wh {
@@ -523,7 +506,7 @@ impl SvgElement {
             }
         }
 
-        let mut attr_map: HashMap<String, String> = HashMap::new();
+        let mut attr_map = AttrMap::new();
         let mut classes: BTreeSet<String> = BTreeSet::new();
 
         for (key, value) in new_attrs.clone() {
@@ -535,14 +518,13 @@ impl SvgElement {
                 attr_map.insert(key.to_string(), value.to_string());
             }
         }
-        self.attrs = new_attrs;
-        self.attr_map = attr_map;
+        self.attrs = attr_map;
         self.classes = classes;
     }
 
     fn evaluate_endpoints(&self, context: &TransformerContext) -> ((f32, f32), (f32, f32)) {
-        let start_ref = self.attr_map.get("start").unwrap();
-        let end_ref = self.attr_map.get("end").unwrap();
+        let start_ref = self.attrs.get("start").unwrap();
+        let end_ref = self.attrs.get("end").unwrap();
 
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
@@ -785,7 +767,7 @@ impl TransformerContext {
 
                 let mut text = None;
 
-                for (key, value) in &e.attrs {
+                for (key, value) in e.clone().attrs {
                     if key == "text" {
                         // allows an empty element to contain text content directly as an attribute
                         text = Some(value);
@@ -827,7 +809,7 @@ impl TransformerContext {
                 let mut leg1_attrs: Vec<(String, String)> = vec![];
                 let mut leg2_attrs: Vec<(String, String)> = vec![];
 
-                for (key, value) in &e.attrs {
+                for (key, value) in e.clone().attrs {
                     match key.as_str() {
                         "x" => {
                             x1 = value.clone().parse().unwrap();
@@ -903,7 +885,7 @@ impl TransformerContext {
                 let mut width = 0.;
                 let mut height = 0.;
                 let mut common_attrs = vec![];
-                for (key, value) in &e.attrs {
+                for (key, value) in e.clone().attrs {
                     match key.as_str() {
                         "x" => {
                             x = value.clone().parse().unwrap();
@@ -1196,5 +1178,22 @@ impl Transformer {
         }
 
         output.write_to(writer).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_fstr() {
+        assert_eq!(fstr(1.0), "1");
+        assert_eq!(fstr(-100.0), "-100");
+        assert_eq!(fstr(1.2345678), "1.235");
+        assert_eq!(fstr(-1.2345678), "-1.235");
+        assert_eq!(fstr(91.0004), "91");
+        // Large-ish integers (up to 24 bit mantissa) should be fine
+        assert_eq!(fstr(12345678.0), "12345678");
+        assert_eq!(fstr(12340000.0), "12340000");
     }
 }
