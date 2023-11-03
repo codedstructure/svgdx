@@ -1,4 +1,4 @@
-mod utils;
+pub mod utils;
 use utils::contains;
 
 const RECT_SVG: &str = r#"
