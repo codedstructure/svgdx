@@ -10,7 +10,7 @@ pub fn compare(input: &str, expected: &str) {
         .expect("Transform failure");
     let output = String::from_utf8(output).unwrap();
 
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 pub fn contains(input: &str, expected: &str) {

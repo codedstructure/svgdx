@@ -71,12 +71,14 @@ impl SvgElement {
         self.attrs.insert(key, value);
     }
 
+    #[allow(dead_code)]
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
         attrs.insert(key, value);
         SvgElement::new(self.name.as_str(), &attrs.to_vec())
     }
 
+    #[allow(dead_code)]
     fn without_attr(&self, key: &str) -> Self {
         let attrs: Vec<(String, String)> = self
             .attrs
@@ -180,6 +182,7 @@ impl SvgElement {
         }
     }
 
+    #[allow(dead_code)]
     fn translated(&self, dx: f32, dy: f32) -> Self {
         let mut attrs = vec![];
         for (key, mut value) in self.attrs.clone() {
@@ -197,6 +200,7 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs)
     }
 
+    #[allow(dead_code)]
     fn positioned(&self, x: f32, y: f32) -> Self {
         // TODO: should allow specifying which loc this positions; this currently
         // sets the top-left (for rect/tbox), but for some scenarios it might be
@@ -643,7 +647,6 @@ impl TransformerContext {
                     break;
                 }
                 Event::Start(e) | Event::Empty(e) => {
-                    let mut attr_map = HashMap::new();
                     let mut attr_list = vec![];
                     let mut id_opt = None;
                     for a in e.attributes() {
@@ -655,15 +658,10 @@ impl TransformerContext {
                         if &key == "id" {
                             id_opt = Some(value);
                         } else {
-                            attr_map.insert(key.clone(), value.clone());
                             attr_list.push((key, value.clone()));
                         }
                     }
                     if let Some(id) = id_opt {
-                        attr_map.insert(
-                            String::from("_element_name"),
-                            String::from_utf8(e.name().into_inner().to_vec()).unwrap(),
-                        );
                         let elem_name: String =
                             String::from_utf8(e.name().into_inner().to_vec()).unwrap();
                         let mut elem = SvgElement::new(&elem_name, &attr_list);
@@ -979,11 +977,6 @@ impl TransformerContext {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct Transformer {
-    context: TransformerContext,
-}
-
 struct EventList<'a> {
     events: Vec<Event<'a>>,
 }
@@ -1044,6 +1037,11 @@ impl EventList<'_> {
     }
 }
 
+#[derive(Default, Debug)]
+pub struct Transformer {
+    context: TransformerContext,
+}
+
 impl Transformer {
     pub fn new() -> Self {
         Self {
@@ -1069,46 +1067,23 @@ impl Transformer {
                 }
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
-                    let ee = self.context.handle_element(&SvgElement::from(e), is_empty);
-                    for svg_ev in ee.into_iter() {
-                        // re-calculate is_empty for each generated event
-                        let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
-                        match svg_ev {
-                            SvgEvent::Empty(e) | SvgEvent::Start(e) => {
-                                let mut bs = BytesStart::new(e.name);
-                                // Collect non-'class' attributes
-                                for (k, v) in e.attrs.into_iter() {
-                                    if k != "class" {
-                                        bs.push_attribute(Attribute::from((
-                                            k.as_bytes(),
-                                            v.as_bytes(),
-                                        )));
-                                    }
-                                }
-                                // Any 'class' attribute values are stored separately as a HashSet;
-                                // collect those into the BytesStart object
-                                if !e.classes.is_empty() {
-                                    bs.push_attribute(Attribute::from((
-                                        "class".as_bytes(),
-                                        e.classes
-                                            .into_iter()
-                                            .collect::<Vec<String>>()
-                                            .join(" ")
-                                            .as_bytes(),
-                                    )));
-                                }
-                                if is_empty {
-                                    output.push(&Event::Empty(bs));
-                                } else {
-                                    output.push(&Event::Start(bs));
-                                }
-                            }
-                            SvgEvent::Text(t) => {
-                                output.push(&Event::Text(BytesText::new(&t)));
-                            }
-                            SvgEvent::End(name) => {
-                                output.push(&Event::End(BytesEnd::new(name)));
-                            }
+                    let mut repeat = 1;
+                    let mut event_element = SvgElement::from(e);
+                    if let Some(rep_count) = event_element.pop_attr("repeat") {
+                        if is_empty {
+                            repeat = rep_count.parse().unwrap_or(1);
+                        } else {
+                            todo!("Repeat is not implemented for non-empty elements");
+                        }
+                    }
+                    for rep_idx in 0..repeat {
+                        transform_element(&event_element, &mut self.context, &mut output, is_empty);
+
+                        if rep_idx < (repeat - 1) {
+                            output.push(&Event::Text(BytesText::new(&format!(
+                                "\n{}",
+                                self.context.last_indent
+                            ))));
                         }
                     }
                 }
@@ -1178,6 +1153,53 @@ impl Transformer {
         }
 
         output.write_to(writer).map_err(|e| e.to_string())
+    }
+}
+
+fn transform_element(
+    element: &SvgElement,
+    context: &mut TransformerContext,
+    output: &mut EventList,
+    is_empty: bool,
+) {
+    let ee = context.handle_element(element, is_empty);
+    for svg_ev in ee.into_iter() {
+        // re-calculate is_empty for each generated event
+        let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
+        match svg_ev {
+            SvgEvent::Empty(e) | SvgEvent::Start(e) => {
+                let mut bs = BytesStart::new(e.name);
+                // Collect non-'class' attributes
+                for (k, v) in e.attrs.into_iter() {
+                    if k != "class" {
+                        bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+                    }
+                }
+                // Any 'class' attribute values are stored separately as a HashSet;
+                // collect those into the BytesStart object
+                if !e.classes.is_empty() {
+                    bs.push_attribute(Attribute::from((
+                        "class".as_bytes(),
+                        e.classes
+                            .into_iter()
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                            .as_bytes(),
+                    )));
+                }
+                if is_empty {
+                    output.push(&Event::Empty(bs));
+                } else {
+                    output.push(&Event::Start(bs));
+                }
+            }
+            SvgEvent::Text(t) => {
+                output.push(&Event::Text(BytesText::new(&t)));
+            }
+            SvgEvent::End(name) => {
+                output.push(&Event::End(BytesEnd::new(name)));
+            }
+        }
     }
 }
 
