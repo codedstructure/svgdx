@@ -4,12 +4,12 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use std::io::{BufReader, Read, Write};
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::HashMap;
 
 use regex::Regex;
 
 mod types;
-use types::{AttrMap, BoundingBox};
+use types::{AttrMap, BoundingBox, ClassList};
 
 /// Return a 'minimal' representation of the given number
 fn fstr(x: f32) -> String {
@@ -32,14 +32,14 @@ fn strp(s: &str) -> f32 {
 struct SvgElement {
     name: String,
     attrs: AttrMap,
-    classes: BTreeSet<String>,
+    classes: ClassList,
     content: Option<String>,
 }
 
 impl SvgElement {
     fn new(name: &str, attrs: &[(String, String)]) -> Self {
         let mut attr_map = AttrMap::new();
-        let mut classes: BTreeSet<String> = BTreeSet::new();
+        let mut classes = ClassList::new();
 
         for (key, value) in attrs {
             if key == "class" {
@@ -507,7 +507,7 @@ impl SvgElement {
         }
 
         let mut attr_map = AttrMap::new();
-        let mut classes: BTreeSet<String> = BTreeSet::new();
+        let mut classes = ClassList::new();
 
         for (key, value) in new_attrs.clone() {
             if key == "class" {

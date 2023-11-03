@@ -1,4 +1,5 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BoundingBox {
@@ -161,6 +162,92 @@ impl<'s> IntoIterator for &'s AttrMap {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct ClassList {
+    classes: BTreeSet<(usize, String)>,
+    index_map: HashMap<String, usize>,
+    next_index: usize,
+}
+
+impl ClassList {
+    pub fn new() -> Self {
+        Self {
+            classes: BTreeSet::new(),
+            index_map: HashMap::new(),
+            next_index: 0,
+        }
+    }
+
+    /// Insert the given key/value into the ClassList.
+    pub fn insert(&mut self, class: impl Into<String>) {
+        let class = class.into();
+        let index = *self.index_map.entry(class.clone()).or_insert_with(|| {
+            self.next_index += 1;
+            self.next_index
+        });
+        self.classes.insert((index, class));
+    }
+
+    pub fn contains(&self, class: impl Into<String>) -> bool {
+        let class = class.into();
+        self.index_map.contains_key(&class)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.index_map.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &String> + '_ {
+        self.classes.iter().map(|item| (&item.1))
+    }
+
+    pub fn remove(&mut self, class: impl Into<String>) -> bool {
+        let class = class.into();
+        if let Some(&index) = self.index_map.get(&class) {
+            self.index_map.remove(&class);
+            self.classes.remove(&(index, class))
+        } else {
+            false
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<String> {
+        self.clone().into_iter().collect()
+    }
+}
+
+impl fmt::Display for ClassList {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ClassList{:?}", self.to_vec())
+    }
+}
+
+impl IntoIterator for ClassList {
+    type Item = String;
+    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.classes
+            .into_iter()
+            .map(|v| v.1)
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
+impl<'s> IntoIterator for &'s ClassList {
+    type Item = &'s String;
+    type IntoIter = <Vec<&'s String> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.classes
+            .iter()
+            .map(|v| &v.1)
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -230,5 +317,24 @@ mod test {
             total += value.parse::<i32>().unwrap();
         }
         assert_eq!(total, 35);
+    }
+
+    #[test]
+    fn test_classlist() {
+        let mut cl = ClassList::new();
+
+        assert!(cl.is_empty());
+        cl.insert("abc");
+        cl.insert("xyz");
+        cl.insert("pqr");
+        assert!(!cl.is_empty());
+
+        assert!(cl.contains("abc"));
+        assert!(!cl.contains("ijk"));
+
+        let target_state = vec!["abc".to_string(), "xyz".to_string(), "pqr".to_string()];
+
+        assert_eq!(cl.to_vec(), target_state);
+        assert_eq!(format!("{}", cl), r#"ClassList["abc", "xyz", "pqr"]"#);
     }
 }
