@@ -136,6 +136,16 @@ impl AttrMap {
     }
 }
 
+impl FromIterator<(String, String)> for AttrMap {
+    fn from_iter<I: IntoIterator<Item = (String, String)>>(iter: I) -> Self {
+        let mut am = Self::new();
+        for (k, v) in iter {
+            am.insert(k, v);
+        }
+        am
+    }
+}
+
 impl IntoIterator for AttrMap {
     type Item = (String, String);
     type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
@@ -222,6 +232,16 @@ impl fmt::Display for ClassList {
     }
 }
 
+impl FromIterator<String> for ClassList {
+    fn from_iter<I: IntoIterator<Item = String>>(iter: I) -> Self {
+        let mut cl = Self::new();
+        for class in iter {
+            cl.insert(class);
+        }
+        cl
+    }
+}
+
 impl IntoIterator for ClassList {
     type Item = String;
     type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
@@ -251,6 +271,7 @@ impl<'s> IntoIterator for &'s ClassList {
 #[cfg(test)]
 mod test {
     use super::*;
+
     #[test]
     fn test_bbox() {
         let mut bb = BoundingBox::new();
@@ -317,6 +338,14 @@ mod test {
             total += value.parse::<i32>().unwrap();
         }
         assert_eq!(total, 35);
+
+        // Check FromIterator via collect()
+        let two_attrs = vec![
+            ("abc".to_string(), "123".to_string()),
+            ("def".to_string(), "blob".to_string()),
+        ];
+        let am: AttrMap = two_attrs.clone().into_iter().collect();
+        assert_eq!(am.to_vec(), two_attrs);
     }
 
     #[test]
@@ -334,7 +363,10 @@ mod test {
 
         let target_state = vec!["abc".to_string(), "xyz".to_string(), "pqr".to_string()];
 
-        assert_eq!(cl.to_vec(), target_state);
+        assert_eq!(cl.to_vec(), target_state.clone());
         assert_eq!(format!("{}", cl), r#"ClassList["abc", "xyz", "pqr"]"#);
+
+        let cl: ClassList = target_state.clone().into_iter().collect();
+        assert_eq!(cl.to_vec(), target_state);
     }
 }
