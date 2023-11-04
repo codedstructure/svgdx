@@ -23,6 +23,8 @@ fn fstr(x: f32) -> String {
         result
     }
 }
+
+/// Parse a string to an f32
 fn strp(s: &str) -> f32 {
     s.parse()
         .unwrap_or_else(|_| panic!("Could not convert {} into f32", s))
@@ -61,6 +63,12 @@ impl SvgElement {
     fn add_class(&mut self, class: &str) -> Self {
         self.classes.insert(class.to_string());
         self.clone()
+    }
+
+    fn add_classes(&mut self, classes: &ClassList) {
+        for class in classes {
+            self.add_class(class);
+        }
     }
 
     fn has_attr(&self, key: &str) -> bool {
@@ -339,7 +347,7 @@ impl SvgElement {
         input.split_whitespace().map(|v| v.to_string()).cycle()
     }
 
-    fn expand_attributes(&mut self, simple: bool, context: &TransformerContext) {
+    fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
         let mut new_attrs = vec![];
 
         // Process and expand attributes as needed
@@ -524,6 +532,11 @@ impl SvgElement {
         }
         self.attrs = attr_map;
         self.classes = classes;
+        if let Some(elem_id) = self.get_attr("id") {
+            let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
+            updated.add_classes(&self.classes);
+            *context.elem_map.get_mut(&elem_id).unwrap() = updated;
+        }
     }
 
     fn evaluate_endpoints(&self, context: &TransformerContext) -> ((f32, f32), (f32, f32)) {
@@ -619,7 +632,7 @@ enum SvgEvent {
     End(String),
 }
 
-#[derive(Default, Debug)]
+#[derive(Clone, Default, Debug)]
 struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
