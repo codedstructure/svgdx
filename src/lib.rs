@@ -122,7 +122,12 @@ impl SvgElement {
                     strp(self.attrs.get("x2")?)?,
                     strp(self.attrs.get("y2")?)?,
                 );
-                Some(BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
+                Some(BoundingBox::BBox(
+                    x1.min(x2),
+                    y1.min(y2),
+                    x1.max(x2),
+                    y1.max(y2),
+                ))
             }
             "circle" => {
                 let (cx, cy, r) = (
@@ -234,9 +239,17 @@ impl SvgElement {
         }
     }
 
-    fn process_text_attr(&self) -> Option<(SvgElement, SvgElement)> {
+    fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
         let mut orig_elem = self.clone();
+
         let text_value = orig_elem.pop_attr("text")?;
+        // Convert unescaped '\n' into newline characters for multi-line text
+        let re = Regex::new(r"([^\\])\\n").expect("invalid regex");
+        let text_value = re.replace_all(&text_value, "$1\n").into_owned();
+        // Following that, replace any escaped "\\n" into literal '\'+'n' characters
+        let re = Regex::new(r"\\\\n").expect("invalid regex");
+        let text_value = re.replace_all(&text_value, "\\n").into_owned();
+
         let mut text_attrs = vec![];
         let mut text_classes = vec!["tbox"];
         let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
@@ -275,6 +288,16 @@ impl SvgElement {
             }
         }
 
+        // Different conversions from line number to y offset based on whether
+        // top, center, or bottom justification.
+        let line_spacer = match text_loc.as_str() {
+            "tl" | "t" | "tr" => |idx: usize, _max: usize, spacing: f32| idx as f32 * spacing,
+            "bl" | "b" | "br" => {
+                |idx: usize, max: usize, spacing: f32| ((max - 1) - idx) as f32 * -spacing
+            }
+            _ => |idx, max, spacing| idx as f32 * spacing - ((max - 1) as f32 * spacing) / 2.,
+        };
+
         // Assumption is that text should be centered within the rect,
         // and has styling via CSS to reflect this, e.g.:
         //  text.tbox { dominant-baseline: central; text-anchor: middle; }
@@ -284,20 +307,32 @@ impl SvgElement {
         if let Some(dx) = dx {
             text_attrs.push(("dx".into(), fstr(dx)));
         }
-        if let Some(dy) = dy {
-            text_attrs.push(("dy".into(), fstr(dy)));
+        let mut text_elements = Vec::new();
+        let lines: Vec<_> = text_value.lines().collect();
+        let line_count = lines.len();
+        let line_spacing = 3.;  // TODO: This is a horrible hack assuming a fixed font size
+        for (idx, text_fragment) in lines.iter().enumerate() {
+            let mut line_attrs = text_attrs.clone();
+            let line_dy = line_spacer(idx, line_count, line_spacing);
+            if dy.is_none() && line_count > 1 {
+                dy = Some(0.);
+            }
+            if let Some(dy) = dy {
+                line_attrs.push(("dy".into(), fstr(dy + line_dy)));
+            }
+            let mut text_elem = SvgElement::new("text", &line_attrs);
+            // Copy style and class(es) from original element
+            if let Some(style) = orig_elem.get_attr("style") {
+                text_elem.add_attr("style", &style);
+            }
+            text_elem.classes = orig_elem.classes.clone();
+            for class in &text_classes {
+                text_elem.add_class(class);
+            }
+            text_elem.content = Some(text_fragment.to_string());
+            text_elements.push(text_elem);
         }
-        let mut text_elem = SvgElement::new("text", &text_attrs);
-        // Copy style and class(es) from original element
-        if let Some(style) = orig_elem.get_attr("style") {
-            text_elem.add_attr("style", &style);
-        }
-        text_elem.classes = orig_elem.classes.clone();
-        for class in text_classes {
-            text_elem.add_class(class);
-        }
-        text_elem.content = Some(text_value);
-        Some((orig_elem, text_elem))
+        Some((orig_elem, text_elements))
     }
 
     fn eval_pos(&self, input: &str, context: &TransformerContext) -> String {
@@ -335,7 +370,7 @@ impl SvgElement {
                 ref_el = Some(context.elem_map.get(name).unwrap());
             }
             if let Some(pos) = ref_el.unwrap().coord(loc.unwrap_or(default_rel)) {
-                return format!("{} {}", pos.0 + dx, pos.1 + dy);
+                return format!("{} {}", fstr(pos.0 + dx), fstr(pos.1 + dy));
             }
         }
         input.to_owned()
@@ -367,7 +402,12 @@ impl SvgElement {
                 .expect("ref is mandatory in regex")
                 .as_str();
             if ref_str.starts_with('#') {
-                ref_el = Some(context.elem_map.get(ref_str.strip_prefix('#').unwrap()).unwrap());
+                ref_el = Some(
+                    context
+                        .elem_map
+                        .get(ref_str.strip_prefix('#').unwrap())
+                        .unwrap(),
+                );
             }
 
             if let Some(inner) = ref_el {
@@ -821,13 +861,15 @@ impl TransformerContext {
 
         e.expand_attributes(false, self);
 
-        if let Some((orig_elem, text_elem)) = e.process_text_attr() {
+        if let Some((orig_elem, text_elements)) = e.process_text_attr() {
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-            events.push(SvgEvent::Start(text_elem.clone()));
-            events.push(SvgEvent::Text(text_elem.content.unwrap()));
-            events.push(SvgEvent::End("text".to_string()));
+            for elem in text_elements {
+                events.push(SvgEvent::Start(elem.clone()));
+                events.push(SvgEvent::Text(elem.content.unwrap()));
+                events.push(SvgEvent::End("text".to_string()));
+            }
             omit = true;
         }
 
