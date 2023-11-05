@@ -25,9 +25,8 @@ fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-fn strp(s: &str) -> f32 {
-    s.parse()
-        .unwrap_or_else(|_| panic!("Could not convert {} into f32", s))
+fn strp(s: &str) -> Option<f32> {
+    s.parse().ok()
 }
 
 #[derive(Clone, Debug)]
@@ -101,64 +100,64 @@ impl SvgElement {
         self.attrs.remove(key)
     }
 
-    fn get_attr(&mut self, key: &str) -> Option<String> {
+    fn get_attr(&self, key: &str) -> Option<String> {
         self.attrs.get(key).map(|x| x.to_owned())
     }
 
-    fn bbox(&self) -> BoundingBox {
+    fn bbox(&self) -> Option<BoundingBox> {
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
                 let (x, y, w, h) = (
-                    strp(self.attrs.get("x").unwrap()),
-                    strp(self.attrs.get("y").unwrap()),
-                    strp(self.attrs.get("width").unwrap()),
-                    strp(self.attrs.get("height").unwrap()),
+                    strp(self.attrs.get("x")?)?,
+                    strp(self.attrs.get("y")?)?,
+                    strp(self.attrs.get("width")?)?,
+                    strp(self.attrs.get("height")?)?,
                 );
-                BoundingBox::BBox(x, y, x + w, y + h)
+                Some(BoundingBox::BBox(x, y, x + w, y + h))
             }
             "line" => {
                 let (x1, y1, x2, y2) = (
-                    strp(self.attrs.get("x1").unwrap()),
-                    strp(self.attrs.get("y1").unwrap()),
-                    strp(self.attrs.get("x2").unwrap()),
-                    strp(self.attrs.get("y2").unwrap()),
+                    strp(self.attrs.get("x1")?)?,
+                    strp(self.attrs.get("y1")?)?,
+                    strp(self.attrs.get("x2")?)?,
+                    strp(self.attrs.get("y2")?)?,
                 );
-                BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2))
+                Some(BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
             }
             "circle" => {
                 let (cx, cy, r) = (
-                    strp(self.attrs.get("cx").unwrap()),
-                    strp(self.attrs.get("cy").unwrap()),
-                    strp(self.attrs.get("r").unwrap()),
+                    strp(self.attrs.get("cx")?)?,
+                    strp(self.attrs.get("cy")?)?,
+                    strp(self.attrs.get("r")?)?,
                 );
-                BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)
+                Some(BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r))
             }
             "ellipse" => {
                 let (cx, cy, rx, ry) = (
-                    strp(self.attrs.get("cx").unwrap()),
-                    strp(self.attrs.get("cy").unwrap()),
-                    strp(self.attrs.get("rx").unwrap()),
-                    strp(self.attrs.get("ry").unwrap()),
+                    strp(self.attrs.get("cx")?)?,
+                    strp(self.attrs.get("cy")?)?,
+                    strp(self.attrs.get("rx")?)?,
+                    strp(self.attrs.get("ry")?)?,
                 );
-                BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)
+                Some(BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry))
             }
             "person" => {
                 let (x, y, h) = (
-                    strp(self.attrs.get("x").unwrap()),
-                    strp(self.attrs.get("y").unwrap()),
-                    strp(self.attrs.get("height").unwrap()),
+                    strp(self.attrs.get("x")?)?,
+                    strp(self.attrs.get("y")?)?,
+                    strp(self.attrs.get("height")?)?,
                 );
-                BoundingBox::BBox(x, y, x + h / 3., y + h)
+                Some(BoundingBox::BBox(x, y, x + h / 3., y + h))
             }
 
-            _ => BoundingBox::Unknown,
+            _ => None,
         }
     }
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
-        if let BoundingBox::BBox(x1, y1, x2, y2) = self.bbox() {
+        if let Some(BoundingBox::BBox(x1, y1, x2, y2)) = self.bbox() {
             match loc {
                 "tl" => Some((x1, y1)),
                 "t" => Some(((x1 + x2) / 2., y1)),
@@ -171,10 +170,10 @@ impl SvgElement {
                 "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
                 _ => {
                     if self.name == "line" {
-                        let x1 = strp(self.attrs.get("x1").unwrap());
-                        let y1 = strp(self.attrs.get("y1").unwrap());
-                        let x2 = strp(self.attrs.get("x2").unwrap());
-                        let y2 = strp(self.attrs.get("y2").unwrap());
+                        let x1 = strp(self.attrs.get("x1")?)?;
+                        let y1 = strp(self.attrs.get("y1")?)?;
+                        let x2 = strp(self.attrs.get("x2")?)?;
+                        let y2 = strp(self.attrs.get("y2")?)?;
                         match loc {
                             "xy1" | "start" => Some((x1, y1)),
                             "xy2" | "end" => Some((x2, y2)),
@@ -196,10 +195,10 @@ impl SvgElement {
         for (key, mut value) in self.attrs.clone() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    value = fstr(strp(&value) + dx);
+                    value = fstr(strp(&value).unwrap() + dx);
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    value = fstr(strp(&value) + dy);
+                    value = fstr(strp(&value).unwrap() + dy);
                 }
                 _ => (),
             }
@@ -241,8 +240,8 @@ impl SvgElement {
         let mut text_attrs = vec![];
         let mut text_classes = vec!["tbox"];
         let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
-        let mut dx = orig_elem.pop_attr("dx").map(|dx| strp(&dx));
-        let mut dy = orig_elem.pop_attr("dy").map(|dy| strp(&dy));
+        let mut dx = orig_elem.pop_attr("dx").map(|dx| strp(&dx).unwrap());
+        let mut dy = orig_elem.pop_attr("dy").map(|dy| strp(&dy).unwrap());
 
         // Default dx/dy to push it in slightly from the edge (or out for lines);
         // Without inset text squishes to the edge and can be unreadable
@@ -301,7 +300,7 @@ impl SvgElement {
         Some((orig_elem, text_elem))
     }
 
-    fn evaluate(&self, input: &str, context: &TransformerContext) -> String {
+    fn eval_pos(&self, input: &str, context: &TransformerContext) -> String {
         // Relative positioning:
         //   ID LOC DX DY
         // (relv|relh|[#id])[@loc] [dx] [dy]
@@ -322,8 +321,8 @@ impl SvgElement {
                 "relh" => "tr",
                 _ => "tr",
             };
-            let dx = strp(caps.name("dx").map_or("0", |v| v.as_str()));
-            let dy = strp(caps.name("dy").map_or("0", |v| v.as_str()));
+            let dx = strp(caps.name("dx").map_or("0", |v| v.as_str())).unwrap();
+            let dy = strp(caps.name("dy").map_or("0", |v| v.as_str())).unwrap();
 
             let mut ref_el = context.prev_element.as_ref();
             let opt_id = caps
@@ -342,6 +341,59 @@ impl SvgElement {
         input.to_owned()
     }
 
+    fn eval_size(&self, input: &str, context: &TransformerContext) -> String {
+        // Relative size:
+        //   (#id|^) [DW[%] DH[%]]
+        // Meaning:
+        //   #id - reference to size of another element
+        //   ^ - reference to previous element
+        //   dw / dh - delta width/height (user units; may be negative)
+        //   dw% / dh% - scaled width/height (range 0..1000%)
+        // Note: unlike in eval_pos, the id section is mandatory to distinguish from
+        //       a numeric `wh` pair.
+        // Examples:
+        //   wh="#thing 2 110%"  - size of #thing plus 2 units width, *1.1 height
+        // TODO: extend to allow referencing earlier elements beyond previous
+        // TODO: allow mixed relative and absolute values...
+        let rel_re =
+            Regex::new(r"^(?<ref>(#\S+|\^))(\s+(?<dw>[-0-9\.]+%?)\s+(?<dh>[-0-9\.]+%?))?$")
+                .unwrap();
+        if let Some(caps) = rel_re.captures(input) {
+            let dw = caps.name("dw").map_or("0", |v| v.as_str());
+            let dh = caps.name("dh").map_or("0", |v| v.as_str());
+            let mut ref_el = context.prev_element.as_ref();
+            let ref_str = caps
+                .name("ref")
+                .expect("ref is mandatory in regex")
+                .as_str();
+            if ref_str.starts_with('#') {
+                ref_el = Some(context.elem_map.get(ref_str.strip_prefix('#').unwrap()).unwrap());
+            }
+
+            if let Some(inner) = ref_el {
+                if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
+                    let mut w = strp(&w).unwrap();
+                    let mut h = strp(&h).unwrap();
+                    if dw.ends_with('%') {
+                        let dw = strp(dw.trim_end_matches('%')).unwrap() / 100.0;
+                        w *= dw;
+                    } else {
+                        w += strp(dw).unwrap();
+                    }
+                    if dh.ends_with('%') {
+                        let dh = strp(dh.trim_end_matches('%')).unwrap() / 100.0;
+                        h *= dh;
+                    } else {
+                        h += strp(dh).unwrap();
+                    }
+
+                    return format!("{} {}", w, h);
+                }
+            }
+        }
+        input.to_owned()
+    }
+
     /// Returns iterator cycling over whitespace-separated values
     fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
         input.split_whitespace().map(|v| v.to_string()).cycle()
@@ -354,7 +406,16 @@ impl SvgElement {
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             if !simple {
-                value = self.evaluate(value.as_str(), context);
+                match key.as_str() {
+                    "xy" | "cxy" | "xy1" | "xy2" | "start" | "end" => {
+                        value = self.eval_pos(value.as_str(), context);
+                    }
+                    "size" | "wh" => {
+                        // TODO: support rxy for ellipses, with scaling factor
+                        value = self.eval_size(value.as_str(), context);
+                    }
+                    _ => (),
+                }
             }
             // TODO: should expand in a given order to avoid repetition?
             match key.as_str() {
@@ -378,12 +439,12 @@ impl SvgElement {
                             new_attrs.push(("height".into(), parts.next().unwrap()));
                         }
                         "circle" => {
-                            let diameter: f32 = strp(&parts.next().unwrap());
+                            let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
                             new_attrs.push(("r".into(), fstr(diameter / 2.)));
                         }
                         "ellipse" => {
-                            let dia_x: f32 = strp(&parts.next().unwrap());
-                            let dia_y: f32 = strp(&parts.next().unwrap());
+                            let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
+                            let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
                             new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
                             new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
                         }
@@ -399,14 +460,14 @@ impl SvgElement {
                             // the centre point.
                             // TODO: also support specifying other attributes; xy+cxy should be sufficient
                             let wh = self.attrs.get("wh").map(|z| z.to_string());
-                            let mut width = self.attrs.get("width").map(|z| strp(z));
-                            let mut height = self.attrs.get("height").map(|z| strp(z));
-                            let cx = strp(&parts.next().unwrap());
-                            let cy = strp(&parts.next().unwrap());
+                            let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
+                            let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
+                            let cx = strp(&parts.next().unwrap()).unwrap();
+                            let cy = strp(&parts.next().unwrap()).unwrap();
                             if let Some(wh_inner) = wh {
                                 let mut wh_parts = self.attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()));
-                                height = Some(strp(&wh_parts.next().unwrap()));
+                                width = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                                height = Some(strp(&wh_parts.next().unwrap()).unwrap());
                             }
                             if let (Some(width), Some(height)) = (width, height) {
                                 new_attrs.push(("x".into(), fstr(cx - width / 2.)));
@@ -455,21 +516,21 @@ impl SvgElement {
                             // must have xy1 (/ x&y) or wh (/ width&height)
                             let wh = self.attrs.get("wh").map(|z| z.to_string());
                             let xy1 = self.attrs.get("xy1").map(|z| z.to_string());
-                            let mut width = self.attrs.get("width").map(|z| strp(z));
-                            let mut height = self.attrs.get("height").map(|z| strp(z));
-                            let mut x = self.attrs.get("x").map(|z| strp(z));
-                            let mut y = self.attrs.get("y").map(|z| strp(z));
-                            let x2 = strp(&parts.next().unwrap());
-                            let y2 = strp(&parts.next().unwrap());
+                            let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
+                            let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
+                            let mut x = self.attrs.get("x").map(|z| strp(z).unwrap());
+                            let mut y = self.attrs.get("y").map(|z| strp(z).unwrap());
+                            let x2 = strp(&parts.next().unwrap()).unwrap();
+                            let y2 = strp(&parts.next().unwrap()).unwrap();
                             if let Some(wh_inner) = wh {
                                 let mut wh_parts = self.attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()));
-                                height = Some(strp(&wh_parts.next().unwrap()));
+                                width = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                                height = Some(strp(&wh_parts.next().unwrap()).unwrap());
                             }
                             if let Some(xy1_inner) = xy1 {
                                 let mut xy1_parts = self.attr_split(&xy1_inner);
-                                x = Some(strp(&xy1_parts.next().unwrap()));
-                                y = Some(strp(&xy1_parts.next().unwrap()));
+                                x = Some(strp(&xy1_parts.next().unwrap()).unwrap());
+                                y = Some(strp(&xy1_parts.next().unwrap()).unwrap());
                             }
                             if let (Some(w), Some(h)) = (width, height) {
                                 new_attrs.push(("x".into(), fstr(x2 - w)));
@@ -562,7 +623,7 @@ impl SvgElement {
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             start_el = context.elem_map.get(name);
         } else {
-            let mut parts = self.attr_split(start_ref).map(|v| strp(&v));
+            let mut parts = self.attr_split(start_ref).map(|v| strp(&v).unwrap());
             start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
         if let Some(caps) = re.captures(end_ref) {
@@ -570,7 +631,7 @@ impl SvgElement {
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             end_el = context.elem_map.get(name);
         } else {
-            let mut parts = self.attr_split(end_ref).map(|v| strp(&v));
+            let mut parts = self.attr_split(end_ref).map(|v| strp(&v).unwrap());
             end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
 
@@ -791,7 +852,7 @@ impl TransformerContext {
                 // Assumption is that text should be centered within the rect,
                 // and has styling via CSS to reflect this, e.g.:
                 //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-                let cxy = rect_elem.bbox().center().unwrap();
+                let cxy = rect_elem.bbox().unwrap().center().unwrap();
                 text_attrs.push(("x".into(), fstr(cxy.0)));
                 text_attrs.push(("y".into(), fstr(cxy.1)));
                 prev_element = Some(rect_elem.clone());
@@ -978,7 +1039,7 @@ impl TransformerContext {
             } else {
                 events.push(SvgEvent::Start(new_elem.clone()));
             }
-            if !matches!(new_elem.bbox(), BoundingBox::Unknown) {
+            if new_elem.bbox().is_some() {
                 // prev_element is only used for relative positioning, so
                 // only makes sense if it has a bounding box.
                 prev_element = Some(new_elem.clone());
@@ -1131,7 +1192,9 @@ impl Transformer {
         // TODO: preserve other attributes from a given svg root.
         let mut extent = BoundingBox::new();
         for el in output.to_elements() {
-            extent.extend(&el.bbox());
+            if let Some(bb) = &el.bbox() {
+                extent.extend(bb);
+            }
         }
         // Expand by 10, then add 10%. Ensures small images get more than a couple
         // of pixels border, and large images still get a (relatively) decent border.
