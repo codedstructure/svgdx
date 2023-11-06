@@ -17,21 +17,27 @@
             dominant-baseline: central;
             text-anchor: middle;
         }
+        .grey {fill: lightgrey;}
+        text.grey {fill: black;}
+        rect.red {fill: red;}
+        rect.amber {fill: orange;}
+        rect.yellow {fill: yellow;}
+        rect.green {fill: lightgreen;}
     ]]>
   </style>
 
   <rect x="0" y="0" width="20" height="30" id="outline"/>
-  <ellipse cxy="#outline@t" rxy="6 3" text="ports"/>
+  <ellipse cxy="#outline@t" rxy="6 3" class="grey" text="ports"/>
 
-  <rect cxy="0 5" wh="10 5" text="a" id="a"/>
+  <rect cxy="0 5" wh="10 5" text="a" class="red" id="a"/>
   <circle cxy="#a@br" r="2" text="1"/>
 
-  <rect cxy="0 15" wh="10 5" text="b" id="b"/>
+  <rect cxy="0 15" wh="10 5" text="b" class="amber" id="b"/>
   <circle cxy="#b@br" r="2" text="2"/>
 
-  <rect cxy="0 25" wh="10 5" text="c" id="c"/>
+  <rect cxy="0 25" wh="10 5" text="c" class="yellow" id="c"/>
   <circle cxy="#c@br" r="2" text="3"/>
 
-  <rect cxy="20 15" wh="10 5" text="out" id="d"/>
+  <rect cxy="20 15" wh="10 5" text="out" class="green" id="d"/>
   <circle cxy="#d@bl" r="2" text="4"/>
 </svg>

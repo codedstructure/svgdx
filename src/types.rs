@@ -136,6 +136,12 @@ impl AttrMap {
     }
 }
 
+impl From<Vec<(String, String)>> for AttrMap {
+    fn from(value: Vec<(String, String)>) -> Self {
+        value.into_iter().collect()
+    }
+}
+
 impl FromIterator<(String, String)> for AttrMap {
     fn from_iter<I: IntoIterator<Item = (String, String)>>(iter: I) -> Self {
         let mut am = Self::new();

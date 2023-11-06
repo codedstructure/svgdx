@@ -2,14 +2,18 @@
   <style>
     <![CDATA[
     * { stroke-width: 0.2; fill: none; stroke: black; }
+    .red {fill: red;}
+    .amber {fill: orange;}
+    .yellow {fill: yellow;}
+    .green {fill: green;}
     ]]>
   </style>
-  <rect xy="0" wh="5"/>
-  <rect xy="@bl 0 2" wh="5" repeat="9" />
-  <rect xy="7 0" wh="5"/>
-  <rect xy="@bl 0 2" wh="5" repeat="6"/>
-  <rect xy="14 0" wh="5"/>
-  <rect xy="@bl 0 2" wh="5" repeat="7"/>
-  <rect xy="21 0" wh="5"/>
-  <rect xy="@bl 0 2" wh="5" repeat="10"/>
+  <rect xy="0" wh="5" class="red"/>
+  <rect xy="@bl 0 2" wh="5" class="red" repeat="9"/>
+  <rect xy="7 0" wh="5" class="amber"/>
+  <rect xy="@bl 0 2" wh="5" class="amber" repeat="6"/>
+  <rect xy="14 0" wh="5" class="yellow"/>
+  <rect xy="@bl 0 2" wh="5" class="yellow" repeat="7"/>
+  <rect xy="21 0" wh="5" class="green"/>
+  <rect xy="@bl 0 2" wh="5" class="green" repeat="10"/>
 </svg>

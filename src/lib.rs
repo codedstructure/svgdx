@@ -439,10 +439,12 @@ impl SvgElement {
         input.split_whitespace().map(|v| v.to_string()).cycle()
     }
 
+    /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
         let mut new_attrs = vec![];
 
-        // Process and expand attributes as needed
+        // Every attribute is either replaced by one or more other attributes,
+        // or copied as-is into `new_attrs`.
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             if !simple {
@@ -619,20 +621,7 @@ impl SvgElement {
             }
         }
 
-        let mut attr_map = AttrMap::new();
-        let mut classes = ClassList::new();
-
-        for (key, value) in new_attrs.clone() {
-            if key == "class" {
-                for c in value.split(' ') {
-                    classes.insert(c.to_string());
-                }
-            } else {
-                attr_map.insert(key.to_string(), value.to_string());
-            }
-        }
-        self.attrs = attr_map;
-        self.classes = classes;
+        self.attrs = new_attrs.into();
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
