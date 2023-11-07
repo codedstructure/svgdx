@@ -34,7 +34,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="10" dy="1" class="tbox text-top">thing</text>
+<text x="20" y="11" class="tbox text-top">thing</text>
 "#;
 
     compare(input, expected);
@@ -44,7 +44,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="10" y="30" dx="1" dy="-1" class="tbox text-bottom text-left">thing</text>
+<text x="11" y="29" class="tbox text-bottom text-left">thing</text>
 "#;
 
     compare(input, expected);

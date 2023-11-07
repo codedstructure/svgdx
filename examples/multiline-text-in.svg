@@ -16,34 +16,29 @@
             font-size: 3px;
         }
         /* prior to top/bottom/left/right so they can override this */
-        text {
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
-        text.text-top {
-            dominant-baseline: text-before-edge;
-        }
-        text.text-bottom {
-            dominant-baseline: text-after-edge;
-        }
-        text.text-left {
-            text-anchor: start;
-        }
-        text.text-right {
-            text-anchor: end;
-        }
+        text, text * { dominant-baseline: central; text-anchor: middle; }
+        text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
+        text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
+        text.text-left, text.text-left * { text-anchor: start; }
+        text.text-right, text.text-right * { text-anchor: end; }
+        text.small, text.small * { font-size: 1.5px; }
+        text.medium, text.medium * { font-size: 2.25px; }
+        text.large, text.large * { font-size: 3px; }
     ]]>
   </style>
 
-  <rect xy="0" wh="15" text="Multi\nline\ntext" text-loc="tl" />
-  <rect xy="20 0" wh="15" text="Multi\nline\ntext" text-loc="t" />
-  <rect xy="40 0" wh="15" text="Multi\nline\ntext" text-loc="tr" />
+  <!-- top row -->
+  <rect xy="0" wh="15" text="Multi\nline\ntext" text-loc="tl" class="small"/>
+  <rect xy="20 0" wh="15" text="Multi\nline\ntext" text-loc="t" class="medium"/>
+  <rect xy="40 0" wh="15" text="Multi\nline\ntext" text-loc="tr" class="large"/>
 
-  <rect xy="0 20" wh="15" text="Multi\nline\ntext" text-loc="l" />
-  <rect xy="20 20" wh="15" text="Multi\nline\ntext" text-loc="c" />
-  <rect xy="40 20" wh="15" text="Multi\nline\ntext" text-loc="r" />
+  <!-- middle row -->
+  <rect xy="0 20" wh="15" text="Multi\nline\ntext" text-loc="l" class="small"/>
+  <rect xy="20 20" wh="15" text="Multi\nline\ntext" text-loc="c" class="medium"/>
+  <rect xy="40 20" wh="15" text="Multi\nline\ntext" text-loc="r" class="large"/>
 
-  <rect xy="0 40" wh="15" text="Multi\nline\ntext" text-loc="bl" />
-  <rect xy="20 40" wh="15" text="Multi\nline\ntext" text-loc="b" />
-  <rect xy="40 40" wh="15" text="Multi\nline\ntext" text-loc="br" />
+  <!-- bottom row -->
+  <rect xy="0 40" wh="15" text="Multi\nline\ntext" text-loc="bl" class="small"/>
+  <rect xy="20 40" wh="15" text="Multi\nline\ntext" text-loc="b" class="medium"/>
+  <rect xy="40 40" wh="15" text="Multi\nline\ntext" text-loc="br" class="large"/>
 </svg>

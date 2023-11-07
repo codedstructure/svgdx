@@ -288,49 +288,63 @@ impl SvgElement {
             }
         }
 
-        // Different conversions from line number to y offset based on whether
+        // Different conversions from line count to first-line offset based on whether
         // top, center, or bottom justification.
-        let line_spacer = match text_loc.as_str() {
-            "tl" | "t" | "tr" => |idx: usize, _max: usize, spacing: f32| idx as f32 * spacing,
-            "bl" | "b" | "br" => {
-                |idx: usize, max: usize, spacing: f32| ((max - 1) - idx) as f32 * -spacing
-            }
-            _ => |idx, max, spacing| idx as f32 * spacing - ((max - 1) as f32 * spacing) / 2.,
+        let first_line_offset = match text_loc.as_str() {
+            "tl" | "t" | "tr" => |_count: usize, _spacing| 0.,
+            "bl" | "b" | "br" => |count: usize, spacing| -((count - 1) as f32) * spacing,
+            _ => |count: usize, spacing| -((count - 1) as f32 / 2.) * spacing,
         };
 
         // Assumption is that text should be centered within the rect,
         // and has styling via CSS to reflect this, e.g.:
         //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-        let txy = orig_elem.coord(&text_loc).unwrap();
-        text_attrs.push(("x".into(), fstr(txy.0)));
-        text_attrs.push(("y".into(), fstr(txy.1)));
+        let (mut tdx, mut tdy) = orig_elem.coord(&text_loc).unwrap();
         if let Some(dx) = dx {
-            text_attrs.push(("dx".into(), fstr(dx)));
+            tdx += dx;
         }
+        if let Some(dy) = dy {
+            tdy += dy;
+        }
+        text_attrs.push(("x".into(), fstr(tdx)));
+        text_attrs.push(("y".into(), fstr(tdy)));
         let mut text_elements = Vec::new();
         let lines: Vec<_> = text_value.lines().collect();
         let line_count = lines.len();
-        let line_spacing = 3.;  // TODO: This is a horrible hack assuming a fixed font size
-        for (idx, text_fragment) in lines.iter().enumerate() {
-            let mut line_attrs = text_attrs.clone();
-            let line_dy = line_spacer(idx, line_count, line_spacing);
-            if dy.is_none() && line_count > 1 {
-                dy = Some(0.);
+
+        let multiline = line_count > 1;
+
+        // There will always be a text element; if not multiline this is the only element.
+        let mut text_elem = SvgElement::new("text", &text_attrs);
+        // line spacing (in 'em'). TODO: allow configuring this...
+        let line_spacing = 1.05;
+
+        // Copy style and class(es) from original element
+        if let Some(style) = orig_elem.get_attr("style") {
+            text_elem.add_attr("style", &style);
+        }
+        text_elem.classes = orig_elem.classes.clone();
+        for class in &text_classes {
+            text_elem.add_class(class);
+        }
+        if !multiline {
+            text_elem.content = Some(text_value.clone());
+        }
+        text_elements.push(text_elem);
+        if multiline {
+            let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
+            tspan_elem.attrs.remove("y");
+            for (idx, text_fragment) in lines.iter().enumerate() {
+                let mut tspan = tspan_elem.clone();
+                let line_offset = if idx == 0 {
+                    first_line_offset(line_count, line_spacing)
+                } else {
+                    line_spacing
+                };
+                tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
+                tspan.content = Some(text_fragment.to_string());
+                text_elements.push(tspan);
             }
-            if let Some(dy) = dy {
-                line_attrs.push(("dy".into(), fstr(dy + line_dy)));
-            }
-            let mut text_elem = SvgElement::new("text", &line_attrs);
-            // Copy style and class(es) from original element
-            if let Some(style) = orig_elem.get_attr("style") {
-                text_elem.add_attr("style", &style);
-            }
-            text_elem.classes = orig_elem.classes.clone();
-            for class in &text_classes {
-                text_elem.add_class(class);
-            }
-            text_elem.content = Some(text_fragment.to_string());
-            text_elements.push(text_elem);
         }
         Some((orig_elem, text_elements))
     }
@@ -854,10 +868,28 @@ impl TransformerContext {
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-            for elem in text_elements {
-                events.push(SvgEvent::Start(elem.clone()));
-                events.push(SvgEvent::Text(elem.content.unwrap()));
-                events.push(SvgEvent::End("text".to_string()));
+            match text_elements.as_slice() {
+                [] => {}
+                [elem] => {
+                    events.push(SvgEvent::Start(elem.clone()));
+                    events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                    events.push(SvgEvent::End("text".to_string()));
+                }
+                _ => {
+                    let text_elem = &text_elements[0];
+                    events.push(SvgEvent::Start(text_elem.clone()));
+                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    for elem in &text_elements[1..] {
+                        // Note: we can't insert a newline/last_indent here as whitespace
+                        // following a tspan is compressed to a single space and causes
+                        // misalignment - see https://stackoverflow.com/q/41364908
+                        events.push(SvgEvent::Start(elem.clone()));
+                        events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                        events.push(SvgEvent::End("tspan".to_string()));
+                    }
+                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    events.push(SvgEvent::End("text".to_string()));
+                }
             }
             omit = true;
         }
