@@ -16,22 +16,11 @@
             font-size: 3px;
         }
         /* prior to top/bottom/left/right so they can override this */
-        text { 
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
-        text.text-top {
-            dominant-baseline: text-before-edge;
-        }
-        text.text-bottom {
-            dominant-baseline: text-after-edge;
-        }
-        text.text-left {
-            text-anchor: start;
-        }
-        text.text-right {
-            text-anchor: end;
-        }
+        text { dominant-baseline: central; text-anchor: middle; }
+        text.text-top { dominant-baseline: text-before-edge; }
+        text.text-bottom { dominant-baseline: text-after-edge; }
+        text.text-left { text-anchor: start; }
+        text.text-right { text-anchor: end; }
     ]]>
   </style>
 

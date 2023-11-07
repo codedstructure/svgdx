@@ -2,50 +2,49 @@ pub mod utils;
 use utils::compare;
 
 #[test]
-fn test_basic_rect_text() {
-    let input = r#"
-<rect x="0" y="1" width="5" height="4" text="thing"/>
-"#;
-    let expected = r#"
-<rect x="0" y="1" width="5" height="4"/>
-<text x="2.5" y="3" class="tbox">thing</text>
-"#;
+fn test_expand_rect_xy_wh() {
+    let input = r#"<rect xy="1 2" wh="3 4"/>"#;
+    let expected = r#"<rect x="1" y="2" width="3" height="4"/>"#;
 
     compare(input, expected);
 }
 
 #[test]
-fn test_expanded_rect_text() {
-    let input = r#"
-<rect cxy="20" wh="20" text="thing"/>
-"#;
-    let expected = r#"
-<rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="20" class="tbox">thing</text>
-"#;
+fn test_expand_xy1_xy2() {
+    let input = r#"<line xy1="1 2" xy2="3 4"/>"#;
+    let expected = r#"<line x1="1" y1="2" x2="3" y2="4"/>"#;
 
     compare(input, expected);
 }
 
 #[test]
-fn test_text_loc() {
-    let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="t"/>
-"#;
-    let expected = r#"
-<rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="10" dy="1" class="tbox text-top">thing</text>
-"#;
+fn test_expand_rect_xy1_wh() {
+    let input = r#"<rect xy1="1 2" wh="3 6"/>"#;
+    let expected = r#"<rect x="1" y="2" width="3" height="6"/>"#;
 
     compare(input, expected);
+}
 
-    let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="bl"/>
-"#;
-    let expected = r#"
-<rect x="10" y="10" width="20" height="20"/>
-<text x="10" y="30" dx="1" dy="-1" class="tbox text-bottom text-left">thing</text>
-"#;
+#[test]
+fn test_expand_rect_xy1_xy2() {
+    let input = r#"<rect xy1="1 2" xy2="3 6"/>"#;
+    let expected = r#"<rect x="1" y="2" width="2" height="4"/>"#;
+
+    compare(input, expected);
+}
+
+#[test]
+fn test_expand_rect_wh_xy2() {
+    let input = r#"<rect xy2="4 6" wh="2 1"/>"#;
+    let expected = r#"<rect x="2" y="5" width="2" height="1"/>"#;
+
+    compare(input, expected);
+}
+
+#[test]
+fn test_expand_rect_cxy_wh() {
+    let input = r#"<rect cxy="5 7" wh="3 4"/>"#;
+    let expected = r#"<rect x="3.5" y="5" width="3" height="4"/>"#;
 
     compare(input, expected);
 }

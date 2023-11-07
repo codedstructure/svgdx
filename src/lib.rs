@@ -122,7 +122,12 @@ impl SvgElement {
                     strp(self.attrs.get("x2")?)?,
                     strp(self.attrs.get("y2")?)?,
                 );
-                Some(BoundingBox::BBox(x1.min(x2), y1.min(y2), x1.max(x2), y1.max(y2)))
+                Some(BoundingBox::BBox(
+                    x1.min(x2),
+                    y1.min(y2),
+                    x1.max(x2),
+                    y1.max(y2),
+                ))
             }
             "circle" => {
                 let (cx, cy, r) = (
@@ -234,9 +239,17 @@ impl SvgElement {
         }
     }
 
-    fn process_text_attr(&self) -> Option<(SvgElement, SvgElement)> {
+    fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
         let mut orig_elem = self.clone();
+
         let text_value = orig_elem.pop_attr("text")?;
+        // Convert unescaped '\n' into newline characters for multi-line text
+        let re = Regex::new(r"([^\\])\\n").expect("invalid regex");
+        let text_value = re.replace_all(&text_value, "$1\n").into_owned();
+        // Following that, replace any escaped "\\n" into literal '\'+'n' characters
+        let re = Regex::new(r"\\\\n").expect("invalid regex");
+        let text_value = re.replace_all(&text_value, "\\n").into_owned();
+
         let mut text_attrs = vec![];
         let mut text_classes = vec!["tbox"];
         let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
@@ -275,29 +288,65 @@ impl SvgElement {
             }
         }
 
+        // Different conversions from line count to first-line offset based on whether
+        // top, center, or bottom justification.
+        let first_line_offset = match text_loc.as_str() {
+            "tl" | "t" | "tr" => |_count: usize, _spacing| 0.,
+            "bl" | "b" | "br" => |count: usize, spacing| -((count - 1) as f32) * spacing,
+            _ => |count: usize, spacing| -((count - 1) as f32 / 2.) * spacing,
+        };
+
         // Assumption is that text should be centered within the rect,
         // and has styling via CSS to reflect this, e.g.:
         //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-        let txy = orig_elem.coord(&text_loc).unwrap();
-        text_attrs.push(("x".into(), fstr(txy.0)));
-        text_attrs.push(("y".into(), fstr(txy.1)));
+        let (mut tdx, mut tdy) = orig_elem.coord(&text_loc).unwrap();
         if let Some(dx) = dx {
-            text_attrs.push(("dx".into(), fstr(dx)));
+            tdx += dx;
         }
         if let Some(dy) = dy {
-            text_attrs.push(("dy".into(), fstr(dy)));
+            tdy += dy;
         }
+        text_attrs.push(("x".into(), fstr(tdx)));
+        text_attrs.push(("y".into(), fstr(tdy)));
+        let mut text_elements = Vec::new();
+        let lines: Vec<_> = text_value.lines().collect();
+        let line_count = lines.len();
+
+        let multiline = line_count > 1;
+
+        // There will always be a text element; if not multiline this is the only element.
         let mut text_elem = SvgElement::new("text", &text_attrs);
+        // line spacing (in 'em'). TODO: allow configuring this...
+        let line_spacing = 1.05;
+
         // Copy style and class(es) from original element
         if let Some(style) = orig_elem.get_attr("style") {
             text_elem.add_attr("style", &style);
         }
         text_elem.classes = orig_elem.classes.clone();
-        for class in text_classes {
+        for class in &text_classes {
             text_elem.add_class(class);
         }
-        text_elem.content = Some(text_value);
-        Some((orig_elem, text_elem))
+        if !multiline {
+            text_elem.content = Some(text_value.clone());
+        }
+        text_elements.push(text_elem);
+        if multiline {
+            let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
+            tspan_elem.attrs.remove("y");
+            for (idx, text_fragment) in lines.iter().enumerate() {
+                let mut tspan = tspan_elem.clone();
+                let line_offset = if idx == 0 {
+                    first_line_offset(line_count, line_spacing)
+                } else {
+                    line_spacing
+                };
+                tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
+                tspan.content = Some(text_fragment.to_string());
+                text_elements.push(tspan);
+            }
+        }
+        Some((orig_elem, text_elements))
     }
 
     fn eval_pos(&self, input: &str, context: &TransformerContext) -> String {
@@ -335,7 +384,7 @@ impl SvgElement {
                 ref_el = Some(context.elem_map.get(name).unwrap());
             }
             if let Some(pos) = ref_el.unwrap().coord(loc.unwrap_or(default_rel)) {
-                return format!("{} {}", pos.0 + dx, pos.1 + dy);
+                return format!("{} {}", fstr(pos.0 + dx), fstr(pos.1 + dy));
             }
         }
         input.to_owned()
@@ -367,7 +416,12 @@ impl SvgElement {
                 .expect("ref is mandatory in regex")
                 .as_str();
             if ref_str.starts_with('#') {
-                ref_el = Some(context.elem_map.get(ref_str.strip_prefix('#').unwrap()).unwrap());
+                ref_el = Some(
+                    context
+                        .elem_map
+                        .get(ref_str.strip_prefix('#').unwrap())
+                        .unwrap(),
+                );
             }
 
             if let Some(inner) = ref_el {
@@ -399,10 +453,12 @@ impl SvgElement {
         input.split_whitespace().map(|v| v.to_string()).cycle()
     }
 
+    /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
         let mut new_attrs = vec![];
 
-        // Process and expand attributes as needed
+        // Every attribute is either replaced by one or more other attributes,
+        // or copied as-is into `new_attrs`.
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             if !simple {
@@ -579,20 +635,7 @@ impl SvgElement {
             }
         }
 
-        let mut attr_map = AttrMap::new();
-        let mut classes = ClassList::new();
-
-        for (key, value) in new_attrs.clone() {
-            if key == "class" {
-                for c in value.split(' ') {
-                    classes.insert(c.to_string());
-                }
-            } else {
-                attr_map.insert(key.to_string(), value.to_string());
-            }
-        }
-        self.attrs = attr_map;
-        self.classes = classes;
+        self.attrs = new_attrs.into();
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
@@ -821,13 +864,33 @@ impl TransformerContext {
 
         e.expand_attributes(false, self);
 
-        if let Some((orig_elem, text_elem)) = e.process_text_attr() {
+        if let Some((orig_elem, text_elements)) = e.process_text_attr() {
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
-            events.push(SvgEvent::Start(text_elem.clone()));
-            events.push(SvgEvent::Text(text_elem.content.unwrap()));
-            events.push(SvgEvent::End("text".to_string()));
+            match text_elements.as_slice() {
+                [] => {}
+                [elem] => {
+                    events.push(SvgEvent::Start(elem.clone()));
+                    events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                    events.push(SvgEvent::End("text".to_string()));
+                }
+                _ => {
+                    let text_elem = &text_elements[0];
+                    events.push(SvgEvent::Start(text_elem.clone()));
+                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    for elem in &text_elements[1..] {
+                        // Note: we can't insert a newline/last_indent here as whitespace
+                        // following a tspan is compressed to a single space and causes
+                        // misalignment - see https://stackoverflow.com/q/41364908
+                        events.push(SvgEvent::Start(elem.clone()));
+                        events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                        events.push(SvgEvent::End("tspan".to_string()));
+                    }
+                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    events.push(SvgEvent::End("text".to_string()));
+                }
+            }
             omit = true;
         }
 

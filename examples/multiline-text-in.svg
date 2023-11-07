@@ -1,0 +1,44 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="70mm" height="50mm" viewBox="-2 -2 70 50">
+  <defs>
+   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+   </marker>
+  </defs>
+  <style>
+    <![CDATA[
+        rect, line {
+            stroke-width: 0.5;
+            stroke: black;
+            fill: white;
+        }
+        text {
+            font-family: "Ubuntu Mono", monospace;
+            font-size: 3px;
+        }
+        /* prior to top/bottom/left/right so they can override this */
+        text, text * { dominant-baseline: central; text-anchor: middle; }
+        text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
+        text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
+        text.text-left, text.text-left * { text-anchor: start; }
+        text.text-right, text.text-right * { text-anchor: end; }
+        text.small, text.small * { font-size: 1.5px; }
+        text.medium, text.medium * { font-size: 2.25px; }
+        text.large, text.large * { font-size: 3px; }
+    ]]>
+  </style>
+
+  <!-- top row -->
+  <rect xy="0" wh="15" text="Multi\nline\ntext" text-loc="tl" class="small"/>
+  <rect xy="20 0" wh="15" text="Multi\nline\ntext" text-loc="t" class="medium"/>
+  <rect xy="40 0" wh="15" text="Multi\nline\ntext" text-loc="tr" class="large"/>
+
+  <!-- middle row -->
+  <rect xy="0 20" wh="15" text="Multi\nline\ntext" text-loc="l" class="small"/>
+  <rect xy="20 20" wh="15" text="Multi\nline\ntext" text-loc="c" class="medium"/>
+  <rect xy="40 20" wh="15" text="Multi\nline\ntext" text-loc="r" class="large"/>
+
+  <!-- bottom row -->
+  <rect xy="0 40" wh="15" text="Multi\nline\ntext" text-loc="bl" class="small"/>
+  <rect xy="20 40" wh="15" text="Multi\nline\ntext" text-loc="b" class="medium"/>
+  <rect xy="40 40" wh="15" text="Multi\nline\ntext" text-loc="br" class="large"/>
+</svg>
