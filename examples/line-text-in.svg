@@ -6,33 +6,19 @@
             stroke: black;
             fill: white;
         }
-        text {
+        text, tspan {
             font-family: "Ubuntu Mono", monospace;
             font-size: 3px;
             stroke: none;
             fill: black;
         }
-        text.tbox {
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
         /* prior to top/bottom/left/right so they can override this */
-        text {
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
-        text.text-top {
-            dominant-baseline: text-before-edge;
-        }
-        text.text-bottom {
-            dominant-baseline: text-after-edge;
-        }
-        text.text-left {
-            text-anchor: start;
-        }
-        text.text-right {
-            text-anchor: end;
-        }
+        text, text * { dominant-baseline: central; text-anchor: middle; }
+        text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
+        text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
+        text.text-left, text.text-left * { text-anchor: start; }
+        text.text-right, text.text-right * { text-anchor: end; }
+        .small * { font-size: 2px; }
     ]]>
   </style>
 
@@ -40,4 +26,10 @@
   <line xy1="25 0" xy2="25 30" text="top" text-loc="t" />
   <rect xy="30 0" wh="20 30" text="right" />
   <line xy1="0 35" xy2="50 35" text="bottom" text-loc="b" />
+  <g class="small">
+    <line xy1="0 45" xy2="25 45" text="below\nthe line" text-loc="b" />
+    <line xy1="0 45" xy2="25 45" text="left\nof\nthe\nline" text-loc="l" />
+    <line xy1="0 45" xy2="25 45" text="on the right\nand down a bit" text-loc="br" />
+    <line xy1="0 45" xy2="25 45" text="above\nline" text-loc="t" />
+  </g>
 </svg>

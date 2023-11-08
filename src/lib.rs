@@ -290,10 +290,18 @@ impl SvgElement {
 
         // Different conversions from line count to first-line offset based on whether
         // top, center, or bottom justification.
-        let first_line_offset = match text_loc.as_str() {
-            "tl" | "t" | "tr" => |_count: usize, _spacing| 0.,
-            "bl" | "b" | "br" => |count: usize, spacing| -((count - 1) as f32) * spacing,
-            _ => |count: usize, spacing| -((count - 1) as f32 / 2.) * spacing,
+        const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
+        const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
+        const WRAP_MID: fn(usize, f32) -> f32 =
+            |count, spacing| -(count as f32 - 1.) / 2. * spacing;
+        let first_line_offset = match (is_line, text_loc.as_str()) {
+            // shapes - text 'inside'
+            (false, "tl" | "t" | "tr") => WRAP_DOWN,
+            (false, "bl" | "b" | "br") => WRAP_UP,
+            // lines - text 'beyond'
+            (true, "tl" | "t" | "tr") => WRAP_UP,
+            (true, "bl" | "b" | "br") => WRAP_DOWN,
+            (_, _) => WRAP_MID,
         };
 
         // Assumption is that text should be centered within the rect,

@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="77mm" height="60.5mm" viewBox="-13.5 -12.75 77 60.5">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="77mm" height="71.5mm" viewBox="-13.5 -13.25 77 71.5">
   <style>
     <![CDATA[
         * {
@@ -6,42 +6,46 @@
             stroke: black;
             fill: white;
         }
-        text {
+        text, tspan {
             font-family: "Ubuntu Mono", monospace;
             font-size: 3px;
             stroke: none;
             fill: black;
         }
-        text.tbox {
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
         /* prior to top/bottom/left/right so they can override this */
-        text {
-            dominant-baseline: central;
-            text-anchor: middle;
-        }
-        text.text-top {
-            dominant-baseline: text-before-edge;
-        }
-        text.text-bottom {
-            dominant-baseline: text-after-edge;
-        }
-        text.text-left {
-            text-anchor: start;
-        }
-        text.text-right {
-            text-anchor: end;
-        }
+        text, text * { dominant-baseline: central; text-anchor: middle; }
+        text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
+        text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
+        text.text-left, text.text-left * { text-anchor: start; }
+        text.text-right, text.text-right * { text-anchor: end; }
+        .small * { font-size: 2px; }
     ]]>
   </style>
 
   <rect x="0" y="0" width="20" height="30"/>
   <text x="10" y="15" class="tbox">left</text>
   <line x1="25" y1="0" x2="25" y2="30"/>
-  <text x="25" y="0" dy="-1" class="tbox text-bottom">top</text>
+  <text x="25" y="-1" class="tbox text-bottom">top</text>
   <rect x="30" y="0" width="20" height="30"/>
   <text x="40" y="15" class="tbox">right</text>
   <line x1="0" y1="35" x2="50" y2="35"/>
-  <text x="25" y="35" dy="1" class="tbox text-top">bottom</text>
+  <text x="25" y="36" class="tbox text-top">bottom</text>
+  <g class="small">
+    <line x1="0" y1="45" x2="25" y2="45"/>
+    <text x="12.5" y="46" class="tbox text-top">
+    <tspan x="12.5" dy="0em">below</tspan><tspan x="12.5" dy="1.05em">the line</tspan>
+    </text>
+    <line x1="0" y1="45" x2="25" y2="45"/>
+    <text x="-1" y="45" class="tbox text-right">
+    <tspan x="-1" dy="-1.575em">left</tspan><tspan x="-1" dy="1.05em">of</tspan><tspan x="-1" dy="1.05em">the</tspan><tspan x="-1" dy="1.05em">line</tspan>
+    </text>
+    <line x1="0" y1="45" x2="25" y2="45"/>
+    <text x="26" y="46" class="tbox text-top text-left">
+    <tspan x="26" dy="0em">on the right</tspan><tspan x="26" dy="1.05em">and down a bit</tspan>
+    </text>
+    <line x1="0" y1="45" x2="25" y2="45"/>
+    <text x="12.5" y="44" class="tbox text-bottom">
+    <tspan x="12.5" dy="-1.05em">above</tspan><tspan x="12.5" dy="1.05em">line</tspan>
+    </text>
+  </g>
 </svg>
