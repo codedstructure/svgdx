@@ -79,6 +79,7 @@ impl SvgElement {
     }
 
     #[allow(dead_code)]
+    #[must_use]
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
         attrs.insert(key, value);
@@ -86,6 +87,7 @@ impl SvgElement {
     }
 
     #[allow(dead_code)]
+    #[must_use]
     fn without_attr(&self, key: &str) -> Self {
         let attrs: Vec<(String, String)> = self
             .attrs
@@ -94,6 +96,18 @@ impl SvgElement {
             .filter(|(k, _v)| k != key)
             .collect();
         SvgElement::new(self.name.as_str(), &attrs)
+    }
+
+    /// copy attributes and classes from another element, returning the merged element
+    #[must_use]
+    fn with_attrs_from(&self, other: &SvgElement) -> Self {
+        let mut attrs = self.attrs.clone();
+        for (k, v) in &other.attrs {
+            attrs.insert(k, v);
+        }
+        let mut element = SvgElement::new(self.name.as_str(), &attrs.to_vec());
+        element.add_classes(&other.classes);
+        element
     }
 
     fn pop_attr(&mut self, key: &str) -> Option<String> {
@@ -671,29 +685,23 @@ enum ConnectionType {
     Corner,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 struct Connector {
+    source_element: SvgElement,
     start: Endpoint,
     end: Endpoint,
     conn_type: ConnectionType,
 }
 
 impl Connector {
-    fn new(start: Endpoint, end: Endpoint, conn_type: ConnectionType) -> Self {
-        Self {
-            start,
-            end,
-            conn_type,
-        }
-    }
-
     fn from_element(
         element: &SvgElement,
         context: &TransformerContext,
         conn_type: ConnectionType,
     ) -> Self {
-        let start_ref = element.attrs.get("start").unwrap();
-        let end_ref = element.attrs.get("end").unwrap();
+        let mut element = element.clone();
+        let start_ref = element.pop_attr("start").unwrap();
+        let end_ref = element.pop_attr("end").unwrap();
 
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
@@ -719,22 +727,22 @@ impl Connector {
         // Example: "#thing@tl" => top left coordinate of element id="thing"
         let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
 
-        if let Some(caps) = re.captures(start_ref) {
+        if let Some(caps) = re.captures(&start_ref) {
             let name = &caps["id"];
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             start_dir = loc_to_dir(start_loc.clone());
             start_el = context.elem_map.get(name);
         } else {
-            let mut parts = element.attr_split(start_ref).map(|v| strp(&v).unwrap());
+            let mut parts = element.attr_split(&start_ref).map(|v| strp(&v).unwrap());
             start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
-        if let Some(caps) = re.captures(end_ref) {
+        if let Some(caps) = re.captures(&end_ref) {
             let name = &caps["id"];
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             end_dir = loc_to_dir(end_loc.clone());
             end_el = context.elem_map.get(name);
         } else {
-            let mut parts = element.attr_split(end_ref).map(|v| strp(&v).unwrap());
+            let mut parts = element.attr_split(&end_ref).map(|v| strp(&v).unwrap());
             end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
 
@@ -784,7 +792,12 @@ impl Connector {
                 )
             }
         };
-        Self::new(start, end, conn_type)
+        Self {
+            source_element: element,
+            start,
+            end,
+            conn_type,
+        }
     }
 
     fn render(&self) -> impl Iterator<Item = SvgEvent> + '_ {
@@ -794,15 +807,18 @@ impl Connector {
         let (x2, y2) = self.end.origin;
         match self.conn_type {
             ConnectionType::Straight => {
-                vec.push(SvgEvent::Empty(SvgElement::new(
-                    "line",
-                    &[
-                        ("x1".to_string(), fstr(x1)),
-                        ("y1".to_string(), fstr(y1)),
-                        ("x2".to_string(), fstr(x2)),
-                        ("y2".to_string(), fstr(y2)),
-                    ],
-                )));
+                vec.push(SvgEvent::Empty(
+                    SvgElement::new(
+                        "line",
+                        &[
+                            ("x1".to_string(), fstr(x1)),
+                            ("y1".to_string(), fstr(y1)),
+                            ("x2".to_string(), fstr(x2)),
+                            ("y2".to_string(), fstr(y2)),
+                        ],
+                    )
+                    .with_attrs_from(&self.source_element),
+                ));
             }
             ConnectionType::Corner => {
                 let points;
@@ -832,27 +848,33 @@ impl Connector {
                     points = vec![(x1, y1), (x2, y2)];
                 }
                 if points.len() == 2 {
-                    vec.push(SvgEvent::Empty(SvgElement::new(
-                        "line",
-                        &[
-                            ("x1".to_string(), fstr(points[0].0)),
-                            ("y1".to_string(), fstr(points[0].1)),
-                            ("x2".to_string(), fstr(points[1].0)),
-                            ("y2".to_string(), fstr(points[1].1)),
-                        ],
-                    )));
+                    vec.push(SvgEvent::Empty(
+                        SvgElement::new(
+                            "line",
+                            &[
+                                ("x1".to_string(), fstr(points[0].0)),
+                                ("y1".to_string(), fstr(points[0].1)),
+                                ("x2".to_string(), fstr(points[1].0)),
+                                ("y2".to_string(), fstr(points[1].1)),
+                            ],
+                        )
+                        .with_attrs_from(&self.source_element),
+                    ));
                 } else {
-                    vec.push(SvgEvent::Empty(SvgElement::new(
-                        "polyline",
-                        &[(
-                            "points".to_string(),
-                            points
-                                .into_iter()
-                                .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                        )],
-                    )));
+                    vec.push(SvgEvent::Empty(
+                        SvgElement::new(
+                            "polyline",
+                            &[(
+                                "points".to_string(),
+                                points
+                                    .into_iter()
+                                    .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
+                                    .collect::<Vec<String>>()
+                                    .join(", "),
+                            )],
+                        )
+                        .with_attrs_from(&self.source_element),
+                    ));
                 }
             }
         }
@@ -1010,7 +1032,6 @@ impl TransformerContext {
             for ev in conn.render() {
                 events.push(ev);
             }
-            // TODO: ensure original element's attrs (e.g. marker-end) get passed through
             omit = true;
         }
 
@@ -1503,15 +1524,5 @@ mod test {
         // Large-ish integers (up to 24 bit mantissa) should be fine
         assert_eq!(fstr(12345678.0), "12345678");
         assert_eq!(fstr(12340000.0), "12340000");
-    }
-
-    #[test]
-    fn test_connector() {
-        let c = Connector::new(
-            Endpoint::new((10., 10.), Some(Direction::Right)),
-            Endpoint::new((20., 20.), Some(Direction::Up)),
-            ConnectionType::Corner,
-        );
-        println!("{:?}", c.render().collect::<Vec<_>>());
     }
 }
