@@ -16,7 +16,7 @@ fn fstr(x: f32) -> String {
     if x == (x as u32) as f32 {
         return (x as u32).to_string();
     }
-    let result = format!("{:.3}", x);
+    let result = format!("{x:.3}");
     if result.contains('.') {
         result.trim_end_matches('0').trim_end_matches('.').into()
     } else {
@@ -102,6 +102,12 @@ impl SvgElement {
 
     fn get_attr(&self, key: &str) -> Option<String> {
         self.attrs.get(key).map(|x| x.to_owned())
+    }
+
+    fn is_connector(&self) -> bool {
+        self.has_attr("start")
+            && self.has_attr("end")
+            && (self.name == "line" || self.name == "polyline")
     }
 
     fn bbox(&self) -> Option<BoundingBox> {
@@ -449,7 +455,7 @@ impl SvgElement {
                         h += strp(dh).unwrap();
                     }
 
-                    return format!("{} {}", w, h);
+                    return format!("{w} {h}");
                 }
             }
         }
@@ -471,7 +477,7 @@ impl SvgElement {
             let mut value = value.clone();
             if !simple {
                 match key.as_str() {
-                    "xy" | "cxy" | "xy1" | "xy2" | "start" | "end" => {
+                    "xy" | "cxy" | "xy1" | "xy2" => {
                         value = self.eval_pos(value.as_str(), context);
                     }
                     "size" | "wh" => {
@@ -609,36 +615,6 @@ impl SvgElement {
                         _ => new_attrs.push((key.clone(), value.clone())),
                     }
                 }
-                "start" => match self.name.as_str() {
-                    "line" => {
-                        let start_x: f32;
-                        let start_y: f32;
-                        if self.has_attr("end") {
-                            ((start_x, start_y), (_, _)) = self.evaluate_endpoints(context);
-                        } else {
-                            (start_x, start_y) = context.eval_ref(&value).unwrap();
-                        }
-
-                        new_attrs.push(("x1".into(), fstr(start_x)));
-                        new_attrs.push(("y1".into(), fstr(start_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "end" => match self.name.as_str() {
-                    "line" => {
-                        let end_x: f32;
-                        let end_y: f32;
-                        if self.has_attr("start") {
-                            ((_, _), (end_x, end_y)) = self.evaluate_endpoints(context);
-                        } else {
-                            (end_x, end_y) = context.eval_ref(&value).unwrap();
-                        }
-
-                        new_attrs.push(("x2".into(), fstr(end_x)));
-                        new_attrs.push(("y2".into(), fstr(end_y)));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
                 _ => new_attrs.push((key.clone(), value)),
             }
         }
@@ -648,74 +624,6 @@ impl SvgElement {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
             *context.elem_map.get_mut(&elem_id).unwrap() = updated;
-        }
-    }
-
-    fn evaluate_endpoints(&self, context: &TransformerContext) -> ((f32, f32), (f32, f32)) {
-        let start_ref = self.attrs.get("start").unwrap();
-        let end_ref = self.attrs.get("end").unwrap();
-
-        // This could probably be tidier, trying to deal with lots of combinations.
-        // Needs to support explicit coordinate pairs or element references, and
-        // for element references support given locations or not (in which case
-        // the location is determined automatically to give the shortest distance)
-        let mut start_el = None;
-        let mut end_el = None;
-        let mut start_loc = String::from("");
-        let mut end_loc = String::from("");
-        let mut start_point: Option<(f32, f32)> = None;
-        let mut end_point: Option<(f32, f32)> = None;
-
-        // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
-
-        if let Some(caps) = re.captures(start_ref) {
-            let name = &caps["id"];
-            start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            start_el = context.elem_map.get(name);
-        } else {
-            let mut parts = self.attr_split(start_ref).map(|v| strp(&v).unwrap());
-            start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
-        }
-        if let Some(caps) = re.captures(end_ref) {
-            let name = &caps["id"];
-            end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            end_el = context.elem_map.get(name);
-        } else {
-            let mut parts = self.attr_split(end_ref).map(|v| strp(&v).unwrap());
-            end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
-        }
-
-        match (start_point, end_point) {
-            (Some(start_point), Some(end_point)) => (start_point, end_point),
-            (Some(start_point), None) => {
-                let end_el = end_el.unwrap();
-                if end_loc.is_empty() {
-                    end_loc = context.closest_loc(end_el, start_point);
-                }
-                (start_point, end_el.coord(&end_loc).unwrap())
-            }
-            (None, Some(end_point)) => {
-                let start_el = start_el.unwrap();
-                if start_loc.is_empty() {
-                    start_loc = context.closest_loc(start_el, end_point);
-                }
-                (start_el.coord(&start_loc).unwrap(), end_point)
-            }
-            (None, None) => {
-                let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
-                if start_loc.is_empty() && end_loc.is_empty() {
-                    (start_loc, end_loc) = context.shortest_link(start_el, end_el);
-                } else if start_loc.is_empty() {
-                    start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
-                } else if end_loc.is_empty() {
-                    end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
-                }
-                (
-                    start_el.coord(&start_loc).unwrap(),
-                    end_el.coord(&end_loc).unwrap(),
-                )
-            }
         }
     }
 }
@@ -737,6 +645,223 @@ impl From<&BytesStart<'_>> for SvgElement {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Direction {
+    Up,
+    Right,
+    Down,
+    Left,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Endpoint {
+    origin: (f32, f32),
+    dir: Option<Direction>,
+}
+
+impl Endpoint {
+    fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
+        Self { origin, dir }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+enum ConnectionType {
+    Straight,
+    Corner,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Connector {
+    start: Endpoint,
+    end: Endpoint,
+    conn_type: ConnectionType,
+}
+
+impl Connector {
+    fn new(start: Endpoint, end: Endpoint, conn_type: ConnectionType) -> Self {
+        Self {
+            start,
+            end,
+            conn_type,
+        }
+    }
+
+    fn from_element(
+        element: &SvgElement,
+        context: &TransformerContext,
+        conn_type: ConnectionType,
+    ) -> Self {
+        let start_ref = element.attrs.get("start").unwrap();
+        let end_ref = element.attrs.get("end").unwrap();
+
+        // This could probably be tidier, trying to deal with lots of combinations.
+        // Needs to support explicit coordinate pairs or element references, and
+        // for element references support given locations or not (in which case
+        // the location is determined automatically to give the shortest distance)
+        let mut start_el = None;
+        let mut end_el = None;
+        let mut start_loc = String::from("");
+        let mut end_loc = String::from("");
+        let mut start_point: Option<(f32, f32)> = None;
+        let mut end_point: Option<(f32, f32)> = None;
+        let mut start_dir = None;
+        let mut end_dir = None;
+
+        let loc_to_dir = |dir: String| match dir.as_str() {
+            "t" => Some(Direction::Up),
+            "r" => Some(Direction::Right),
+            "b" => Some(Direction::Down),
+            "l" => Some(Direction::Left),
+            _ => None,
+        };
+
+        // Example: "#thing@tl" => top left coordinate of element id="thing"
+        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
+
+        if let Some(caps) = re.captures(start_ref) {
+            let name = &caps["id"];
+            start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+            start_dir = loc_to_dir(start_loc.clone());
+            start_el = context.elem_map.get(name);
+        } else {
+            let mut parts = element.attr_split(start_ref).map(|v| strp(&v).unwrap());
+            start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
+        }
+        if let Some(caps) = re.captures(end_ref) {
+            let name = &caps["id"];
+            end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
+            end_dir = loc_to_dir(end_loc.clone());
+            end_el = context.elem_map.get(name);
+        } else {
+            let mut parts = element.attr_split(end_ref).map(|v| strp(&v).unwrap());
+            end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
+        }
+
+        let (start, end) = match (start_point, end_point) {
+            (Some(start_point), Some(end_point)) => (
+                Endpoint::new(start_point, start_dir),
+                Endpoint::new(end_point, end_dir),
+            ),
+            (Some(start_point), None) => {
+                let end_el = end_el.unwrap();
+                if end_loc.is_empty() {
+                    end_loc = context.closest_loc(end_el, start_point);
+                    end_dir = loc_to_dir(end_loc.clone());
+                }
+                (
+                    Endpoint::new(start_point, start_dir),
+                    Endpoint::new(end_el.coord(&end_loc).unwrap(), end_dir),
+                )
+            }
+            (None, Some(end_point)) => {
+                let start_el = start_el.unwrap();
+                if start_loc.is_empty() {
+                    start_loc = context.closest_loc(start_el, end_point);
+                    start_dir = loc_to_dir(start_loc.clone());
+                }
+                (
+                    Endpoint::new(start_el.coord(&start_loc).unwrap(), start_dir),
+                    Endpoint::new(end_point, end_dir),
+                )
+            }
+            (None, None) => {
+                let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
+                if start_loc.is_empty() && end_loc.is_empty() {
+                    (start_loc, end_loc) = context.shortest_link(start_el, end_el);
+                    start_dir = loc_to_dir(start_loc.clone());
+                    end_dir = loc_to_dir(end_loc.clone());
+                } else if start_loc.is_empty() {
+                    start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
+                    start_dir = loc_to_dir(start_loc.clone());
+                } else if end_loc.is_empty() {
+                    end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
+                    end_dir = loc_to_dir(end_loc.clone());
+                }
+                (
+                    Endpoint::new(start_el.coord(&start_loc).unwrap(), start_dir),
+                    Endpoint::new(end_el.coord(&end_loc).unwrap(), end_dir),
+                )
+            }
+        };
+        Self::new(start, end, conn_type)
+    }
+
+    fn render(&self) -> impl Iterator<Item = SvgEvent> + '_ {
+        let mut vec = vec![];
+
+        let (x1, y1) = self.start.origin;
+        let (x2, y2) = self.end.origin;
+        match self.conn_type {
+            ConnectionType::Straight => {
+                vec.push(SvgEvent::Empty(SvgElement::new(
+                    "line",
+                    &[
+                        ("x1".to_string(), fstr(x1)),
+                        ("y1".to_string(), fstr(y1)),
+                        ("x2".to_string(), fstr(x2)),
+                        ("y2".to_string(), fstr(y2)),
+                    ],
+                )));
+            }
+            ConnectionType::Corner => {
+                let points;
+                if let (Some(start_dir_some), Some(end_dir_some)) = (self.start.dir, self.end.dir) {
+                    points = match (start_dir_some, end_dir_some) {
+                        // L-shaped connection
+                        (Direction::Up | Direction::Down, Direction::Left | Direction::Right) => {
+                            vec![(x1, y1), (self.start.origin.0, self.end.origin.1), (x2, y2)]
+                        }
+                        (Direction::Left | Direction::Right, Direction::Up | Direction::Down) => {
+                            vec![(x1, y1), (self.end.origin.0, self.start.origin.1), (x2, y2)]
+                        }
+                        // Z-shaped connection
+                        (Direction::Left, Direction::Right)
+                        | (Direction::Right, Direction::Left) => {
+                            let mid_x = (self.start.origin.0 + self.end.origin.0) / 2.;
+                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
+                        }
+                        (Direction::Up, Direction::Down) | (Direction::Down, Direction::Up) => {
+                            let mid_y = (self.start.origin.1 + self.end.origin.1) / 2.;
+                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
+                        }
+                        // If all else fails, straight line...
+                        _ => vec![(x1, y1), (x2, y2)],
+                    };
+                } else {
+                    points = vec![(x1, y1), (x2, y2)];
+                }
+                if points.len() == 2 {
+                    vec.push(SvgEvent::Empty(SvgElement::new(
+                        "line",
+                        &[
+                            ("x1".to_string(), fstr(points[0].0)),
+                            ("y1".to_string(), fstr(points[0].1)),
+                            ("x2".to_string(), fstr(points[1].0)),
+                            ("y2".to_string(), fstr(points[1].1)),
+                        ],
+                    )));
+                } else {
+                    vec.push(SvgEvent::Empty(SvgElement::new(
+                        "polyline",
+                        &[(
+                            "points".to_string(),
+                            points
+                                .into_iter()
+                                .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
+                                .collect::<Vec<String>>()
+                                .join(", "),
+                        )],
+                    )));
+                }
+            }
+        }
+
+        vec.into_iter()
+    }
+}
+
+#[derive(Debug)]
 enum SvgEvent {
     Text(String),
     Start(SvgElement),
@@ -871,6 +996,23 @@ impl TransformerContext {
         let mut e = e.clone();
 
         e.expand_attributes(false, self);
+
+        if e.is_connector() {
+            let conn = Connector::from_element(
+                &e,
+                self,
+                if e.name == "polyline" {
+                    ConnectionType::Corner
+                } else {
+                    ConnectionType::Straight
+                },
+            );
+            for ev in conn.render() {
+                events.push(ev);
+            }
+            // TODO: ensure original element's attrs (e.g. marker-end) get passed through
+            omit = true;
+        }
 
         if let Some((orig_elem, text_elements)) = e.process_text_attr() {
             prev_element = Some(e.clone());
@@ -1278,11 +1420,8 @@ impl Transformer {
             let mut bs = BytesStart::new("svg");
             bs.push_attribute(Attribute::from(("version", "1.1")));
             bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
-            bs.push_attribute(Attribute::from(("width", format!("{}mm", width).as_str())));
-            bs.push_attribute(Attribute::from((
-                "height",
-                format!("{}mm", height).as_str(),
-            )));
+            bs.push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
+            bs.push_attribute(Attribute::from(("height", format!("{height}mm").as_str())));
             bs.push_attribute(Attribute::from((
                 "viewBox",
                 format!("{} {} {} {}", fstr(minx), fstr(miny), width, height).as_str(),
@@ -1364,5 +1503,15 @@ mod test {
         // Large-ish integers (up to 24 bit mantissa) should be fine
         assert_eq!(fstr(12345678.0), "12345678");
         assert_eq!(fstr(12340000.0), "12340000");
+    }
+
+    #[test]
+    fn test_connector() {
+        let c = Connector::new(
+            Endpoint::new((10., 10.), Some(Direction::Right)),
+            Endpoint::new((20., 20.), Some(Direction::Up)),
+            ConnectionType::Corner,
+        );
+        println!("{:?}", c.render().collect::<Vec<_>>());
     }
 }
