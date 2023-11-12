@@ -10,7 +10,7 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-use svgd::Transformer;
+use svgd::svg_transform;
 
 fn path_exists(path: &str) -> bool {
     fs::metadata(path).is_ok()
@@ -45,17 +45,17 @@ fn transform(input: &str, output: Option<String>) {
         panic!("File does not exist");
     }
 
-    let mut t = Transformer::new();
+    //let mut t = Transformer::new();
     let mut in_reader = Box::new(BufReader::new(File::open(input).unwrap()));
 
     match output {
         Some(x) => {
             let mut out_temp = NamedTempFile::new().unwrap();
-            let _ = t.transform(&mut in_reader, &mut out_temp);
+            let _ = svg_transform(&mut in_reader, &mut out_temp);
             out_temp.persist(x).expect("Could not persist temp file");
         }
         None => {
-            let _ = t.transform(&mut in_reader, &mut std::io::stdout());
+            let _ = svg_transform(&mut in_reader, &mut std::io::stdout());
         }
     }
 }
