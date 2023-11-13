@@ -31,6 +31,18 @@ fn strp(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
+/// Parse a ratio (float or %age) to an f32
+/// Note this deliberately does not clamp to 0..1
+fn strp_ratio(s: &str) -> Option<f32> {
+    let mut s = s.clone();
+    let mut scale = 1.;
+    if s.ends_with("%") {
+        scale = 0.01;
+        s = s.trim_end_matches('%');
+    }
+    Some(strp(s)? * scale)
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct SvgElement {
     name: String,

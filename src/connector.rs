@@ -1,5 +1,5 @@
 use crate::transform::TransformerContext;
-use crate::{fstr, strp, SvgElement};
+use crate::{fstr, strp, strp_ratio, SvgElement};
 use regex::Regex;
 
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +34,7 @@ pub(crate) struct Connector {
     start: Endpoint,
     end: Endpoint,
     conn_type: ConnectionType,
+    offset: f32,
 }
 
 impl Connector {
@@ -45,6 +46,10 @@ impl Connector {
         let mut element = element.clone();
         let start_ref = element.pop_attr("start").unwrap();
         let end_ref = element.pop_attr("end").unwrap();
+        let offset = element
+            .pop_attr("corner-offset")
+            .unwrap_or(String::from("0.5"));
+        let offset = strp_ratio(&offset).expect("Invalid corner-offset value");
 
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
@@ -140,6 +145,7 @@ impl Connector {
             start,
             end,
             conn_type,
+            offset,
         }
     }
 
@@ -171,11 +177,13 @@ impl Connector {
                         // Z-shaped connection
                         (Direction::Left, Direction::Right)
                         | (Direction::Right, Direction::Left) => {
-                            let mid_x = (self.start.origin.0 + self.end.origin.0) / 2.;
+                            let len_x = self.end.origin.0 - self.start.origin.0;
+                            let mid_x = self.start.origin.0 + len_x * self.offset;
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Down) | (Direction::Down, Direction::Up) => {
-                            let mid_y = (self.start.origin.1 + self.end.origin.1) / 2.;
+                            let len_y = self.end.origin.1 - self.start.origin.1;
+                            let mid_y = self.start.origin.1 + len_y * self.offset;
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         // If all else fails, straight line...
