@@ -1,5 +1,5 @@
 use crate::transform::TransformerContext;
-use crate::{fstr, strp, strp_ratio, SvgElement};
+use crate::{fstr, strp, strp_length, Length, SvgElement};
 use regex::Regex;
 
 #[derive(Clone, Copy, Debug)]
@@ -34,7 +34,7 @@ pub(crate) struct Connector {
     start: Endpoint,
     end: Endpoint,
     conn_type: ConnectionType,
-    offset: f32,
+    offset: Length,
 }
 
 impl Connector {
@@ -48,8 +48,8 @@ impl Connector {
         let end_ref = element.pop_attr("end").unwrap();
         let offset = element
             .pop_attr("corner-offset")
-            .unwrap_or(String::from("0.5"));
-        let offset = strp_ratio(&offset).expect("Invalid corner-offset value");
+            .unwrap_or(String::from("50%"));
+        let offset = strp_length(&offset).expect("Invalid corner-offset value");
 
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
@@ -177,17 +177,38 @@ impl Connector {
                         // Z-shaped connection
                         (Direction::Left, Direction::Right)
                         | (Direction::Right, Direction::Left) => {
-                            let len_x = self.end.origin.0 - self.start.origin.0;
-                            let mid_x = self.start.origin.0 + len_x * self.offset;
+                            let mid_x = self
+                                .offset
+                                .calc_offset(self.start.origin.0, self.end.origin.0);
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Down) | (Direction::Down, Direction::Up) => {
-                            let len_y = self.end.origin.1 - self.start.origin.1;
-                            let mid_y = self.start.origin.1 + len_y * self.offset;
+                            let mid_y = self
+                                .offset
+                                .calc_offset(self.start.origin.1, self.end.origin.1);
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
-                        // If all else fails, straight line...
-                        _ => vec![(x1, y1), (x2, y2)],
+                        // U-shaped connection
+                        (Direction::Left, Direction::Left) => {
+                            let min_x = self.start.origin.0.min(self.end.origin.0);
+                            let mid_x = min_x - self.offset.absolute().unwrap();
+                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
+                        }
+                        (Direction::Right, Direction::Right) => {
+                            let max_x = self.start.origin.0.max(self.end.origin.0);
+                            let mid_x = max_x + self.offset.absolute().unwrap();
+                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
+                        }
+                        (Direction::Up, Direction::Up) => {
+                            let min_y = self.start.origin.1.min(self.end.origin.1);
+                            let mid_y = min_y - self.offset.absolute().unwrap();
+                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
+                        }
+                        (Direction::Down, Direction::Down) => {
+                            let max_y = self.start.origin.1.max(self.end.origin.1);
+                            let mid_y = max_y + self.offset.absolute().unwrap();
+                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
+                        }
                     };
                 } else {
                     points = vec![(x1, y1), (x2, y2)];

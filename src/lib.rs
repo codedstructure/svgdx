@@ -31,16 +31,56 @@ fn strp(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Length {
+    Absolute(f32),
+    Ratio(f32),
+}
+
+#[allow(dead_code)]
+impl Length {
+    fn ratio(&self) -> Option<f32> {
+        if let Length::Ratio(result) = self {
+            Some(*result)
+        } else {
+            None
+        }
+    }
+
+    fn absolute(&self) -> Option<f32> {
+        if let Length::Absolute(result) = self {
+            Some(*result)
+        } else {
+            None
+        }
+    }
+
+    fn calc_offset(&self, start: f32, end: f32) -> f32 {
+        match self {
+            Length::Absolute(abs) => {
+                if abs < &0. {
+                    // '+' here since abs is negative and
+                    // we're going 'back' from the end.
+                    end + abs
+                } else {
+                    start + abs
+                }
+            }
+            Length::Ratio(ratio) => start + (end - start) * ratio,
+        }
+    }
+}
+
 /// Parse a ratio (float or %age) to an f32
 /// Note this deliberately does not clamp to 0..1
-fn strp_ratio(s: &str) -> Option<f32> {
+fn strp_length(s: &str) -> Option<Length> {
     let mut s = s.clone();
-    let mut scale = 1.;
-    if s.ends_with("%") {
-        scale = 0.01;
+    if s.ends_with('%') {
         s = s.trim_end_matches('%');
+        Some(Length::Ratio(strp(s)? * 0.01))
+    } else {
+        Some(Length::Absolute(strp(s)?))
     }
-    Some(strp(s)? * scale)
 }
 
 #[derive(Clone, Debug)]
@@ -162,6 +202,43 @@ impl SvgElement {
                     x1.max(x2),
                     y1.max(y2),
                 ))
+            }
+            "polyline" | "polygon" => {
+                let mut min_x = f32::MAX;
+                let mut min_y = f32::MAX;
+                let mut max_x = f32::MIN;
+                let mut max_y = f32::MIN;
+                // these are checks to ensure we have some valid points, or we'll
+                // end up with an 'interesting' bounding box...
+                let mut has_x = false;
+                let mut has_y = false;
+
+                let points = self.attrs.get("points")?;
+                let mut idx = 0;
+                for point_ws in points.split_whitespace() {
+                    for point in point_ws.split(',') {
+                        let point = point.trim();
+                        if point.is_empty() {
+                            continue;
+                        }
+                        let point: f32 = strp(point)?;
+                        if idx % 2 == 0 {
+                            min_x = min_x.min(point);
+                            max_x = max_x.max(point);
+                            has_x = true;
+                        } else {
+                            min_y = min_y.min(point);
+                            max_y = max_y.max(point);
+                            has_y = true;
+                        }
+                        idx += 1;
+                    }
+                }
+                if has_x && has_y {
+                    Some(BoundingBox::BBox(min_x, min_y, max_x, max_y))
+                } else {
+                    None
+                }
             }
             "circle" => {
                 let (cx, cy, r) = (

@@ -71,10 +71,10 @@ fn test_loc_connector() {
 #[test]
 fn test_loc_connector_offset() {
     let input = format!(
-        r##"{}<polyline start="#a@b" end="#d@t" corner-offset="0.2" />"##,
+        r##"{}<polyline start="#a@b" end="#d@t" corner-offset="2" />"##,
         RECT_SVG
     );
-    let expected_line = r#"<polyline points="2.5 5, 2.5 8, 22.5 8, 22.5 20"/>"#;
+    let expected_line = r#"<polyline points="2.5 5, 2.5 7, 22.5 7, 22.5 20"/>"#;
     contains(&input, expected_line);
 
     let input = format!(

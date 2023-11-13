@@ -19,5 +19,6 @@
     <rect xy="20 33" wh="5" text="c" id="c"/>
     <polyline start="#a@b" end="#b@t" corner-offset="25%" marker-end="url(#arrow)"/>
     <polyline start="#a@r" end="#c@t" marker-end="url(#arrow)"/>
+    <polyline start="#a@l" end="#b@l" corner-offset="1.5" marker-end="url(#arrow)"/>
     <line start="#b@r" end="#c@l" marker-end="url(#arrow)"/>
 </svg>
