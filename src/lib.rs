@@ -305,7 +305,6 @@ impl SvgElement {
         }
     }
 
-    #[allow(dead_code)]
     fn translated(&self, dx: f32, dy: f32) -> Self {
         let mut attrs = vec![];
         for (key, mut value) in self.attrs.clone() {

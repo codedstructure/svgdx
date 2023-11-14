@@ -154,6 +154,26 @@ impl TransformerContext {
             e = conn.render();
         }
 
+        // "xy-loc" attr allows us to position based on a non-top-left position
+        // assumes the bounding-box is well-defined by this point.
+        if let (Some(bbox), Some(xy_loc)) = (e.bbox(), e.pop_attr("xy-loc")) {
+            let width = bbox.width().unwrap();
+            let height = bbox.height().unwrap();
+            let (dx, dy) = match xy_loc.as_str() {
+                "tl" => (0., 0.),
+                "t" => (width / 2., 0.),
+                "tr" => (width, 0.),
+                "r" => (width, height / 2.),
+                "br" => (width, height),
+                "b" => (width / 2., height),
+                "bl" => (0., height),
+                "l" => (0., height / 2.),
+                "c" => (width / 2., height / 2.),
+                _ => (0., 0.),
+            };
+            e = e.translated(-dx, -dy);
+        }
+
         if let Some((orig_elem, text_elements)) = e.process_text_attr() {
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));

@@ -48,3 +48,16 @@ fn test_expand_rect_cxy_wh() {
 
     compare(input, expected);
 }
+
+#[test]
+fn test_expand_rect_xy_loc() {
+    let input = r#"<rect xy="5 7" wh="3 4" xy-loc="br"/>"#;
+    let expected = r#"<rect x="2" y="3" width="3" height="4"/>"#;
+
+    compare(input, expected);
+
+    let input = r#"<rect xy="5 7" wh="3 4" xy-loc="t"/>"#;
+    let expected = r#"<rect x="3.5" y="7" width="3" height="4"/>"#;
+
+    compare(input, expected);
+}
