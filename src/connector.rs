@@ -1,5 +1,5 @@
 use crate::transform::TransformerContext;
-use crate::{fstr, strp, strp_length, Length, SvgElement};
+use crate::{attr_split, fstr, strp, strp_length, Length, SvgElement};
 use regex::Regex;
 
 #[derive(Clone, Copy, Debug)]
@@ -81,7 +81,7 @@ impl Connector {
             start_dir = loc_to_dir(start_loc.clone());
             start_el = context.elem_map.get(name);
         } else {
-            let mut parts = element.attr_split(&start_ref).map(|v| strp(&v).unwrap());
+            let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
             start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
         if let Some(caps) = re.captures(&end_ref) {
@@ -90,7 +90,7 @@ impl Connector {
             end_dir = loc_to_dir(end_loc.clone());
             end_el = context.elem_map.get(name);
         } else {
-            let mut parts = element.attr_split(&end_ref).map(|v| strp(&v).unwrap());
+            let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
             end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
         }
 

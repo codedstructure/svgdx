@@ -1,0 +1,6 @@
+<svg>
+    <rect xy="10,10" wh="10" margin="1 3" id="base"/>
+    <rect xy="#base@l" wh="10" xy-loc="r" style="fill:blue"/>
+    <rect xy="#base@r" wh="10" xy-loc="l" style="fill:green"/>
+    <rect xy="#base@tr" wh="10" xy-loc="bl" style="fill:red"/>
+</svg>

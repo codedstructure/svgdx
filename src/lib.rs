@@ -31,6 +31,15 @@ fn strp(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
+/// Returns iterator cycling over whitespace-separated values
+fn attr_split<'a>(input: &'a str) -> impl Iterator<Item = String> + '_ {
+    input
+        .split_whitespace()
+        .flat_map(|v| v.split(','))
+        .map(|v| v.to_string())
+        .cycle()
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Length {
     Absolute(f32),
@@ -483,6 +492,9 @@ impl SvgElement {
         // TODO - extend to allow referencing earlier elements beyond previous
         let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)(\s+(?<dx>[-0-9\.]+))?(\s+(?<dy>[-0-9\.]+))?$").unwrap();
         if let Some(caps) = rel_re.captures(input) {
+            // TODO: relv should be equivalent to xy="@b" xy-loc="@t" and similar
+            // for relh being xy="@r" xy-loc="@l". Otherwise relh would also be
+            // affected by margin-y.
             let default_rel = match input {
                 "relv" => "bl",
                 "relh" => "tr",
@@ -501,8 +513,32 @@ impl SvgElement {
             if let Some(name) = opt_id {
                 ref_el = Some(context.elem_map.get(name).unwrap());
             }
-            if let Some(pos) = ref_el.unwrap().coord(loc.unwrap_or(default_rel)) {
-                return format!("{} {}", fstr(pos.0 + dx), fstr(pos.1 + dy));
+            if let Some(ref_el) = ref_el {
+                let mut margin_x = 0.;
+                let mut margin_y = 0.;
+                if let Some(margin) = ref_el.get_attr("margin") {
+                    let mut margin_parts = attr_split(&margin);
+                    margin_x = strp(&margin_parts.next().unwrap()).unwrap();
+                    margin_y = strp(&margin_parts.next().unwrap()).unwrap();
+                }
+                let loc = loc.unwrap_or(default_rel);
+                margin_y = match loc {
+                    "tl" | "t" | "tr" => -margin_y,
+                    "bl" | "b" | "br" => margin_y,
+                    _ => 0.,
+                };
+                margin_x = match loc {
+                    "tl" | "l" | "bl" => -margin_x,
+                    "tr" | "r" | "br" => margin_x,
+                    _ => 0.,
+                };
+                if let Some(pos) = ref_el.coord(loc) {
+                    return format!(
+                        "{} {}",
+                        fstr(pos.0 + margin_x + dx),
+                        fstr(pos.1 + margin_y + dy)
+                    );
+                }
             }
         }
         input.to_owned()
@@ -566,11 +602,6 @@ impl SvgElement {
         input.to_owned()
     }
 
-    /// Returns iterator cycling over whitespace-separated values
-    fn attr_split<'a>(&'a self, input: &'a str) -> impl Iterator<Item = String> + '_ {
-        input.split_whitespace().map(|v| v.to_string()).cycle()
-    }
-
     /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
         let mut new_attrs = vec![];
@@ -594,7 +625,7 @@ impl SvgElement {
             // TODO: should expand in a given order to avoid repetition?
             match key.as_str() {
                 "xy" => {
-                    let mut parts = self.attr_split(&value);
+                    let mut parts = attr_split(&value);
 
                     match self.name.as_str() {
                         "text" | "rect" | "tbox" | "pipeline" => {
@@ -605,7 +636,7 @@ impl SvgElement {
                     }
                 }
                 "size" | "wh" => {
-                    let mut parts = self.attr_split(&value);
+                    let mut parts = attr_split(&value);
 
                     match self.name.as_str() {
                         "rect" | "tbox" | "pipeline" => {
@@ -626,7 +657,7 @@ impl SvgElement {
                     }
                 }
                 "cxy" => {
-                    let mut parts = self.attr_split(&value);
+                    let mut parts = attr_split(&value);
 
                     match self.name.as_str() {
                         "rect" | "tbox" | "pipeline" => {
@@ -639,7 +670,7 @@ impl SvgElement {
                             let cx = strp(&parts.next().unwrap()).unwrap();
                             let cy = strp(&parts.next().unwrap()).unwrap();
                             if let Some(wh_inner) = wh {
-                                let mut wh_parts = self.attr_split(&wh_inner);
+                                let mut wh_parts = attr_split(&wh_inner);
                                 width = Some(strp(&wh_parts.next().unwrap()).unwrap());
                                 height = Some(strp(&wh_parts.next().unwrap()).unwrap());
                             }
@@ -658,7 +689,7 @@ impl SvgElement {
                 }
                 "rxy" => match self.name.as_str() {
                     "ellipse" => {
-                        let mut parts = self.attr_split(&value);
+                        let mut parts = attr_split(&value);
 
                         new_attrs.push(("rx".into(), parts.next().unwrap()));
                         new_attrs.push(("ry".into(), parts.next().unwrap()));
@@ -666,7 +697,7 @@ impl SvgElement {
                     _ => new_attrs.push((key.clone(), value)),
                 },
                 "xy1" => {
-                    let mut parts = self.attr_split(&value);
+                    let mut parts = attr_split(&value);
                     match self.name.as_str() {
                         "line" => {
                             new_attrs.push(("x1".into(), parts.next().unwrap()));
@@ -680,7 +711,7 @@ impl SvgElement {
                     }
                 }
                 "xy2" => {
-                    let mut parts = self.attr_split(&value);
+                    let mut parts = attr_split(&value);
                     match self.name.as_str() {
                         "line" => {
                             new_attrs.push(("x2".into(), parts.next().unwrap()));
@@ -697,12 +728,12 @@ impl SvgElement {
                             let x2 = strp(&parts.next().unwrap()).unwrap();
                             let y2 = strp(&parts.next().unwrap()).unwrap();
                             if let Some(wh_inner) = wh {
-                                let mut wh_parts = self.attr_split(&wh_inner);
+                                let mut wh_parts = attr_split(&wh_inner);
                                 width = Some(strp(&wh_parts.next().unwrap()).unwrap());
                                 height = Some(strp(&wh_parts.next().unwrap()).unwrap());
                             }
                             if let Some(xy1_inner) = xy1 {
-                                let mut xy1_parts = self.attr_split(&xy1_inner);
+                                let mut xy1_parts = attr_split(&xy1_inner);
                                 x = Some(strp(&xy1_parts.next().unwrap()).unwrap());
                                 y = Some(strp(&xy1_parts.next().unwrap()).unwrap());
                             }

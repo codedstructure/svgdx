@@ -1,6 +1,6 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::types::BoundingBox;
-use crate::{fstr, SvgElement};
+use crate::{attr_split, fstr, strp, SvgElement};
 
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
@@ -172,6 +172,28 @@ impl TransformerContext {
                 _ => (0., 0.),
             };
             e = e.translated(-dx, -dy);
+        }
+
+        if e.name != "text" && e.name != "tspan" {
+            let dx = e.pop_attr("dx");
+            let dy = e.pop_attr("dy");
+            let dxy = e.pop_attr("dxy");
+            let mut d_x = None;
+            let mut d_y = None;
+            if let Some(dxy) = dxy {
+                let mut parts = attr_split(&dxy).map(|v| strp(&v).unwrap());
+                d_x = parts.next();
+                d_y = parts.next();
+            }
+            if let Some(dx) = dx {
+                d_x = strp(&dx);
+            }
+            if let Some(dy) = dy {
+                d_y = strp(&dy);
+            }
+            if d_x.is_some() || d_y.is_some() {
+                e = e.translated(d_x.unwrap_or(0.), d_y.unwrap_or(0.));
+            }
         }
 
         if let Some((orig_elem, text_elements)) = e.process_text_attr() {
