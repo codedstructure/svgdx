@@ -73,61 +73,6 @@ impl TransformerContext {
         self.last_indent = indent;
     }
 
-    fn eval_ref(&self, attr: &str) -> Option<(f32, f32)> {
-        // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
-
-        let input = String::from(attr);
-
-        let caps = re.captures(&input)?;
-        let name = &caps["id"];
-        let loc = caps.name("loc").map_or("", |v| v.as_str());
-        if loc.is_empty() {
-            // find nearest location to us
-        }
-
-        let element = self.elem_map.get(name)?;
-        element.coord(loc)
-    }
-
-    pub(crate) fn closest_loc(&self, this: &SvgElement, point: (f32, f32)) -> String {
-        let mut min_dist_sq = f32::MAX;
-        let mut min_loc = "c";
-
-        for loc in this.locations() {
-            let this_coord = this.coord(loc);
-            if let (Some((x1, y1)), (x2, y2)) = (this_coord, point) {
-                let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-                if dist_sq < min_dist_sq {
-                    min_dist_sq = dist_sq;
-                    min_loc = loc;
-                }
-            }
-        }
-        min_loc.to_string()
-    }
-
-    pub(crate) fn shortest_link(&self, this: &SvgElement, that: &SvgElement) -> (String, String) {
-        let mut min_dist_sq = f32::MAX;
-        let mut this_min_loc = "c";
-        let mut that_min_loc = "c";
-        for this_loc in this.locations() {
-            for that_loc in that.locations() {
-                let this_coord = this.coord(this_loc);
-                let that_coord = that.coord(that_loc);
-                if let (Some((x1, y1)), Some((x2, y2))) = (this_coord, that_coord) {
-                    let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-                    if dist_sq < min_dist_sq {
-                        min_dist_sq = dist_sq;
-                        this_min_loc = this_loc;
-                        that_min_loc = that_loc;
-                    }
-                }
-            }
-        }
-        (this_min_loc.to_owned(), that_min_loc.to_owned())
-    }
-
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
         let elem_name = &e.name;
 

@@ -37,6 +37,44 @@ pub(crate) struct Connector {
     offset: Length,
 }
 
+fn closest_loc(this: &SvgElement, point: (f32, f32)) -> String {
+    let mut min_dist_sq = f32::MAX;
+    let mut min_loc = "c";
+
+    for loc in this.locations() {
+        let this_coord = this.coord(loc);
+        if let (Some((x1, y1)), (x2, y2)) = (this_coord, point) {
+            let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+            if dist_sq < min_dist_sq {
+                min_dist_sq = dist_sq;
+                min_loc = loc;
+            }
+        }
+    }
+    min_loc.to_string()
+}
+
+fn shortest_link(this: &SvgElement, that: &SvgElement) -> (String, String) {
+    let mut min_dist_sq = f32::MAX;
+    let mut this_min_loc = "c";
+    let mut that_min_loc = "c";
+    for this_loc in this.locations() {
+        for that_loc in that.locations() {
+            let this_coord = this.coord(this_loc);
+            let that_coord = that.coord(that_loc);
+            if let (Some((x1, y1)), Some((x2, y2))) = (this_coord, that_coord) {
+                let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+                if dist_sq < min_dist_sq {
+                    min_dist_sq = dist_sq;
+                    this_min_loc = this_loc;
+                    that_min_loc = that_loc;
+                }
+            }
+        }
+    }
+    (this_min_loc.to_owned(), that_min_loc.to_owned())
+}
+
 impl Connector {
     pub fn from_element(
         element: &SvgElement,
@@ -102,7 +140,7 @@ impl Connector {
             (Some(start_point), None) => {
                 let end_el = end_el.unwrap();
                 if end_loc.is_empty() {
-                    end_loc = context.closest_loc(end_el, start_point);
+                    end_loc = closest_loc(end_el, start_point);
                     end_dir = loc_to_dir(end_loc.clone());
                 }
                 (
@@ -113,7 +151,7 @@ impl Connector {
             (None, Some(end_point)) => {
                 let start_el = start_el.unwrap();
                 if start_loc.is_empty() {
-                    start_loc = context.closest_loc(start_el, end_point);
+                    start_loc = closest_loc(start_el, end_point);
                     start_dir = loc_to_dir(start_loc.clone());
                 }
                 (
@@ -124,14 +162,14 @@ impl Connector {
             (None, None) => {
                 let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
                 if start_loc.is_empty() && end_loc.is_empty() {
-                    (start_loc, end_loc) = context.shortest_link(start_el, end_el);
+                    (start_loc, end_loc) = shortest_link(start_el, end_el);
                     start_dir = loc_to_dir(start_loc.clone());
                     end_dir = loc_to_dir(end_loc.clone());
                 } else if start_loc.is_empty() {
-                    start_loc = context.closest_loc(start_el, end_el.coord(&end_loc).unwrap());
+                    start_loc = closest_loc(start_el, end_el.coord(&end_loc).unwrap());
                     start_dir = loc_to_dir(start_loc.clone());
                 } else if end_loc.is_empty() {
-                    end_loc = context.closest_loc(end_el, start_el.coord(&start_loc).unwrap());
+                    end_loc = closest_loc(end_el, start_el.coord(&start_loc).unwrap());
                     end_dir = loc_to_dir(end_loc.clone());
                 }
                 (

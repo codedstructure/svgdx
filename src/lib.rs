@@ -31,8 +31,8 @@ fn strp(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
-/// Returns iterator cycling over whitespace-separated values
-fn attr_split<'a>(input: &'a str) -> impl Iterator<Item = String> + '_ {
+/// Returns iterator cycling over whitespace-or-comma separated values
+fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
     input
         .split_whitespace()
         .flat_map(|v| v.split(','))
