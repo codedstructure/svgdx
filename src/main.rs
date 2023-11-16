@@ -51,8 +51,11 @@ fn transform(input: &str, output: Option<String>) {
     match output {
         Some(x) => {
             let mut out_temp = NamedTempFile::new().unwrap();
-            let _ = svg_transform(&mut in_reader, &mut out_temp);
-            out_temp.persist(x).expect("Could not persist temp file");
+            svg_transform(&mut in_reader, &mut out_temp).expect("SVG transform failed");
+            // Copy content rather than rename (by .persist()) since this
+            // could cross filesystems; some apps (e.g. eog) also fail to
+            // react to 'moved-over' files.
+            fs::copy(out_temp.path(), x).expect("Could not write target file");
         }
         None => {
             let _ = svg_transform(&mut in_reader, &mut std::io::stdout());
