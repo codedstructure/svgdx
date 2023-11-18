@@ -73,6 +73,12 @@ impl TransformerContext {
         self.last_indent = indent;
     }
 
+    fn update_elem_map(elem_map: &mut HashMap<String, SvgElement>, e: &SvgElement) {
+        if let Some(el_id) = e.get_attr("id") {
+            elem_map.insert(el_id, e.clone());
+        }
+    }
+
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Vec<SvgEvent> {
         let elem_name = &e.name;
 
@@ -84,20 +90,6 @@ impl TransformerContext {
         let mut e = e.clone();
 
         e.expand_attributes(false, self);
-
-        if e.is_connector() {
-            let conn = Connector::from_element(
-                &e,
-                self,
-                if e.name == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            );
-            // replace with rendered connection element
-            e = conn.render();
-        }
 
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
@@ -117,6 +109,23 @@ impl TransformerContext {
                 _ => (0., 0.),
             };
             e = e.translated(-dx, -dy);
+            Self::update_elem_map(&mut self.elem_map, &e);
+        }
+
+        if e.is_connector() {
+            let conn = Connector::from_element(
+                &e,
+                self,
+                if e.name == "polyline" {
+                    ConnectionType::Corner
+                } else if let Some(e_type) = e.get_attr("edge-type") {
+                    ConnectionType::from_str(&e_type)
+                } else {
+                    ConnectionType::Straight
+                },
+            );
+            // replace with rendered connection element
+            e = conn.render().without_attr("edge-type");
         }
 
         if e.name != "text" && e.name != "tspan" {

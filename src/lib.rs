@@ -348,16 +348,6 @@ impl SvgElement {
         result
     }
 
-    fn locations(&self) -> &[&str] {
-        if self.name == "line" {
-            &[
-                "xy1", "start", "xy2", "end", "t", "b", "l", "r", "tl", "bl", "tr", "br",
-            ]
-        } else {
-            &["t", "b", "l", "r", "tl", "bl", "tr", "br"]
-        }
-    }
-
     fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
         let mut orig_elem = self.clone();
 
