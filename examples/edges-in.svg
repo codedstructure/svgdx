@@ -3,15 +3,21 @@
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
         <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
       </marker>
+      <pattern id="grid" patternUnits="userSpaceOnUse" width="1" height="1" viewBox="0,0,5,5">
+        <line x1="0" y1="0" x2="5" y2="0"/>
+        <line x1="0" y1="0" x2="0" y2="5"/>
+      </pattern>
     </defs>
     <style>
         <![CDATA[
             rect { fill: white; stroke: black; stroke-width: 0.1px; }
+            rect.background-grid { fill: url(#grid); stroke: none; }
             line, polyline { stroke-width: 0.2px; stroke: black; fill: none; }
             text { font-size: 3px; dominant-baseline: central; text-anchor: middle; }
         ]]>
     </style>
 
+    <rect xy="-20 -5" wh="50 55" class="background-grid"/>
     <rect xy="0" wh="10 30" text="base" id="base"/>
     <rect xy="15 0" wh="10 5" text="a" id="a"/>
     <rect xy="15 10" wh="10 5" text="b" id="b"/>

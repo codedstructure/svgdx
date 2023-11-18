@@ -1,17 +1,23 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="66mm" height="71.5mm" viewBox="-28 -13.25 66 71.5">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="77mm" height="82.5mm" viewBox="-33.5 -18.75 77 82.5">
     <defs>
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
         <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
       </marker>
+      <pattern id="grid" patternUnits="userSpaceOnUse" width="1" height="1" viewBox="0,0,5,5">
+        <line x1="0" y1="0" x2="5" y2="0"/>
+        <line x1="0" y1="0" x2="0" y2="5"/>
+      </pattern>
     </defs>
     <style>
         <![CDATA[
             rect { fill: white; stroke: black; stroke-width: 0.1px; }
+            rect.background-grid { fill: url(#grid); stroke: none; }
             line, polyline { stroke-width: 0.2px; stroke: black; fill: none; }
             text { font-size: 3px; dominant-baseline: central; text-anchor: middle; }
         ]]>
     </style>
 
+    <rect x="-20" y="-5" width="50" height="55" class="background-grid"/>
     <rect x="0" y="0" width="10" height="30" id="base"/>
     <text x="5" y="15" class="tbox">base</text>
     <rect x="15" y="0" width="10" height="5" id="a"/>
