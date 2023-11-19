@@ -3,10 +3,28 @@
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
         <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
       </marker>
-      <pattern id="grid" patternUnits="userSpaceOnUse" width="1" height="1" viewBox="0,0,5,5">
-        <line x1="0" y1="0" x2="5" y2="0"/>
-        <line x1="0" y1="0" x2="0" y2="5"/>
+      <pattern id="grid-1" patternUnits="userSpaceOnUse" width="1" height="1" viewBox="0,0,10,10">
+        <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.6)"/>
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.6)"/>
       </pattern>
+      <pattern id="grid-5" patternUnits="userSpaceOnUse" width="5" height="5" viewBox="0,0,10,10">
+        <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.4)"/>
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.4)"/>
+      </pattern>
+      <pattern id="grid-10" patternUnits="userSpaceOnUse" width="10" height="10" viewBox="0,0,10,10">
+        <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.3)"/>
+        <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.3)"/>
+      </pattern>
+      <pattern id="grid" width="1" height="1">
+        <rect width="500" height="500" style="fill: url(#grid-1)"/>
+        <rect width="500" height="500" style="fill: url(#grid-5)"/>
+        <rect width="500" height="500" style="fill: url(#grid-10)"/>
+      </pattern>
+      <symbol id="zero-marker" x="-1" y="-1" width="2" height="2" viewBox="-1 -1 2 2">
+        <circle xy="0" r="1"/>
+        <line xy1="-1 0" xy2="1 0"/>
+        <line xy1="0 -1" xy2="0 1"/>
+      </symbol>
     </defs>
     <style>
         <![CDATA[
@@ -14,10 +32,11 @@
             rect.background-grid { fill: url(#grid); stroke: none; }
             line, polyline { stroke-width: 0.2px; stroke: black; fill: none; }
             text { font-size: 3px; dominant-baseline: central; text-anchor: middle; }
+            #zero-marker * { stroke: rgba(255,0,0,0.5); stroke-width: 0.2; fill: none;}
         ]]>
     </style>
 
-    <rect xy="-20 -5" wh="50 55" class="background-grid"/>
+    <rect xy="-50" wh="200" class="background-grid"/>
     <rect xy="0" wh="10 30" text="base" id="base"/>
     <rect xy="15 0" wh="10 5" text="a" id="a"/>
     <rect xy="15 10" wh="10 5" text="b" id="b"/>
@@ -31,4 +50,5 @@
     <line end="#d" start="#base" edge-type="v" marker-end="url(#arrow)"/>
     <line end="#e" start="#base" edge-type="h" marker-end="url(#arrow)"/>
     <line end="#f" start="#base" edge-type="h" marker-end="url(#arrow)"/>
+    <use href="#zero-marker" x="0" y="0"/>
 </svg>

@@ -46,8 +46,8 @@ enum Length {
     Ratio(f32),
 }
 
-#[allow(dead_code)]
 impl Length {
+    #[allow(dead_code)]
     fn ratio(&self) -> Option<f32> {
         if let Length::Ratio(result) = self {
             Some(*result)
@@ -83,7 +83,7 @@ impl Length {
 /// Parse a ratio (float or %age) to an f32
 /// Note this deliberately does not clamp to 0..1
 fn strp_length(s: &str) -> Option<Length> {
-    let mut s = s.clone();
+    let mut s = s;
     if s.ends_with('%') {
         s = s.trim_end_matches('%');
         Some(Length::Ratio(strp(s)? * 0.01))
@@ -149,7 +149,6 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs.to_vec())
     }
 
-    #[allow(dead_code)]
     #[must_use]
     fn without_attr(&self, key: &str) -> Self {
         let attrs: Vec<(String, String)> = self
@@ -331,7 +330,6 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs)
     }
 
-    #[allow(dead_code)]
     fn positioned(&self, x: f32, y: f32) -> Self {
         // TODO: should allow specifying which loc this positions; this currently
         // sets the top-left (for rect/tbox), but for some scenarios it might be

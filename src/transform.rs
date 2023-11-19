@@ -446,23 +446,6 @@ impl EventList<'_> {
         self.events.iter()
     }
 
-    fn to_elements(&self) -> Vec<SvgElement> {
-        let mut result = vec![];
-        let mut event_iter = self.iter();
-        loop {
-            match event_iter.next() {
-                Some(Event::Empty(e)) | Some(Event::Start(e)) => {
-                    result.push(e.into());
-                }
-                None => {
-                    break;
-                }
-                _ => (),
-            }
-        }
-        result
-    }
-
     fn push(&mut self, ev: &Event) {
         self.events.push(ev.clone().into_owned());
     }
@@ -548,15 +531,38 @@ impl Transformer {
         // This also allows just using `<svg>` as the root element.
         // TODO: preserve other attributes from a given svg root.
         let mut extent = BoundingBox::new();
-        for el in output.to_elements() {
-            if let Some(bb) = &el.bbox() {
-                extent.extend(bb);
+        let mut elem_path = Vec::new();
+        for ev in output.iter() {
+            match ev {
+                Event::Start(e) | Event::Empty(e) => {
+                    let is_empty = matches!(ev, Event::Empty(_));
+                    let event_element = SvgElement::from(e);
+                    if !is_empty {
+                        elem_path.push(event_element.name.clone());
+                    }
+                    if event_element.classes.contains("background-grid") {
+                        // special-case "background-grid" as an 'infinite' grid
+                        // sitting behind everything...
+                        continue;
+                    }
+                    if !(elem_path.contains(&"defs".to_string()) ||
+                         elem_path.contains(&"symbol".to_string())) {
+                        if let Some(bb) = &event_element.bbox() {
+                            extent.extend(bb);
+                        }
+                    }
+                }
+                Event::End(_) => {
+                    elem_path.pop();
+                }
+                _ => {}
             }
         }
-        // Expand by 10, then add 10%. Ensures small images get more than a couple
+        // Expand by 5, then add 5%. Ensures small images get more than a couple
         // of pixels border, and large images still get a (relatively) decent border.
-        extent.expand(10.);
-        extent.scale(1.1);
+        extent.expand(5.);
+        extent.scale(1.05);
+        extent.round();
 
         if let BoundingBox::BBox(minx, miny, maxx, maxy) = extent {
             let width = fstr(maxx - minx);

@@ -66,6 +66,14 @@ impl BoundingBox {
         }
         self
     }
+
+    /// Expand (floor/ceil) BBox to integer coords surrounding current extent.
+    pub fn round(&mut self) -> &Self {
+        if let BoundingBox::BBox(x1, y1, x2, y2) = &self {
+            *self = BoundingBox::BBox(x1.floor(), y1.floor(), x2.ceil(), y2.ceil());
+        }
+        self
+    }
 }
 
 /// AttrMap - an order preserving map for storing element attributes.

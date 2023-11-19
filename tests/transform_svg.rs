@@ -14,7 +14,7 @@ fn test_transform_full_svg() {
   <ellipse cxy="20 30" rxy="10 5" text="ellipse" style="font-size:1px" id="z"/>
   <line start="#a" end="#z"/>
 </svg>"##;
-    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="55mm" height="60.5mm" viewBox="-12.5 -12.75 55 60.5">
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="42mm" height="49mm" viewBox="-6 -7 42 49">
   <style>
     <![CDATA[
     * { stroke-width: 0.2; fill: none; stroke: black; }
