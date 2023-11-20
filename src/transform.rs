@@ -545,8 +545,9 @@ impl Transformer {
                         // sitting behind everything...
                         continue;
                     }
-                    if !(elem_path.contains(&"defs".to_string()) ||
-                         elem_path.contains(&"symbol".to_string())) {
+                    if !(elem_path.contains(&"defs".to_string())
+                        || elem_path.contains(&"symbol".to_string()))
+                    {
                         if let Some(bb) = &event_element.bbox() {
                             extent.extend(bb);
                         }

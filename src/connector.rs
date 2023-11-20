@@ -133,7 +133,8 @@ impl Connector {
         let mut start_dir = None;
         let mut end_dir = None;
 
-        let loc_to_dir = |dir: &str| match dir {
+        // loc may have a 'length' part following a colon, ignore that
+        let loc_to_dir = |dir: &str| match dir.split(':').next().unwrap() {
             "t" => Some(Direction::Up),
             "r" => Some(Direction::Right),
             "b" => Some(Direction::Down),

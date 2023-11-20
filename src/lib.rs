@@ -279,19 +279,34 @@ impl SvgElement {
     }
 
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
+        let mut loc = loc;
+        let mut len = Length::Ratio(0.5);
+        let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").unwrap();
+        if let Some(caps) = re.captures(loc) {
+            loc = caps.name("loc").unwrap().as_str();
+            len = caps
+                .name("len")
+                .map(|v| strp_length(v.as_str()).expect("Invalid length"))
+                .unwrap_or(len);
+        }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
         if let Some(BoundingBox::BBox(x1, y1, x2, y2)) = self.bbox() {
+            let tl = (x1, y1);
+            let tr = (x2, y1);
+            let br = (x2, y2);
+            let bl = (x1, y2);
+            let c = ((x1 + x2) / 2., (y1 + y2) / 2.);
             match loc {
-                "tl" => Some((x1, y1)),
-                "t" => Some(((x1 + x2) / 2., y1)),
-                "tr" => Some((x2, y1)),
-                "r" => Some((x2, (y1 + y2) / 2.)),
-                "br" => Some((x2, y2)),
-                "b" => Some(((x1 + x2) / 2., y2)),
-                "bl" => Some((x1, y2)),
-                "l" => Some((x1, (y1 + y2) / 2.)),
-                "c" => Some(((x1 + x2) / 2., (y1 + y2) / 2.)),
+                "tl" => Some(tl),
+                "t" => Some((len.calc_offset(tl.0, tr.0), tl.1)),
+                "tr" => Some(tr),
+                "r" => Some((tr.0, len.calc_offset(tr.1, br.1))),
+                "br" => Some(br),
+                "b" => Some((len.calc_offset(bl.0, br.0), bl.1)),
+                "bl" => Some(bl),
+                "l" => Some((tl.0, len.calc_offset(tl.1, bl.1))),
+                "c" => Some(c),
                 _ => {
                     if self.name == "line" {
                         let x1 = strp(self.attrs.get("x1")?)?;
