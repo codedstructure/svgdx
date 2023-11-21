@@ -31,16 +31,21 @@ fn strp(s: &str) -> Option<f32> {
     s.parse().ok()
 }
 
-/// Returns iterator cycling over whitespace-or-comma separated values
+/// Returns iterator over whitespace-or-comma separated values
 fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
     input
         .split_whitespace()
         .flat_map(|v| v.split(','))
         .map(|v| v.to_string())
-        .cycle()
 }
 
-#[derive(Clone, Copy, Debug)]
+/// Returns iterator *cycling* over whitespace-or-comma separated values
+fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
+    let x: Vec<String> = attr_split(input).collect();
+    x.into_iter().cycle()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 enum Length {
     Absolute(f32),
     Ratio(f32),
@@ -83,9 +88,7 @@ impl Length {
 /// Parse a ratio (float or %age) to an f32
 /// Note this deliberately does not clamp to 0..1
 fn strp_length(s: &str) -> Option<Length> {
-    let mut s = s;
-    if s.ends_with('%') {
-        s = s.trim_end_matches('%');
+    if let Some(s) = s.strip_suffix('%') {
         Some(Length::Ratio(strp(s)? * 0.01))
     } else {
         Some(Length::Absolute(strp(s)?))
@@ -493,18 +496,25 @@ impl SvgElement {
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)(\s+(?<dx>[-0-9\.]+))?(\s+(?<dy>[-0-9\.]+))?$").unwrap();
-        if let Some(caps) = rel_re.captures(input) {
+        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)").unwrap();
+        let mut parts = attr_split(input);
+        let ref_loc = parts.next().unwrap();
+        if let Some(caps) = rel_re.captures(&ref_loc) {
+            if caps.get(0).unwrap().is_empty() {
+                // We need either id or loc or both; since they are both optional in
+                // the regex we check that we did actually match some text here...
+                return input.to_owned();
+            }
             // TODO: relv should be equivalent to xy="@b" xy-loc="@t" and similar
             // for relh being xy="@r" xy-loc="@l". Otherwise relh would also be
             // affected by margin-y.
-            let default_rel = match input {
+            let default_rel = match ref_loc.as_str() {
                 "relv" => "bl",
                 "relh" => "tr",
                 _ => "tr",
             };
-            let dx = strp(caps.name("dx").map_or("0", |v| v.as_str())).unwrap();
-            let dy = strp(caps.name("dy").map_or("0", |v| v.as_str())).unwrap();
+            let dx = strp(&parts.next().unwrap_or("0".to_owned())).unwrap();
+            let dy = strp(&parts.next().unwrap_or("0".to_owned())).unwrap();
 
             let mut ref_el = context.prev_element.as_ref();
             let opt_id = caps
@@ -520,7 +530,7 @@ impl SvgElement {
                 let mut margin_x = 0.;
                 let mut margin_y = 0.;
                 if let Some(margin) = ref_el.get_attr("margin") {
-                    let mut margin_parts = attr_split(&margin);
+                    let mut margin_parts = attr_split_cycle(&margin);
                     margin_x = strp(&margin_parts.next().unwrap()).unwrap();
                     margin_y = strp(&margin_parts.next().unwrap()).unwrap();
                 }
@@ -561,41 +571,34 @@ impl SvgElement {
         //   wh="#thing 2 110%"  - size of #thing plus 2 units width, *1.1 height
         // TODO: extend to allow referencing earlier elements beyond previous
         // TODO: allow mixed relative and absolute values...
-        let rel_re =
-            Regex::new(r"^(?<ref>(#\S+|\^))(\s+(?<dw>[-0-9\.]+%?)\s+(?<dh>[-0-9\.]+%?))?$")
-                .unwrap();
-        if let Some(caps) = rel_re.captures(input) {
-            let dw = caps.name("dw").map_or("0", |v| v.as_str());
-            let dh = caps.name("dh").map_or("0", |v| v.as_str());
+        let mut parts = attr_split(input);
+        let ref_loc = parts.next();
+        let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").unwrap();
+        if let Some(caps) = rel_re.captures(&ref_loc.unwrap()) {
+            let dw = parts.next().unwrap_or("0".to_owned());
+            let dh = parts.next().unwrap_or("0".to_owned());
             let mut ref_el = context.prev_element.as_ref();
             let ref_str = caps
                 .name("ref")
                 .expect("ref is mandatory in regex")
                 .as_str();
-            if ref_str.starts_with('#') {
-                ref_el = Some(
-                    context
-                        .elem_map
-                        .get(ref_str.strip_prefix('#').unwrap())
-                        .unwrap(),
-                );
+            if let Some(ref_str) = ref_str.strip_prefix('#') {
+                ref_el = Some(context.elem_map.get(ref_str).unwrap());
             }
 
             if let Some(inner) = ref_el {
                 if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
                     let mut w = strp(&w).unwrap();
                     let mut h = strp(&h).unwrap();
-                    if dw.ends_with('%') {
-                        let dw = strp(dw.trim_end_matches('%')).unwrap() / 100.0;
-                        w *= dw;
+                    if let Some(dw) = dw.strip_suffix('%') {
+                        w *= strp(dw).unwrap() / 100.;
                     } else {
-                        w += strp(dw).unwrap();
+                        w += strp(&dw).unwrap();
                     }
-                    if dh.ends_with('%') {
-                        let dh = strp(dh.trim_end_matches('%')).unwrap() / 100.0;
-                        h *= dh;
+                    if let Some(dh) = dh.strip_suffix('%') {
+                        h *= strp(dh).unwrap() / 100.;
                     } else {
-                        h += strp(dh).unwrap();
+                        h += strp(&dh).unwrap();
                     }
 
                     return format!("{w} {h}");
@@ -618,7 +621,7 @@ impl SvgElement {
                     "xy" | "cxy" | "xy1" | "xy2" => {
                         value = self.eval_pos(value.as_str(), context);
                     }
-                    "size" | "wh" => {
+                    "wh" => {
                         // TODO: support rxy for ellipses, with scaling factor
                         value = self.eval_size(value.as_str(), context);
                     }
@@ -626,134 +629,63 @@ impl SvgElement {
                 }
             }
             // TODO: should expand in a given order to avoid repetition?
-            match key.as_str() {
-                "xy" => {
-                    let mut parts = attr_split(&value);
-
-                    match self.name.as_str() {
-                        "text" | "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("x".into(), parts.next().unwrap()));
-                            new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
+            let mut parts = attr_split_cycle(&value);
+            match (key.as_str(), self.name.as_str()) {
+                ("xy", "text" | "rect" | "pipeline") => {
+                    new_attrs.push(("x".into(), parts.next().unwrap()));
+                    new_attrs.push(("y".into(), parts.next().unwrap()));
+                }
+                ("wh", "rect" | "tbox" | "pipeline") => {
+                    new_attrs.push(("width".into(), parts.next().unwrap()));
+                    new_attrs.push(("height".into(), parts.next().unwrap()));
+                }
+                ("wh", "circle") => {
+                    let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
+                    new_attrs.push(("r".into(), fstr(diameter / 2.)));
+                }
+                ("wh", "ellipse") => {
+                    let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
+                    let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
+                    new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
+                    new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
+                }
+                ("cxy", "rect" | "tbox" | "pipeline") => {
+                    // Requires wh (/ width&height) be specified in order to evaluate
+                    // the centre point.
+                    // TODO: also support specifying other attributes; xy+cxy should be sufficient
+                    let wh = self.attrs.get("wh").map(|z| z.to_string());
+                    let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
+                    let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
+                    let cx = strp(&parts.next().unwrap()).unwrap();
+                    let cy = strp(&parts.next().unwrap()).unwrap();
+                    if let Some(wh_inner) = wh {
+                        let mut wh_parts = attr_split_cycle(&wh_inner);
+                        width = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                        height = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                    }
+                    if let (Some(width), Some(height)) = (width, height) {
+                        new_attrs.push(("x".into(), fstr(cx - width / 2.)));
+                        new_attrs.push(("y".into(), fstr(cy - height / 2.)));
+                        // wh / width&height will be handled separately
                     }
                 }
-                "size" | "wh" => {
-                    let mut parts = attr_split(&value);
-
-                    match self.name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            new_attrs.push(("width".into(), parts.next().unwrap()));
-                            new_attrs.push(("height".into(), parts.next().unwrap()));
-                        }
-                        "circle" => {
-                            let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
-                            new_attrs.push(("r".into(), fstr(diameter / 2.)));
-                        }
-                        "ellipse" => {
-                            let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
-                            let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
-                            new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
-                            new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
+                ("cxy", "circle" | "ellipse") => {
+                    new_attrs.push(("cx".into(), parts.next().unwrap()));
+                    new_attrs.push(("cy".into(), parts.next().unwrap()));
                 }
-                "cxy" => {
-                    let mut parts = attr_split(&value);
-
-                    match self.name.as_str() {
-                        "rect" | "tbox" | "pipeline" => {
-                            // Requires wh (/ width&height) be specified in order to evaluate
-                            // the centre point.
-                            // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                            let wh = self.attrs.get("wh").map(|z| z.to_string());
-                            let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
-                            let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
-                            let cx = strp(&parts.next().unwrap()).unwrap();
-                            let cy = strp(&parts.next().unwrap()).unwrap();
-                            if let Some(wh_inner) = wh {
-                                let mut wh_parts = attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                                height = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                            }
-                            if let (Some(width), Some(height)) = (width, height) {
-                                new_attrs.push(("x".into(), fstr(cx - width / 2.)));
-                                new_attrs.push(("y".into(), fstr(cy - height / 2.)));
-                                // wh / width&height will be handled separately
-                            }
-                        }
-                        "circle" | "ellipse" => {
-                            new_attrs.push(("cx".into(), parts.next().unwrap()));
-                            new_attrs.push(("cy".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
+                ("rxy", "ellipse") => {
+                    new_attrs.push(("rx".into(), parts.next().unwrap()));
+                    new_attrs.push(("ry".into(), parts.next().unwrap()));
                 }
-                "rxy" => match self.name.as_str() {
-                    "ellipse" => {
-                        let mut parts = attr_split(&value);
-
-                        new_attrs.push(("rx".into(), parts.next().unwrap()));
-                        new_attrs.push(("ry".into(), parts.next().unwrap()));
-                    }
-                    _ => new_attrs.push((key.clone(), value)),
-                },
-                "xy1" => {
-                    let mut parts = attr_split(&value);
-                    match self.name.as_str() {
-                        "line" => {
-                            new_attrs.push(("x1".into(), parts.next().unwrap()));
-                            new_attrs.push(("y1".into(), parts.next().unwrap()));
-                        }
-                        "rect" => {
-                            new_attrs.push(("x".into(), parts.next().unwrap()));
-                            new_attrs.push(("y".into(), parts.next().unwrap()));
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
+                ("xy1", "line") => {
+                    new_attrs.push(("x1".into(), parts.next().unwrap()));
+                    new_attrs.push(("y1".into(), parts.next().unwrap()));
                 }
-                "xy2" => {
-                    let mut parts = attr_split(&value);
-                    match self.name.as_str() {
-                        "line" => {
-                            new_attrs.push(("x2".into(), parts.next().unwrap()));
-                            new_attrs.push(("y2".into(), parts.next().unwrap()));
-                        }
-                        "rect" => {
-                            // must have xy1 (/ x&y) or wh (/ width&height)
-                            let wh = self.attrs.get("wh").map(|z| z.to_string());
-                            let xy1 = self.attrs.get("xy1").map(|z| z.to_string());
-                            let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
-                            let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
-                            let mut x = self.attrs.get("x").map(|z| strp(z).unwrap());
-                            let mut y = self.attrs.get("y").map(|z| strp(z).unwrap());
-                            let x2 = strp(&parts.next().unwrap()).unwrap();
-                            let y2 = strp(&parts.next().unwrap()).unwrap();
-                            if let Some(wh_inner) = wh {
-                                let mut wh_parts = attr_split(&wh_inner);
-                                width = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                                height = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                            }
-                            if let Some(xy1_inner) = xy1 {
-                                let mut xy1_parts = attr_split(&xy1_inner);
-                                x = Some(strp(&xy1_parts.next().unwrap()).unwrap());
-                                y = Some(strp(&xy1_parts.next().unwrap()).unwrap());
-                            }
-                            if let (Some(w), Some(h)) = (width, height) {
-                                new_attrs.push(("x".into(), fstr(x2 - w)));
-                                new_attrs.push(("y".into(), fstr(y2 - h)));
-                                // width / height either already exist in the target or will be expanded from a wh.
-                            } else if let (Some(x), Some(y)) = (x, y) {
-                                new_attrs.push(("width".into(), fstr(x2 - x)));
-                                new_attrs.push(("height".into(), fstr(y2 - y)));
-                                // x/y either already exist in the target or will be expanded from a xy1.
-                            }
-                        }
-                        _ => new_attrs.push((key.clone(), value.clone())),
-                    }
+                ("xy2", "line") => {
+                    new_attrs.push(("x2".into(), parts.next().unwrap()));
+                    new_attrs.push(("y2".into(), parts.next().unwrap()));
                 }
-                _ => new_attrs.push((key.clone(), value)),
+                _ => new_attrs.push((key.clone(), value.clone())),
             }
         }
 
@@ -780,5 +712,35 @@ mod test {
         // Large-ish integers (up to 24 bit mantissa) should be fine
         assert_eq!(fstr(12345678.0), "12345678");
         assert_eq!(fstr(12340000.0), "12340000");
+    }
+
+    #[test]
+    fn test_strp() {
+        assert_eq!(strp("1"), Some(1.));
+        assert_eq!(strp("100"), Some(100.));
+        assert_eq!(strp("-100"), Some(-100.));
+        assert_eq!(strp("-0.00123"), Some(-0.00123));
+        assert_eq!(strp("1234567.89"), Some(1234567.89));
+    }
+
+    #[test]
+    fn test_strp_length() {
+        assert_eq!(strp_length("1"), Some(Length::Absolute(1.)));
+        assert_eq!(strp_length("123"), Some(Length::Absolute(123.)));
+        assert_eq!(strp_length("-0.0123"), Some(Length::Absolute(-0.0123)));
+        assert_eq!(strp_length("0.5%"), Some(Length::Ratio(0.005)));
+        assert_eq!(strp_length("150%"), Some(Length::Ratio(1.5)));
+        assert_eq!(strp_length("1.2.3"), None);
+        assert_eq!(strp_length("a"), None);
+        assert_eq!(strp_length("a%"), None);
+    }
+
+    #[test]
+    fn test_length_calc_offset() {
+        assert_eq!(strp_length("25%").unwrap().calc_offset(10., 50.), 20.);
+        assert_eq!(strp_length("50%").unwrap().calc_offset(-10., -9.), -9.5);
+        assert_eq!(strp_length("200%").unwrap().calc_offset(10., 50.), 90.);
+        assert_eq!(strp_length("-3.5").unwrap().calc_offset(10., 50.), 46.5);
+        assert_eq!(strp_length("3.5").unwrap().calc_offset(-10., 90.), -6.5);
     }
 }
