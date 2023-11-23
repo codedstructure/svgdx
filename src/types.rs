@@ -1,5 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    fmt,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BoundingBox {
@@ -60,8 +62,10 @@ impl BoundingBox {
     /// Scale the bounding box by the given amount with origin at the center
     pub fn scale(&mut self, amount: f32) -> &Self {
         if let BoundingBox::BBox(x1, y1, x2, y2) = &self {
-            let dx_by_2 = (self.width().unwrap() * amount - self.width().unwrap()) / 2.;
-            let dy_by_2 = (self.height().unwrap() * amount - self.height().unwrap()) / 2.;
+            let width = x2 - x1;
+            let height = y2 - y1;
+            let dx_by_2 = (width * amount - width) / 2.;
+            let dy_by_2 = (height * amount - height) / 2.;
             *self = BoundingBox::BBox(*x1 - dx_by_2, *y1 - dy_by_2, *x2 + dx_by_2, *y2 + dy_by_2);
         }
         self

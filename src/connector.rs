@@ -2,6 +2,8 @@ use crate::transform::TransformerContext;
 use crate::{attr_split, fstr, strp, strp_length, Length, SvgElement};
 use regex::Regex;
 
+use anyhow::{Context, Result};
+
 #[derive(Clone, Copy, Debug)]
 enum Direction {
     Up,
@@ -61,7 +63,7 @@ pub(crate) struct Connector {
     start: Endpoint,
     end: Endpoint,
     conn_type: ConnectionType,
-    offset: Length,
+    offset: Option<Length>,
 }
 
 fn closest_loc(this: &SvgElement, point: (f32, f32), conn_type: ConnectionType) -> String {
@@ -111,14 +113,15 @@ impl Connector {
         element: &SvgElement,
         context: &TransformerContext,
         conn_type: ConnectionType,
-    ) -> Self {
+    ) -> Result<Self> {
         let mut element = element.clone();
-        let start_ref = element.pop_attr("start").unwrap();
-        let end_ref = element.pop_attr("end").unwrap();
-        let offset = element
-            .pop_attr("corner-offset")
-            .unwrap_or(String::from("50%"));
-        let offset = strp_length(&offset).expect("Invalid corner-offset value");
+        let start_ref = element.pop_attr("start").context("No 'start' element")?;
+        let end_ref = element.pop_attr("end").context("No 'end' element")?;
+        let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
+            Some(strp_length(&o_inner).context("Invalid corner-offset")?)
+        } else {
+            None
+        };
 
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
@@ -143,7 +146,7 @@ impl Connector {
         };
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").unwrap();
+        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").expect("Bad RegEx");
 
         if let Some(caps) = re.captures(&start_ref) {
             let name = &caps["id"];
@@ -187,7 +190,12 @@ impl Connector {
                     start_dir = loc_to_dir(&start_loc);
                 }
                 (
-                    Endpoint::new(start_el.coord(&start_loc).unwrap(), start_dir),
+                    Endpoint::new(
+                        start_el
+                            .coord(&start_loc)
+                            .context("no coord for start_loc")?,
+                        start_dir,
+                    ),
                     Endpoint::new(end_point, end_dir),
                 )
             }
@@ -201,16 +209,27 @@ impl Connector {
                     start_loc = closest_loc(start_el, end_el.coord(&end_loc).unwrap(), conn_type);
                     start_dir = loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
-                    end_loc = closest_loc(end_el, start_el.coord(&start_loc).unwrap(), conn_type);
+                    end_loc = closest_loc(
+                        end_el,
+                        start_el
+                            .coord(&start_loc)
+                            .context("no coord for start_loc")?,
+                        conn_type,
+                    );
                     end_dir = loc_to_dir(&end_loc);
                 }
                 (
-                    Endpoint::new(start_el.coord(&start_loc).unwrap(), start_dir),
+                    Endpoint::new(
+                        start_el
+                            .coord(&start_loc)
+                            .context("no coord for start_loc")?,
+                        start_dir,
+                    ),
                     Endpoint::new(end_el.coord(&end_loc).unwrap(), end_dir),
                 )
             }
         };
-        Self {
+        Ok(Self {
             source_element: element,
             start,
             end,
@@ -218,10 +237,13 @@ impl Connector {
             end_el: end_el.cloned(),
             conn_type,
             offset,
-        }
+        })
     }
 
     pub fn render(&self) -> SvgElement {
+        let default_ratio_offset = Length::Ratio(0.5);
+        let default_abs_offset = Length::Absolute(2.);
+
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
         match self.conn_type {
@@ -309,34 +331,56 @@ impl Connector {
                         | (Direction::Right, Direction::Left) => {
                             let mid_x = self
                                 .offset
+                                .unwrap_or(default_ratio_offset)
                                 .calc_offset(self.start.origin.0, self.end.origin.0);
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Down) | (Direction::Down, Direction::Up) => {
                             let mid_y = self
                                 .offset
+                                .unwrap_or(default_ratio_offset)
                                 .calc_offset(self.start.origin.1, self.end.origin.1);
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         // U-shaped connection
                         (Direction::Left, Direction::Left) => {
                             let min_x = self.start.origin.0.min(self.end.origin.0);
-                            let mid_x = min_x - self.offset.absolute().unwrap();
+                            let mid_x = min_x
+                                - self
+                                    .offset
+                                    .unwrap_or(default_abs_offset)
+                                    .absolute()
+                                    .unwrap();
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Right, Direction::Right) => {
                             let max_x = self.start.origin.0.max(self.end.origin.0);
-                            let mid_x = max_x + self.offset.absolute().unwrap();
+                            let mid_x = max_x
+                                + self
+                                    .offset
+                                    .unwrap_or(default_abs_offset)
+                                    .absolute()
+                                    .unwrap();
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Up) => {
                             let min_y = self.start.origin.1.min(self.end.origin.1);
-                            let mid_y = min_y - self.offset.absolute().unwrap();
+                            let mid_y = min_y
+                                - self
+                                    .offset
+                                    .unwrap_or(default_abs_offset)
+                                    .absolute()
+                                    .unwrap();
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         (Direction::Down, Direction::Down) => {
                             let max_y = self.start.origin.1.max(self.end.origin.1);
-                            let mid_y = max_y + self.offset.absolute().unwrap();
+                            let mid_y = max_y
+                                + self
+                                    .offset
+                                    .unwrap_or(default_abs_offset)
+                                    .absolute()
+                                    .unwrap();
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                     };

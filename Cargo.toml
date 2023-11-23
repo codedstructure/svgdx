@@ -13,3 +13,4 @@ tempfile = "3.8.1"
 notify = "6.1.1"
 notify-debouncer-mini = "0.4.1"
 clap = { version = "4.0", features = ["derive"] }
+anyhow = "1.0.75"

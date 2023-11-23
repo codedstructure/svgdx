@@ -1,3 +1,4 @@
+use anyhow::Result;
 use clap::{Args, Parser};
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
@@ -11,10 +12,6 @@ use std::{
 use tempfile::NamedTempFile;
 
 use svgd::svg_transform;
-
-fn path_exists(path: &str) -> bool {
-    fs::metadata(path).is_ok()
-}
 
 /// Transform given file to SVG
 #[derive(Parser)]
@@ -40,35 +37,32 @@ struct InputArgs {
     watch: Option<String>,
 }
 
-fn transform(input: &str, output: Option<String>) {
-    if !path_exists(input) {
-        panic!("File does not exist");
-    }
-
-    //let mut t = Transformer::new();
-    let mut in_reader = Box::new(BufReader::new(File::open(input).unwrap()));
+fn transform(input: &str, output: Option<String>) -> Result<()> {
+    let mut in_reader = Box::new(BufReader::new(File::open(input)?));
 
     match output {
         Some(x) => {
-            let mut out_temp = NamedTempFile::new().unwrap();
-            svg_transform(&mut in_reader, &mut out_temp).expect("SVG transform failed");
+            let mut out_temp = NamedTempFile::new()?;
+            svg_transform(&mut in_reader, &mut out_temp)?;
             // Copy content rather than rename (by .persist()) since this
             // could cross filesystems; some apps (e.g. eog) also fail to
             // react to 'moved-over' files.
-            fs::copy(out_temp.path(), x).expect("Could not write target file");
+            fs::copy(out_temp.path(), x)?;
         }
         None => {
-            let _ = svg_transform(&mut in_reader, &mut std::io::stdout());
+            svg_transform(&mut in_reader, &mut std::io::stdout())?;
         }
     }
+
+    Ok(())
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Arguments::parse();
     let input_type = args.input_type;
 
     if let Some(input) = input_type.input {
-        transform(&input, args.output.clone());
+        transform(&input, args.output.clone())?;
     } else if let Some(watch) = input_type.watch {
         let (tx, rx) = channel();
         let mut watcher =
@@ -76,9 +70,10 @@ fn main() {
         let watch_path = Path::new(&watch);
         watcher
             .watcher()
-            .watch(Path::new(&watch), RecursiveMode::NonRecursive)
-            .unwrap_or_else(|_| panic!("Could not establish watch on {}", watch));
-        transform(&watch, args.output.clone());
+            .watch(Path::new(&watch), RecursiveMode::NonRecursive)?;
+        transform(&watch, args.output.clone()).unwrap_or_else(|e| {
+            eprintln!("transform failed: {e:?}");
+        });
         eprintln!("Watching {} for changes", watch);
         loop {
             match rx.recv() {
@@ -87,7 +82,9 @@ fn main() {
                         if event.path.canonicalize().unwrap() == watch_path.canonicalize().unwrap()
                         {
                             eprintln!("{} changed", event.path.to_string_lossy());
-                            transform(&watch, args.output.clone());
+                            transform(&watch, args.output.clone()).unwrap_or_else(|e| {
+                                eprintln!("transform failed: {e:?}");
+                            });
                         }
                     }
                 }
@@ -96,4 +93,6 @@ fn main() {
             }
         }
     }
+
+    Ok(())
 }

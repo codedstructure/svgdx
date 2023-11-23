@@ -6,7 +6,7 @@ pub fn compare(input: &str, expected: &str) {
 
     let mut input = Cursor::new(input);
     svg_transform(&mut input, &mut output).expect("Transform failure");
-    let output = String::from_utf8(output).unwrap();
+    let output = String::from_utf8(output).expect("not UTF8");
 
     assert_eq!(output.trim(), expected.trim());
 }
@@ -16,7 +16,7 @@ pub fn contains(input: &str, expected: &str) {
 
     let mut input = Cursor::new(input);
     svg_transform(&mut input, &mut output).expect("Transform failure");
-    let output = String::from_utf8(output).unwrap();
+    let output = String::from_utf8(output).expect("not UTF8");
 
     assert!(
         output.contains(expected),

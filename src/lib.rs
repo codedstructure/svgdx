@@ -2,13 +2,15 @@ use std::io::{Read, Write};
 
 use regex::Regex;
 
+use anyhow::{Context, Result};
+
 mod types;
 use types::{AttrMap, BoundingBox, ClassList};
 mod transform;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
 
-pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<(), String> {
+pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<()> {
     let mut t = Transformer::new();
     t.transform(reader, writer)
 }
@@ -72,12 +74,13 @@ impl Length {
     fn calc_offset(&self, start: f32, end: f32) -> f32 {
         match self {
             Length::Absolute(abs) => {
+                let mult = if end < start { -1. } else { 1. };
                 if abs < &0. {
                     // '+' here since abs is negative and
                     // we're going 'back' from the end.
-                    end + abs
+                    end + abs * mult
                 } else {
-                    start + abs
+                    start + abs * mult
                 }
             }
             Length::Ratio(ratio) => start + (end - start) * ratio,
@@ -482,7 +485,7 @@ impl SvgElement {
         Some((orig_elem, text_elements))
     }
 
-    fn eval_pos(&self, input: &str, context: &TransformerContext) -> String {
+    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
         // Relative positioning:
         //   ID LOC DX DY
         // (relv|relh|[#id])[@loc] [dx] [dy]
@@ -503,7 +506,7 @@ impl SvgElement {
             if caps.get(0).unwrap().is_empty() {
                 // We need either id or loc or both; since they are both optional in
                 // the regex we check that we did actually match some text here...
-                return input.to_owned();
+                return Ok(input.to_owned());
             }
             // TODO: relv should be equivalent to xy="@b" xy-loc="@t" and similar
             // for relh being xy="@r" xy-loc="@l". Otherwise relh would also be
@@ -524,7 +527,12 @@ impl SvgElement {
                 .name("loc")
                 .map(|v| v.as_str().strip_prefix('@').unwrap());
             if let Some(name) = opt_id {
-                ref_el = Some(context.elem_map.get(name).unwrap());
+                ref_el = Some(
+                    context
+                        .elem_map
+                        .get(name)
+                        .context(format!(r#"id '{name}' not found in eval_pos("{input}")"#))?,
+                );
             }
             if let Some(ref_el) = ref_el {
                 let mut margin_x = 0.;
@@ -546,18 +554,18 @@ impl SvgElement {
                     _ => 0.,
                 };
                 if let Some(pos) = ref_el.coord(loc) {
-                    return format!(
+                    return Ok(format!(
                         "{} {}",
                         fstr(pos.0 + margin_x + dx),
                         fstr(pos.1 + margin_y + dy)
-                    );
+                    ));
                 }
             }
         }
-        input.to_owned()
+        Ok(input.to_owned())
     }
 
-    fn eval_size(&self, input: &str, context: &TransformerContext) -> String {
+    fn eval_size(&self, input: &str, context: &TransformerContext) -> Result<String> {
         // Relative size:
         //   (#id|^) [DW[%] DH[%]]
         // Meaning:
@@ -572,24 +580,28 @@ impl SvgElement {
         // TODO: extend to allow referencing earlier elements beyond previous
         // TODO: allow mixed relative and absolute values...
         let mut parts = attr_split(input);
-        let ref_loc = parts.next();
+        let ref_loc = parts.next().unwrap();
         let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").unwrap();
-        if let Some(caps) = rel_re.captures(&ref_loc.unwrap()) {
+        if let Some(caps) = rel_re.captures(&ref_loc) {
             let dw = parts.next().unwrap_or("0".to_owned());
             let dh = parts.next().unwrap_or("0".to_owned());
             let mut ref_el = context.prev_element.as_ref();
             let ref_str = caps
                 .name("ref")
-                .expect("ref is mandatory in regex")
+                .context("ref is mandatory in regex")?
                 .as_str();
             if let Some(ref_str) = ref_str.strip_prefix('#') {
-                ref_el = Some(context.elem_map.get(ref_str).unwrap());
+                ref_el = Some(context.elem_map.get(ref_str).context(format!(
+                    "Could not find reference '{ref_str}' in eval_size({input})"
+                ))?);
             }
 
             if let Some(inner) = ref_el {
                 if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
-                    let mut w = strp(&w).unwrap();
-                    let mut h = strp(&h).unwrap();
+                    let mut w =
+                        strp(&w).context(r#"Could not derive width in eval_size("{input}")"#)?;
+                    let mut h =
+                        strp(&h).context(r#"Could not derive height in eval_size("{input}")"#)?;
                     if let Some(dw) = dw.strip_suffix('%') {
                         w *= strp(dw).unwrap() / 100.;
                     } else {
@@ -601,15 +613,15 @@ impl SvgElement {
                         h += strp(&dh).unwrap();
                     }
 
-                    return format!("{w} {h}");
+                    return Ok(format!("{w} {h}"));
                 }
             }
         }
-        input.to_owned()
+        Ok(input.to_owned())
     }
 
     /// Process and expand attributes as needed
-    fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
+    fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) -> Result<()> {
         let mut new_attrs = vec![];
 
         // Every attribute is either replaced by one or more other attributes,
@@ -619,11 +631,11 @@ impl SvgElement {
             if !simple {
                 match key.as_str() {
                     "xy" | "cxy" | "xy1" | "xy2" => {
-                        value = self.eval_pos(value.as_str(), context);
+                        value = self.eval_pos(value.as_str(), context)?;
                     }
                     "wh" => {
                         // TODO: support rxy for ellipses, with scaling factor
-                        value = self.eval_size(value.as_str(), context);
+                        value = self.eval_size(value.as_str(), context)?;
                     }
                     _ => (),
                 }
@@ -650,18 +662,31 @@ impl SvgElement {
                     new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
                 }
                 ("cxy", "rect" | "tbox" | "pipeline") => {
+                    if simple {
+                        // when doing initial expansion for elem_map population we might not
+                        // have evaluated needed elements yet.
+                        // TODO: tidy this up / split simple and non-simple expansion, or
+                        // avoid initial expansion step altogether
+                        continue;
+                    }
                     // Requires wh (/ width&height) be specified in order to evaluate
                     // the centre point.
                     // TODO: also support specifying other attributes; xy+cxy should be sufficient
                     let wh = self.attrs.get("wh").map(|z| z.to_string());
                     let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
                     let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
-                    let cx = strp(&parts.next().unwrap()).unwrap();
-                    let cy = strp(&parts.next().unwrap()).unwrap();
+                    let cx = strp(&parts.next().unwrap()).context("Could not derive x from cxy")?;
+                    let cy = strp(&parts.next().unwrap()).context("Could not derive y from cxy")?;
                     if let Some(wh_inner) = wh {
                         let mut wh_parts = attr_split_cycle(&wh_inner);
-                        width = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                        height = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                        width = Some(
+                            strp(&wh_parts.next().unwrap())
+                                .context("Could not derive width during cxy processing")?,
+                        );
+                        height = Some(
+                            strp(&wh_parts.next().unwrap())
+                                .context("Could not derive height during cxy processing")?,
+                        );
                     }
                     if let (Some(width), Some(height)) = (width, height) {
                         new_attrs.push(("x".into(), fstr(cx - width / 2.)));
@@ -693,8 +718,12 @@ impl SvgElement {
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
-            *context.elem_map.get_mut(&elem_id).unwrap() = updated;
+            if let Some(elem) = context.elem_map.get_mut(&elem_id) {
+                *elem = updated;
+            }
         }
+
+        Ok(())
     }
 }
 
