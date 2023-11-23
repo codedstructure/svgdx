@@ -1,5 +1,4 @@
-pub mod utils;
-use utils::compare;
+use crate::utils::compare;
 
 #[test]
 fn test_transform_full_svg() {

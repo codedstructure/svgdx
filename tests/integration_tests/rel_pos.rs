@@ -1,5 +1,4 @@
-pub mod utils;
-use utils::contains;
+use crate::utils::contains;
 
 #[test]
 fn test_rel_prev() {

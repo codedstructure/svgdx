@@ -1,5 +1,4 @@
-pub mod utils;
-use utils::contains;
+use crate::utils::contains;
 
 const RECT_SVG: &str = r#"
 <rect x="0" y="0" width="5" height="5" id="a" />
