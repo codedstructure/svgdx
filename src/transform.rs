@@ -10,7 +10,69 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use regex::Regex;
+use regex::{Captures, Regex};
+
+/// Convert unescaped '$var' or '${var}' in given input according
+/// to the supplied variables. Missing variables are left as-is.
+pub(crate) fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
+    let re =
+        Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
+            .expect("invalid regex");
+    let text_value = re.replace_all(value, |caps: &Captures| {
+        let inner = caps.name("inner").unwrap();
+        // Check if the match is escaped; do this here rather than within the regex
+        // to avoid the need for an extra initial character which can cause matches
+        // to overlap and fail replacement. We're safe to look at the previous character
+        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
+        // the top bit clear, so will only match on a one-byte utf8 char.
+        let start = inner.start();
+        if start > 0 && value.as_bytes()[start - 1] == b'\\' {
+            inner.as_str().to_string()
+        } else {
+            let cap = caps
+                .name("var_brace")
+                .unwrap_or_else(|| caps.name("var_simple").unwrap());
+            variables
+                .get(&cap.as_str().to_string())
+                .unwrap_or(&inner.as_str().to_string())
+                .to_string()
+        }
+    });
+    // Following that, replace any escaped "\$" back into "$"" characters
+    let re = Regex::new(r"\\\$").expect("invalid regex");
+    re.replace_all(&text_value, r"$").into_owned()
+}
+
+#[test]
+fn test_eval_var() {
+    let vars: HashMap<String, String> = vec![
+        ("one", "1"),
+        ("this_year", "2023"),
+        ("empty", ""),
+        ("me", "Ben"),
+    ]
+    .iter()
+    .map(|v| (v.0.to_string(), v.1.to_string()))
+    .collect();
+
+    assert_eq!(eval_vars("$one", &vars), "1");
+    assert_eq!(eval_vars("${one}", &vars), "1");
+    assert_eq!(eval_vars("$two", &vars), "$two");
+    assert_eq!(eval_vars("${two}", &vars), "${two}");
+    assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
+    assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
+    assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
+    assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
+    assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
+    assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
+    assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
+    assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
+    assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
+    assert_eq!(
+        eval_vars(r"Created in ${this_year} by ${me}", &vars),
+        "Created in 2023 by Ben"
+    );
+}
 
 use anyhow::Result;
 
@@ -18,16 +80,16 @@ use anyhow::Result;
 pub(crate) struct TransformerContext {
     pub(crate) elem_map: HashMap<String, SvgElement>,
     pub(crate) prev_element: Option<SvgElement>,
+    pub(crate) variables: HashMap<String, String>,
     last_indent: String,
 }
 
 impl TransformerContext {
     pub fn new() -> Self {
-        let elem_map: HashMap<String, SvgElement> = HashMap::new();
-
         Self {
-            elem_map,
+            elem_map: HashMap::new(),
             prev_element: None,
+            variables: HashMap::new(),
             last_indent: String::from(""),
         }
     }
@@ -42,6 +104,8 @@ impl TransformerContext {
                     break;
                 }
                 Event::Start(e) | Event::Empty(e) => {
+                    let elem_name: String =
+                        String::from_utf8(e.name().into_inner().to_vec()).unwrap();
                     let mut attr_list = vec![];
                     let mut id_opt = None;
                     for a in e.attributes() {
@@ -51,15 +115,16 @@ impl TransformerContext {
                             String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
                         let value = aa.unescape_value().expect("XML decode error").into_owned();
 
-                        if &key == "id" {
+                        if &elem_name == "define" {
+                            let value = eval_vars(&value, &self.variables);
+                            self.variables.insert(key, value);
+                        } else if &key == "id" {
                             id_opt = Some(value);
                         } else {
                             attr_list.push((key, value.clone()));
                         }
                     }
                     if let Some(id) = id_opt {
-                        let elem_name: String =
-                            String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
                         let mut elem = SvgElement::new(&elem_name, &attr_list);
                         // Expand anything we can given the current context
                         elem.expand_attributes(true, self)?;
