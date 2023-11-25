@@ -5,6 +5,7 @@ use regex::Regex;
 mod types;
 use types::{AttrMap, BoundingBox, ClassList};
 mod transform;
+use transform::eval_vars;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
 
@@ -611,6 +612,11 @@ impl SvgElement {
     /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
         let mut new_attrs = vec![];
+
+        for (key, value) in self.attrs.clone() {
+            let replace = eval_vars(&value, &context.variables);
+            self.attrs.insert(&key, &replace);
+        }
 
         // Every attribute is either replaced by one or more other attributes,
         // or copied as-is into `new_attrs`.
