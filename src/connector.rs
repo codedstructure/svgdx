@@ -227,6 +227,9 @@ impl Connector {
         match self.conn_type {
             ConnectionType::Horizontal => {
                 // If we have start and end elements, use midpoint of overlapping region
+                // TODO: If start_loc is specified, should probably set midpoint
+                // to the y coord of that... (implies moving start_loc as an optional
+                // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let y_top = start_el

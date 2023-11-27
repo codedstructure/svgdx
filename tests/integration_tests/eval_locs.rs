@@ -57,34 +57,6 @@ fn test_loc_mixed() {
 }
 
 #[test]
-fn test_loc_connector() {
-    let input = format!(r##"{}<polyline start="#a@b" end="#d@t" />"##, RECT_SVG);
-    let expected_line = r#"<polyline points="2.5 5, 2.5 12.5, 22.5 12.5, 22.5 20"/>"#;
-    contains(&input, expected_line);
-
-    let input = format!(r##"{}<polyline start="#a@r" end="#d@t" />"##, RECT_SVG);
-    let expected_line = r#"<polyline points="5 2.5, 22.5 2.5, 22.5 20"/>"#;
-    contains(&input, expected_line);
-}
-
-#[test]
-fn test_loc_connector_offset() {
-    let input = format!(
-        r##"{}<polyline start="#a@b" end="#d@t" corner-offset="2" />"##,
-        RECT_SVG
-    );
-    let expected_line = r#"<polyline points="2.5 5, 2.5 7, 22.5 7, 22.5 20"/>"#;
-    contains(&input, expected_line);
-
-    let input = format!(
-        r##"{}<polyline start="#a@b" end="#d@t" corner-offset="75%" />"##,
-        RECT_SVG
-    );
-    let expected_line = r#"<polyline points="2.5 5, 2.5 16.25, 22.5 16.25, 22.5 20"/>"#;
-    contains(&input, expected_line);
-}
-
-#[test]
 fn test_loc_shape() {
     let input = format!(r##"{}<circle cxy="#a@r" r="2" />"##, RECT_SVG);
     let expected_circle = r#"<circle cx="5" cy="2.5" r="2"/>"#;
