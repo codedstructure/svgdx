@@ -52,6 +52,12 @@ enum Length {
     Ratio(f32),
 }
 
+impl Default for Length {
+    fn default() -> Self {
+        Length::Absolute(0.)
+    }
+}
+
 impl Length {
     #[allow(dead_code)]
     fn ratio(&self) -> Option<f32> {
@@ -70,6 +76,19 @@ impl Length {
         }
     }
 
+    /// Given a single value, update it (scale or addition) from
+    /// the current Length value
+    fn adjust(&self, value: f32) -> f32 {
+        match self {
+            Length::Absolute(abs) => value + abs,
+            Length::Ratio(ratio) => value * ratio,
+        }
+    }
+
+    /// Given a range, return a value (typically) in the range
+    /// where a positive Absolute is 'from start', a negative Absolute
+    /// is 'backwards from end' and Ratios scale as 0%=start, 100%=end
+    /// but ratio values are not limited to 0..100 at either end.
     fn calc_offset(&self, start: f32, end: f32) -> f32 {
         match self {
             Length::Absolute(abs) => {
@@ -349,6 +368,23 @@ impl SvgElement {
         SvgElement::new(self.name.as_str(), &attrs)
     }
 
+    fn resized_by(&self, dw: Length, dh: Length) -> Self {
+        let mut attrs = vec![];
+        for (key, mut value) in self.attrs.clone() {
+            match key.as_str() {
+                "width" => {
+                    value = fstr(dw.adjust(strp(&value).unwrap()));
+                }
+                "height" => {
+                    value = fstr(dh.adjust(strp(&value).unwrap()));
+                }
+                _ => (),
+            }
+            attrs.push((key.clone(), value.clone()));
+        }
+        SvgElement::new(self.name.as_str(), &attrs)
+    }
+
     fn positioned(&self, x: f32, y: f32) -> Self {
         // TODO: should allow specifying which loc this positions; this currently
         // sets the top-left (for rect/tbox), but for some scenarios it might be
@@ -589,18 +625,12 @@ impl SvgElement {
 
             if let Some(inner) = ref_el {
                 if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
-                    let mut w = strp(&w).unwrap();
-                    let mut h = strp(&h).unwrap();
-                    if let Some(dw) = dw.strip_suffix('%') {
-                        w *= strp(dw).unwrap() / 100.;
-                    } else {
-                        w += strp(&dw).unwrap();
-                    }
-                    if let Some(dh) = dh.strip_suffix('%') {
-                        h *= strp(dh).unwrap() / 100.;
-                    } else {
-                        h += strp(&dh).unwrap();
-                    }
+                    let w = strp(&w).unwrap();
+                    let h = strp(&h).unwrap();
+                    let dw = strp_length(&dw).unwrap();
+                    let dh = strp_length(&dh).unwrap();
+                    let w = fstr(dw.adjust(w));
+                    let h = fstr(dh.adjust(h));
 
                     return format!("{w} {h}");
                 }
@@ -748,5 +778,14 @@ mod test {
         assert_eq!(strp_length("200%").unwrap().calc_offset(10., 50.), 90.);
         assert_eq!(strp_length("-3.5").unwrap().calc_offset(10., 50.), 46.5);
         assert_eq!(strp_length("3.5").unwrap().calc_offset(-10., 90.), -6.5);
+    }
+
+    #[test]
+    fn test_length_adjust() {
+        assert_eq!(strp_length("25%").unwrap().adjust(10.), 2.5);
+        assert_eq!(strp_length("-50%").unwrap().adjust(150.), -75.);
+        assert_eq!(strp_length("125%").unwrap().adjust(20.), 25.);
+        assert_eq!(strp_length("1").unwrap().adjust(23.), 24.);
+        assert_eq!(strp_length("-12").unwrap().adjust(123.), 111.);
     }
 }

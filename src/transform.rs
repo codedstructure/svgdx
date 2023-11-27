@@ -1,6 +1,6 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::types::BoundingBox;
-use crate::{attr_split, fstr, strp, SvgElement};
+use crate::{attr_split_cycle, fstr, strp, strp_length, SvgElement};
 
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
@@ -156,6 +156,34 @@ impl TransformerContext {
 
         e.expand_attributes(false, self);
 
+        // Size adjustments must be computed before updating position,
+        // as they affect any xy-loc other than default top-left.
+        // NOTE: these attributes may be removed once variable arithmetic
+        // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
+        // with $var="20 30" or similar (the reference form of wh already
+        // supports inline dw / dh).
+        {
+            let dw = e.pop_attr("dw");
+            let dh = e.pop_attr("dh");
+            let dwh = e.pop_attr("dwh");
+            let mut d_w = None;
+            let mut d_h = None;
+            if let Some(dwh) = dwh {
+                let mut parts = attr_split_cycle(&dwh).map(|v| strp_length(&v).unwrap());
+                d_w = parts.next();
+                d_h = parts.next();
+            }
+            if let Some(dw) = dw {
+                d_w = strp_length(&dw);
+            }
+            if let Some(dh) = dh {
+                d_h = strp_length(&dh);
+            }
+            if d_w.is_some() || d_h.is_some() {
+                e = e.resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default());
+            }
+        }
+
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
         if let (Some(bbox), Some(xy_loc)) = (e.bbox(), e.pop_attr("xy-loc")) {
@@ -200,7 +228,7 @@ impl TransformerContext {
             let mut d_x = None;
             let mut d_y = None;
             if let Some(dxy) = dxy {
-                let mut parts = attr_split(&dxy).map(|v| strp(&v).unwrap());
+                let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
                 d_x = parts.next();
                 d_y = parts.next();
             }
@@ -211,7 +239,7 @@ impl TransformerContext {
                 d_y = strp(&dy);
             }
             if d_x.is_some() || d_y.is_some() {
-                e = e.translated(d_x.unwrap_or(0.), d_y.unwrap_or(0.));
+                e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
             }
         }
 
