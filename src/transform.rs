@@ -181,6 +181,7 @@ impl TransformerContext {
             }
             if d_w.is_some() || d_h.is_some() {
                 e = e.resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default());
+                Self::update_elem_map(&mut self.elem_map, &e);
             }
         }
 
@@ -240,6 +241,7 @@ impl TransformerContext {
             }
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
+                Self::update_elem_map(&mut self.elem_map, &e);
             }
         }
 
