@@ -54,22 +54,22 @@ enum Length {
 
 impl Default for Length {
     fn default() -> Self {
-        Length::Absolute(0.)
+        Self::Absolute(0.)
     }
 }
 
 impl Length {
     #[allow(dead_code)]
-    fn ratio(&self) -> Option<f32> {
-        if let Length::Ratio(result) = self {
+    const fn ratio(&self) -> Option<f32> {
+        if let Self::Ratio(result) = self {
             Some(*result)
         } else {
             None
         }
     }
 
-    fn absolute(&self) -> Option<f32> {
-        if let Length::Absolute(result) = self {
+    const fn absolute(&self) -> Option<f32> {
+        if let Self::Absolute(result) = self {
             Some(*result)
         } else {
             None
@@ -80,8 +80,8 @@ impl Length {
     /// the current Length value
     fn adjust(&self, value: f32) -> f32 {
         match self {
-            Length::Absolute(abs) => value + abs,
-            Length::Ratio(ratio) => value * ratio,
+            Self::Absolute(abs) => value + abs,
+            Self::Ratio(ratio) => value * ratio,
         }
     }
 
@@ -91,7 +91,7 @@ impl Length {
     /// but ratio values are not limited to 0..100 at either end.
     fn calc_offset(&self, start: f32, end: f32) -> f32 {
         match self {
-            Length::Absolute(abs) => {
+            Self::Absolute(abs) => {
                 if abs < &0. {
                     // '+' here since abs is negative and
                     // we're going 'back' from the end.
@@ -100,7 +100,7 @@ impl Length {
                     start + abs
                 }
             }
-            Length::Ratio(ratio) => start + (end - start) * ratio,
+            Self::Ratio(ratio) => start + (end - start) * ratio,
         }
     }
 }
@@ -201,6 +201,10 @@ impl SvgElement {
 
     fn get_attr(&self, key: &str) -> Option<String> {
         self.attrs.get(key).map(|x| x.to_owned())
+    }
+
+    fn set_attr(&mut self, key: &str, value: &str) {
+        self.attrs.insert(key, value);
     }
 
     fn is_connector(&self) -> bool {
@@ -309,8 +313,7 @@ impl SvgElement {
             loc = caps.name("loc").unwrap().as_str();
             len = caps
                 .name("len")
-                .map(|v| strp_length(v.as_str()).expect("Invalid length"))
-                .unwrap_or(len);
+                .map_or(len, |v| strp_length(v.as_str()).expect("Invalid length"));
         }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
@@ -352,56 +355,45 @@ impl SvgElement {
     }
 
     fn translated(&self, dx: f32, dy: f32) -> Self {
-        let mut attrs = vec![];
-        for (key, mut value) in self.attrs.clone() {
+        let mut new_elem = self.clone();
+        for (key, value) in &self.attrs {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    value = fstr(strp(&value).unwrap() + dx);
+                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dx));
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    value = fstr(strp(&value).unwrap() + dy);
+                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dy));
                 }
                 _ => (),
             }
-            attrs.push((key.clone(), value.clone()));
         }
-        SvgElement::new(self.name.as_str(), &attrs)
+        new_elem
     }
 
     fn resized_by(&self, dw: Length, dh: Length) -> Self {
-        let mut attrs = vec![];
-        for (key, mut value) in self.attrs.clone() {
+        let mut new_elem = self.clone();
+        for (key, value) in &self.attrs {
             match key.as_str() {
                 "width" => {
-                    value = fstr(dw.adjust(strp(&value).unwrap()));
+                    new_elem.set_attr(key, &fstr(dw.adjust(strp(value).unwrap())));
                 }
                 "height" => {
-                    value = fstr(dh.adjust(strp(&value).unwrap()));
+                    new_elem.set_attr(key, &fstr(dh.adjust(strp(value).unwrap())));
                 }
                 _ => (),
             }
-            attrs.push((key.clone(), value.clone()));
         }
-        SvgElement::new(self.name.as_str(), &attrs)
-    }
-
-    fn positioned(&self, x: f32, y: f32) -> Self {
-        // TODO: should allow specifying which loc this positions; this currently
-        // sets the top-left (for rect/tbox), but for some scenarios it might be
-        // necessary to set e.g. the bottom-right loc.
-        let mut result = self.clone();
-        match self.name.as_str() {
-            "rect" | "tbox" | "pipeline" => {
-                result = result.with_attr("x", &fstr(x)).with_attr("y", &fstr(y));
-            }
-            _ => {
-                todo!()
-            }
-        }
-        result
+        new_elem
     }
 
     fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
+        // Different conversions from line count to first-line offset based on whether
+        // top, center, or bottom justification.
+        const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
+        const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
+        const WRAP_MID: fn(usize, f32) -> f32 =
+            |count, spacing| -(count as f32 - 1.) / 2. * spacing;
+
         let mut orig_elem = self.clone();
 
         let text_value = orig_elem.pop_attr("text")?;
@@ -450,12 +442,6 @@ impl SvgElement {
             }
         }
 
-        // Different conversions from line count to first-line offset based on whether
-        // top, center, or bottom justification.
-        const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
-        const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
-        const WRAP_MID: fn(usize, f32) -> f32 =
-            |count, spacing| -(count as f32 - 1.) / 2. * spacing;
         let first_line_offset = match (is_line, text_loc.as_str()) {
             // shapes - text 'inside'
             (false, "tl" | "t" | "tr") => WRAP_DOWN,

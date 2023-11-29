@@ -17,13 +17,13 @@ struct Endpoint {
 }
 
 impl Endpoint {
-    fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
+    const fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
         Self { origin, dir }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum ConnectionType {
+pub enum ConnectionType {
     Horizontal,
     Vertical,
     Corner,
@@ -45,7 +45,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
         ConnectionType::Horizontal => vec!["l", "r"],
         ConnectionType::Vertical => vec!["t", "b"],
         ConnectionType::Corner => vec!["t", "r", "b", "l"],
-        _ => vec!["t", "b", "l", "r", "tl", "bl", "tr", "br"],
+        ConnectionType::Straight => vec!["t", "b", "l", "r", "tl", "bl", "tr", "br"],
     };
     if el.name == "line" {
         result.extend(&["xy1", "start", "xy2", "end"]);
@@ -54,7 +54,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Connector {
+pub struct Connector {
     source_element: SvgElement,
     start_el: Option<SvgElement>,
     end_el: Option<SvgElement>,
@@ -126,8 +126,8 @@ impl Connector {
         // the location is determined automatically to give the shortest distance)
         let mut start_el = None;
         let mut end_el = None;
-        let mut start_loc = String::from("");
-        let mut end_loc = String::from("");
+        let mut start_loc = String::new();
+        let mut end_loc = String::new();
         let mut start_point: Option<(f32, f32)> = None;
         let mut end_point: Option<(f32, f32)> = None;
         let mut start_dir = None;

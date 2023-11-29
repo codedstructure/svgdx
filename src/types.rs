@@ -8,7 +8,7 @@ pub enum BoundingBox {
 }
 
 impl BoundingBox {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         BoundingBox::Unknown
     }
 
@@ -67,7 +67,7 @@ impl BoundingBox {
         self
     }
 
-    /// Expand (floor/ceil) BBox to integer coords surrounding current extent.
+    /// Expand (floor/ceil) `BBox` to integer coords surrounding current extent.
     pub fn round(&mut self) -> &Self {
         if let BoundingBox::BBox(x1, y1, x2, y2) = &self {
             *self = BoundingBox::BBox(x1.floor(), y1.floor(), x2.ceil(), y2.ceil());
@@ -76,14 +76,14 @@ impl BoundingBox {
     }
 }
 
-/// AttrMap - an order preserving map for storing element attributes.
+/// `AttrMap` - an order preserving map for storing element attributes.
 ///
-/// Implemented with a BTreeMap for key-ordered iteration, and a separate
-/// mapping from 'user-key' to index, with the BTreeMap keyed on an (index,
+/// Implemented with a `BTreeMap` for key-ordered iteration, and a separate
+/// mapping from 'user-key' to index, with the `BTreeMap` keyed on an (index,
 /// user-key) pair.
 ///
-/// NOTE: Since next_index is never decremented, a large number of remove/insert
-/// operations on the same AttrMap instance could cause overflow, especially for
+/// NOTE: Since `next_index` is never decremented, a large number of remove/insert
+/// operations on the same `AttrMap` instance could cause overflow, especially for
 /// usize < 64 bits. For the target use-case and typical 64-bit target
 /// architectures, this is not considered a problem.
 #[derive(Debug, Clone, Default)]
@@ -102,7 +102,7 @@ impl AttrMap {
         }
     }
 
-    /// Insert-or-update the given key/value into the AttrMap.
+    /// Insert-or-update the given key/value into the `AttrMap`.
     /// If the key is already present, update in place; otherwise append.
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
@@ -202,7 +202,7 @@ impl ClassList {
         }
     }
 
-    /// Insert the given key/value into the ClassList.
+    /// Insert the given key/value into the `ClassList`.
     pub fn insert(&mut self, class: impl Into<String>) {
         let class = class.into();
         let index = *self.index_map.entry(class.clone()).or_insert_with(|| {

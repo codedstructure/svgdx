@@ -14,7 +14,7 @@ use regex::{Captures, Regex};
 
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
-pub(crate) fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
+pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
     let re =
         Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
             .expect("invalid regex");
@@ -75,7 +75,7 @@ fn test_eval_var() {
 }
 
 #[derive(Clone, Default, Debug)]
-pub(crate) struct TransformerContext {
+pub struct TransformerContext {
     pub(crate) elem_map: HashMap<String, SvgElement>,
     pub(crate) prev_element: Option<SvgElement>,
     pub(crate) variables: HashMap<String, String>,
@@ -88,7 +88,7 @@ impl TransformerContext {
             elem_map: HashMap::new(),
             prev_element: None,
             variables: HashMap::new(),
-            last_indent: String::from(""),
+            last_indent: String::new(),
         }
     }
 
@@ -308,7 +308,7 @@ impl TransformerContext {
                 // the corresponding </tbox> will be converted into a </text> element.
                 if empty {
                     if let Some(tt) = text {
-                        events.push(SvgEvent::Text(tt.to_string()));
+                        events.push(SvgEvent::Text(tt));
                         events.push(SvgEvent::End("text".to_string()));
                     }
                 }
@@ -486,7 +486,7 @@ impl TransformerContext {
             if new_elem.bbox().is_some() {
                 // prev_element is only used for relative positioning, so
                 // only makes sense if it has a bounding box.
-                prev_element = Some(new_elem.clone());
+                prev_element = Some(new_elem);
             }
         }
         self.prev_element = prev_element;
@@ -532,7 +532,7 @@ impl EventList<'_> {
         let mut writer = Writer::new(writer);
 
         for event in &self.events {
-            writer.write_event(event).map_err(|e| e.to_string())?
+            writer.write_event(event).map_err(|e| e.to_string())?;
         }
         Ok(())
     }
@@ -601,20 +601,18 @@ impl Transformer {
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    output.push(&Event::End(BytesEnd::new(ee_name)))
+                    output.push(&Event::End(BytesEnd::new(ee_name)));
                 }
                 Event::Text(e) => {
                     // Extract any trailing whitespace following newlines as the current indentation level
                     let re = Regex::new(r"(?ms)\n.*^(\s+)*").unwrap();
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
                     if let Some(captures) = re.captures(&text) {
-                        let indent = captures
-                            .get(1)
-                            .map_or(String::from(""), |m| m.as_str().into());
+                        let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());
                         self.context.set_indent(indent);
                     }
 
-                    output.push(&Event::Text(e.borrow()))
+                    output.push(&Event::Text(e.borrow()));
                 }
                 _ => {
                     output.push(ev);
@@ -676,7 +674,8 @@ impl Transformer {
 
             for item in &mut output.events.iter_mut() {
                 if let Event::Start(x) = item {
-                    if x.name().into_inner() == "svg".as_bytes() {
+                    if x.name().into_inner() == b"svg" {
+                        // }.as_bytes() {
                         *item = new_svg.clone().into_owned();
                         break;
                     }
@@ -684,7 +683,7 @@ impl Transformer {
             }
         }
 
-        output.write_to(writer).map_err(|e| e.to_string())
+        output.write_to(writer)
     }
 }
 
@@ -712,14 +711,14 @@ fn transform_element(
     is_empty: bool,
 ) {
     let ee = context.handle_element(element, is_empty);
-    for svg_ev in ee.into_iter() {
+    for svg_ev in ee {
         // re-calculate is_empty for each generated event
         let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
         match svg_ev {
             SvgEvent::Empty(e) | SvgEvent::Start(e) => {
                 let mut bs = BytesStart::new(e.name);
                 // Collect non-'class' attributes
-                for (k, v) in e.attrs.into_iter() {
+                for (k, v) in e.attrs {
                     if k != "class" {
                         bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
                     }
