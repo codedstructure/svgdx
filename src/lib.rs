@@ -8,6 +8,7 @@ mod transform;
 use transform::eval_vars;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
+mod expression;
 
 pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<(), String> {
     let mut t = Transformer::new();
