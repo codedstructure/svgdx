@@ -1,6 +1,8 @@
+/// Recursive descent expression parser
+use regex::{Captures, Regex};
 use std::collections::HashMap;
 
-/// Recursive descent expression parser
+use crate::fstr;
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
@@ -104,23 +106,16 @@ impl EvalState {
     fn lookup(&self, v: &str) -> Result<f32, &'static str> {
         self.var_table
             .get(v)
-            .and_then(|t| evaluate(tokenize(t)).ok())
+            .and_then(|t| evaluate(tokenize(t), &self.var_table).ok())
             .ok_or("Could not evaluate variable")
     }
 }
 
-fn evaluate(tokens: impl IntoIterator<Item = Token>) -> Result<f32, &'static str> {
-    let mut eval_state = EvalState::new(
-        tokens,
-        HashMap::from([
-            ("pi".to_owned(), "3.1415927".to_owned()),
-            ("tau".to_owned(), "(2. * $pi)".to_owned()),
-            ("milli".to_owned(), "0.001".to_owned()),
-            ("micro".to_owned(), "($milli * $milli)".to_owned()),
-            ("kilo".to_owned(), "1000".to_owned()),
-            ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
-        ]),
-    );
+fn evaluate(
+    tokens: impl IntoIterator<Item = Token>,
+    vars: &HashMap<String, String>,
+) -> Result<f32, &'static str> {
+    let mut eval_state = EvalState::new(tokens, vars.clone());
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
@@ -192,6 +187,14 @@ fn factor(eval_state: &mut EvalState) -> Result<f32, &'static str> {
 
 #[test]
 fn test_valid_expressions() {
+    let variables = HashMap::from([
+        ("pi".to_owned(), "3.1415927".to_owned()),
+        ("tau".to_owned(), "(2. * $pi)".to_owned()),
+        ("milli".to_owned(), "0.001".to_owned()),
+        ("micro".to_owned(), "($milli * $milli)".to_owned()),
+        ("kilo".to_owned(), "1000".to_owned()),
+        ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
+    ]);
     for (expr, expected) in [
         ("2 * 2", Ok(4.)),
         ("2 * 2 + 1", Ok(5.)),
@@ -205,6 +208,111 @@ fn test_valid_expressions() {
         ("${tau} - 6", Ok(0.28318548)),
         ("0.125 * $mega", Ok(125000.)),
     ] {
-        assert_eq!(evaluate(tokenize(&expr)), expected);
+        assert_eq!(evaluate(tokenize(&expr), &variables), expected);
     }
+}
+
+/// Convert unescaped '$var' or '${var}' in given input according
+/// to the supplied variables. Missing variables are left as-is.
+pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
+    let re =
+        Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
+            .expect("invalid regex");
+    let value = re.replace_all(value, |caps: &Captures| {
+        let inner = caps.name("inner").unwrap();
+        // Check if the match is escaped; do this here rather than within the regex
+        // to avoid the need for an extra initial character which can cause matches
+        // to overlap and fail replacement. We're safe to look at the previous character
+        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
+        // the top bit clear, so will only match on a one-byte utf8 char.
+        let start = inner.start();
+        if start > 0 && value.as_bytes()[start - 1] == b'\\' {
+            inner.as_str().to_string()
+        } else {
+            let cap = caps
+                .name("var_brace")
+                .unwrap_or_else(|| caps.name("var_simple").unwrap());
+            variables
+                .get(&cap.as_str().to_string())
+                .unwrap_or(&inner.as_str().to_string())
+                .to_string()
+        }
+    });
+    // Following that, replace any escaped "\$" back into "$"" characters
+    let re = Regex::new(r"\\\$").expect("invalid regex");
+    re.replace_all(&value, r"$").into_owned()
+}
+
+/// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
+fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
+    // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
+    let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
+    re.replace_all(value, |caps: &Captures| {
+        let inner = caps.name("inner").unwrap();
+
+        fstr(evaluate(tokenize(inner.as_str()), variables).expect("Invalid expression"))
+    })
+    .to_string()
+}
+
+/// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
+pub fn eval_attr(value: &str, variables: &HashMap<String, String>) -> String {
+    // Step 1: Evaluate arithmetic expressions. All variables referenced here
+    // are assumed to resolve to a numeric expression.
+    let value = eval_expr(value, variables);
+    // Step 2: Replace other variables (e.g. for string values)
+    eval_vars(&value, variables)
+}
+
+#[test]
+fn test_eval_var() {
+    let vars: HashMap<String, String> = vec![
+        ("one", "1"),
+        ("this_year", "2023"),
+        ("empty", ""),
+        ("me", "Ben"),
+    ]
+    .iter()
+    .map(|v| (v.0.to_string(), v.1.to_string()))
+    .collect();
+
+    assert_eq!(eval_vars("$one", &vars), "1");
+    assert_eq!(eval_vars("${one}", &vars), "1");
+    assert_eq!(eval_vars("$two", &vars), "$two");
+    assert_eq!(eval_vars("${two}", &vars), "${two}");
+    assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
+    assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
+    assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
+    assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
+    assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
+    assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
+    assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
+    assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
+    assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
+    assert_eq!(
+        eval_vars(r"Created in ${this_year} by ${me}", &vars),
+        "Created in 2023 by Ben"
+    );
+}
+
+#[test]
+fn test_eval_attr() {
+    let vars: HashMap<String, String> = vec![
+        ("one", "1"),
+        ("this_year", "2023"),
+        ("empty", ""),
+        ("me", "Ben"),
+    ]
+    .iter()
+    .map(|v| (v.0.to_string(), v.1.to_string()))
+    .collect();
+
+    assert_eq!(
+        eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &vars),
+        "Made by Ben in 2023"
+    );
+    assert_eq!(
+        eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &vars),
+        "Made by Ben in 2023"
+    );
 }
