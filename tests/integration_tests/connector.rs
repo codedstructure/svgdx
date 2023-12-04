@@ -39,7 +39,7 @@ fn test_connector_h() {
 <rect x="20" y="2" width="5" height="5" id="b" />
 <line start="#a" end="#b" edge-type="h"/>"##;
     let expected_line = r#"<line x1="5" y1="3.5" x2="20" y2="3.5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn test_connector_v() {
 <rect x="1" y="20" width="5" height="5" id="b" />
 <line start="#a" end="#b" edge-type="v"/>"##;
     let expected_line = r#"<line x1="3" y1="5" x2="3" y2="20"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]
@@ -60,7 +60,7 @@ fn test_connector_u_bb() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@b" end="#b@b" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="2.5 5, 2.5 7, 12.5 7, 12.5 5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -68,7 +68,7 @@ fn test_connector_u_bb() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@b" end="#b@b"/>"##;
     let expected_line = r#"<polyline points="2.5 5, 2.5 8, 12.5 8, 12.5 5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn test_connector_u_tt() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@t" end="#b@t" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="2.5 0, 2.5 -2, 12.5 -2, 12.5 0"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -87,7 +87,7 @@ fn test_connector_u_tt() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@t" end="#b@t"/>"##;
     let expected_line = r#"<polyline points="2.5 0, 2.5 -3, 12.5 -3, 12.5 0"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]
@@ -98,7 +98,7 @@ fn test_connector_u_ll() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@l" end="#b@l" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="0 2.5, -2 2.5, -2 12.5, 0 12.5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -106,7 +106,7 @@ fn test_connector_u_ll() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@l" end="#b@l"/>"##;
     let expected_line = r#"<polyline points="0 2.5, -3 2.5, -3 12.5, 0 12.5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]
@@ -117,7 +117,7 @@ fn test_connector_u_rr() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@r" end="#b@r" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="5 2.5, 7 2.5, 7 12.5, 5 12.5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -125,7 +125,7 @@ fn test_connector_u_rr() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@r" end="#b@r"/>"##;
     let expected_line = r#"<polyline points="5 2.5, 8 2.5, 8 12.5, 5 12.5"/>"#;
-    contains(&input, expected_line);
+    contains(input, expected_line);
 }
 
 #[test]

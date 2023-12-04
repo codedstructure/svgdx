@@ -761,7 +761,7 @@ mod test {
         assert_eq!(strp("100"), Some(100.));
         assert_eq!(strp("-100"), Some(-100.));
         assert_eq!(strp("-0.00123"), Some(-0.00123));
-        assert_eq!(strp("1234567.89"), Some(1234567.89));
+        assert_eq!(strp("1234567.8"), Some(1234567.8));
     }
 
     #[test]

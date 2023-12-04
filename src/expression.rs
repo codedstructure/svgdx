@@ -272,7 +272,7 @@ mod tests {
 
     #[test]
     fn test_eval_var() {
-        let vars: HashMap<String, String> = vec![
+        let vars: HashMap<String, String> = [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
@@ -324,7 +324,7 @@ mod tests {
             ("${tau} - 6", Ok(0.28318548)),
             ("0.125 * $mega", Ok(125000.)),
         ] {
-            assert_eq!(evaluate(tokenize(&expr).unwrap(), &variables), expected);
+            assert_eq!(evaluate(tokenize(expr).unwrap(), &variables), expected);
         }
     }
 
@@ -337,7 +337,7 @@ mod tests {
             "$abc}", // Not obvious, but '}' here is just another character.
             "${abcthing}",
         ] {
-            assert!(tokenize(&expr).is_ok(), "Should succeed: {}", expr);
+            assert!(tokenize(expr).is_ok(), "Should succeed: {}", expr);
         }
     }
 
@@ -353,14 +353,14 @@ mod tests {
             "${abc-thing}",
             "234#",
         ] {
-            assert!(tokenize(&expr).is_err(), "Should have failed: {}", expr);
+            assert!(tokenize(expr).is_err(), "Should have failed: {}", expr);
         }
     }
 
     #[test]
     fn test_bad_expressions() {
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)"] {
-            assert!(evaluate(tokenize(&expr).unwrap(), &HashMap::new()).is_err());
+            assert!(evaluate(tokenize(expr).unwrap(), &HashMap::new()).is_err());
         }
     }
 
@@ -380,16 +380,13 @@ mod tests {
             ("4*-3", Ok(-12.)),
             ("-4*-(2+1)", Ok(12.)),
         ] {
-            assert_eq!(
-                evaluate(tokenize(&expr).unwrap(), &HashMap::new()),
-                expected
-            );
+            assert_eq!(evaluate(tokenize(expr).unwrap(), &HashMap::new()), expected);
         }
     }
 
     #[test]
     fn test_eval_attr() {
-        let vars: HashMap<String, String> = vec![
+        let vars: HashMap<String, String> = [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
