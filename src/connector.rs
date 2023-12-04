@@ -224,6 +224,9 @@ impl Connector {
     pub fn render(&self) -> SvgElement {
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
+        // For some (e.g. u-shaped) connections we need a default *absolute* offset
+        // as ratio (e.g. the overall '50%' default) don't make sense.
+        let default_abs_offset = 3.;
         match self.conn_type {
             ConnectionType::Horizontal => {
                 // If we have start and end elements, use midpoint of overlapping region
@@ -324,22 +327,26 @@ impl Connector {
                         // U-shaped connection
                         (Direction::Left, Direction::Left) => {
                             let min_x = self.start.origin.0.min(self.end.origin.0);
-                            let mid_x = min_x - self.offset.absolute().unwrap();
+                            let mid_x =
+                                min_x - self.offset.absolute().unwrap_or(default_abs_offset);
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Right, Direction::Right) => {
                             let max_x = self.start.origin.0.max(self.end.origin.0);
-                            let mid_x = max_x + self.offset.absolute().unwrap();
+                            let mid_x =
+                                max_x + self.offset.absolute().unwrap_or(default_abs_offset);
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Up) => {
                             let min_y = self.start.origin.1.min(self.end.origin.1);
-                            let mid_y = min_y - self.offset.absolute().unwrap();
+                            let mid_y =
+                                min_y - self.offset.absolute().unwrap_or(default_abs_offset);
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         (Direction::Down, Direction::Down) => {
                             let max_y = self.start.origin.1.max(self.end.origin.1);
-                            let mid_y = max_y + self.offset.absolute().unwrap();
+                            let mid_y =
+                                max_y + self.offset.absolute().unwrap_or(default_abs_offset);
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                     };
