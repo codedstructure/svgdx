@@ -5,9 +5,10 @@ use regex::Regex;
 mod types;
 use types::{AttrMap, BoundingBox, ClassList};
 mod transform;
-use transform::eval_vars;
+use expression::eval_attr;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
+mod expression;
 
 pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<(), String> {
     let mut t = Transformer::new();
@@ -627,10 +628,10 @@ impl SvgElement {
 
     /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) {
-        let mut new_attrs = vec![];
+        let mut new_attrs = AttrMap::new();
 
         for (key, value) in self.attrs.clone() {
-            let replace = eval_vars(&value, &context.variables);
+            let replace = eval_attr(&value, &context.variables);
             self.attrs.insert(&key, &replace);
         }
 
@@ -650,68 +651,86 @@ impl SvgElement {
                     _ => (),
                 }
             }
-            // TODO: should expand in a given order to avoid repetition?
+
+            // The first pass is straightforward 'expansion', where the current
+            // attribute totally determines the resulting value(s).
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
                 ("xy", "text" | "rect" | "pipeline") => {
-                    new_attrs.push(("x".into(), parts.next().unwrap()));
-                    new_attrs.push(("y".into(), parts.next().unwrap()));
+                    new_attrs.insert("x", parts.next().unwrap());
+                    new_attrs.insert("y", parts.next().unwrap());
                 }
                 ("wh", "rect" | "tbox" | "pipeline") => {
-                    new_attrs.push(("width".into(), parts.next().unwrap()));
-                    new_attrs.push(("height".into(), parts.next().unwrap()));
+                    new_attrs.insert("width", parts.next().unwrap());
+                    new_attrs.insert("height", parts.next().unwrap());
                 }
                 ("wh", "circle") => {
                     let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
-                    new_attrs.push(("r".into(), fstr(diameter / 2.)));
+                    new_attrs.insert("r", fstr(diameter / 2.));
                 }
                 ("wh", "ellipse") => {
                     let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
                     let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
-                    new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
-                    new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
-                }
-                ("cxy", "rect" | "tbox" | "pipeline") => {
-                    // Requires wh (/ width&height) be specified in order to evaluate
-                    // the centre point.
-                    // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                    let wh = self.attrs.get("wh").map(|z| z.to_string());
-                    let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
-                    let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
-                    let cx = strp(&parts.next().unwrap()).unwrap();
-                    let cy = strp(&parts.next().unwrap()).unwrap();
-                    if let Some(wh_inner) = wh {
-                        let mut wh_parts = attr_split_cycle(&wh_inner);
-                        width = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                        height = Some(strp(&wh_parts.next().unwrap()).unwrap());
-                    }
-                    if let (Some(width), Some(height)) = (width, height) {
-                        new_attrs.push(("x".into(), fstr(cx - width / 2.)));
-                        new_attrs.push(("y".into(), fstr(cy - height / 2.)));
-                        // wh / width&height will be handled separately
-                    }
+                    new_attrs.insert("rx", fstr(dia_x / 2.));
+                    new_attrs.insert("ry", fstr(dia_y / 2.));
                 }
                 ("cxy", "circle" | "ellipse") => {
-                    new_attrs.push(("cx".into(), parts.next().unwrap()));
-                    new_attrs.push(("cy".into(), parts.next().unwrap()));
+                    new_attrs.insert("cx", parts.next().unwrap());
+                    new_attrs.insert("cy", parts.next().unwrap());
                 }
                 ("rxy", "ellipse") => {
-                    new_attrs.push(("rx".into(), parts.next().unwrap()));
-                    new_attrs.push(("ry".into(), parts.next().unwrap()));
+                    new_attrs.insert("rx", parts.next().unwrap());
+                    new_attrs.insert("ry", parts.next().unwrap());
                 }
                 ("xy1", "line") => {
-                    new_attrs.push(("x1".into(), parts.next().unwrap()));
-                    new_attrs.push(("y1".into(), parts.next().unwrap()));
+                    new_attrs.insert("x1", parts.next().unwrap());
+                    new_attrs.insert("y1", parts.next().unwrap());
                 }
                 ("xy2", "line") => {
-                    new_attrs.push(("x2".into(), parts.next().unwrap()));
-                    new_attrs.push(("y2".into(), parts.next().unwrap()));
+                    new_attrs.insert("x2", parts.next().unwrap());
+                    new_attrs.insert("y2", parts.next().unwrap());
                 }
-                _ => new_attrs.push((key.clone(), value.clone())),
+                _ => new_attrs.insert(key.clone(), value.clone()),
             }
         }
 
-        self.attrs = new_attrs.into();
+        if !simple {
+            // A second pass is used where the processed values of other attributes
+            // (which may be given in any order and so not available on first pass)
+            // are required, e.g. updating cxy for rect-like objects, which requires
+            // width & height to already be determined.
+            let mut pass_two_attrs = AttrMap::new();
+            for (key, value) in new_attrs.clone() {
+                let mut parts = attr_split_cycle(&value);
+                match (key.as_str(), self.name.as_str()) {
+                    ("cxy", "rect" | "tbox" | "pipeline") => {
+                        // Requires wh (/ width&height) be specified in order to evaluate
+                        // the centre point.
+                        // TODO: also support specifying other attributes; xy+cxy should be sufficient
+                        let wh = new_attrs.get("wh").map(|z| z.to_string());
+                        let mut width = new_attrs.get("width").map(|z| strp(z).unwrap());
+                        let mut height = new_attrs.get("height").map(|z| strp(z).unwrap());
+                        let cx = strp(&parts.next().unwrap()).unwrap();
+                        let cy = strp(&parts.next().unwrap()).unwrap();
+                        if let Some(wh_inner) = wh {
+                            let mut wh_parts = attr_split_cycle(&wh_inner);
+                            width = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                            height = Some(strp(&wh_parts.next().unwrap()).unwrap());
+                        }
+                        if let (Some(width), Some(height)) = (width, height) {
+                            pass_two_attrs.insert("x", fstr(cx - width / 2.));
+                            pass_two_attrs.insert("y", fstr(cy - height / 2.));
+                            // wh / width&height will be handled separately
+                        }
+                    }
+                    _ => pass_two_attrs.insert(key.clone(), value.clone()),
+                }
+            }
+
+            new_attrs = pass_two_attrs;
+        }
+
+        self.attrs = new_attrs;
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
