@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::fstr;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum Token {
     Number(f32),
     Var(String),
@@ -14,24 +14,42 @@ enum Token {
     Sub,
     Mul,
     Div,
+    Mod,
     Whitespace,
     Other,
 }
 
-fn tokenize_atom(input: &str) -> Option<Token> {
+fn valid_variable_name(var: &str) -> Result<&str, &'static str> {
+    let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").unwrap();
+    if re.is_match(var) {
+        Ok(var)
+    } else {
+        Err("Invalid variable name")
+    }
+}
+
+fn tokenize_atom(input: &str) -> Result<Token, &'static str> {
     if let Some(input) = input.strip_prefix('$') {
         let var_name = if let Some(input) = input.strip_prefix('{') {
             input.strip_suffix('}')
         } else {
             Some(input)
         };
-        var_name.map(|v| Token::Var(v.to_string()))
+        if let Some(var) = var_name {
+            valid_variable_name(var).map(|v| Token::Var(v.to_string()))
+        } else {
+            Err("Invalid variable")
+        }
     } else {
-        input.parse::<f32>().ok().map(Token::Number)
+        input
+            .parse::<f32>()
+            .ok()
+            .map(Token::Number)
+            .ok_or("Invalid number")
     }
 }
 
-fn tokenize(input: &str) -> Vec<Token> {
+fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
     let mut tokens = Vec::new();
     let mut buffer = Vec::new();
 
@@ -43,6 +61,7 @@ fn tokenize(input: &str) -> Vec<Token> {
             '-' => Token::Sub,
             '*' => Token::Mul,
             '/' => Token::Div,
+            '%' => Token::Mod,
             ' ' | '\t' => Token::Whitespace,
             _ => Token::Other,
         };
@@ -55,7 +74,7 @@ fn tokenize(input: &str) -> Vec<Token> {
             }
             _ => {
                 if !buffer.is_empty() {
-                    let buffer_token = tokenize_atom(&buffer.iter().collect::<String>()).unwrap();
+                    let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
                     buffer.clear();
                     tokens.push(buffer_token);
                 }
@@ -65,14 +84,13 @@ fn tokenize(input: &str) -> Vec<Token> {
     }
 
     if !buffer.is_empty() {
-        let buffer_token = tokenize_atom(&buffer.iter().collect::<String>()).unwrap();
+        let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
         buffer.clear();
         tokens.push(buffer_token);
     }
-    tokens
+    Ok(tokens)
 }
 
-#[derive(Clone, Debug, PartialEq)]
 struct EvalState {
     tokens: Vec<Token>,
     index: usize,
@@ -106,7 +124,7 @@ impl EvalState {
     fn lookup(&self, v: &str) -> Result<f32, &'static str> {
         self.var_table
             .get(v)
-            .and_then(|t| evaluate(tokenize(t), &self.var_table).ok())
+            .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table).ok())
             .ok_or("Could not evaluate variable")
     }
 }
@@ -156,6 +174,10 @@ fn term(eval_state: &mut EvalState) -> Result<f32, &'static str> {
                 eval_state.advance();
                 e /= factor(eval_state)?;
             }
+            Some(Token::Mod) => {
+                eval_state.advance();
+                e %= factor(eval_state)?;
+            }
             _ => {
                 break;
             }
@@ -182,33 +204,6 @@ fn factor(eval_state: &mut EvalState) -> Result<f32, &'static str> {
             _ => Err("Invalid unary minus"),
         },
         _ => Err("Invalid token in factor()"),
-    }
-}
-
-#[test]
-fn test_valid_expressions() {
-    let variables = HashMap::from([
-        ("pi".to_owned(), "3.1415927".to_owned()),
-        ("tau".to_owned(), "(2. * $pi)".to_owned()),
-        ("milli".to_owned(), "0.001".to_owned()),
-        ("micro".to_owned(), "($milli * $milli)".to_owned()),
-        ("kilo".to_owned(), "1000".to_owned()),
-        ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
-    ]);
-    for (expr, expected) in [
-        ("2 * 2", Ok(4.)),
-        ("2 * 2 + 1", Ok(5.)),
-        ("2 * (2 + 1)", Ok(6.)),
-        ("(2+1)/2", Ok(1.5)),
-        ("   (   2 +   1)   / 2", Ok(1.5)),
-        ("(1+(1+(1+(1+(2+1)))))/2", Ok(3.5)),
-        ("$pi * 10.", Ok(31.415927_f32)),
-        ("${pi}*-100.", Ok(-314.15927_f32)),
-        ("-${pi}*-100.", Ok(314.15927_f32)),
-        ("${tau} - 6", Ok(0.28318548)),
-        ("0.125 * $mega", Ok(125000.)),
-    ] {
-        assert_eq!(evaluate(tokenize(&expr), &variables), expected);
     }
 }
 
@@ -248,9 +243,16 @@ fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
     re.replace_all(value, |caps: &Captures| {
-        let inner = caps.name("inner").unwrap();
-
-        fstr(evaluate(tokenize(inner.as_str()), variables).expect("Invalid expression"))
+        let inner = caps.name("inner").unwrap().as_str();
+        if let Ok(tokens) = tokenize(inner) {
+            if let Ok(parsed) = evaluate(tokens, variables) {
+                fstr(parsed)
+            } else {
+                inner.to_owned()
+            }
+        } else {
+            inner.to_owned()
+        }
     })
     .to_string()
 }
@@ -264,55 +266,146 @@ pub fn eval_attr(value: &str, variables: &HashMap<String, String>) -> String {
     eval_vars(&value, variables)
 }
 
-#[test]
-fn test_eval_var() {
-    let vars: HashMap<String, String> = vec![
-        ("one", "1"),
-        ("this_year", "2023"),
-        ("empty", ""),
-        ("me", "Ben"),
-    ]
-    .iter()
-    .map(|v| (v.0.to_string(), v.1.to_string()))
-    .collect();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert_eq!(eval_vars("$one", &vars), "1");
-    assert_eq!(eval_vars("${one}", &vars), "1");
-    assert_eq!(eval_vars("$two", &vars), "$two");
-    assert_eq!(eval_vars("${two}", &vars), "${two}");
-    assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
-    assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
-    assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
-    assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
-    assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
-    assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
-    assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
-    assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
-    assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
-    assert_eq!(
-        eval_vars(r"Created in ${this_year} by ${me}", &vars),
-        "Created in 2023 by Ben"
-    );
-}
+    #[test]
+    fn test_eval_var() {
+        let vars: HashMap<String, String> = vec![
+            ("one", "1"),
+            ("this_year", "2023"),
+            ("empty", ""),
+            ("me", "Ben"),
+        ]
+        .iter()
+        .map(|v| (v.0.to_string(), v.1.to_string()))
+        .collect();
 
-#[test]
-fn test_eval_attr() {
-    let vars: HashMap<String, String> = vec![
-        ("one", "1"),
-        ("this_year", "2023"),
-        ("empty", ""),
-        ("me", "Ben"),
-    ]
-    .iter()
-    .map(|v| (v.0.to_string(), v.1.to_string()))
-    .collect();
+        assert_eq!(eval_vars("$one", &vars), "1");
+        assert_eq!(eval_vars("${one}", &vars), "1");
+        assert_eq!(eval_vars("$two", &vars), "$two");
+        assert_eq!(eval_vars("${two}", &vars), "${two}");
+        assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
+        assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
+        assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
+        assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
+        assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
+        assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
+        assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
+        assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
+        assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
+        assert_eq!(
+            eval_vars(r"Created in ${this_year} by ${me}", &vars),
+            "Created in 2023 by Ben"
+        );
+    }
 
-    assert_eq!(
-        eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &vars),
-        "Made by Ben in 2023"
-    );
-    assert_eq!(
-        eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &vars),
-        "Made by Ben in 2023"
-    );
+    #[test]
+    fn test_valid_expressions() {
+        let variables = HashMap::from([
+            ("pi".to_owned(), "3.1415927".to_owned()),
+            ("tau".to_owned(), "(2. * $pi)".to_owned()),
+            ("milli".to_owned(), "0.001".to_owned()),
+            ("micro".to_owned(), "($milli * $milli)".to_owned()),
+            ("kilo".to_owned(), "1000".to_owned()),
+            ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
+        ]);
+        for (expr, expected) in [
+            ("2 * 2", Ok(4.)),
+            ("2 * 2 + 1", Ok(5.)),
+            ("2 * (2 + 1)", Ok(6.)),
+            ("(2+1)/2", Ok(1.5)),
+            ("   (   2 +   1)   / 2", Ok(1.5)),
+            ("(1+(1+(1+(1+(2+1)))))/2", Ok(3.5)),
+            ("$pi * 10.", Ok(31.415927_f32)),
+            ("${pi}*-100.", Ok(-314.15927_f32)),
+            ("-${pi}*-100.", Ok(314.15927_f32)),
+            ("${tau} - 6", Ok(0.28318548)),
+            ("0.125 * $mega", Ok(125000.)),
+        ] {
+            assert_eq!(evaluate(tokenize(&expr).unwrap(), &variables), expected);
+        }
+    }
+
+    #[test]
+    fn test_good_tokenize() {
+        for expr in [
+            "(((((4+5)))))",
+            "$abcthing",
+            "$abc-${thing}",
+            "$abc}", // Not obvious, but '}' here is just another character.
+            "${abcthing}",
+        ] {
+            assert!(tokenize(&expr).is_ok(), "Should succeed: {}", expr);
+        }
+    }
+
+    #[test]
+    fn test_bad_tokenize() {
+        for expr in [
+            "4&5",
+            "$",
+            "${}",
+            "${abc",
+            "${-}",
+            "${abc-thing}",
+            "${abc-thing}",
+            "234#",
+        ] {
+            assert!(tokenize(&expr).is_err(), "Should have failed: {}", expr);
+        }
+    }
+
+    #[test]
+    fn test_bad_expressions() {
+        for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)"] {
+            assert!(evaluate(tokenize(&expr).unwrap(), &HashMap::new()).is_err());
+        }
+    }
+
+    #[test]
+    fn test_eval_precedence() {
+        for (expr, expected) in [
+            // Subtraction is left-to-right
+            ("3-2-1", Ok(0.)),
+            ("3-(2-1)", Ok(2.)),
+            // Multiplication is higher precedence than +
+            ("2+3*5+2", Ok(19.)),
+            // Modulo is same precedence as *, left-to-right.
+            ("3*4*5%2", Ok(0.)),
+            ("5%2*3*4", Ok(12.)),
+            ("3*4*(5%2)", Ok(12.)),
+            // Unary minus
+            ("4*-3", Ok(-12.)),
+            ("-4*-(2+1)", Ok(12.)),
+        ] {
+            assert_eq!(
+                evaluate(tokenize(&expr).unwrap(), &HashMap::new()),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn test_eval_attr() {
+        let vars: HashMap<String, String> = vec![
+            ("one", "1"),
+            ("this_year", "2023"),
+            ("empty", ""),
+            ("me", "Ben"),
+        ]
+        .iter()
+        .map(|v| (v.0.to_string(), v.1.to_string()))
+        .collect();
+
+        assert_eq!(
+            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &vars),
+            "Made by Ben in 2023"
+        );
+        assert_eq!(
+            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &vars),
+            "Made by Ben in 2023"
+        );
+    }
 }
