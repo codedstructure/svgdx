@@ -2,6 +2,8 @@
 use regex::{Captures, Regex};
 use std::collections::HashMap;
 
+use anyhow::{bail, Context, Result};
+
 use crate::fstr;
 
 #[derive(Clone, PartialEq)]
@@ -19,16 +21,15 @@ enum Token {
     Other,
 }
 
-fn valid_variable_name(var: &str) -> Result<&str, &'static str> {
+fn valid_variable_name(var: &str) -> Result<&str> {
     let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").unwrap();
-    if re.is_match(var) {
-        Ok(var)
-    } else {
-        Err("Invalid variable name")
+    if !re.is_match(var) {
+        bail!("Invalid variable name");
     }
+    Ok(var)
 }
 
-fn tokenize_atom(input: &str) -> Result<Token, &'static str> {
+fn tokenize_atom(input: &str) -> Result<Token> {
     if let Some(input) = input.strip_prefix('$') {
         let var_name = if let Some(input) = input.strip_prefix('{') {
             input.strip_suffix('}')
@@ -38,18 +39,18 @@ fn tokenize_atom(input: &str) -> Result<Token, &'static str> {
         if let Some(var) = var_name {
             valid_variable_name(var).map(|v| Token::Var(v.to_string()))
         } else {
-            Err("Invalid variable")
+            bail!("Invalid variable");
         }
     } else {
         input
             .parse::<f32>()
             .ok()
             .map(Token::Number)
-            .ok_or("Invalid number")
+            .context("Invalid number")
     }
 }
 
-fn tokenize(input: &str) -> Result<Vec<Token>, &'static str> {
+fn tokenize(input: &str) -> Result<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut buffer = Vec::new();
 
@@ -121,28 +122,28 @@ impl EvalState {
         self.index += 1;
     }
 
-    fn lookup(&self, v: &str) -> Result<f32, &'static str> {
+    fn lookup(&self, v: &str) -> Result<f32> {
         self.var_table
             .get(v)
             .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table).ok())
-            .ok_or("Could not evaluate variable")
+            .context("Could not evaluate variable")
     }
 }
 
 fn evaluate(
     tokens: impl IntoIterator<Item = Token>,
     vars: &HashMap<String, String>,
-) -> Result<f32, &'static str> {
+) -> Result<f32> {
     let mut eval_state = EvalState::new(tokens, vars.clone());
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
     } else {
-        Err("Unexpected trailing tokens")
+        bail!("Unexpected trailing tokens")
     }
 }
 
-fn expr(eval_state: &mut EvalState) -> Result<f32, &'static str> {
+fn expr(eval_state: &mut EvalState) -> Result<f32> {
     let mut e = term(eval_state)?;
     loop {
         match eval_state.peek() {
@@ -162,7 +163,7 @@ fn expr(eval_state: &mut EvalState) -> Result<f32, &'static str> {
     Ok(e)
 }
 
-fn term(eval_state: &mut EvalState) -> Result<f32, &'static str> {
+fn term(eval_state: &mut EvalState) -> Result<f32> {
     let mut e = factor(eval_state)?;
     loop {
         match eval_state.peek() {
@@ -186,14 +187,14 @@ fn term(eval_state: &mut EvalState) -> Result<f32, &'static str> {
     Ok(e)
 }
 
-fn factor(eval_state: &mut EvalState) -> Result<f32, &'static str> {
+fn factor(eval_state: &mut EvalState) -> Result<f32> {
     match eval_state.next() {
         Some(Token::Number(x)) => Ok(x),
         Some(Token::Var(v)) => eval_state.lookup(&v),
         Some(Token::OpenParen) => {
             let e = expr(eval_state)?;
             if eval_state.next() != Some(Token::CloseParen) {
-                return Err("Expected closing parenthesis");
+                bail!("Expected closing parenthesis");
             }
             Ok(e)
         }
@@ -201,9 +202,9 @@ fn factor(eval_state: &mut EvalState) -> Result<f32, &'static str> {
             Some(Token::OpenParen) | Some(Token::Number(_)) | Some(Token::Var(_)) => {
                 Ok(-expr(eval_state)?)
             }
-            _ => Err("Invalid unary minus"),
+            _ => bail!("Invalid unary minus"),
         },
-        _ => Err("Invalid token in factor()"),
+        _ => bail!("Invalid token in factor()"),
     }
 }
 
@@ -312,19 +313,19 @@ mod tests {
             ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
         ]);
         for (expr, expected) in [
-            ("2 * 2", Ok(4.)),
-            ("2 * 2 + 1", Ok(5.)),
-            ("2 * (2 + 1)", Ok(6.)),
-            ("(2+1)/2", Ok(1.5)),
-            ("   (   2 +   1)   / 2", Ok(1.5)),
-            ("(1+(1+(1+(1+(2+1)))))/2", Ok(3.5)),
-            ("$pi * 10.", Ok(31.415927_f32)),
-            ("${pi}*-100.", Ok(-314.15927_f32)),
-            ("-${pi}*-100.", Ok(314.15927_f32)),
-            ("${tau} - 6", Ok(0.28318548)),
-            ("0.125 * $mega", Ok(125000.)),
+            ("2 * 2", Some(4.)),
+            ("2 * 2 + 1", Some(5.)),
+            ("2 * (2 + 1)", Some(6.)),
+            ("(2+1)/2", Some(1.5)),
+            ("   (   2 +   1)   / 2", Some(1.5)),
+            ("(1+(1+(1+(1+(2+1)))))/2", Some(3.5)),
+            ("$pi * 10.", Some(31.415927_f32)),
+            ("${pi}*-100.", Some(-314.15927_f32)),
+            ("-${pi}*-100.", Some(314.15927_f32)),
+            ("${tau} - 6", Some(0.28318548)),
+            ("0.125 * $mega", Some(125000.)),
         ] {
-            assert_eq!(evaluate(tokenize(expr).unwrap(), &variables), expected);
+            assert_eq!(evaluate(tokenize(expr).unwrap(), &variables).ok(), expected);
         }
     }
 
@@ -368,19 +369,22 @@ mod tests {
     fn test_eval_precedence() {
         for (expr, expected) in [
             // Subtraction is left-to-right
-            ("3-2-1", Ok(0.)),
-            ("3-(2-1)", Ok(2.)),
+            ("3-2-1", Some(0.)),
+            ("3-(2-1)", Some(2.)),
             // Multiplication is higher precedence than +
-            ("2+3*5+2", Ok(19.)),
+            ("2+3*5+2", Some(19.)),
             // Modulo is same precedence as *, left-to-right.
-            ("3*4*5%2", Ok(0.)),
-            ("5%2*3*4", Ok(12.)),
-            ("3*4*(5%2)", Ok(12.)),
+            ("3*4*5%2", Some(0.)),
+            ("5%2*3*4", Some(12.)),
+            ("3*4*(5%2)", Some(12.)),
             // Unary minus
-            ("4*-3", Ok(-12.)),
-            ("-4*-(2+1)", Ok(12.)),
+            ("4*-3", Some(-12.)),
+            ("-4*-(2+1)", Some(12.)),
         ] {
-            assert_eq!(evaluate(tokenize(expr).unwrap(), &HashMap::new()), expected);
+            assert_eq!(
+                evaluate(tokenize(expr).unwrap(), &HashMap::new()).ok(),
+                expected
+            );
         }
     }
 
