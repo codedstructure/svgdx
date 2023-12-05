@@ -7,9 +7,10 @@ use anyhow::{Context, Result};
 mod types;
 use types::{AttrMap, BoundingBox, ClassList};
 mod transform;
-use transform::eval_vars;
+use expression::eval_attr;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
+mod expression;
 
 pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<()> {
     let mut t = Transformer::new();
@@ -54,27 +55,46 @@ enum Length {
     Ratio(f32),
 }
 
+impl Default for Length {
+    fn default() -> Self {
+        Self::Absolute(0.)
+    }
+}
+
 impl Length {
     #[allow(dead_code)]
-    fn ratio(&self) -> Option<f32> {
-        if let Length::Ratio(result) = self {
+    const fn ratio(&self) -> Option<f32> {
+        if let Self::Ratio(result) = self {
             Some(*result)
         } else {
             None
         }
     }
 
-    fn absolute(&self) -> Option<f32> {
-        if let Length::Absolute(result) = self {
+    const fn absolute(&self) -> Option<f32> {
+        if let Self::Absolute(result) = self {
             Some(*result)
         } else {
             None
         }
     }
 
+    /// Given a single value, update it (scale or addition) from
+    /// the current Length value
+    fn adjust(&self, value: f32) -> f32 {
+        match self {
+            Self::Absolute(abs) => value + abs,
+            Self::Ratio(ratio) => value * ratio,
+        }
+    }
+
+    /// Given a range, return a value (typically) in the range
+    /// where a positive Absolute is 'from start', a negative Absolute
+    /// is 'backwards from end' and Ratios scale as 0%=start, 100%=end
+    /// but ratio values are not limited to 0..100 at either end.
     fn calc_offset(&self, start: f32, end: f32) -> f32 {
         match self {
-            Length::Absolute(abs) => {
+            Self::Absolute(abs) => {
                 let mult = if end < start { -1. } else { 1. };
                 if abs < &0. {
                     // '+' here since abs is negative and
@@ -84,7 +104,7 @@ impl Length {
                     start + abs * mult
                 }
             }
-            Length::Ratio(ratio) => start + (end - start) * ratio,
+            Self::Ratio(ratio) => start + (end - start) * ratio,
         }
     }
 }
@@ -185,6 +205,10 @@ impl SvgElement {
 
     fn get_attr(&self, key: &str) -> Option<String> {
         self.attrs.get(key).map(|x| x.to_owned())
+    }
+
+    fn set_attr(&mut self, key: &str, value: &str) {
+        self.attrs.insert(key, value);
     }
 
     fn is_connector(&self) -> bool {
@@ -293,8 +317,7 @@ impl SvgElement {
             loc = caps.name("loc").unwrap().as_str();
             len = caps
                 .name("len")
-                .map(|v| strp_length(v.as_str()).expect("Invalid length"))
-                .unwrap_or(len);
+                .map_or(len, |v| strp_length(v.as_str()).expect("Invalid length"));
         }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
@@ -336,39 +359,45 @@ impl SvgElement {
     }
 
     fn translated(&self, dx: f32, dy: f32) -> Self {
-        let mut attrs = vec![];
-        for (key, mut value) in self.attrs.clone() {
+        let mut new_elem = self.clone();
+        for (key, value) in &self.attrs {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    value = fstr(strp(&value).unwrap() + dx);
+                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dx));
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    value = fstr(strp(&value).unwrap() + dy);
+                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dy));
                 }
                 _ => (),
             }
-            attrs.push((key.clone(), value.clone()));
         }
-        SvgElement::new(self.name.as_str(), &attrs)
+        new_elem
     }
 
-    fn positioned(&self, x: f32, y: f32) -> Self {
-        // TODO: should allow specifying which loc this positions; this currently
-        // sets the top-left (for rect/tbox), but for some scenarios it might be
-        // necessary to set e.g. the bottom-right loc.
-        let mut result = self.clone();
-        match self.name.as_str() {
-            "rect" | "tbox" | "pipeline" => {
-                result = result.with_attr("x", &fstr(x)).with_attr("y", &fstr(y));
-            }
-            _ => {
-                todo!()
+    fn resized_by(&self, dw: Length, dh: Length) -> Self {
+        let mut new_elem = self.clone();
+        for (key, value) in &self.attrs {
+            match key.as_str() {
+                "width" => {
+                    new_elem.set_attr(key, &fstr(dw.adjust(strp(value).unwrap())));
+                }
+                "height" => {
+                    new_elem.set_attr(key, &fstr(dh.adjust(strp(value).unwrap())));
+                }
+                _ => (),
             }
         }
-        result
+        new_elem
     }
 
     fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
+        // Different conversions from line count to first-line offset based on whether
+        // top, center, or bottom justification.
+        const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
+        const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
+        const WRAP_MID: fn(usize, f32) -> f32 =
+            |count, spacing| -(count as f32 - 1.) / 2. * spacing;
+
         let mut orig_elem = self.clone();
 
         let text_value = orig_elem.pop_attr("text")?;
@@ -417,12 +446,6 @@ impl SvgElement {
             }
         }
 
-        // Different conversions from line count to first-line offset based on whether
-        // top, center, or bottom justification.
-        const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
-        const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
-        const WRAP_MID: fn(usize, f32) -> f32 =
-            |count, spacing| -(count as f32 - 1.) / 2. * spacing;
         let first_line_offset = match (is_line, text_loc.as_str()) {
             // shapes - text 'inside'
             (false, "tl" | "t" | "tr") => WRAP_DOWN,
@@ -599,20 +622,16 @@ impl SvgElement {
 
             if let Some(inner) = ref_el {
                 if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
-                    let mut w =
+                    let w =
                         strp(&w).context(r#"Could not derive width in eval_size("{input}")"#)?;
-                    let mut h =
+                    let h =
                         strp(&h).context(r#"Could not derive height in eval_size("{input}")"#)?;
-                    if let Some(dw) = dw.strip_suffix('%') {
-                        w *= strp(dw).unwrap() / 100.;
-                    } else {
-                        w += strp(&dw).unwrap();
-                    }
-                    if let Some(dh) = dh.strip_suffix('%') {
-                        h *= strp(dh).unwrap() / 100.;
-                    } else {
-                        h += strp(&dh).unwrap();
-                    }
+                    let dw = strp_length(&dw)
+                        .context(r#"Could not derive dw in eval_size("{input"})"#)?;
+                    let dh = strp_length(&dh)
+                        .context(r#"Could not derive dh in eval_size("{input"})"#)?;
+                    let w = fstr(dw.adjust(w));
+                    let h = fstr(dh.adjust(h));
 
                     return Ok(format!("{w} {h}"));
                 }
@@ -623,10 +642,10 @@ impl SvgElement {
 
     /// Process and expand attributes as needed
     fn expand_attributes(&mut self, simple: bool, context: &mut TransformerContext) -> Result<()> {
-        let mut new_attrs = vec![];
+        let mut new_attrs = AttrMap::new();
 
         for (key, value) in self.attrs.clone() {
-            let replace = eval_vars(&value, &context.variables);
+            let replace = eval_attr(&value, &context.variables);
             self.attrs.insert(&key, &replace);
         }
 
@@ -646,81 +665,94 @@ impl SvgElement {
                     _ => (),
                 }
             }
-            // TODO: should expand in a given order to avoid repetition?
+
+            // The first pass is straightforward 'expansion', where the current
+            // attribute totally determines the resulting value(s).
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
                 ("xy", "text" | "rect" | "pipeline") => {
-                    new_attrs.push(("x".into(), parts.next().unwrap()));
-                    new_attrs.push(("y".into(), parts.next().unwrap()));
+                    new_attrs.insert("x", parts.next().unwrap());
+                    new_attrs.insert("y", parts.next().unwrap());
                 }
                 ("wh", "rect" | "tbox" | "pipeline") => {
-                    new_attrs.push(("width".into(), parts.next().unwrap()));
-                    new_attrs.push(("height".into(), parts.next().unwrap()));
+                    new_attrs.insert("width", parts.next().unwrap());
+                    new_attrs.insert("height", parts.next().unwrap());
                 }
                 ("wh", "circle") => {
                     let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
-                    new_attrs.push(("r".into(), fstr(diameter / 2.)));
+                    new_attrs.insert("r", fstr(diameter / 2.));
                 }
                 ("wh", "ellipse") => {
                     let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
                     let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
-                    new_attrs.push(("rx".into(), fstr(dia_x / 2.)));
-                    new_attrs.push(("ry".into(), fstr(dia_y / 2.)));
-                }
-                ("cxy", "rect" | "tbox" | "pipeline") => {
-                    if simple {
-                        // when doing initial expansion for elem_map population we might not
-                        // have evaluated needed elements yet.
-                        // TODO: tidy this up / split simple and non-simple expansion, or
-                        // avoid initial expansion step altogether
-                        continue;
-                    }
-                    // Requires wh (/ width&height) be specified in order to evaluate
-                    // the centre point.
-                    // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                    let wh = self.attrs.get("wh").map(|z| z.to_string());
-                    let mut width = self.attrs.get("width").map(|z| strp(z).unwrap());
-                    let mut height = self.attrs.get("height").map(|z| strp(z).unwrap());
-                    let cx = strp(&parts.next().unwrap()).context("Could not derive x from cxy")?;
-                    let cy = strp(&parts.next().unwrap()).context("Could not derive y from cxy")?;
-                    if let Some(wh_inner) = wh {
-                        let mut wh_parts = attr_split_cycle(&wh_inner);
-                        width = Some(
-                            strp(&wh_parts.next().unwrap())
-                                .context("Could not derive width during cxy processing")?,
-                        );
-                        height = Some(
-                            strp(&wh_parts.next().unwrap())
-                                .context("Could not derive height during cxy processing")?,
-                        );
-                    }
-                    if let (Some(width), Some(height)) = (width, height) {
-                        new_attrs.push(("x".into(), fstr(cx - width / 2.)));
-                        new_attrs.push(("y".into(), fstr(cy - height / 2.)));
-                        // wh / width&height will be handled separately
-                    }
+                    new_attrs.insert("rx", fstr(dia_x / 2.));
+                    new_attrs.insert("ry", fstr(dia_y / 2.));
                 }
                 ("cxy", "circle" | "ellipse") => {
-                    new_attrs.push(("cx".into(), parts.next().unwrap()));
-                    new_attrs.push(("cy".into(), parts.next().unwrap()));
+                    new_attrs.insert("cx", parts.next().unwrap());
+                    new_attrs.insert("cy", parts.next().unwrap());
                 }
                 ("rxy", "ellipse") => {
-                    new_attrs.push(("rx".into(), parts.next().unwrap()));
-                    new_attrs.push(("ry".into(), parts.next().unwrap()));
+                    new_attrs.insert("rx", parts.next().unwrap());
+                    new_attrs.insert("ry", parts.next().unwrap());
                 }
                 ("xy1", "line") => {
-                    new_attrs.push(("x1".into(), parts.next().unwrap()));
-                    new_attrs.push(("y1".into(), parts.next().unwrap()));
+                    new_attrs.insert("x1", parts.next().unwrap());
+                    new_attrs.insert("y1", parts.next().unwrap());
                 }
                 ("xy2", "line") => {
-                    new_attrs.push(("x2".into(), parts.next().unwrap()));
-                    new_attrs.push(("y2".into(), parts.next().unwrap()));
+                    new_attrs.insert("x2", parts.next().unwrap());
+                    new_attrs.insert("y2", parts.next().unwrap());
                 }
-                _ => new_attrs.push((key.clone(), value.clone())),
+                _ => new_attrs.insert(key.clone(), value.clone()),
             }
         }
 
-        self.attrs = new_attrs.into();
+        if !simple {
+            // A second pass is used where the processed values of other attributes
+            // (which may be given in any order and so not available on first pass)
+            // are required, e.g. updating cxy for rect-like objects, which requires
+            // width & height to already be determined.
+            let mut pass_two_attrs = AttrMap::new();
+            for (key, value) in new_attrs.clone() {
+                let mut parts = attr_split_cycle(&value);
+                match (key.as_str(), self.name.as_str()) {
+                    ("cxy", "rect" | "tbox" | "pipeline") => {
+                        // Requires wh (/ width&height) be specified in order to evaluate
+                        // the centre point.
+                        // TODO: also support specifying other attributes; xy+cxy should be sufficient
+                        let wh = new_attrs.get("wh").map(|z| z.to_string());
+                        let mut width = new_attrs.get("width").map(|z| strp(z).unwrap());
+                        let mut height = new_attrs.get("height").map(|z| strp(z).unwrap());
+                        let cx =
+                            strp(&parts.next().unwrap()).context("Could not derive x from cxy")?;
+                        let cy =
+                            strp(&parts.next().unwrap()).context("Could not derive y from cxy")?;
+                        if let Some(wh_inner) = wh {
+                            let mut wh_parts = attr_split_cycle(&wh_inner);
+                            width = Some(
+                                strp(&wh_parts.next().unwrap())
+                                    .context("Could not derive width during cxy processing")?,
+                            );
+                            height = Some(
+                                strp(&wh_parts.next().unwrap())
+                                    .context("Could not derive height during cxy processing")?,
+                            );
+                        }
+                        if let (Some(width), Some(height)) = (width, height) {
+                            pass_two_attrs.insert("x", fstr(cx - width / 2.));
+                            pass_two_attrs.insert("y", fstr(cy - height / 2.));
+                            // wh / width&height will be handled separately
+                        }
+                    }
+                    _ => pass_two_attrs.insert(key.clone(), value.clone()),
+                }
+            }
+
+            new_attrs = pass_two_attrs;
+        }
+
+        self.attrs = new_attrs;
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
@@ -755,7 +787,7 @@ mod test {
         assert_eq!(strp("100"), Some(100.));
         assert_eq!(strp("-100"), Some(-100.));
         assert_eq!(strp("-0.00123"), Some(-0.00123));
-        assert_eq!(strp("1234567.89"), Some(1234567.89));
+        assert_eq!(strp("1234567.8"), Some(1234567.8));
     }
 
     #[test]
@@ -777,5 +809,14 @@ mod test {
         assert_eq!(strp_length("200%").unwrap().calc_offset(10., 50.), 90.);
         assert_eq!(strp_length("-3.5").unwrap().calc_offset(10., 50.), 46.5);
         assert_eq!(strp_length("3.5").unwrap().calc_offset(-10., 90.), -6.5);
+    }
+
+    #[test]
+    fn test_length_adjust() {
+        assert_eq!(strp_length("25%").unwrap().adjust(10.), 2.5);
+        assert_eq!(strp_length("-50%").unwrap().adjust(150.), -75.);
+        assert_eq!(strp_length("125%").unwrap().adjust(20.), 25.);
+        assert_eq!(strp_length("1").unwrap().adjust(23.), 24.);
+        assert_eq!(strp_length("-12").unwrap().adjust(123.), 111.);
     }
 }

@@ -1,6 +1,7 @@
 use crate::connector::{ConnectionType, Connector};
+use crate::expression::eval_attr;
 use crate::types::BoundingBox;
-use crate::{attr_split_cycle, fstr, strp, SvgElement};
+use crate::{attr_split_cycle, fstr, strp, strp_length, SvgElement};
 
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
@@ -10,74 +11,11 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use regex::{Captures, Regex};
-
-/// Convert unescaped '$var' or '${var}' in given input according
-/// to the supplied variables. Missing variables are left as-is.
-pub(crate) fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
-    let re =
-        Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
-            .expect("invalid regex");
-    let text_value = re.replace_all(value, |caps: &Captures| {
-        let inner = caps.name("inner").unwrap();
-        // Check if the match is escaped; do this here rather than within the regex
-        // to avoid the need for an extra initial character which can cause matches
-        // to overlap and fail replacement. We're safe to look at the previous character
-        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
-        // the top bit clear, so will only match on a one-byte utf8 char.
-        let start = inner.start();
-        if start > 0 && value.as_bytes()[start - 1] == b'\\' {
-            inner.as_str().to_string()
-        } else {
-            let cap = caps
-                .name("var_brace")
-                .unwrap_or_else(|| caps.name("var_simple").unwrap());
-            variables
-                .get(&cap.as_str().to_string())
-                .unwrap_or(&inner.as_str().to_string())
-                .to_string()
-        }
-    });
-    // Following that, replace any escaped "\$" back into "$"" characters
-    let re = Regex::new(r"\\\$").expect("invalid regex");
-    re.replace_all(&text_value, r"$").into_owned()
-}
-
-#[test]
-fn test_eval_var() {
-    let vars: HashMap<String, String> = vec![
-        ("one", "1"),
-        ("this_year", "2023"),
-        ("empty", ""),
-        ("me", "Ben"),
-    ]
-    .iter()
-    .map(|v| (v.0.to_string(), v.1.to_string()))
-    .collect();
-
-    assert_eq!(eval_vars("$one", &vars), "1");
-    assert_eq!(eval_vars("${one}", &vars), "1");
-    assert_eq!(eval_vars("$two", &vars), "$two");
-    assert_eq!(eval_vars("${two}", &vars), "${two}");
-    assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
-    assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
-    assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
-    assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
-    assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
-    assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
-    assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
-    assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
-    assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
-    assert_eq!(
-        eval_vars(r"Created in ${this_year} by ${me}", &vars),
-        "Created in 2023 by Ben"
-    );
-}
-
 use anyhow::Result;
+use regex::Regex;
 
 #[derive(Clone, Default, Debug)]
-pub(crate) struct TransformerContext {
+pub struct TransformerContext {
     pub(crate) elem_map: HashMap<String, SvgElement>,
     pub(crate) prev_element: Option<SvgElement>,
     pub(crate) variables: HashMap<String, String>,
@@ -90,7 +28,7 @@ impl TransformerContext {
             elem_map: HashMap::new(),
             prev_element: None,
             variables: HashMap::new(),
-            last_indent: String::from(""),
+            last_indent: String::new(),
         }
     }
 
@@ -116,7 +54,7 @@ impl TransformerContext {
                         let value = aa.unescape_value().expect("XML decode error").into_owned();
 
                         if &elem_name == "define" {
-                            let value = eval_vars(&value, &self.variables);
+                            let value = eval_attr(&value, &self.variables);
                             self.variables.insert(key, value);
                         } else if &key == "id" {
                             id_opt = Some(value);
@@ -161,6 +99,35 @@ impl TransformerContext {
 
         e.expand_attributes(false, self)?;
 
+        // Size adjustments must be computed before updating position,
+        // as they affect any xy-loc other than default top-left.
+        // NOTE: these attributes may be removed once variable arithmetic
+        // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
+        // with $var="20 30" or similar (the reference form of wh already
+        // supports inline dw / dh).
+        {
+            let dw = e.pop_attr("dw");
+            let dh = e.pop_attr("dh");
+            let dwh = e.pop_attr("dwh");
+            let mut d_w = None;
+            let mut d_h = None;
+            if let Some(dwh) = dwh {
+                let mut parts = attr_split_cycle(&dwh).map(|v| strp_length(&v).unwrap());
+                d_w = parts.next();
+                d_h = parts.next();
+            }
+            if let Some(dw) = dw {
+                d_w = strp_length(&dw);
+            }
+            if let Some(dh) = dh {
+                d_h = strp_length(&dh);
+            }
+            if d_w.is_some() || d_h.is_some() {
+                e = e.resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default());
+                Self::update_elem_map(&mut self.elem_map, &e);
+            }
+        }
+
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
         if let (Some(bbox), Some(xy_loc)) = (e.bbox(), e.pop_attr("xy-loc")) {
@@ -195,7 +162,7 @@ impl TransformerContext {
                 },
             ) {
                 // replace with rendered connection element
-                e = conn.render().without_attr("edge-type");
+                e = conn.render()?.without_attr("edge-type");
             }
         }
 
@@ -217,7 +184,8 @@ impl TransformerContext {
                 d_y = strp(&dy);
             }
             if d_x.is_some() || d_y.is_some() {
-                e = e.translated(d_x.unwrap_or(0.), d_y.unwrap_or(0.));
+                e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
+                Self::update_elem_map(&mut self.elem_map, &e);
             }
         }
 
@@ -284,7 +252,7 @@ impl TransformerContext {
                 // the corresponding </tbox> will be converted into a </text> element.
                 if empty {
                     if let Some(tt) = text {
-                        events.push(SvgEvent::Text(tt.to_string()));
+                        events.push(SvgEvent::Text(tt));
                         events.push(SvgEvent::End("text".to_string()));
                     }
                 }
@@ -462,7 +430,7 @@ impl TransformerContext {
             if new_elem.bbox().is_some() {
                 // prev_element is only used for relative positioning, so
                 // only makes sense if it has a bounding box.
-                prev_element = Some(new_elem.clone());
+                prev_element = Some(new_elem);
             }
         }
         self.prev_element = prev_element;
@@ -578,20 +546,18 @@ impl Transformer {
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    output.push(&Event::End(BytesEnd::new(ee_name)))
+                    output.push(&Event::End(BytesEnd::new(ee_name)));
                 }
                 Event::Text(e) => {
                     // Extract any trailing whitespace following newlines as the current indentation level
                     let re = Regex::new(r"(?ms)\n.*^(\s+)*").unwrap();
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
                     if let Some(captures) = re.captures(&text) {
-                        let indent = captures
-                            .get(1)
-                            .map_or(String::from(""), |m| m.as_str().into());
+                        let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());
                         self.context.set_indent(indent);
                     }
 
-                    output.push(&Event::Text(e.borrow()))
+                    output.push(&Event::Text(e.borrow()));
                 }
                 _ => {
                     output.push(ev);
@@ -653,7 +619,8 @@ impl Transformer {
 
             for item in &mut output.events.iter_mut() {
                 if let Event::Start(x) = item {
-                    if x.name().into_inner() == "svg".as_bytes() {
+                    if x.name().into_inner() == b"svg" {
+                        // }.as_bytes() {
                         *item = new_svg.clone().into_owned();
                         break;
                     }
@@ -690,14 +657,14 @@ fn transform_element(
     is_empty: bool,
 ) -> Result<()> {
     let ee = context.handle_element(element, is_empty)?;
-    for svg_ev in ee.into_iter() {
+    for svg_ev in ee {
         // re-calculate is_empty for each generated event
         let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
         match svg_ev {
             SvgEvent::Empty(e) | SvgEvent::Start(e) => {
                 let mut bs = BytesStart::new(e.name);
                 // Collect non-'class' attributes
-                for (k, v) in e.attrs.into_iter() {
+                for (k, v) in e.attrs {
                     if k != "class" {
                         bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
                     }

@@ -19,13 +19,13 @@ struct Endpoint {
 }
 
 impl Endpoint {
-    fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
+    const fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
         Self { origin, dir }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(crate) enum ConnectionType {
+pub enum ConnectionType {
     Horizontal,
     Vertical,
     Corner,
@@ -47,7 +47,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
         ConnectionType::Horizontal => vec!["l", "r"],
         ConnectionType::Vertical => vec!["t", "b"],
         ConnectionType::Corner => vec!["t", "r", "b", "l"],
-        _ => vec!["t", "b", "l", "r", "tl", "bl", "tr", "br"],
+        ConnectionType::Straight => vec!["t", "b", "l", "r", "tl", "bl", "tr", "br"],
     };
     if el.name == "line" {
         result.extend(&["xy1", "start", "xy2", "end"]);
@@ -56,7 +56,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Connector {
+pub struct Connector {
     source_element: SvgElement,
     start_el: Option<SvgElement>,
     end_el: Option<SvgElement>,
@@ -129,8 +129,8 @@ impl Connector {
         // the location is determined automatically to give the shortest distance)
         let mut start_el = None;
         let mut end_el = None;
-        let mut start_loc = String::from("");
-        let mut end_loc = String::from("");
+        let mut start_loc = String::new();
+        let mut end_loc = String::new();
         let mut start_point: Option<(f32, f32)> = None;
         let mut end_point: Option<(f32, f32)> = None;
         let mut start_dir = None;
@@ -240,15 +240,20 @@ impl Connector {
         })
     }
 
-    pub fn render(&self) -> SvgElement {
+    pub fn render(&self) -> Result<SvgElement> {
         let default_ratio_offset = Length::Ratio(0.5);
-        let default_abs_offset = Length::Absolute(2.);
+        let default_abs_offset = Length::Absolute(3.);
 
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
-        match self.conn_type {
+        // For some (e.g. u-shaped) connections we need a default *absolute* offset
+        // as ratio (e.g. the overall '50%' default) don't make sense.
+        let conn_element = match self.conn_type {
             ConnectionType::Horizontal => {
                 // If we have start and end elements, use midpoint of overlapping region
+                // TODO: If start_loc is specified, should probably set midpoint
+                // to the y coord of that... (implies moving start_loc as an optional
+                // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let y_top = start_el
@@ -350,7 +355,7 @@ impl Connector {
                                     .offset
                                     .unwrap_or(default_abs_offset)
                                     .absolute()
-                                    .unwrap();
+                                    .context("Corner type requires absolute offset")?;
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Right, Direction::Right) => {
@@ -360,7 +365,8 @@ impl Connector {
                                     .offset
                                     .unwrap_or(default_abs_offset)
                                     .absolute()
-                                    .unwrap();
+                                    .context("Corner type requires absolute offset")?;
+
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Up) => {
@@ -370,7 +376,8 @@ impl Connector {
                                     .offset
                                     .unwrap_or(default_abs_offset)
                                     .absolute()
-                                    .unwrap();
+                                    .context("Corner type requires absolute offset")?;
+
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         (Direction::Down, Direction::Down) => {
@@ -380,7 +387,8 @@ impl Connector {
                                     .offset
                                     .unwrap_or(default_abs_offset)
                                     .absolute()
-                                    .unwrap();
+                                    .context("Corner type requires absolute offset")?;
+
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                     };
@@ -413,6 +421,7 @@ impl Connector {
                     .with_attrs_from(&self.source_element)
                 }
             }
-        }
+        };
+        Ok(conn_element)
     }
 }
