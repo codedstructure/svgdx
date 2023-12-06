@@ -550,7 +550,7 @@ impl Transformer {
                 }
                 Event::Text(e) => {
                     // Extract any trailing whitespace following newlines as the current indentation level
-                    let re = Regex::new(r"(?ms)\n.*^(\s+)*").unwrap();
+                    let re = Regex::new(r"(?ms)\n.*^(\s+)*").expect("Bad Regex");
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
                     if let Some(captures) = re.captures(&text) {
                         let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());

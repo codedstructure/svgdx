@@ -312,7 +312,7 @@ impl SvgElement {
     fn coord(&self, loc: &str) -> Option<(f32, f32)> {
         let mut loc = loc;
         let mut len = Length::Ratio(0.5);
-        let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").unwrap();
+        let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").expect("Bad Regex");
         if let Some(caps) = re.captures(loc) {
             loc = caps.name("loc").unwrap().as_str();
             len = caps
@@ -523,9 +523,9 @@ impl SvgElement {
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)").unwrap();
+        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)").expect("Bad Regex");
         let mut parts = attr_split(input);
-        let ref_loc = parts.next().unwrap();
+        let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
             if caps.get(0).unwrap().is_empty() {
                 // We need either id or loc or both; since they are both optional in
@@ -540,8 +540,10 @@ impl SvgElement {
                 "relh" => "tr",
                 _ => "tr",
             };
-            let dx = strp(&parts.next().unwrap_or("0".to_owned())).unwrap();
-            let dy = strp(&parts.next().unwrap_or("0".to_owned())).unwrap();
+            let dx = strp(&parts.next().unwrap_or("0".to_owned()))
+                .context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
+            let dy = strp(&parts.next().unwrap_or("0".to_owned()))
+                .context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
 
             let mut ref_el = context.prev_element.as_ref();
             let opt_id = caps
@@ -563,8 +565,8 @@ impl SvgElement {
                 let mut margin_y = 0.;
                 if let Some(margin) = ref_el.get_attr("margin") {
                     let mut margin_parts = attr_split_cycle(&margin);
-                    margin_x = strp(&margin_parts.next().unwrap()).unwrap();
-                    margin_y = strp(&margin_parts.next().unwrap()).unwrap();
+                    margin_x = strp(&margin_parts.next().expect("cycle")).unwrap();
+                    margin_y = strp(&margin_parts.next().expect("cycle")).unwrap();
                 }
                 let loc = loc.unwrap_or(default_rel);
                 margin_y = match loc {
@@ -604,8 +606,8 @@ impl SvgElement {
         // TODO: extend to allow referencing earlier elements beyond previous
         // TODO: allow mixed relative and absolute values...
         let mut parts = attr_split(input);
-        let ref_loc = parts.next().unwrap();
-        let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").unwrap();
+        let ref_loc = parts.next().expect("always at least one");
+        let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").expect("Bad Regex");
         if let Some(caps) = rel_re.captures(&ref_loc) {
             let dw = parts.next().unwrap_or("0".to_owned());
             let dh = parts.next().unwrap_or("0".to_owned());
@@ -671,38 +673,38 @@ impl SvgElement {
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
                 ("xy", "text" | "rect" | "pipeline") => {
-                    new_attrs.insert("x", parts.next().unwrap());
-                    new_attrs.insert("y", parts.next().unwrap());
+                    new_attrs.insert("x", parts.next().expect("cycle"));
+                    new_attrs.insert("y", parts.next().expect("cycle"));
                 }
                 ("wh", "rect" | "tbox" | "pipeline") => {
-                    new_attrs.insert("width", parts.next().unwrap());
-                    new_attrs.insert("height", parts.next().unwrap());
+                    new_attrs.insert("width", parts.next().expect("cycle"));
+                    new_attrs.insert("height", parts.next().expect("cycle"));
                 }
                 ("wh", "circle") => {
-                    let diameter: f32 = strp(&parts.next().unwrap()).unwrap();
+                    let diameter: f32 = strp(&parts.next().expect("cycle")).unwrap();
                     new_attrs.insert("r", fstr(diameter / 2.));
                 }
                 ("wh", "ellipse") => {
-                    let dia_x: f32 = strp(&parts.next().unwrap()).unwrap();
-                    let dia_y: f32 = strp(&parts.next().unwrap()).unwrap();
+                    let dia_x: f32 = strp(&parts.next().expect("cycle")).unwrap();
+                    let dia_y: f32 = strp(&parts.next().expect("cycle")).unwrap();
                     new_attrs.insert("rx", fstr(dia_x / 2.));
                     new_attrs.insert("ry", fstr(dia_y / 2.));
                 }
                 ("cxy", "circle" | "ellipse") => {
-                    new_attrs.insert("cx", parts.next().unwrap());
-                    new_attrs.insert("cy", parts.next().unwrap());
+                    new_attrs.insert("cx", parts.next().expect("cycle"));
+                    new_attrs.insert("cy", parts.next().expect("cycle"));
                 }
                 ("rxy", "ellipse") => {
-                    new_attrs.insert("rx", parts.next().unwrap());
-                    new_attrs.insert("ry", parts.next().unwrap());
+                    new_attrs.insert("rx", parts.next().expect("cycle"));
+                    new_attrs.insert("ry", parts.next().expect("cycle"));
                 }
                 ("xy1", "line") => {
-                    new_attrs.insert("x1", parts.next().unwrap());
-                    new_attrs.insert("y1", parts.next().unwrap());
+                    new_attrs.insert("x1", parts.next().expect("cycle"));
+                    new_attrs.insert("y1", parts.next().expect("cycle"));
                 }
                 ("xy2", "line") => {
-                    new_attrs.insert("x2", parts.next().unwrap());
-                    new_attrs.insert("y2", parts.next().unwrap());
+                    new_attrs.insert("x2", parts.next().expect("cycle"));
+                    new_attrs.insert("y2", parts.next().expect("cycle"));
                 }
                 _ => new_attrs.insert(key.clone(), value.clone()),
             }
@@ -724,18 +726,18 @@ impl SvgElement {
                         let wh = new_attrs.get("wh").map(|z| z.to_string());
                         let mut width = new_attrs.get("width").map(|z| strp(z).unwrap());
                         let mut height = new_attrs.get("height").map(|z| strp(z).unwrap());
-                        let cx =
-                            strp(&parts.next().unwrap()).context("Could not derive x from cxy")?;
-                        let cy =
-                            strp(&parts.next().unwrap()).context("Could not derive y from cxy")?;
+                        let cx = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive x from cxy")?;
+                        let cy = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive y from cxy")?;
                         if let Some(wh_inner) = wh {
                             let mut wh_parts = attr_split_cycle(&wh_inner);
                             width = Some(
-                                strp(&wh_parts.next().unwrap())
+                                strp(&wh_parts.next().expect("cycle"))
                                     .context("Could not derive width during cxy processing")?,
                             );
                             height = Some(
-                                strp(&wh_parts.next().unwrap())
+                                strp(&wh_parts.next().expect("cycle"))
                                     .context("Could not derive height during cxy processing")?,
                             );
                         }
@@ -804,19 +806,31 @@ mod test {
 
     #[test]
     fn test_length_calc_offset() {
-        assert_eq!(strp_length("25%").unwrap().calc_offset(10., 50.), 20.);
-        assert_eq!(strp_length("50%").unwrap().calc_offset(-10., -9.), -9.5);
-        assert_eq!(strp_length("200%").unwrap().calc_offset(10., 50.), 90.);
-        assert_eq!(strp_length("-3.5").unwrap().calc_offset(10., 50.), 46.5);
-        assert_eq!(strp_length("3.5").unwrap().calc_offset(-10., 90.), -6.5);
+        assert_eq!(strp_length("25%").expect("test").calc_offset(10., 50.), 20.);
+        assert_eq!(
+            strp_length("50%").expect("test").calc_offset(-10., -9.),
+            -9.5
+        );
+        assert_eq!(
+            strp_length("200%").expect("test").calc_offset(10., 50.),
+            90.
+        );
+        assert_eq!(
+            strp_length("-3.5").expect("test").calc_offset(10., 50.),
+            46.5
+        );
+        assert_eq!(
+            strp_length("3.5").expect("test").calc_offset(-10., 90.),
+            -6.5
+        );
     }
 
     #[test]
     fn test_length_adjust() {
-        assert_eq!(strp_length("25%").unwrap().adjust(10.), 2.5);
-        assert_eq!(strp_length("-50%").unwrap().adjust(150.), -75.);
-        assert_eq!(strp_length("125%").unwrap().adjust(20.), 25.);
-        assert_eq!(strp_length("1").unwrap().adjust(23.), 24.);
-        assert_eq!(strp_length("-12").unwrap().adjust(123.), 111.);
+        assert_eq!(strp_length("25%").expect("test").adjust(10.), 2.5);
+        assert_eq!(strp_length("-50%").expect("test").adjust(150.), -75.);
+        assert_eq!(strp_length("125%").expect("test").adjust(20.), 25.);
+        assert_eq!(strp_length("1").expect("test").adjust(23.), 24.);
+        assert_eq!(strp_length("-12").expect("test").adjust(123.), 111.);
     }
 }

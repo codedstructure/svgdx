@@ -348,12 +348,12 @@ mod test {
         // Check iteration (ref and owned) over the AttrMap works...
         let mut total = 0;
         for (_key, value) in &am {
-            total += value.parse::<i32>().unwrap();
+            total += value.parse::<i32>().expect("test");
         }
         assert_eq!(total, 35);
         let mut total = 0;
         for (_key, value) in am {
-            total += value.parse::<i32>().unwrap();
+            total += value.parse::<i32>().expect("test");
         }
         assert_eq!(total, 35);
 

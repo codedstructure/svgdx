@@ -109,6 +109,17 @@ fn shortest_link(
 }
 
 impl Connector {
+    fn loc_to_dir(loc: &str) -> Option<Direction> {
+        // loc may have a 'length' part following a colon, ignore that
+        match loc.split(':').next().expect("always at least once") {
+            "t" => Some(Direction::Up),
+            "r" => Some(Direction::Right),
+            "b" => Some(Direction::Down),
+            "l" => Some(Direction::Left),
+            _ => None,
+        }
+    }
+
     pub fn from_element(
         element: &SvgElement,
         context: &TransformerContext,
@@ -136,22 +147,13 @@ impl Connector {
         let mut start_dir = None;
         let mut end_dir = None;
 
-        // loc may have a 'length' part following a colon, ignore that
-        let loc_to_dir = |dir: &str| match dir.split(':').next().unwrap() {
-            "t" => Some(Direction::Up),
-            "r" => Some(Direction::Right),
-            "b" => Some(Direction::Down),
-            "l" => Some(Direction::Left),
-            _ => None,
-        };
-
         // Example: "#thing@tl" => top left coordinate of element id="thing"
         let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").expect("Bad RegEx");
 
         if let Some(caps) = re.captures(&start_ref) {
             let name = &caps["id"];
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            start_dir = loc_to_dir(&start_loc);
+            start_dir = Self::loc_to_dir(&start_loc);
             start_el = context.elem_map.get(name);
         } else {
             let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
@@ -160,7 +162,7 @@ impl Connector {
         if let Some(caps) = re.captures(&end_ref) {
             let name = &caps["id"];
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            end_dir = loc_to_dir(&end_loc);
+            end_dir = Self::loc_to_dir(&end_loc);
             end_el = context.elem_map.get(name);
         } else {
             let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
@@ -176,7 +178,7 @@ impl Connector {
                 let end_el = end_el.unwrap();
                 if end_loc.is_empty() {
                     end_loc = closest_loc(end_el, start_point, conn_type);
-                    end_dir = loc_to_dir(&end_loc);
+                    end_dir = Self::loc_to_dir(&end_loc);
                 }
                 (
                     Endpoint::new(start_point, start_dir),
@@ -187,7 +189,7 @@ impl Connector {
                 let start_el = start_el.unwrap();
                 if start_loc.is_empty() {
                     start_loc = closest_loc(start_el, end_point, conn_type);
-                    start_dir = loc_to_dir(&start_loc);
+                    start_dir = Self::loc_to_dir(&start_loc);
                 }
                 (
                     Endpoint::new(
@@ -203,11 +205,11 @@ impl Connector {
                 let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
                 if start_loc.is_empty() && end_loc.is_empty() {
                     (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type);
-                    start_dir = loc_to_dir(&start_loc);
-                    end_dir = loc_to_dir(&end_loc);
+                    start_dir = Self::loc_to_dir(&start_loc);
+                    end_dir = Self::loc_to_dir(&end_loc);
                 } else if start_loc.is_empty() {
                     start_loc = closest_loc(start_el, end_el.coord(&end_loc).unwrap(), conn_type);
-                    start_dir = loc_to_dir(&start_loc);
+                    start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
                     end_loc = closest_loc(
                         end_el,
@@ -216,7 +218,7 @@ impl Connector {
                             .context("no coord for start_loc")?,
                         conn_type,
                     );
-                    end_dir = loc_to_dir(&end_loc);
+                    end_dir = Self::loc_to_dir(&end_loc);
                 }
                 (
                     Endpoint::new(

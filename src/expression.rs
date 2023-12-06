@@ -22,7 +22,7 @@ enum Token {
 }
 
 fn valid_variable_name(var: &str) -> Result<&str> {
-    let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").unwrap();
+    let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").expect("Bad Regex");
     if !re.is_match(var) {
         bail!("Invalid variable name");
     }
@@ -215,7 +215,9 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
         Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
             .expect("invalid regex");
     let value = re.replace_all(value, |caps: &Captures| {
-        let inner = caps.name("inner").unwrap();
+        let inner = caps
+            .name("inner")
+            .expect("Matched regex must have this group");
         // Check if the match is escaped; do this here rather than within the regex
         // to avoid the need for an extra initial character which can cause matches
         // to overlap and fail replacement. We're safe to look at the previous character
@@ -225,9 +227,10 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
         if start > 0 && value.as_bytes()[start - 1] == b'\\' {
             inner.as_str().to_string()
         } else {
-            let cap = caps
-                .name("var_brace")
-                .unwrap_or_else(|| caps.name("var_simple").unwrap());
+            let cap = caps.name("var_brace").unwrap_or_else(|| {
+                caps.name("var_simple")
+                    .expect("Matched regex must have var_simple or var_brace")
+            });
             variables
                 .get(&cap.as_str().to_string())
                 .unwrap_or(&inner.as_str().to_string())
@@ -244,7 +247,10 @@ fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
     re.replace_all(value, |caps: &Captures| {
-        let inner = caps.name("inner").unwrap().as_str();
+        let inner = caps
+            .name("inner")
+            .expect("Matched regex must have this group")
+            .as_str();
         if let Ok(tokens) = tokenize(inner) {
             if let Ok(parsed) = evaluate(tokens, variables) {
                 fstr(parsed)
@@ -325,7 +331,10 @@ mod tests {
             ("${tau} - 6", Some(0.28318548)),
             ("0.125 * $mega", Some(125000.)),
         ] {
-            assert_eq!(evaluate(tokenize(expr).unwrap(), &variables).ok(), expected);
+            assert_eq!(
+                evaluate(tokenize(expr).expect("test"), &variables).ok(),
+                expected
+            );
         }
     }
 
@@ -361,7 +370,7 @@ mod tests {
     #[test]
     fn test_bad_expressions() {
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)"] {
-            assert!(evaluate(tokenize(expr).unwrap(), &HashMap::new()).is_err());
+            assert!(evaluate(tokenize(expr).expect("test"), &HashMap::new()).is_err());
         }
     }
 
@@ -382,7 +391,7 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).unwrap(), &HashMap::new()).ok(),
+                evaluate(tokenize(expr).expect("test"), &HashMap::new()).ok(),
                 expected
             );
         }
