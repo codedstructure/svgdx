@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use std::io::{Read, Write};
 
 use regex::Regex;
@@ -125,6 +126,16 @@ pub(crate) struct SvgElement {
     attrs: AttrMap,
     classes: ClassList,
     content: Option<String>,
+}
+
+impl Display for SvgElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.name, self.attrs)?;
+        if !self.classes.is_empty() {
+            write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
+        }
+        Ok(())
+    }
 }
 
 impl SvgElement {
@@ -400,6 +411,25 @@ impl SvgElement {
 
         let mut orig_elem = self.clone();
 
+        let mut t_dx = None;
+        let mut t_dy = None;
+        {
+            let dx = orig_elem.pop_attr("text-dx");
+            let dy = orig_elem.pop_attr("text-dy");
+            let dxy = orig_elem.pop_attr("text-dxy");
+            if let Some(dxy) = dxy {
+                let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
+                t_dx = parts.next();
+                t_dy = parts.next();
+            }
+            if let Some(dx) = dx {
+                t_dx = strp(&dx);
+            }
+            if let Some(dy) = dy {
+                t_dy = strp(&dy);
+            }
+        }
+
         let text_value = orig_elem.pop_attr("text")?;
         // Convert unescaped '\n' into newline characters for multi-line text
         let re = Regex::new(r"([^\\])\\n").expect("invalid regex");
@@ -411,8 +441,6 @@ impl SvgElement {
         let mut text_attrs = vec![];
         let mut text_classes = vec!["tbox"];
         let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
-        let mut dx = orig_elem.pop_attr("dx").map(|dx| strp(&dx).unwrap());
-        let mut dy = orig_elem.pop_attr("dy").map(|dy| strp(&dy).unwrap());
 
         // Default dx/dy to push it in slightly from the edge (or out for lines);
         // Without inset text squishes to the edge and can be unreadable
@@ -425,24 +453,24 @@ impl SvgElement {
         // and dx/dy values are opposite.
         if ["t", "tl", "tr"].iter().any(|&s| s == text_loc) {
             text_classes.push(if is_line { "text-bottom" } else { "text-top" });
-            if dy.is_none() {
-                dy = Some(if is_line { -text_inset } else { text_inset });
+            if t_dy.is_none() {
+                t_dy = Some(if is_line { -text_inset } else { text_inset });
             }
         } else if ["b", "bl", "br"].iter().any(|&s| s == text_loc) {
             text_classes.push(if is_line { "text-top" } else { "text-bottom" });
-            if dy.is_none() {
-                dy = Some(if is_line { text_inset } else { -text_inset });
+            if t_dy.is_none() {
+                t_dy = Some(if is_line { text_inset } else { -text_inset });
             }
         }
         if ["l", "tl", "bl"].iter().any(|&s| s == text_loc) {
             text_classes.push(if is_line { "text-right" } else { "text-left" });
-            if dx.is_none() {
-                dx = Some(if is_line { -text_inset } else { text_inset });
+            if t_dx.is_none() {
+                t_dx = Some(if is_line { -text_inset } else { text_inset });
             }
         } else if ["r", "br", "tr"].iter().any(|&s| s == text_loc) {
             text_classes.push(if is_line { "text-left" } else { "text-right" });
-            if dx.is_none() {
-                dx = Some(if is_line { text_inset } else { -text_inset });
+            if t_dx.is_none() {
+                t_dx = Some(if is_line { text_inset } else { -text_inset });
             }
         }
 
@@ -460,10 +488,10 @@ impl SvgElement {
         // and has styling via CSS to reflect this, e.g.:
         //  text.tbox { dominant-baseline: central; text-anchor: middle; }
         let (mut tdx, mut tdy) = orig_elem.coord(&text_loc).unwrap();
-        if let Some(dx) = dx {
+        if let Some(dx) = t_dx {
             tdx += dx;
         }
-        if let Some(dy) = dy {
+        if let Some(dy) = t_dy {
             tdy += dy;
         }
         text_attrs.push(("x".into(), fstr(tdx)));
@@ -476,8 +504,9 @@ impl SvgElement {
 
         // There will always be a text element; if not multiline this is the only element.
         let mut text_elem = SvgElement::new("text", &text_attrs);
-        // line spacing (in 'em'). TODO: allow configuring this...
-        let line_spacing = 1.05;
+        // line spacing (in 'em').
+        let line_spacing =
+            strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned())).unwrap();
 
         // Copy style and class(es) from original element
         if let Some(style) = orig_elem.get_attr("style") {

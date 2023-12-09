@@ -153,10 +153,10 @@ impl TransformerContext {
             if let Ok(conn) = Connector::from_element(
                 &e,
                 self,
-                if e.name == "polyline" {
-                    ConnectionType::Corner
-                } else if let Some(e_type) = e.get_attr("edge-type") {
+                if let Some(e_type) = e.get_attr("edge-type") {
                     ConnectionType::from_str(&e_type)
+                } else if e.name == "polyline" {
+                    ConnectionType::Corner
                 } else {
                     ConnectionType::Straight
                 },
@@ -493,12 +493,14 @@ impl EventList<'_> {
 #[derive(Default, Debug)]
 pub struct Transformer {
     context: TransformerContext,
+    debug: bool,
 }
 
 impl Transformer {
     pub fn new() -> Self {
         Self {
             context: TransformerContext::new(),
+            debug: false, // TODO: expose this
         }
     }
 
@@ -524,6 +526,19 @@ impl Transformer {
                         } else {
                             todo!("Repeat is not implemented for non-empty elements");
                         }
+                    }
+                    if self.debug {
+                        // Prefix replaced element(s) with a representation of the original element
+                        //
+                        // Replace double quote with backtick to avoid messy XML entity conversion
+                        // (i.e. &quot; or &apos; if single quotes were used)
+                        output.push(&Event::Comment(BytesText::new(
+                            &format!(" {event_element}",).replace('"', "`"),
+                        )));
+                        output.push(&Event::Text(BytesText::new(&format!(
+                            "\n{}",
+                            self.context.last_indent
+                        ))));
                     }
                     for rep_idx in 0..repeat {
                         transform_element(
