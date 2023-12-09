@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use std::io::{Read, Write};
 
 use regex::Regex;
@@ -122,6 +123,16 @@ pub(crate) struct SvgElement {
     attrs: AttrMap,
     classes: ClassList,
     content: Option<String>,
+}
+
+impl Display for SvgElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.name, self.attrs)?;
+        if !self.classes.is_empty() {
+            write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
+        }
+        Ok(())
+    }
 }
 
 impl SvgElement {

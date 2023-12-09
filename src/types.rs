@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt;
+use std::fmt::{self, Display};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BoundingBox {
@@ -91,6 +91,18 @@ pub struct AttrMap {
     attrs: BTreeMap<(usize, String), String>,
     index_map: HashMap<String, usize>,
     next_index: usize,
+}
+
+impl Display for AttrMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (idx, (k, v)) in self.attrs.iter().enumerate() {
+            write!(f, r#"{}="{}""#, k.1, v)?;
+            if idx < self.attrs.len() {
+                write!(f, " ")?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl AttrMap {
