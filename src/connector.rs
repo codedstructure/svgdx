@@ -397,6 +397,7 @@ impl Connector {
                 } else {
                     points = vec![(x1, y1), (x2, y2)];
                 }
+                // TODO: remove repeated points.
                 if points.len() == 2 {
                     SvgElement::new(
                         "line",

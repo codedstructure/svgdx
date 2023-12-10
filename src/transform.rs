@@ -11,7 +11,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use regex::Regex;
 
 #[derive(Clone, Default, Debug)]
@@ -35,7 +35,7 @@ impl TransformerContext {
     fn populate(&mut self, events: &EventList) -> Result<()> {
         let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
 
-        for ev in events.iter() {
+        for (ev, pos) in events.iter() {
             match ev {
                 Event::Eof => {
                     // should never happen, as handled in EventList::from_reader()
@@ -47,7 +47,7 @@ impl TransformerContext {
                     let mut attr_list = vec![];
                     let mut id_opt = None;
                     for a in e.attributes() {
-                        let aa = a?;
+                        let aa = a.context(format!("Invalid attribute at {pos}"))?;
 
                         let key =
                             String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
@@ -448,11 +448,11 @@ enum SvgEvent {
 }
 
 struct EventList<'a> {
-    events: Vec<Event<'a>>,
+    events: Vec<(Event<'a>, usize)>,
 }
 
 impl EventList<'_> {
-    fn from_reader(reader: &mut dyn Read) -> Self {
+    fn from_reader(reader: &mut dyn Read) -> Result<Self> {
         let mut reader = Reader::from_reader(BufReader::new(reader));
 
         let mut events = Vec::new();
@@ -462,31 +462,31 @@ impl EventList<'_> {
             let ev = reader.read_event_into(&mut buf);
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(e) => events.push(e.clone().into_owned()),
+                Ok(e) => events.push((e.clone().into_owned(), reader.buffer_position())),
                 Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
             };
 
             buf.clear();
         }
 
-        Self { events }
+        Ok(Self { events })
     }
 
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
         for event in &self.events {
-            writer.write_event(event)?
+            writer.write_event(event.0.clone())?
         }
         Ok(())
     }
 
-    fn iter(&self) -> impl Iterator<Item = &Event> + '_ {
+    fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
         self.events.iter()
     }
 
     fn push(&mut self, ev: &Event) {
-        self.events.push(ev.clone().into_owned());
+        self.events.push((ev.clone().into_owned(), 0));
     }
 }
 
@@ -505,12 +505,12 @@ impl Transformer {
     }
 
     pub fn transform(&mut self, reader: &mut dyn Read, writer: &mut dyn Write) -> Result<()> {
-        let input = EventList::from_reader(reader);
+        let input = EventList::from_reader(reader)?;
         let mut output = EventList { events: vec![] };
 
         self.context.populate(&input)?;
 
-        for ev in input.iter() {
+        for (ev, pos) in input.iter() {
             match ev {
                 Event::Eof => {
                     // should never happen, as handled in EventList::from_reader()
@@ -519,7 +519,8 @@ impl Transformer {
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
                     let mut repeat = 1;
-                    let mut event_element = SvgElement::from(e);
+                    let mut event_element =
+                        SvgElement::try_from(e).context(format!("Error {pos}"))?;
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
@@ -585,11 +586,11 @@ impl Transformer {
         // TODO: preserve other attributes from a given svg root.
         let mut extent = BoundingBox::new();
         let mut elem_path = Vec::new();
-        for ev in output.iter() {
+        for (ev, _) in output.iter() {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
-                    let event_element = SvgElement::from(e);
+                    let event_element = SvgElement::try_from(e)?;
                     if !is_empty {
                         elem_path.push(event_element.name.clone());
                     }
@@ -632,7 +633,7 @@ impl Transformer {
             )));
             let new_svg = Event::Start(bs);
 
-            for item in &mut output.events.iter_mut() {
+            for (item, _) in &mut output.events.iter_mut() {
                 if let Event::Start(x) = item {
                     if x.name().into_inner() == b"svg" {
                         // }.as_bytes() {
@@ -647,21 +648,23 @@ impl Transformer {
     }
 }
 
-impl From<&BytesStart<'_>> for SvgElement {
-    fn from(e: &BytesStart) -> Self {
+impl TryFrom<&BytesStart<'_>> for SvgElement {
+    type Error = anyhow::Error;
+
+    fn try_from(e: &BytesStart) -> Result<Self, Self::Error> {
         let elem_name: String =
             String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
 
-        let attrs: Vec<(String, String)> = e
+        let attrs: Result<Vec<(String, String)>, Self::Error> = e
             .attributes()
             .map(move |a| {
-                let aa = a.unwrap();
-                let key = String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
-                let value = aa.unescape_value().expect("XML decode error").into_owned();
-                (key, value)
+                let aa = a?;
+                let key = String::from_utf8(aa.key.into_inner().to_vec())?;
+                let value = aa.unescape_value()?.into_owned();
+                Ok((key, value))
             })
             .collect();
-        SvgElement::new(&elem_name, &attrs)
+        Ok(SvgElement::new(&elem_name, &attrs?))
     }
 }
 
