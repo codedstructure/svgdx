@@ -14,6 +14,7 @@ mod transform;
 use expression::eval_attr;
 pub(crate) use transform::{Transformer, TransformerContext};
 mod connector;
+mod custom;
 mod expression;
 mod text;
 

@@ -49,6 +49,7 @@ impl BoundingBox {
         }
     }
 
+    #[allow(dead_code)]
     pub fn center(&self) -> Option<(f32, f32)> {
         if let Self::BBox(x1, y1, x2, y2) = self {
             Some((x1 + (x2 - x1) / 2., y1 + (y2 - y1) / 2.))
