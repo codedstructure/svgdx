@@ -1,5 +1,6 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::expression::eval_attr;
+use crate::text::process_text_attr;
 use crate::types::BoundingBox;
 use crate::{attr_split_cycle, fstr, strp, strp_length, SvgElement};
 
@@ -190,7 +191,7 @@ impl TransformerContext {
         }
 
         if e.has_attr("text") {
-            let (orig_elem, text_elements) = e.process_text_attr()?;
+            let (orig_elem, text_elements) = process_text_attr(&e)?;
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
