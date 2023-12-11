@@ -1,9 +1,12 @@
 use core::fmt::Display;
-use std::io::{Read, Write};
+use std::{
+    io::{Read, Write},
+    num::ParseFloatError,
+};
 
 use regex::Regex;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 mod types;
 use types::{AttrMap, BoundingBox, ClassList};
@@ -32,8 +35,8 @@ fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-fn strp(s: &str) -> Option<f32> {
-    s.parse().ok()
+fn strp(s: &str) -> Result<f32> {
+    s.parse().map_err(|e: ParseFloatError| e.into())
 }
 
 /// Returns iterator over whitespace-or-comma separated values
@@ -112,11 +115,11 @@ impl Length {
 
 /// Parse a ratio (float or %age) to an f32
 /// Note this deliberately does not clamp to 0..1
-fn strp_length(s: &str) -> Option<Length> {
+fn strp_length(s: &str) -> Result<Length> {
     if let Some(s) = s.strip_suffix('%') {
-        Some(Length::Ratio(strp(s)? * 0.01))
+        Ok(Length::Ratio(strp(s)? * 0.01))
     } else {
-        Some(Length::Absolute(strp(s)?))
+        Ok(Length::Absolute(strp(s)?))
     }
 }
 
@@ -228,30 +231,44 @@ impl SvgElement {
             && (self.name == "line" || self.name == "polyline")
     }
 
-    fn bbox(&self) -> Option<BoundingBox> {
+    fn bbox(&self) -> Result<Option<BoundingBox>> {
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
-                let (x, y, w, h) = (
-                    strp(self.attrs.get("x")?)?,
-                    strp(self.attrs.get("y")?)?,
-                    strp(self.attrs.get("width")?)?,
-                    strp(self.attrs.get("height")?)?,
-                );
-                Some(BoundingBox::BBox(x, y, x + w, y + h))
+                if let (Some(x), Some(y), Some(w), Some(h)) = (
+                    self.attrs.get("x"),
+                    self.attrs.get("y"),
+                    self.attrs.get("width"),
+                    self.attrs.get("height"),
+                ) {
+                    let x = strp(x)?;
+                    let y = strp(y)?;
+                    let w = strp(w)?;
+                    let h = strp(h)?;
+                    Ok(Some(BoundingBox::BBox(x, y, x + w, y + h)))
+                } else {
+                    Ok(None)
+                }
             }
             "line" => {
-                let (x1, y1, x2, y2) = (
-                    strp(self.attrs.get("x1")?)?,
-                    strp(self.attrs.get("y1")?)?,
-                    strp(self.attrs.get("x2")?)?,
-                    strp(self.attrs.get("y2")?)?,
-                );
-                Some(BoundingBox::BBox(
-                    x1.min(x2),
-                    y1.min(y2),
-                    x1.max(x2),
-                    y1.max(y2),
-                ))
+                if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
+                    self.attrs.get("x1"),
+                    self.attrs.get("y1"),
+                    self.attrs.get("x2"),
+                    self.attrs.get("y2"),
+                ) {
+                    let x1 = strp(x1)?;
+                    let y1 = strp(y1)?;
+                    let x2 = strp(x2)?;
+                    let y2 = strp(y2)?;
+                    Ok(Some(BoundingBox::BBox(
+                        x1.min(x2),
+                        y1.min(y2),
+                        x1.max(x2),
+                        y1.max(y2),
+                    )))
+                } else {
+                    Ok(None)
+                }
             }
             "polyline" | "polygon" => {
                 let mut min_x = f32::MAX;
@@ -263,64 +280,85 @@ impl SvgElement {
                 let mut has_x = false;
                 let mut has_y = false;
 
-                let points = self.attrs.get("points")?;
-                let mut idx = 0;
-                for point_ws in points.split_whitespace() {
-                    for point in point_ws.split(',') {
-                        let point = point.trim();
-                        if point.is_empty() {
-                            continue;
+                if let Some(points) = self.attrs.get("points") {
+                    let mut idx = 0;
+                    for point_ws in points.split_whitespace() {
+                        for point in point_ws.split(',') {
+                            let point = point.trim();
+                            if point.is_empty() {
+                                continue;
+                            }
+                            let point: f32 = strp(point)?;
+                            if idx % 2 == 0 {
+                                min_x = min_x.min(point);
+                                max_x = max_x.max(point);
+                                has_x = true;
+                            } else {
+                                min_y = min_y.min(point);
+                                max_y = max_y.max(point);
+                                has_y = true;
+                            }
+                            idx += 1;
                         }
-                        let point: f32 = strp(point)?;
-                        if idx % 2 == 0 {
-                            min_x = min_x.min(point);
-                            max_x = max_x.max(point);
-                            has_x = true;
-                        } else {
-                            min_y = min_y.min(point);
-                            max_y = max_y.max(point);
-                            has_y = true;
-                        }
-                        idx += 1;
                     }
-                }
-                if has_x && has_y {
-                    Some(BoundingBox::BBox(min_x, min_y, max_x, max_y))
+                    if has_x && has_y {
+                        Ok(Some(BoundingBox::BBox(min_x, min_y, max_x, max_y)))
+                    } else {
+                        bail!("Insufficient points for bbox")
+                    }
                 } else {
-                    None
+                    Ok(None)
                 }
             }
             "circle" => {
-                let (cx, cy, r) = (
-                    strp(self.attrs.get("cx")?)?,
-                    strp(self.attrs.get("cy")?)?,
-                    strp(self.attrs.get("r")?)?,
-                );
-                Some(BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r))
+                if let (Some(cx), Some(cy), Some(r)) = (
+                    self.attrs.get("cx"),
+                    self.attrs.get("cy"),
+                    self.attrs.get("r"),
+                ) {
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
+                    let r = strp(r)?;
+                    Ok(Some(BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)))
+                } else {
+                    Ok(None)
+                }
             }
             "ellipse" => {
-                let (cx, cy, rx, ry) = (
-                    strp(self.attrs.get("cx")?)?,
-                    strp(self.attrs.get("cy")?)?,
-                    strp(self.attrs.get("rx")?)?,
-                    strp(self.attrs.get("ry")?)?,
-                );
-                Some(BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry))
+                if let (Some(cx), Some(cy), Some(rx), Some(ry)) = (
+                    self.attrs.get("cx"),
+                    self.attrs.get("cy"),
+                    self.attrs.get("rx"),
+                    self.attrs.get("ry"),
+                ) {
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
+                    let rx = strp(rx)?;
+                    let ry = strp(ry)?;
+                    Ok(Some(BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)))
+                } else {
+                    Ok(None)
+                }
             }
             "person" => {
-                let (x, y, h) = (
-                    strp(self.attrs.get("x")?)?,
-                    strp(self.attrs.get("y")?)?,
-                    strp(self.attrs.get("height")?)?,
-                );
-                Some(BoundingBox::BBox(x, y, x + h / 3., y + h))
+                if let (Some(x), Some(y), Some(h)) = (
+                    self.attrs.get("x"),
+                    self.attrs.get("y"),
+                    self.attrs.get("height"),
+                ) {
+                    let x = strp(x)?;
+                    let y = strp(y)?;
+                    let h = strp(h)?;
+                    Ok(Some(BoundingBox::BBox(x, y, x + h / 3., y + h)))
+                } else {
+                    Ok(None)
+                }
             }
-
-            _ => None,
+            _ => Ok(None),
         }
     }
 
-    fn coord(&self, loc: &str) -> Option<(f32, f32)> {
+    fn coord(&self, loc: &str) -> Result<Option<(f32, f32)>> {
         let mut loc = loc;
         let mut len = Length::Ratio(0.5);
         let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").expect("Bad Regex");
@@ -332,13 +370,13 @@ impl SvgElement {
         }
         // This assumes a rectangular bounding box
         // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
-        if let Some(BoundingBox::BBox(x1, y1, x2, y2)) = self.bbox() {
+        if let Some(BoundingBox::BBox(x1, y1, x2, y2)) = self.bbox()? {
             let tl = (x1, y1);
             let tr = (x2, y1);
             let br = (x2, y2);
             let bl = (x1, y2);
             let c = ((x1 + x2) / 2., (y1 + y2) / 2.);
-            match loc {
+            Ok(match loc {
                 "tl" => Some(tl),
                 "t" => Some((len.calc_offset(tl.0, tr.0), tl.1)),
                 "tr" => Some(tr),
@@ -350,22 +388,31 @@ impl SvgElement {
                 "c" => Some(c),
                 _ => {
                     if self.name == "line" {
-                        let x1 = strp(self.attrs.get("x1")?)?;
-                        let y1 = strp(self.attrs.get("y1")?)?;
-                        let x2 = strp(self.attrs.get("x2")?)?;
-                        let y2 = strp(self.attrs.get("y2")?)?;
-                        match loc {
-                            "xy1" | "start" => Some((x1, y1)),
-                            "xy2" | "end" => Some((x2, y2)),
-                            _ => None,
+                        if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
+                            self.attrs.get("x1"),
+                            self.attrs.get("y1"),
+                            self.attrs.get("x2"),
+                            self.attrs.get("y2"),
+                        ) {
+                            let x1 = strp(x1)?;
+                            let y1 = strp(y1)?;
+                            let x2 = strp(x2)?;
+                            let y2 = strp(y2)?;
+                            match loc {
+                                "xy1" | "start" => Some((x1, y1)),
+                                "xy2" | "end" => Some((x2, y2)),
+                                _ => None,
+                            }
+                        } else {
+                            None
                         }
                     } else {
                         None
                     }
                 }
-            }
+            })
         } else {
-            None
+            Ok(None)
         }
     }
 
@@ -401,7 +448,7 @@ impl SvgElement {
         new_elem
     }
 
-    fn process_text_attr(&self) -> Option<(SvgElement, Vec<SvgElement>)> {
+    fn process_text_attr(&self) -> Result<(SvgElement, Vec<SvgElement>)> {
         // Different conversions from line count to first-line offset based on whether
         // top, center, or bottom justification.
         const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
@@ -423,14 +470,16 @@ impl SvgElement {
                 t_dy = parts.next();
             }
             if let Some(dx) = dx {
-                t_dx = strp(&dx);
+                t_dx = Some(strp(&dx)?);
             }
             if let Some(dy) = dy {
-                t_dy = strp(&dy);
+                t_dy = Some(strp(&dy)?);
             }
         }
 
-        let text_value = orig_elem.pop_attr("text")?;
+        let text_value = orig_elem
+            .pop_attr("text")
+            .expect("no text attr in process_text_attr");
         // Convert unescaped '\n' into newline characters for multi-line text
         let re = Regex::new(r"([^\\])\\n").expect("invalid regex");
         let text_value = re.replace_all(&text_value, "$1\n").into_owned();
@@ -487,7 +536,7 @@ impl SvgElement {
         // Assumption is that text should be centered within the rect,
         // and has styling via CSS to reflect this, e.g.:
         //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-        let (mut tdx, mut tdy) = orig_elem.coord(&text_loc).unwrap();
+        let (mut tdx, mut tdy) = orig_elem.coord(&text_loc)?.unwrap();
         if let Some(dx) = t_dx {
             tdx += dx;
         }
@@ -535,7 +584,7 @@ impl SvgElement {
                 text_elements.push(tspan);
             }
         }
-        Some((orig_elem, text_elements))
+        Ok((orig_elem, text_elements))
     }
 
     fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
@@ -608,7 +657,7 @@ impl SvgElement {
                     "tr" | "r" | "br" => margin_x,
                     _ => 0.,
                 };
-                if let Some(pos) = ref_el.coord(loc) {
+                if let Some(pos) = ref_el.coord(loc)? {
                     return Ok(format!(
                         "{} {}",
                         fstr(pos.0 + margin_x + dx),
@@ -814,23 +863,23 @@ mod test {
 
     #[test]
     fn test_strp() {
-        assert_eq!(strp("1"), Some(1.));
-        assert_eq!(strp("100"), Some(100.));
-        assert_eq!(strp("-100"), Some(-100.));
-        assert_eq!(strp("-0.00123"), Some(-0.00123));
-        assert_eq!(strp("1234567.8"), Some(1234567.8));
+        assert_eq!(strp("1").ok(), Some(1.));
+        assert_eq!(strp("100").ok(), Some(100.));
+        assert_eq!(strp("-100").ok(), Some(-100.));
+        assert_eq!(strp("-0.00123").ok(), Some(-0.00123));
+        assert_eq!(strp("1234567.8").ok(), Some(1234567.8));
     }
 
     #[test]
     fn test_strp_length() {
-        assert_eq!(strp_length("1"), Some(Length::Absolute(1.)));
-        assert_eq!(strp_length("123"), Some(Length::Absolute(123.)));
-        assert_eq!(strp_length("-0.0123"), Some(Length::Absolute(-0.0123)));
-        assert_eq!(strp_length("0.5%"), Some(Length::Ratio(0.005)));
-        assert_eq!(strp_length("150%"), Some(Length::Ratio(1.5)));
-        assert_eq!(strp_length("1.2.3"), None);
-        assert_eq!(strp_length("a"), None);
-        assert_eq!(strp_length("a%"), None);
+        assert_eq!(strp_length("1").ok(), Some(Length::Absolute(1.)));
+        assert_eq!(strp_length("123").ok(), Some(Length::Absolute(123.)));
+        assert_eq!(strp_length("-0.0123").ok(), Some(Length::Absolute(-0.0123)));
+        assert_eq!(strp_length("0.5%").ok(), Some(Length::Ratio(0.005)));
+        assert_eq!(strp_length("150%").ok(), Some(Length::Ratio(1.5)));
+        assert_eq!(strp_length("1.2.3").ok(), None);
+        assert_eq!(strp_length("a").ok(), None);
+        assert_eq!(strp_length("a%").ok(), None);
     }
 
     #[test]

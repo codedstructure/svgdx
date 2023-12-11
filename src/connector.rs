@@ -66,12 +66,12 @@ pub struct Connector {
     offset: Option<Length>,
 }
 
-fn closest_loc(this: &SvgElement, point: (f32, f32), conn_type: ConnectionType) -> String {
+fn closest_loc(this: &SvgElement, point: (f32, f32), conn_type: ConnectionType) -> Result<String> {
     let mut min_dist_sq = f32::MAX;
     let mut min_loc = "c";
 
     for loc in edge_locations(this, conn_type) {
-        let this_coord = this.coord(loc);
+        let this_coord = this.coord(loc)?;
         if let (Some((x1, y1)), (x2, y2)) = (this_coord, point) {
             let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
             if dist_sq < min_dist_sq {
@@ -80,21 +80,21 @@ fn closest_loc(this: &SvgElement, point: (f32, f32), conn_type: ConnectionType) 
             }
         }
     }
-    min_loc.to_string()
+    Ok(min_loc.to_string())
 }
 
 fn shortest_link(
     this: &SvgElement,
     that: &SvgElement,
     conn_type: ConnectionType,
-) -> (String, String) {
+) -> Result<(String, String)> {
     let mut min_dist_sq = f32::MAX;
     let mut this_min_loc = "c";
     let mut that_min_loc = "c";
     for this_loc in edge_locations(this, conn_type) {
         for that_loc in edge_locations(that, conn_type) {
-            let this_coord = this.coord(this_loc);
-            let that_coord = that.coord(that_loc);
+            let this_coord = this.coord(this_loc)?;
+            let that_coord = that.coord(that_loc)?;
             if let (Some((x1, y1)), Some((x2, y2))) = (this_coord, that_coord) {
                 let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
                 if dist_sq < min_dist_sq {
@@ -105,7 +105,7 @@ fn shortest_link(
             }
         }
     }
-    (this_min_loc.to_owned(), that_min_loc.to_owned())
+    Ok((this_min_loc.to_owned(), that_min_loc.to_owned()))
 }
 
 impl Connector {
@@ -177,24 +177,24 @@ impl Connector {
             (Some(start_point), None) => {
                 let end_el = end_el.unwrap();
                 if end_loc.is_empty() {
-                    end_loc = closest_loc(end_el, start_point, conn_type);
+                    end_loc = closest_loc(end_el, start_point, conn_type)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
                 (
                     Endpoint::new(start_point, start_dir),
-                    Endpoint::new(end_el.coord(&end_loc).unwrap(), end_dir),
+                    Endpoint::new(end_el.coord(&end_loc)?.unwrap(), end_dir),
                 )
             }
             (None, Some(end_point)) => {
                 let start_el = start_el.unwrap();
                 if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_point, conn_type);
+                    start_loc = closest_loc(start_el, end_point, conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 }
                 (
                     Endpoint::new(
                         start_el
-                            .coord(&start_loc)
+                            .coord(&start_loc)?
                             .context("no coord for start_loc")?,
                         start_dir,
                     ),
@@ -204,30 +204,30 @@ impl Connector {
             (None, None) => {
                 let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
                 if start_loc.is_empty() && end_loc.is_empty() {
-                    (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type);
+                    (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                     end_dir = Self::loc_to_dir(&end_loc);
                 } else if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_el.coord(&end_loc).unwrap(), conn_type);
+                    start_loc = closest_loc(start_el, end_el.coord(&end_loc)?.unwrap(), conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
                     end_loc = closest_loc(
                         end_el,
                         start_el
-                            .coord(&start_loc)
+                            .coord(&start_loc)?
                             .context("no coord for start_loc")?,
                         conn_type,
-                    );
+                    )?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
                 (
                     Endpoint::new(
                         start_el
-                            .coord(&start_loc)
+                            .coord(&start_loc)?
                             .context("no coord for start_loc")?,
                         start_dir,
                     ),
-                    Endpoint::new(end_el.coord(&end_loc).unwrap(), end_dir),
+                    Endpoint::new(end_el.coord(&end_loc)?.unwrap(), end_dir),
                 )
             }
         };
@@ -259,15 +259,15 @@ impl Connector {
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let y_top = start_el
-                            .coord("t")
+                            .coord("t")?
                             .unwrap()
                             .1
-                            .max(end_el.coord("t").unwrap().1);
+                            .max(end_el.coord("t")?.unwrap().1);
                         let y_bottom = start_el
-                            .coord("b")
+                            .coord("b")?
                             .unwrap()
                             .1
-                            .min(end_el.coord("b").unwrap().1);
+                            .min(end_el.coord("b")?.unwrap().1);
                         (y_top + y_bottom) / 2.
                     } else {
                         y1
@@ -288,15 +288,15 @@ impl Connector {
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let rightmost_left = start_el
-                            .coord("l")
+                            .coord("l")?
                             .unwrap()
                             .0
-                            .max(end_el.coord("l").unwrap().0);
+                            .max(end_el.coord("l")?.unwrap().0);
                         let leftmost_right = start_el
-                            .coord("r")
+                            .coord("r")?
                             .unwrap()
                             .0
-                            .min(end_el.coord("r").unwrap().0);
+                            .min(end_el.coord("r")?.unwrap().0);
                         (rightmost_left + leftmost_right) / 2.
                     } else {
                         x1

@@ -11,7 +11,7 @@ use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use regex::Regex;
 
 #[derive(Clone, Default, Debug)]
@@ -117,10 +117,10 @@ impl TransformerContext {
                 d_h = parts.next();
             }
             if let Some(dw) = dw {
-                d_w = strp_length(&dw);
+                d_w = Some(strp_length(&dw)?);
             }
             if let Some(dh) = dh {
-                d_h = strp_length(&dh);
+                d_h = Some(strp_length(&dh)?);
             }
             if d_w.is_some() || d_h.is_some() {
                 e = e.resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default());
@@ -130,7 +130,7 @@ impl TransformerContext {
 
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
-        if let (Some(bbox), Some(xy_loc)) = (e.bbox(), e.pop_attr("xy-loc")) {
+        if let (Some(bbox), Some(xy_loc)) = (e.bbox()?, e.pop_attr("xy-loc")) {
             let width = bbox.width().unwrap();
             let height = bbox.height().unwrap();
             let (dx, dy) = match xy_loc.as_str() {
@@ -178,10 +178,10 @@ impl TransformerContext {
                 d_y = parts.next();
             }
             if let Some(dx) = dx {
-                d_x = strp(&dx);
+                d_x = Some(strp(&dx)?);
             }
             if let Some(dy) = dy {
-                d_y = strp(&dy);
+                d_y = Some(strp(&dy)?);
             }
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
@@ -189,7 +189,8 @@ impl TransformerContext {
             }
         }
 
-        if let Some((orig_elem, text_elements)) = e.process_text_attr() {
+        if e.has_attr("text") {
+            let (orig_elem, text_elements) = e.process_text_attr()?;
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
@@ -240,7 +241,7 @@ impl TransformerContext {
                 // Assumption is that text should be centered within the rect,
                 // and has styling via CSS to reflect this, e.g.:
                 //  text.tbox { dominant-baseline: central; text-anchor: middle; }
-                let cxy = rect_elem.bbox().unwrap().center().unwrap();
+                let cxy = rect_elem.bbox()?.unwrap().center().unwrap();
                 text_attrs.push(("x".into(), fstr(cxy.0)));
                 text_attrs.push(("y".into(), fstr(cxy.1)));
                 prev_element = Some(rect_elem.clone());
@@ -427,7 +428,7 @@ impl TransformerContext {
             } else {
                 events.push(SvgEvent::Start(new_elem.clone()));
             }
-            if new_elem.bbox().is_some() {
+            if new_elem.bbox()?.is_some() {
                 // prev_element is only used for relative positioning, so
                 // only makes sense if it has a bounding box.
                 prev_element = Some(new_elem);
@@ -463,7 +464,7 @@ impl EventList<'_> {
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Ok(e) => events.push((e.clone().into_owned(), reader.buffer_position())),
-                Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Err(e) => bail!("Error at position {}: {:?}", reader.buffer_position(), e),
             };
 
             buf.clear();
@@ -602,7 +603,7 @@ impl Transformer {
                     if !(elem_path.contains(&"defs".to_string())
                         || elem_path.contains(&"symbol".to_string()))
                     {
-                        if let Some(bb) = &event_element.bbox() {
+                        if let Some(bb) = &event_element.bbox()? {
                             extent.extend(bb);
                         }
                     }

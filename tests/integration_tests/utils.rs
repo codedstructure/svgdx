@@ -1,4 +1,7 @@
 use std::io::Cursor;
+
+use anyhow::Result;
+
 use svgd::svg_transform;
 
 pub fn compare(input: &str, expected: &str) {
@@ -24,4 +27,12 @@ pub fn contains(input: &str, expected: &str) {
         expected,
         output
     );
+}
+
+pub fn transform(input: &str) -> Result<String> {
+    let mut output: Vec<u8> = vec![];
+
+    let mut input = Cursor::new(input);
+    svg_transform(&mut input, &mut output)?;
+    Ok(String::from_utf8(output).expect("not UTF8"))
 }
