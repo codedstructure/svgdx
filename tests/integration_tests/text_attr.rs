@@ -83,6 +83,18 @@ fn test_text_multiline() {
 </text>
 "#;
     compare(input, expected);
+
+    // test adjacent empty lines
+    let input = r#"
+<rect xy="0" wh="10" text-lsp="1" text="multi\n\n\nline"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="tbox">
+<tspan x="5" dy="-1.5em">multi</tspan><tspan x="5" dy="1em"></tspan><tspan x="5" dy="1em"></tspan><tspan x="5" dy="1em">line</tspan>
+</text>
+"#;
+    compare(input, expected);
 }
 
 #[test]

@@ -220,7 +220,7 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
             .expect("Matched regex must have this group");
         // Check if the match is escaped; do this here rather than within the regex
         // to avoid the need for an extra initial character which can cause matches
-        // to overlap and fail replacement. We're safe to look at the previous character
+        // to overlap and fail replacement. We're safe to look at the previous byte
         // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
         // the top bit clear, so will only match on a one-byte utf8 char.
         let start = inner.start();

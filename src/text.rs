@@ -1,7 +1,7 @@
 use crate::{attr_split_cycle, fstr, strp, SvgElement};
 
 use anyhow::Result;
-use regex::Regex;
+use regex::{Captures, Regex};
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
     // Different conversions from line count to first-line offset based on whether
@@ -35,8 +35,21 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
     // Convert unescaped '\n' into newline characters for multi-line text
-    let re = Regex::new(r"([^\\])\\n").expect("invalid regex");
-    let text_value = re.replace_all(&text_value, "$1\n").into_owned();
+    let re = Regex::new(r"\\n").expect("invalid regex");
+    let text_value = re.replace_all(&text_value, |caps: &Captures| {
+        let inner = caps.get(0).expect("Matched regex must have this group");
+        // Check if the newline is escaped; do this here rather than within the regex
+        // to avoid the need for an extra initial character which can cause matches
+        // to overlap and fail replacement. We're safe to look at the previous byte
+        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
+        // the top bit clear, so will only match on a one-byte utf8 char.
+        let start = inner.start();
+        if start > 0 && text_value.as_bytes()[start - 1] == b'\\' {
+            inner.as_str().to_string()
+        } else {
+            "\n".to_owned()
+        }
+    });
     // Following that, replace any escaped "\\n" into literal '\'+'n' characters
     let re = Regex::new(r"\\\\n").expect("invalid regex");
     let text_value = re.replace_all(&text_value, "\\n").into_owned();
