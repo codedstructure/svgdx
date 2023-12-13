@@ -1,6 +1,7 @@
 pub mod utils;
 
 mod attr_expansion;
+mod cmdline;
 mod connector;
 mod error_handling;
 mod eval_locs;
