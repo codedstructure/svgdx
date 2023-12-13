@@ -1,4 +1,5 @@
-use crate::{attr_split_cycle, fstr, strp, SvgElement};
+use crate::element::SvgElement;
+use crate::{attr_split_cycle, fstr, strp};
 
 use anyhow::Result;
 use regex::{Captures, Regex};

@@ -3,7 +3,7 @@ use crate::custom::process_custom;
 use crate::expression::eval_attr;
 use crate::text::process_text_attr;
 use crate::types::BoundingBox;
-use crate::{attr_split_cycle, fstr, strp, strp_length, SvgElement};
+use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
 
 use std::collections::HashMap;
 use std::io::{BufReader, Read, Write};
