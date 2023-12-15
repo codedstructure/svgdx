@@ -45,3 +45,25 @@ fn test_expand_cycle() {
     let expected = r#"<rect x="5.5" y="5.5" width="2" height="2"/>"#;
     compare(input, expected);
 }
+
+#[test]
+fn test_expand_circle() {
+    let input = r#"<circle cxy="5" wh="3"/>"#;
+    let expected = r#"<circle cx="5" cy="5" r="1.5"/>"#;
+    compare(input, expected);
+
+    let input = r#"<circle xy="5" wh="3"/>"#;
+    let expected = r#"<circle cx="6.5" cy="6.5" r="1.5"/>"#;
+    compare(input, expected);
+}
+
+#[test]
+fn test_expand_ellipse() {
+    let input = r#"<ellipse cxy="5" wh="3 2"/>"#;
+    let expected = r#"<ellipse cx="5" cy="5" rx="1.5" ry="1"/>"#;
+    compare(input, expected);
+
+    let input = r#"<ellipse xy="5" wh="3 2"/>"#;
+    let expected = r#"<ellipse cx="6.5" cy="6" rx="1.5" ry="1"/>"#;
+    compare(input, expected);
+}

@@ -541,36 +541,51 @@ impl SvgElement {
             // (which may be given in any order and so not available on first pass)
             // are required, e.g. updating cxy for rect-like objects, which requires
             // width & height to already be determined.
+            // Note first-pass expansion must be assumed to have occurred, e.g.
+            // there will no longer be a "wh" attribute for element types where this
+            // is expanded in the first pass.
             let mut pass_two_attrs = AttrMap::new();
             for (key, value) in new_attrs.clone() {
                 let mut parts = attr_split_cycle(&value);
                 match (key.as_str(), self.name.as_str()) {
                     ("cxy", "rect" | "tbox" | "pipeline") => {
-                        // Requires wh (/ width&height) be specified in order to evaluate
+                        // Requires width / height to be specified in order to evaluate
                         // the centre point.
                         // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                        let wh = new_attrs.get("wh").map(|z| z.to_string());
-                        let mut width = new_attrs.get("width").map(|z| strp(z).unwrap());
-                        let mut height = new_attrs.get("height").map(|z| strp(z).unwrap());
+                        let width = new_attrs.get("width").map(|z| strp(z).unwrap());
+                        let height = new_attrs.get("height").map(|z| strp(z).unwrap());
                         let cx = strp(&parts.next().expect("cycle"))
-                            .context("Could not derive x from cxy")?;
+                            .context("Could not derive cx from cxy")?;
                         let cy = strp(&parts.next().expect("cycle"))
-                            .context("Could not derive y from cxy")?;
-                        if let Some(wh_inner) = wh {
-                            let mut wh_parts = attr_split_cycle(&wh_inner);
-                            width = Some(
-                                strp(&wh_parts.next().expect("cycle"))
-                                    .context("Could not derive width during cxy processing")?,
-                            );
-                            height = Some(
-                                strp(&wh_parts.next().expect("cycle"))
-                                    .context("Could not derive height during cxy processing")?,
-                            );
-                        }
+                            .context("Could not derive cy from cxy")?;
                         if let (Some(width), Some(height)) = (width, height) {
                             pass_two_attrs.insert("x", fstr(cx - width / 2.));
                             pass_two_attrs.insert("y", fstr(cy - height / 2.));
-                            // wh / width&height will be handled separately
+                        }
+                    }
+                    ("xy", "circle") => {
+                        // Requires xy / r
+                        let r = new_attrs.get("r").map(|z| strp(z).unwrap());
+                        let x = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive x from xy")?;
+                        let y = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive y from xy")?;
+                        if let Some(r) = r {
+                            pass_two_attrs.insert("cx", fstr(x + r));
+                            pass_two_attrs.insert("cy", fstr(y + r));
+                        }
+                    }
+                    ("xy", "ellipse") => {
+                        // Requires xy / rx / ry
+                        let rx = new_attrs.get("rx").map(|z| strp(z).unwrap());
+                        let ry = new_attrs.get("ry").map(|z| strp(z).unwrap());
+                        let x = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive x from xy")?;
+                        let y = strp(&parts.next().expect("cycle"))
+                            .context("Could not derive y from xy")?;
+                        if let (Some(rx), Some(ry)) = (rx, ry) {
+                            pass_two_attrs.insert("cx", fstr(x + rx));
+                            pass_two_attrs.insert("cy", fstr(y + ry));
                         }
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
