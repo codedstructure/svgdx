@@ -115,16 +115,16 @@ impl SvgElement {
     }
 
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
+        // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
+        // "If the attribute is not specified, the effect is as if a value of "0" were specified."
+        // The same is not specified for 'size' attributes (width/height/r etc), so we require
+        // these to be set to have a bounding box.
+        let zstr = "0".to_owned();
         match self.name.as_str() {
             "rect" | "tbox" | "pipeline" => {
-                if let (Some(x), Some(y), Some(w), Some(h)) = (
-                    self.attrs.get("x"),
-                    self.attrs.get("y"),
-                    self.attrs.get("width"),
-                    self.attrs.get("height"),
-                ) {
-                    let x = strp(x)?;
-                    let y = strp(y)?;
+                if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
+                    let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
+                    let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
                     let w = strp(w)?;
                     let h = strp(h)?;
                     Ok(Some(BoundingBox::BBox(x, y, x + w, y + h)))
@@ -133,25 +133,16 @@ impl SvgElement {
                 }
             }
             "line" => {
-                if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
-                    self.attrs.get("x1"),
-                    self.attrs.get("y1"),
-                    self.attrs.get("x2"),
-                    self.attrs.get("y2"),
-                ) {
-                    let x1 = strp(x1)?;
-                    let y1 = strp(y1)?;
-                    let x2 = strp(x2)?;
-                    let y2 = strp(y2)?;
-                    Ok(Some(BoundingBox::BBox(
-                        x1.min(x2),
-                        y1.min(y2),
-                        x1.max(x2),
-                        y1.max(y2),
-                    )))
-                } else {
-                    Ok(None)
-                }
+                let x1 = strp(self.attrs.get("x1").unwrap_or(&zstr))?;
+                let y1 = strp(self.attrs.get("y1").unwrap_or(&zstr))?;
+                let x2 = strp(self.attrs.get("x2").unwrap_or(&zstr))?;
+                let y2 = strp(self.attrs.get("y2").unwrap_or(&zstr))?;
+                Ok(Some(BoundingBox::BBox(
+                    x1.min(x2),
+                    y1.min(y2),
+                    x1.max(x2),
+                    y1.max(y2),
+                )))
             }
             "polyline" | "polygon" => {
                 let mut min_x = f32::MAX;
@@ -194,13 +185,9 @@ impl SvgElement {
                 }
             }
             "circle" => {
-                if let (Some(cx), Some(cy), Some(r)) = (
-                    self.attrs.get("cx"),
-                    self.attrs.get("cy"),
-                    self.attrs.get("r"),
-                ) {
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
+                if let Some(r) = self.attrs.get("r") {
+                    let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;
+                    let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
                     let r = strp(r)?;
                     Ok(Some(BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)))
                 } else {
@@ -208,14 +195,9 @@ impl SvgElement {
                 }
             }
             "ellipse" => {
-                if let (Some(cx), Some(cy), Some(rx), Some(ry)) = (
-                    self.attrs.get("cx"),
-                    self.attrs.get("cy"),
-                    self.attrs.get("rx"),
-                    self.attrs.get("ry"),
-                ) {
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
+                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
+                    let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;
+                    let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
                     let rx = strp(rx)?;
                     let ry = strp(ry)?;
                     Ok(Some(BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)))
