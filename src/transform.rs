@@ -6,7 +6,7 @@ use crate::types::BoundingBox;
 use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
 
 use std::collections::HashMap;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufRead, Write};
 
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
@@ -259,8 +259,8 @@ struct EventList<'a> {
 }
 
 impl EventList<'_> {
-    fn from_reader(reader: &mut dyn Read) -> Result<Self> {
-        let mut reader = Reader::from_reader(BufReader::new(reader));
+    fn from_reader(reader: &mut dyn BufRead) -> Result<Self> {
+        let mut reader = Reader::from_reader(reader);
 
         let mut events = Vec::new();
         let mut buf = Vec::new();
@@ -311,7 +311,7 @@ impl Transformer {
         }
     }
 
-    pub fn transform(&mut self, reader: &mut dyn Read, writer: &mut dyn Write) -> Result<()> {
+    pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let mut output = EventList { events: vec![] };
 

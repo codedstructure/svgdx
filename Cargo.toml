@@ -13,5 +13,7 @@ notify = "6.1.1"
 notify-debouncer-mini = "0.4.1"
 clap = { version = "4.0", features = ["derive"] }
 anyhow = "1.0.75"
-assert_cmd = "2.0.12"
 shlex = "1.2.0"
+
+[dev-dependencies]
+assert_cmd = "2.0.12"

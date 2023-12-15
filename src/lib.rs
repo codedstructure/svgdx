@@ -1,10 +1,10 @@
 use std::{
-    io::{Read, Write},
+    io::{BufRead, Cursor, IsTerminal, Read, Write},
     num::ParseFloatError,
 };
 
-use anyhow::Result;
-use clap::{Args, Parser};
+use anyhow::{bail, Result};
+use clap::Parser;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{
@@ -26,7 +26,7 @@ mod element;
 mod expression;
 mod text;
 
-pub fn svg_transform(reader: &mut dyn Read, writer: &mut dyn Write) -> Result<()> {
+pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
     let mut t = Transformer::new();
     t.transform(reader, writer)
 }
@@ -135,30 +135,39 @@ fn strp_length(s: &str) -> Result<Length> {
 
 /// Transform given file to SVG
 #[derive(Parser)]
-#[command(author, version, about, long_about=None)]
+#[command(author, version, about, long_about=None)] // Read from Cargo.toml
 struct Arguments {
-    #[command(flatten)]
-    input_type: InputArgs,
+    /// file to process (defaults to stdin)
+    file: Option<String>,
+
+    /// watch file for changes; update output on change. (FILE must be given)
+    #[arg(short, long, requires = "file")]
+    watch: bool,
 
     /// target output file; omit for stdout
     #[arg(short, long)]
     output: Option<String>,
 }
 
-#[derive(Args)]
-#[group(required = true, multiple = false)]
-struct InputArgs {
-    /// input file to read
-    #[arg(short, long, group = "input-type")]
-    input: Option<String>,
-
-    /// file to watch for changes
-    #[arg(short, long, group = "input-type")]
-    watch: Option<String>,
-}
-
-fn transform(input: &str, output: Option<String>) -> Result<()> {
-    let mut in_reader = Box::new(BufReader::new(File::open(input)?));
+fn transform(input: Option<String>, output: Option<String>) -> Result<()> {
+    let mut in_reader = match input {
+        None => {
+            let mut stdin = std::io::stdin().lock();
+            if stdin.is_terminal() {
+                // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
+                // enough to signal end-of-input, even when given at the start of a line.
+                // Work around this by reading entire input, then wrapping in a Cursor to
+                // provide a buffered reader.
+                // It would be nice to improve this.
+                let mut buf = Vec::new();
+                stdin.read_to_end(&mut buf).unwrap();
+                Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
+            } else {
+                Box::new(stdin) as Box<dyn BufRead>
+            }
+        }
+        Some(x) => Box::new(BufReader::new(File::open(x)?)) as Box<dyn BufRead>,
+    };
 
     match output {
         Some(x) => {
@@ -178,35 +187,40 @@ fn transform(input: &str, output: Option<String>) -> Result<()> {
 }
 
 pub struct Config {
-    input: InputArgs,
+    input: Option<String>,
     output: Option<String>,
+    watch: bool,
 }
 
 impl Config {
-    pub fn from_args(args: &str) -> Result<Self> {
+    pub(crate) fn from_args(args: Arguments) -> Result<Self> {
+        if args.watch && args.file.is_none() {
+            // Should already be enforced by clap validation
+            bail!("Filename must be provided with -w/--watch argument");
+        }
+        Ok(Config {
+            input: args.file,
+            output: args.output,
+            watch: args.watch,
+        })
+    }
+
+    pub fn from_cmdline(args: &str) -> Result<Self> {
         let args = shlex::split(args).unwrap_or_default();
         let args = Arguments::try_parse_from(args.iter())?;
-        Ok(Config {
-            input: args.input_type,
-            output: args.output,
-        })
+        Self::from_args(args)
     }
 }
 
 pub fn get_config() -> Result<Config> {
     let args = Arguments::parse();
-    Ok(Config {
-        input: args.input_type,
-        output: args.output,
-    })
+    Config::from_args(args)
 }
 
 pub fn run(config: Config) -> Result<()> {
-    let input_type = config.input;
-
-    if let Some(input) = input_type.input {
-        transform(&input, config.output.clone())?;
-    } else if let Some(watch) = input_type.watch {
+    if !config.watch {
+        transform(config.input.clone(), config.output.clone())?;
+    } else if let Some(watch) = config.input {
         let (tx, rx) = channel();
         let mut watcher =
             new_debouncer(Duration::from_millis(250), tx).expect("Could not create watcher");
@@ -214,7 +228,7 @@ pub fn run(config: Config) -> Result<()> {
         watcher
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)?;
-        transform(&watch, config.output.clone()).unwrap_or_else(|e| {
+        transform(Some(watch.clone()), config.output.clone()).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });
         eprintln!("Watching {} for changes", watch);
@@ -225,9 +239,11 @@ pub fn run(config: Config) -> Result<()> {
                         if event.path.canonicalize().unwrap() == watch_path.canonicalize().unwrap()
                         {
                             eprintln!("{} changed", event.path.to_string_lossy());
-                            transform(&watch, config.output.clone()).unwrap_or_else(|e| {
-                                eprintln!("transform failed: {e:?}");
-                            });
+                            transform(Some(watch.clone()), config.output.clone()).unwrap_or_else(
+                                |e| {
+                                    eprintln!("transform failed: {e:?}");
+                                },
+                            );
                         }
                     }
                 }
