@@ -24,6 +24,7 @@ mod connector;
 mod custom;
 mod element;
 mod expression;
+mod svg_defs;
 mod text;
 
 pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {

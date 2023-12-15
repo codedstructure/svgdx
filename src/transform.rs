@@ -1,6 +1,7 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::custom::process_custom;
 use crate::expression::eval_attr;
+use crate::svg_defs;
 use crate::text::process_text_attr;
 use crate::types::BoundingBox;
 use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
@@ -254,8 +255,25 @@ pub enum SvgEvent {
     End(String),
 }
 
+#[derive(Debug, Clone)]
 struct EventList<'a> {
     events: Vec<(Event<'a>, usize)>,
+}
+
+impl From<Event<'_>> for EventList<'_> {
+    fn from(value: Event) -> Self {
+        Self {
+            events: vec![(value.into_owned(), 0)],
+        }
+    }
+}
+
+impl From<Vec<Event<'_>>> for EventList<'_> {
+    fn from(value: Vec<Event>) -> Self {
+        Self {
+            events: value.into_iter().map(|v| (v.into_owned(), 0)).collect(),
+        }
+    }
 }
 
 impl EventList<'_> {
@@ -279,6 +297,20 @@ impl EventList<'_> {
         Ok(Self { events })
     }
 
+    fn from_str(s: impl Into<String>) -> Result<Self> {
+        let s: String = s.into();
+        let mut reader = Reader::from_str(&s);
+        let mut events = Vec::new();
+        loop {
+            match reader.read_event() {
+                Ok(Event::Eof) => break, // exits the loop when reaching end of file
+                Ok(e) => events.push((e.clone().into_owned(), reader.buffer_position())),
+                Err(e) => bail!("Error at position {}: {:?}", reader.buffer_position(), e),
+            }
+        }
+        Ok(Self { events })
+    }
+
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
@@ -286,6 +318,33 @@ impl EventList<'_> {
             writer.write_event(event.0.clone())?
         }
         Ok(())
+    }
+
+    /// Split an EventList into (up to) 3 parts: before, pivot, after.
+    fn partition(&self, name: &str) -> (Self, Option<(Event, usize)>, Self) {
+        let mut before = vec![];
+        let mut pivot = None;
+        let mut after = vec![];
+        for (event, pos) in self.iter().cloned() {
+            if pivot.is_some() {
+                after.push((event.clone().into_owned(), pos));
+            } else {
+                match event {
+                    Event::Start(ref e) | Event::Empty(ref e) => {
+                        let elem_name: String =
+                            String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
+                        if elem_name == name {
+                            pivot = Some((event.clone(), pos));
+                        } else {
+                            before.push((event.clone().into_owned(), pos));
+                        }
+                    }
+                    _ => before.push((event.clone().into_owned(), pos)),
+                }
+            }
+        }
+
+        (Self { events: before }, pivot, Self { events: after })
     }
 
     fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
@@ -301,13 +360,18 @@ impl EventList<'_> {
 pub struct Transformer {
     context: TransformerContext,
     debug: bool,
+    add_defs: bool,
+    add_style: bool,
 }
 
 impl Transformer {
     pub fn new() -> Self {
         Self {
             context: TransformerContext::new(),
-            debug: false, // TODO: expose this
+            // TODO: expose these
+            debug: false,
+            add_defs: false,
+            add_style: false,
         }
     }
 
@@ -390,7 +454,6 @@ impl Transformer {
 
         // Calculate bounding box of diagram and use as new viewBox for the image.
         // This also allows just using `<svg>` as the root element.
-        // TODO: preserve other attributes from a given svg root.
         let mut extent = BoundingBox::new();
         let mut elem_path = Vec::new();
         for (ev, _) in output.iter() {
@@ -426,32 +489,98 @@ impl Transformer {
         extent.scale(1.05);
         extent.round();
 
-        if let BoundingBox::BBox(minx, miny, maxx, maxy) = extent {
-            let width = fstr(maxx - minx);
-            let height = fstr(maxy - miny);
-            let mut bs = BytesStart::new("svg");
-            bs.push_attribute(Attribute::from(("version", "1.1")));
-            bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
-            bs.push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
-            bs.push_attribute(Attribute::from(("height", format!("{height}mm").as_str())));
-            bs.push_attribute(Attribute::from((
-                "viewBox",
-                format!("{} {} {} {}", fstr(minx), fstr(miny), width, height).as_str(),
-            )));
-            let new_svg = Event::Start(bs);
+        let mut has_svg_element = false;
+        if let (pre_svg, Some(first_svg), remain) = output.partition("svg") {
+            has_svg_element = true;
+            pre_svg.write_to(writer)?;
 
-            for (item, _) in &mut output.events.iter_mut() {
-                if let Event::Start(x) = item {
-                    if x.name().into_inner() == b"svg" {
-                        // }.as_bytes() {
-                        *item = new_svg.clone().into_owned();
-                        break;
-                    }
+            let mut new_svg_bs = BytesStart::new("svg");
+            let mut orig_svg_attrs = vec![];
+            if let (Event::Start(orig_svg), _) = first_svg {
+                new_svg_bs = orig_svg;
+                orig_svg_attrs = new_svg_bs
+                    .attributes()
+                    .map(|v| {
+                        String::from_utf8(v.unwrap().key.into_inner().to_owned()).expect("Non-UTF8")
+                    })
+                    .collect();
+            }
+            if !orig_svg_attrs.contains(&"version".to_owned()) {
+                new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
+            }
+            if !orig_svg_attrs.contains(&"xmlns".to_owned()) {
+                new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
+            }
+            if let BoundingBox::BBox(minx, miny, maxx, maxy) = extent {
+                let width = fstr(maxx - minx);
+                let height = fstr(maxy - miny);
+                if !orig_svg_attrs.contains(&"width".to_owned()) {
+                    new_svg_bs
+                        .push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
                 }
+                if !orig_svg_attrs.contains(&"height".to_owned()) {
+                    new_svg_bs.push_attribute(Attribute::from((
+                        "height",
+                        format!("{height}mm").as_str(),
+                    )));
+                }
+                if !orig_svg_attrs.contains(&"viewBox".to_owned()) {
+                    new_svg_bs.push_attribute(Attribute::from((
+                        "viewBox",
+                        format!("{} {} {} {}", fstr(minx), fstr(miny), width, height).as_str(),
+                    )));
+                }
+            }
+
+            EventList::from(Event::Start(new_svg_bs)).write_to(writer)?;
+            output = remain;
+        }
+
+        // Default behaviour: include default styles iff we have an SVG element,
+        // i.e. this is a full SVG document rather than a fragment.
+        if has_svg_element {
+            if self.add_defs {
+                output = Self::include_defaults(
+                    "defs",
+                    &EventList::from_str(svg_defs::SVG_DEFS).expect("Bad internal SVG definition"),
+                    &output,
+                    writer,
+                )?
+                .clone();
+            }
+            if self.add_style {
+                output = Self::include_defaults(
+                    "style",
+                    &EventList::from_str(svg_defs::SVG_STYLES)
+                        .expect("Bad internal SVG definition"),
+                    &output,
+                    writer,
+                )?
+                .clone();
             }
         }
 
         output.write_to(writer)
+    }
+
+    fn include_defaults<'a>(
+        name: &str,
+        def_content: &EventList<'a>,
+        ev_list: &EventList<'a>,
+        writer: &mut dyn Write,
+    ) -> Result<EventList<'a>> {
+        let (before, style, after) = ev_list.partition(name);
+        if let Some((def_start_event, _)) = style {
+            before.write_to(writer)?;
+            def_content.write_to(writer)?;
+            EventList::from(def_start_event).write_to(writer)?;
+            Ok(after.clone())
+        } else {
+            // No existing style element, so we'll write one out immediately
+            // (having just written out the svg element).
+            def_content.write_to(writer)?;
+            Ok(before.clone())
+        }
     }
 }
 

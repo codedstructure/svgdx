@@ -1,0 +1,14 @@
+  <style>
+    <![CDATA[
+    /* Default styles for svgd */
+    rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text, text * { dominant-baseline: central; text-anchor: middle; }
+    text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
+    text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
+    text.text-left, text.text-left * { text-anchor: start; }
+    text.text-right, text.text-right * { text-anchor: end; }
+    /* Default styles finished */
+    ]]>
+  </style>
