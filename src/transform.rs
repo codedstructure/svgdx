@@ -57,7 +57,7 @@ impl TransformerContext {
                         let value = aa.unescape_value().expect("XML decode error").into_owned();
 
                         if &elem_name == "define" {
-                            let value = eval_attr(&value, &self.variables);
+                            let value = eval_attr(&value, &self.variables, &elem_map);
                             self.variables.insert(key, value);
                         } else if &key == "id" {
                             id_opt = Some(value);

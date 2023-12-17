@@ -33,6 +33,38 @@ impl BoundingBox {
         self
     }
 
+    pub fn top(&self) -> Option<f32> {
+        if let Self::BBox(_, y1, _, _) = self {
+            Some(*y1)
+        } else {
+            None
+        }
+    }
+
+    pub fn right(&self) -> Option<f32> {
+        if let Self::BBox(_, _, x2, _) = self {
+            Some(*x2)
+        } else {
+            None
+        }
+    }
+
+    pub fn bottom(&self) -> Option<f32> {
+        if let Self::BBox(_, _, _, y2) = self {
+            Some(*y2)
+        } else {
+            None
+        }
+    }
+
+    pub fn left(&self) -> Option<f32> {
+        if let Self::BBox(x1, _, _, _) = self {
+            Some(*x1)
+        } else {
+            None
+        }
+    }
+
     pub fn width(&self) -> Option<f32> {
         if let Self::BBox(x1, _, x2, _) = self {
             Some(x2 - x1)

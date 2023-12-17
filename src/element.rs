@@ -402,7 +402,7 @@ impl SvgElement {
         //   #id - reference to size of another element
         //   ^ - reference to previous element
         //   dw / dh - delta width/height (user units; may be negative)
-        //   dw% / dh% - scaled width/height (range 0..1000%)
+        //   dw% / dh% - scaled width/height
         // Note: unlike in eval_pos, the id section is mandatory to distinguish from
         //       a numeric `wh` pair.
         // Examples:
@@ -455,7 +455,7 @@ impl SvgElement {
         let mut new_attrs = AttrMap::new();
 
         for (key, value) in self.attrs.clone() {
-            let replace = eval_attr(&value, &context.variables);
+            let replace = eval_attr(&value, &context.variables, &context.elem_map);
             self.attrs.insert(&key, &replace);
         }
 

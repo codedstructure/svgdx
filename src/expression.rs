@@ -4,20 +4,34 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
-use crate::fstr;
+use crate::{element::SvgElement, fstr};
 
 #[derive(Clone, PartialEq)]
 enum Token {
+    /// A numeric literal
     Number(f32),
+    /// A variable reference, beginning with '$'
     Var(String),
+    /// Reference to an element-derived value, beginning with '#'
+    ElementRef(String),
+    /// A literal '('
     OpenParen,
+    /// A literal ')'
     CloseParen,
+    /// A literal '+' for addition
     Add,
+    /// A literal '-' for subtraction or unary minus
     Sub,
+    /// A literal '*' for multiplication
     Mul,
+    /// A literal '/' for division
     Div,
+    /// A literal '%' for mod operation
     Mod,
+    /// Tabs and spaces are whitespace
     Whitespace,
+    /// Internal-only token for collecting characters for use in
+    /// `Number`, `Var` or `ElementRef` variants.
     Other,
 }
 
@@ -41,6 +55,8 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         } else {
             bail!("Invalid variable");
         }
+    } else if input.starts_with('#') {
+        Ok(Token::ElementRef(input.to_owned()))
     } else {
         input
             .parse::<f32>()
@@ -96,14 +112,20 @@ struct EvalState {
     tokens: Vec<Token>,
     index: usize,
     var_table: HashMap<String, String>,
+    elem_map: HashMap<String, SvgElement>,
 }
 
 impl EvalState {
-    fn new(tokens: impl IntoIterator<Item = Token>, var_table: HashMap<String, String>) -> Self {
+    fn new(
+        tokens: impl IntoIterator<Item = Token>,
+        var_table: HashMap<String, String>,
+        elem_map: HashMap<String, SvgElement>,
+    ) -> Self {
         Self {
             tokens: tokens.into_iter().collect(),
             index: 0,
             var_table,
+            elem_map,
         }
     }
 
@@ -125,16 +147,48 @@ impl EvalState {
     fn lookup(&self, v: &str) -> Result<f32> {
         self.var_table
             .get(v)
-            .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table).ok())
+            .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table, &self.elem_map).ok())
             .context("Could not evaluate variable")
+    }
+
+    fn element_ref(&self, v: &str) -> Result<f32> {
+        // TODO: perhaps this should be in the SvgElement impl, so it can
+        // be re-used by other single-value attribute references, e.g.
+        // <line x1="#abc:l" .../>
+        let re = Regex::new(r"#(?<id>[^:\s]+):(?<val>[trblwh])").expect("Bad Regex");
+        if let Some(caps) = re.captures(v) {
+            let id = caps.name("id").expect("must match if here").as_str();
+            let val = caps.name("val").expect("must match if here").as_str();
+            if let Some(elem) = self.elem_map.get(id) {
+                if let Some(bb) = elem.bbox()? {
+                    (match val {
+                        "t" => bb.top(),
+                        "r" => bb.right(),
+                        "b" => bb.bottom(),
+                        "l" => bb.left(),
+                        "w" => bb.width(),
+                        "h" => bb.height(),
+                        _ => None,
+                    })
+                    .context(format!("Could not determine {} for #{}", val, id))
+                } else {
+                    bail!("No bounding box for #{}", id);
+                }
+            } else {
+                bail!("Element #{} not found", id);
+            }
+        } else {
+            bail!("Invalid element_ref: {}", v);
+        }
     }
 }
 
 fn evaluate(
     tokens: impl IntoIterator<Item = Token>,
     vars: &HashMap<String, String>,
+    elem_map: &HashMap<String, SvgElement>,
 ) -> Result<f32> {
-    let mut eval_state = EvalState::new(tokens, vars.clone());
+    let mut eval_state = EvalState::new(tokens, vars.clone(), elem_map.clone());
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
@@ -191,6 +245,7 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
     match eval_state.next() {
         Some(Token::Number(x)) => Ok(x),
         Some(Token::Var(v)) => eval_state.lookup(&v),
+        Some(Token::ElementRef(v)) => eval_state.element_ref(&v),
         Some(Token::OpenParen) => {
             let e = expr(eval_state)?;
             if eval_state.next() != Some(Token::CloseParen) {
@@ -243,7 +298,11 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
+fn eval_expr(
+    value: &str,
+    variables: &HashMap<String, String>,
+    elem_map: &HashMap<String, SvgElement>,
+) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
     re.replace_all(value, |caps: &Captures| {
@@ -252,7 +311,7 @@ fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
             .expect("Matched regex must have this group")
             .as_str();
         if let Ok(tokens) = tokenize(inner) {
-            if let Ok(parsed) = evaluate(tokens, variables) {
+            if let Ok(parsed) = evaluate(tokens, variables, elem_map) {
                 fstr(parsed)
             } else {
                 inner.to_owned()
@@ -265,10 +324,14 @@ fn eval_expr(value: &str, variables: &HashMap<String, String>) -> String {
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(value: &str, variables: &HashMap<String, String>) -> String {
+pub fn eval_attr(
+    value: &str,
+    variables: &HashMap<String, String>,
+    elem_map: &HashMap<String, SvgElement>,
+) -> String {
     // Step 1: Evaluate arithmetic expressions. All variables referenced here
     // are assumed to resolve to a numeric expression.
-    let value = eval_expr(value, variables);
+    let value = eval_expr(value, variables, elem_map);
     // Step 2: Replace other variables (e.g. for string values)
     eval_vars(&value, variables)
 }
@@ -332,7 +395,7 @@ mod tests {
             ("0.125 * $mega", Some(125000.)),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &variables).ok(),
+                evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).ok(),
                 expected
             );
         }
@@ -370,7 +433,12 @@ mod tests {
     #[test]
     fn test_bad_expressions() {
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)"] {
-            assert!(evaluate(tokenize(expr).expect("test"), &HashMap::new()).is_err());
+            assert!(evaluate(
+                tokenize(expr).expect("test"),
+                &HashMap::new(),
+                &HashMap::new()
+            )
+            .is_err());
         }
     }
 
@@ -391,7 +459,12 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &HashMap::new()).ok(),
+                evaluate(
+                    tokenize(expr).expect("test"),
+                    &HashMap::new(),
+                    &HashMap::new()
+                )
+                .ok(),
                 expected
             );
         }
@@ -410,11 +483,19 @@ mod tests {
         .collect();
 
         assert_eq!(
-            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &vars),
+            eval_attr(
+                "Made by ${me} in 20{{20 + ${one} * 3}}",
+                &vars,
+                &HashMap::new()
+            ),
             "Made by Ben in 2023"
         );
         assert_eq!(
-            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &vars),
+            eval_attr(
+                "Made by ${me} in {{5*4}}{{20 + ${one} * 3}}",
+                &vars,
+                &HashMap::new()
+            ),
             "Made by Ben in 2023"
         );
     }
