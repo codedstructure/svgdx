@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 fn main() -> Result<()> {
-    svgd::run(svgd::get_config()?)?;
+    svgdx::run(svgdx::get_config()?)?;
 
     Ok(())
 }

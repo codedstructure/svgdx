@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use anyhow::Result;
 
-use svgd::svg_transform;
+use svgdx::svg_transform;
 
 pub fn compare(input: &str, expected: &str) {
     let mut output: Vec<u8> = vec![];

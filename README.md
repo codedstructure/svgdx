@@ -1,12 +1,15 @@
-# Introduction
+# svgdx
 
-Markdown is a text based format which allows simple text files to carry both semantic and simple style information. Being able to do both of those in a single workflow - just by _typing_ - allows a flow which would otherwise not be achievable.
+**svgdx** is a 'delta' on SVG; a preprocessor and transpiler which accepts a superset of SVG and outputs SVG.
 
-Can the same be done for _drawing_ - specifically for **diagrams**? That's what this project aims to deliver.
+It is intended to support 'typing a diagram' workflows, at a lower (and more flexible) level than structured tools such as [Mermaid](https://mermaid.js.org) or [Graphviz](https://graphviz.org).
+An important principle is that raw SVG can be included directly at any point in the input. This is analogous to Markdown, which provides the 'escape hatch' of using inline HTML tags. Markdown has been incredibly successful as a text based format allowing simple text files to carry both semantic and simple style information. Being able to do both of those in a single workflow - just by _typing_ - allows a flow which would otherwise not be achievable.
 
-Text files provide a number of advantages:
+Can the same be done for _drawing_ - specifically for **diagrams**? That's what **svgdx** aims to deliver.
+
+Text files provide a number of advantages over other formats:
 * Clear compatibility with version control - meaningful diffs
-* Self-describing - text files are easy to (at least approximately) reverse engineer even in the absence of a clear spec.
+* Self-describing - text files are easy to (at least approximately) reverse engineer even in the absence of a clear spec or other tools
 * Application independence - additional tools can be written to deal with the format
 * Easy editing - at least for simple changes
 
@@ -22,7 +25,7 @@ In most of these, the tools are specialised for various particular forms of data
 
 When abstraction fails, moving to a lower layer is often the answer. Rather than starting with the input information, can we work backwards from the end result we want?
 
-Enter **[SVG](https://en.wikipedia.org/wiki/SVG)** - an XML-based language for defining vector images. The tools discussed above (with the exception of `ditaa`) can all output SVG images, and SVG is the lowest-common-denominator of graphics formats for diagramming tools.
+**[SVG](https://en.wikipedia.org/wiki/SVG)** is an XML-based language for defining vector images. The tools discussed above (with the exception of `ditaa`) can all output SVG images, and SVG is a (perhaps _the_)  lowest-common-denominator of graphics formats for diagramming tools.
 
 SVG is a fairly simple language, and a small subset can be used to create a large number of diagrams:
 
@@ -30,7 +33,7 @@ SVG is a fairly simple language, and a small subset can be used to create a larg
 * Lines
 * Text
 
-Out of these, text is the most tricky, but it's still straightforward to make simple diagrams.
+Out of these, text and positioning are frustrating in SVG, but it's still straightforward to make simple diagrams.
 
 ```xml
 <svg>
@@ -56,33 +59,23 @@ renders as:
 
 Not too tricky, but there are a lot of fiddly coordinate values, and I've omitted some boilerplate for styling and XML processing instructions. See the underlying file [here](simple.svg).
 
-What if we could render the same thing something more like the following?
+What if we could render the same thing from something more like the following?
 
 ```xml
 <svg>
-  <def id="smallrect" width="20" height="10" y="2" />
+  <rect id="in" xy="10 2" wh="20 10" text="input" />
+  <rect id="proc" xy="^h 20" wh="^" text="process" />
+  <rect id="out" xy="^h 20" wh="^" text="output" />
 
-  <tbox id="inp" x="10" from="#smallrect">input</tbox>
-  <line start="#inp%r" end="#proc%l" />
-  <tbox id="proc" x="40" from="#smallrect">process</tbox>
-  <line start="#proc%r" end="#out%l" />
-  <tbox id="out" x="70" from="#smallrect">output</tbox>
+  <line start="#in" end="#proc" />
+  <line start="#proc" end="#out" />
 </svg>
 ```
 
-This potential example shows a few possible features for an SVG pre-processor:
+This example shows just a few of the enhancements `svgdx` provides:
 
-* the use of attribute injection from a particular source id
-* the consistent use of #{id} to reference an element with a given `id` attribute (which, per XML, should be unique in the document)
-* a consistent 'mini-language' for referencing particular aspects of other elements; e.g. `#{id}%{direction}`, where `direction` is one of `t` (top), `b` (bottom), `l` (left), `r` (right), `c` (centre), or combinations of `t` / `b` followed by `l` or `r` (e.g. `bl` - bottom-left)
-* redefining attributes of existing SVG elements - e.g. providing `start` and `end` attributes for the `<line>` element.
-* defining new elements, such as `<tbox>` which will transform into multiple SVG elements
-* supports all existing SVG elements and attributes, and will leave these untransformed
+* shortcut attributes, e.g. the use of `wh` rather than having to specify `width` and `height` separately.
+* relative positioning, either by reference to an id (e.g. `#in`), or to the previous element using the caret (`^`) symbol
+* new attributes providing additional functionality - `text` within shapes, or `start` and `end` points on `<line>` elements to define connectors.
 
-A further enhancement may be moving beyond XML to a simple text format:
-
-```
-tbox "input"
-tbox "process"
-tbox "output"
-```
+Many more features are provided by **svgdx**, with the goal of making a diagram something you can write, rather than draw.
