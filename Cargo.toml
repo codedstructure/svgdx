@@ -1,9 +1,12 @@
 [package]
 name = "svgdx"
 version = "0.1.0"
+description = "create SVG diagrams simply"
+authors = ["Ben Bass <benbass@codedstructure.net>"]
+repository = "https://github.com/codedstructure/svgdx"
+keywords = ["svg", "diagrams"]
+license = "MIT"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 quick-xml = "0.30.0"
