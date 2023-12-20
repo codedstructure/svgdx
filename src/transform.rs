@@ -283,12 +283,16 @@ impl EventList<'_> {
         let mut events = Vec::new();
         let mut buf = Vec::new();
 
+        let mut line_count = 1;
         loop {
             let ev = reader.read_event_into(&mut buf);
+            if let Ok(ok_ev) = ev.clone() {
+                line_count += &ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count();
+            }
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(e) => events.push((e.clone().into_owned(), reader.buffer_position())),
-                Err(e) => bail!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Ok(e) => events.push((e.clone().into_owned(), line_count)),
+                Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
 
             buf.clear();
@@ -301,11 +305,18 @@ impl EventList<'_> {
         let s: String = s.into();
         let mut reader = Reader::from_str(&s);
         let mut events = Vec::new();
+
+        // TODO: remove duplication between this and `from_reader`
+        let mut line_count = 1;
         loop {
-            match reader.read_event() {
+            let ev = reader.read_event();
+            if let Ok(ok_ev) = ev.clone() {
+                line_count += &ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count();
+            }
+            match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(e) => events.push((e.clone().into_owned(), reader.buffer_position())),
-                Err(e) => bail!("Error at position {}: {:?}", reader.buffer_position(), e),
+                Ok(e) => events.push((e.clone().into_owned(), line_count)),
+                Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
         }
         Ok(Self { events })
@@ -390,8 +401,8 @@ impl Transformer {
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
                     let mut repeat = 1;
-                    let mut event_element =
-                        SvgElement::try_from(e).context(format!("Error {pos}"))?;
+                    let mut event_element = SvgElement::try_from(e)
+                        .context(format!("could not extract element at line {pos}"))?;
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
@@ -413,12 +424,8 @@ impl Transformer {
                         ))));
                     }
                     for rep_idx in 0..repeat {
-                        transform_element(
-                            &event_element,
-                            &mut self.context,
-                            &mut output,
-                            is_empty,
-                        )?;
+                        transform_element(&event_element, &mut self.context, &mut output, is_empty)
+                            .context(format!("processing element on line {pos}"))?;
 
                         if rep_idx < (repeat - 1) {
                             output.push(&Event::Text(BytesText::new(&format!(
