@@ -313,21 +313,26 @@ impl SvgElement {
         new_elem
     }
 
-    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
+    fn eval_pos(&mut self, input: &str, context: &TransformerContext) -> Result<String> {
         // Relative positioning:
         //   ID LOC DX DY
-        // (relv|relh|[#id])[@loc] [dx] [dy]
+        // [#id][@loc] [dx] [dy]
+        //   or
+        // ^(h|v|H|V) [gap]
+
         // Defaults:
         //   #id = previous element
-        //   @loc = tr; equivalent to @tr for relh, @bl for relv)
+        //   @loc = tr
         //   dx, dy - offset from the @loc
         // Examples:
-        //   xy="relv"       - position immediately below previous element
-        //   xy="relh"       - position immediately to right of previous element
+        //   xy="^h 10"      - position to right of previous element with gap of 10
+        //   xy="^H"         - position immediately to left of previous element
+        //   xy="^v"         - position immediately below previous element
+        //   xy="^V 5"       - position immediately previous element
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re = Regex::new(r"^(relv|relh|(?<id>#[^@]+)?(?<loc>@\S+)?)").expect("Bad Regex");
+        let rel_re = Regex::new(r"^(\^[hvHV]|(?<id>#[^@]+)?(?<loc>@\S+)?)").expect("Bad Regex");
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
@@ -336,18 +341,53 @@ impl SvgElement {
                 // the regex we check that we did actually match some text here...
                 return Ok(input.to_owned());
             }
-            // TODO: relv should be equivalent to xy="@b" xy-loc="@t" and similar
-            // for relh being xy="@r" xy-loc="@l". Otherwise relh would also be
-            // affected by margin-y.
+
+            // For ^h etc, we only consider the first number as a 'gap' value.
+            // For other relative specs these are dx/dy.
+            let d1 = strp(&parts.next().unwrap_or("0".to_owned()));
+            let d2 = strp(&parts.next().unwrap_or("0".to_owned()));
+            let mut dx = 0.;
+            let mut dy = 0.;
+
             let default_rel = match ref_loc.as_str() {
-                "relv" => "bl",
-                "relh" => "tr",
-                _ => "tr",
+                "^h" => {
+                    dx = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                    "r"
+                }
+                "^H" => {
+                    dx = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                    "l"
+                }
+                "^v" => {
+                    dy = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                    "b"
+                }
+                "^V" => {
+                    dy = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                    "t"
+                }
+                _ => {
+                    dx = d1.context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
+                    dy = d2.context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
+                    "tr"
+                }
             };
-            let dx = strp(&parts.next().unwrap_or("0".to_owned()))
-                .context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
-            let dy = strp(&parts.next().unwrap_or("0".to_owned()))
-                .context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
+
+            // This is similar to the more generic `xy-loc` processing.
+            // assumes the bounding-box is well-defined by this point.
+            if let Some(bbox) = self.bbox()? {
+                let width = bbox.width().unwrap();
+                let height = bbox.height().unwrap();
+                let (xy_dx, xy_dy) = match default_rel {
+                    "b" => (width / 2., 0.),
+                    "l" => (width, height / 2.),
+                    "t" => (width / 2., height),
+                    "r" => (0., height / 2.),
+                    _ => (0., 0.),
+                };
+                dx -= xy_dx;
+                dy -= xy_dy;
+            }
 
             let mut ref_el = context.prev_element.as_ref();
             let opt_id = caps
@@ -459,15 +499,10 @@ impl SvgElement {
             self.attrs.insert(&key, &replace);
         }
 
-        // Every attribute is either replaced by one or more other attributes,
-        // or copied as-is into `new_attrs`.
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             if !simple {
                 match key.as_str() {
-                    "xy" | "cxy" | "xy1" | "xy2" => {
-                        value = self.eval_pos(value.as_str(), context)?;
-                    }
                     "wh" => {
                         // TODO: support rxy for ellipses, with scaling factor
                         value = self.eval_size(value.as_str(), context)?;
@@ -475,15 +510,8 @@ impl SvgElement {
                     _ => (),
                 }
             }
-
-            // The first pass is straightforward 'expansion', where the current
-            // attribute totally determines the resulting value(s).
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
-                ("xy", "text" | "rect" | "pipeline") => {
-                    new_attrs.insert("x", parts.next().expect("cycle"));
-                    new_attrs.insert("y", parts.next().expect("cycle"));
-                }
                 ("wh", "rect" | "tbox" | "pipeline") => {
                     new_attrs.insert("width", parts.next().expect("cycle"));
                     new_attrs.insert("height", parts.next().expect("cycle"));
@@ -497,6 +525,34 @@ impl SvgElement {
                     let dia_y: f32 = strp(&parts.next().expect("cycle")).unwrap();
                     new_attrs.insert("rx", fstr(dia_x / 2.));
                     new_attrs.insert("ry", fstr(dia_y / 2.));
+                }
+                _ => new_attrs.insert(key.clone(), value.clone()),
+            }
+        }
+        self.attrs = new_attrs;
+
+        // Every attribute is either replaced by one or more other attributes,
+        // or copied as-is into `new_attrs`.
+        let mut new_attrs = AttrMap::new();
+        for (key, value) in self.attrs.clone() {
+            let mut value = value.clone();
+            if !simple {
+                match key.as_str() {
+                    "xy" | "cxy" | "xy1" | "xy2" => {
+                        // TODO: maybe split up? pos may depende on size, but size doesn't depend on pos
+                        value = self.eval_pos(value.as_str(), context)?;
+                    }
+                    _ => (),
+                }
+            }
+
+            // The first pass is straightforward 'expansion', where the current
+            // attribute totally determines the resulting value(s).
+            let mut parts = attr_split_cycle(&value);
+            match (key.as_str(), self.name.as_str()) {
+                ("xy", "text" | "rect" | "pipeline") => {
+                    new_attrs.insert("x", parts.next().expect("cycle"));
+                    new_attrs.insert("y", parts.next().expect("cycle"));
                 }
                 ("cxy", "circle" | "ellipse") => {
                     new_attrs.insert("cx", parts.next().expect("cycle"));
