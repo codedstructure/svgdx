@@ -1,14 +1,14 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="104.5mm" height="171.6mm" viewBox="-12.75 -7.8 104.5 171.6">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="91mm" height="154mm" viewBox="-6 1 91 154">
 
     <defs>
         <filter id="softshadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
-            <feOffset dx="1" dy="1"/>
+            <feOffset/>
             <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
         </filter>
         <filter id="hardshadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
-            <feOffset dx="1" dy="1"/>
+            <feOffset/>
             <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
         </filter>
     </defs>
@@ -55,12 +55,12 @@
     <rect x="2" y="136" width="36" height="10"/>
     <text x="20" y="141" class="tbox">Check hypothesis</text>
 
-    <path d="M 48.75 20 a 3.75,7.5 0 0,0 0,15 a 3.75,7.5 0 0,0 0,-15 h 22.5 a 3.75,7.5 0 0,1 0,15 h -22.5" class="pipeline"/>
+    <path d="M 48.75 20 a 3.75,7.5 0 0,0 0,15 a 3.75,7.5 0 0,0 0,-15 h 22.5 a 3.75,7.5 0 0,1 0,15 h -22.5" class=" pipeline"/>
     <rect x="43" y="18" width="34" height="19" style="fill:none"/>
 
-    <path d="M 45 62.5 a 5,2.5 0 0,0 10,0 a 5,2.5 0 0,0 -10,0 v 60 a 5,2.5 0 0,0 10,0 v -60" class="pipeline"/>
-    <path d="M 57 62 a 4,2 0 0,0 8,0 a 4,2 0 0,0 -8,0 v 61 a 4,2 0 0,0 8,0 v -61" class="pipeline"/>
-    <path d="M 67 61.25 a 2.5,1.25 0 0,0 5,0 a 2.5,1.25 0 0,0 -5,0 v 62.5 a 2.5,1.25 0 0,0 5,0 v -62.5" class="pipeline"/>
-    <path d="M 74 60.75 a 1.5,0.75 0 0,0 3,0 a 1.5,0.75 0 0,0 -3,0 v 63.5 a 1.5,0.75 0 0,0 3,0 v -63.5" class="pipeline"/>
+    <path d="M 45 62.5 a 5,2.5 0 0,0 10,0 a 5,2.5 0 0,0 -10,0 v 60 a 5,2.5 0 0,0 10,0 v -60" class=" pipeline"/>
+    <path d="M 57 62 a 4,2 0 0,0 8,0 a 4,2 0 0,0 -8,0 v 61 a 4,2 0 0,0 8,0 v -61" class=" pipeline"/>
+    <path d="M 67 61.25 a 2.5,1.25 0 0,0 5,0 a 2.5,1.25 0 0,0 -5,0 v 62.5 a 2.5,1.25 0 0,0 5,0 v -62.5" class=" pipeline"/>
+    <path d="M 74 60.75 a 1.5,0.75 0 0,0 3,0 a 1.5,0.75 0 0,0 -3,0 v 63.5 a 1.5,0.75 0 0,0 3,0 v -63.5" class=" pipeline"/>
 
 </svg>

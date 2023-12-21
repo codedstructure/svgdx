@@ -21,7 +21,7 @@
         <rect width="500" height="500" style="fill: url(#grid-10)"/>
       </pattern>
       <symbol id="zero-marker" x="-1" y="-1" width="2" height="2" viewBox="-1 -1 2 2">
-        <circle xy="0" r="1"/>
+        <circle cx="0" cy="0" r="1"/>
         <line x1="-1" y1="0" x2="1" y2="0"/>
         <line x1="0" y1="-1" x2="0" y2="1"/>
       </symbol>

@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="55mm" height="55mm" viewBox="-17.5 -12.5 55 55">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="42mm" height="42mm" viewBox="-11 -6 42 42">
   <style>
     <![CDATA[
         rect, line {
@@ -20,18 +20,14 @@
   <rect x="0" y="0" width="20" height="30"/>
 
   <tbox x="-5" y="2.5" width="10" height="5"/>
-  <text x="0" y="5" class="tbox">a</text><rect x="-5" y="2.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="5" class="tbox">a</text>
+  <text x="0" y="5" class="tbox">a</text><rect x="-5" y="2.5" width="10" height="5" class="tbox"/><text x="0" y="5" class="tbox">a</text>
 
   <tbox x="-5" y="12.5" width="10" height="5"/>
-  <text x="0" y="15" class="tbox">b</text><rect x="-5" y="12.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="15" class="tbox">b</text>
+  <text x="0" y="15" class="tbox">b</text><rect x="-5" y="12.5" width="10" height="5" class="tbox"/><text x="0" y="15" class="tbox">b</text>
 
   <tbox x="-5" y="22.5" width="10" height="5"/>
-  <text x="0" y="25" class="tbox">c</text><rect x="-5" y="22.5" width="10" height="5" class="tbox"/>
-  <text x="0" y="25" class="tbox">c</text>
+  <text x="0" y="25" class="tbox">c</text><rect x="-5" y="22.5" width="10" height="5" class="tbox"/><text x="0" y="25" class="tbox">c</text>
 
   <!-- text can be given as a 'text' attribute or as element text -->
-  <rect x="15" y="12.5" width="10" height="5" class="tbox"/>
-  <text x="20" y="15" class="tbox">out</text>
+  <rect x="15" y="12.5" width="10" height="5" class="tbox"/><text x="20" y="15" class="tbox">out</text>
 </svg>

@@ -499,16 +499,15 @@ impl SvgElement {
             self.attrs.insert(&key, &replace);
         }
 
+        // In the following steps, every attribute is either replaced by one
+        // or more other attributes, or copied as-is into `new_attrs`.
+
+        // Step 1: Evaluate size from wh attributes
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
-            if !simple {
-                match key.as_str() {
-                    "wh" => {
-                        // TODO: support rxy for ellipses, with scaling factor
-                        value = self.eval_size(value.as_str(), context)?;
-                    }
-                    _ => (),
-                }
+            if !simple && key.as_str() == "wh" {
+                // TODO: support rxy for ellipses, with scaling factor
+                value = self.eval_size(value.as_str(), context)?;
             }
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
@@ -529,11 +528,11 @@ impl SvgElement {
                 _ => new_attrs.insert(key.clone(), value.clone()),
             }
         }
-        self.attrs = new_attrs;
 
-        // Every attribute is either replaced by one or more other attributes,
-        // or copied as-is into `new_attrs`.
+        self.attrs = new_attrs;
         let mut new_attrs = AttrMap::new();
+
+        // Step 2: Evaluate position
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             if !simple {
