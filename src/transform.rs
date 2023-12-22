@@ -56,10 +56,7 @@ impl TransformerContext {
                             String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
                         let value = aa.unescape_value().expect("XML decode error").into_owned();
 
-                        if &elem_name == "define" {
-                            let value = eval_attr(&value, &self.variables, &elem_map);
-                            self.variables.insert(key, value);
-                        } else if &key == "id" {
+                        if &key == "id" {
                             id_opt = Some(value);
                         } else {
                             attr_list.push((key, value.clone()));
@@ -90,6 +87,10 @@ impl TransformerContext {
         }
     }
 
+    /// Process a given `SvgElement` into a list of `SvgEvent`s
+    ///
+    /// Called once per element, and may have side-effects such
+    /// as updating variable values.
     fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Result<Vec<SvgEvent>> {
         let mut prev_element = self.prev_element.clone();
 
@@ -97,6 +98,14 @@ impl TransformerContext {
         let mut events = vec![];
 
         let mut e = e.clone();
+
+        if &e.name == "define" {
+            for (key, value) in e.attrs.clone() {
+                let value = eval_attr(&value, &self.variables, &self.elem_map);
+                self.variables.insert(key, value);
+            }
+            return Ok(vec![]);
+        }
 
         e.expand_attributes(false, self)?;
 
@@ -260,6 +269,20 @@ struct EventList<'a> {
     events: Vec<(Event<'a>, usize)>,
 }
 
+impl<'a> EventList<'a> {
+    fn new() -> Self {
+        Self { events: vec![] }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.events.len()
+    }
+}
+
 impl From<Event<'_>> for EventList<'_> {
     fn from(value: Event) -> Self {
         Self {
@@ -392,7 +415,9 @@ impl Transformer {
 
         self.context.populate(&input)?;
 
+        let mut changed_output = false;
         for (ev, pos) in input.iter() {
+            let old_len = output.len();
             match ev {
                 Event::Eof => {
                     // should never happen, as handled in EventList::from_reader()
@@ -424,10 +449,13 @@ impl Transformer {
                         ))));
                     }
                     for rep_idx in 0..repeat {
-                        transform_element(&event_element, &mut self.context, &mut output, is_empty)
+                        let events = transform_element(&event_element, &mut self.context, is_empty)
                             .context(format!("processing element on line {pos}"))?;
+                        for ev in events.iter() {
+                            output.push(&ev.0);
+                        }
 
-                        if rep_idx < (repeat - 1) {
+                        if !events.is_empty() && rep_idx < (repeat - 1) {
                             output.push(&Event::Text(BytesText::new(&format!(
                                 "\n{}",
                                 self.context.last_indent
@@ -443,6 +471,12 @@ impl Transformer {
                     output.push(&Event::End(BytesEnd::new(ee_name)));
                 }
                 Event::Text(e) => {
+                    if !changed_output {
+                        // if a previous input event didn't generate any
+                        // output events, ignore any text following that
+                        // input event.
+                        continue
+                    }
                     // Extract any trailing whitespace following newlines as the current indentation level
                     let re = Regex::new(r"(?ms)\n.*^(\s+)*").expect("Bad Regex");
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
@@ -457,6 +491,7 @@ impl Transformer {
                     output.push(ev);
                 }
             }
+            changed_output = output.len() != old_len;
         }
 
         // Calculate bounding box of diagram and use as new viewBox for the image.
@@ -611,12 +646,14 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
     }
 }
 
-fn transform_element(
-    element: &SvgElement,
-    context: &mut TransformerContext,
-    output: &mut EventList,
+/// Determine the sequence of (XML-level) events to emit in response
+/// to a given `SvgElement`
+fn transform_element<'a>(
+    element: &'a SvgElement,
+    context: &'a mut TransformerContext,
     is_empty: bool,
-) -> Result<()> {
+) -> Result<EventList<'a>> {
+    let mut output = EventList::new();
     let ee = context.handle_element(element, is_empty)?;
     for svg_ev in ee {
         // re-calculate is_empty for each generated event
@@ -656,5 +693,5 @@ fn transform_element(
             }
         }
     }
-    Ok(())
+    Ok(output)
 }
