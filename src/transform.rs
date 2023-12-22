@@ -326,7 +326,7 @@ impl EventList<'_> {
         let mut writer = Writer::new(writer);
 
         for event in &self.events {
-            writer.write_event(event.0.clone())?
+            writer.write_event(event.0.clone())?;
         }
         Ok(())
     }

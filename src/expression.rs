@@ -170,7 +170,7 @@ impl EvalState {
                         "h" => bb.height(),
                         _ => None,
                     })
-                    .context(format!("Could not determine {} for #{}", val, id))
+                    .context(format!("Could not determine {val} for #{id}"))
                 } else {
                     bail!("No bounding box for #{}", id);
                 }
@@ -410,7 +410,7 @@ mod tests {
             "$abc}", // Not obvious, but '}' here is just another character.
             "${abcthing}",
         ] {
-            assert!(tokenize(expr).is_ok(), "Should succeed: {}", expr);
+            assert!(tokenize(expr).is_ok(), "Should succeed: {expr}");
         }
     }
 
@@ -426,7 +426,7 @@ mod tests {
             "${abc-thing}",
             "234#",
         ] {
-            assert!(tokenize(expr).is_err(), "Should have failed: {}", expr);
+            assert!(tokenize(expr).is_err(), "Should have failed: {expr}");
         }
     }
 

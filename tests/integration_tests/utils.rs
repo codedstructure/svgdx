@@ -23,9 +23,7 @@ pub fn contains(input: &str, expected: &str) {
 
     assert!(
         output.contains(expected),
-        "\n {}\nnot found in\n {}",
-        expected,
-        output
+        "\n {expected}\nnot found in\n {output}"
     );
 }
 

@@ -425,7 +425,7 @@ mod test {
         let target_state = vec!["abc".to_string(), "xyz".to_string(), "pqr".to_string()];
 
         assert_eq!(cl.to_vec(), target_state.clone());
-        assert_eq!(format!("{}", cl), r#"ClassList["abc", "xyz", "pqr"]"#);
+        assert_eq!(format!("{cl}"), r#"ClassList["abc", "xyz", "pqr"]"#);
 
         let cl: ClassList = target_state.clone().into_iter().collect();
         assert_eq!(cl.to_vec(), target_state);

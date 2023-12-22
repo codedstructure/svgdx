@@ -34,8 +34,8 @@ pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result
 
 /// Return a 'minimal' representation of the given number
 fn fstr(x: f32) -> String {
-    if x == (x as u32) as f32 {
-        return (x as u32).to_string();
+    if x == (x as i32) as f32 {
+        return (x as i32).to_string();
     }
     let result = format!("{x:.3}");
     if result.contains('.') {
@@ -232,7 +232,7 @@ pub fn run(config: Config) -> Result<()> {
         transform(Some(watch.clone()), config.output.clone()).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });
-        eprintln!("Watching {} for changes", watch);
+        eprintln!("Watching {watch} for changes");
         loop {
             match rx.recv() {
                 Ok(Ok(events)) => {
@@ -248,8 +248,8 @@ pub fn run(config: Config) -> Result<()> {
                         }
                     }
                 }
-                Ok(Err(e)) => eprintln!("Watch error {:?}", e),
-                Err(e) => eprintln!("Channel error: {:?}", e),
+                Ok(Err(e)) => eprintln!("Watch error {e:?}"),
+                Err(e) => eprintln!("Channel error: {e:?}"),
             }
         }
     }
