@@ -130,15 +130,11 @@ fn test_connector_u_rr() {
 
 #[test]
 fn test_connector_offset() {
-    let input = format!(
-        r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="2" />"##
-    );
+    let input = format!(r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="2" />"##);
     let expected_line = r#"<polyline points="2.5 5, 2.5 7, 22.5 7, 22.5 20"/>"#;
     contains(&input, expected_line);
 
-    let input = format!(
-        r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="75%" />"##
-    );
+    let input = format!(r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="75%" />"##);
     let expected_line = r#"<polyline points="2.5 5, 2.5 16.25, 22.5 16.25, 22.5 20"/>"#;
     contains(&input, expected_line);
 }

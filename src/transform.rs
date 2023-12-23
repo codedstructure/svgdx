@@ -99,11 +99,16 @@ impl TransformerContext {
 
         let mut e = e.clone();
 
-        if &e.name == "define" {
+        if &e.name == "var" {
+            // variables are updated 'in parallel' rather than one-by-one,
+            // allowing e.g. swap in a single `<var>` element:
+            // `<var a="$b" b="$a" />`
+            let mut new_vars = HashMap::new();
             for (key, value) in e.attrs.clone() {
                 let value = eval_attr(&value, &self.variables, &self.elem_map);
-                self.variables.insert(key, value);
+                new_vars.insert(key, value);
             }
+            self.variables.extend(new_vars);
             return Ok(vec![]);
         }
 
@@ -475,7 +480,7 @@ impl Transformer {
                         // if a previous input event didn't generate any
                         // output events, ignore any text following that
                         // input event.
-                        continue
+                        continue;
                     }
                     // Extract any trailing whitespace following newlines as the current indentation level
                     let re = Regex::new(r"(?ms)\n.*^(\s+)*").expect("Bad Regex");
