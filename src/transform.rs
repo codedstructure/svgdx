@@ -105,11 +105,29 @@ impl TransformerContext {
             // `<var a="$b" b="$a" />`
             let mut new_vars = HashMap::new();
             for (key, value) in e.attrs.clone() {
-                let value = eval_attr(&value, &self.variables, &self.elem_map);
-                new_vars.insert(key, value);
+                // Note comments in `var` elements are permitted (and encouraged!)
+                // in the input, but not propagated to the output.
+                if key != "_" && key != "__" {
+                    let value = eval_attr(&value, &self.variables, &self.elem_map);
+                    new_vars.insert(key, value);
+                }
             }
             self.variables.extend(new_vars);
             return Ok(vec![]);
+        }
+
+        // Standard comment: expressions & variables are evaluated.
+        if let Some(comment) = e.pop_attr("_") {
+            // Expressions in comments are evaluated
+            let value = eval_attr(&comment, &self.variables, &self.elem_map);
+            events.push(SvgEvent::Comment(value));
+            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+        }
+
+        // 'Raw' comment: no evaluation of expressions occurs here
+        if let Some(comment) = e.pop_attr("__") {
+            events.push(SvgEvent::Comment(comment));
+            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
         }
 
         e.expand_attributes(false, self)?;
@@ -263,6 +281,7 @@ impl TransformerContext {
 
 #[derive(Debug)]
 pub enum SvgEvent {
+    Comment(String),
     Text(String),
     Start(SvgElement),
     Empty(SvgElement),
@@ -689,6 +708,9 @@ fn transform_element<'a>(
                 } else {
                     output.push(&Event::Start(bs));
                 }
+            }
+            SvgEvent::Comment(t) => {
+                output.push(&Event::Comment(BytesText::new(&t)));
             }
             SvgEvent::Text(t) => {
                 output.push(&Event::Text(BytesText::new(&t)));
