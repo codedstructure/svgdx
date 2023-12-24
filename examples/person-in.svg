@@ -24,9 +24,15 @@
         .Charlotte {
             stroke:pink;
         }
+        .Rich {
+            stroke:red;
+        }
     ]]>
   </style>
     <person id="me" x="0" y="0" height="50" class="Charlotte"/>
     <person id="Ben" x="100" y="50" height="50" class="Ben" />
+    <person id="Rich" x="175" y="25" height="50" class="Rich" />
     <line start="#me@c" end="#Ben@c" marker-start="url(#arrow)" />
+    <line start="#Rich@c" end="#me@c" marker-start="url(#arrow)" />
+    <line start="#Ben@c" end="#Rich@c" marker-start="url(#arrow)" />
 </svg>

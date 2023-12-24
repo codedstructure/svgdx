@@ -10,7 +10,7 @@
             font-family: "Ubuntu Mono", monospace;
             font-size: 4px;
         }
-        text.tbox {
+        text.d-tbox {
             dominant-baseline: central;
             text-anchor: middle;
         }

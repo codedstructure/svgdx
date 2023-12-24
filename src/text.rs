@@ -56,7 +56,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_value = re.replace_all(&text_value, "\\n").into_owned();
 
     let mut text_attrs = vec![];
-    let mut text_classes = vec!["tbox"];
+    let mut text_classes = vec!["d-tbox"];
     let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
@@ -69,23 +69,39 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // where with other shapes it's pulled 'inside'. The classes
     // and dx/dy values are opposite.
     if ["t", "tl", "tr"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line { "text-bottom" } else { "text-top" });
+        text_classes.push(if is_line {
+            "d-text-bottom"
+        } else {
+            "d-text-top"
+        });
         if t_dy.is_none() {
             t_dy = Some(if is_line { -text_inset } else { text_inset });
         }
     } else if ["b", "bl", "br"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line { "text-top" } else { "text-bottom" });
+        text_classes.push(if is_line {
+            "d-text-top"
+        } else {
+            "d-text-bottom"
+        });
         if t_dy.is_none() {
             t_dy = Some(if is_line { text_inset } else { -text_inset });
         }
     }
     if ["l", "tl", "bl"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line { "text-right" } else { "text-left" });
+        text_classes.push(if is_line {
+            "d-text-right"
+        } else {
+            "d-text-left"
+        });
         if t_dx.is_none() {
             t_dx = Some(if is_line { -text_inset } else { text_inset });
         }
     } else if ["r", "br", "tr"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line { "text-left" } else { "text-right" });
+        text_classes.push(if is_line {
+            "d-text-left"
+        } else {
+            "d-text-right"
+        });
         if t_dx.is_none() {
             t_dx = Some(if is_line { text_inset } else { -text_inset });
         }
@@ -103,7 +119,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
-    //  text.tbox { dominant-baseline: central; text-anchor: middle; }
+    //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = orig_elem.coord(&text_loc)?.unwrap();
     if let Some(dx) = t_dx {
         tdx += dx;
@@ -129,7 +145,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         text_elem.add_attr("style", &style);
     }
     text_elem.classes = orig_elem.classes.clone();
-    for class in &text_classes {
+    for class in text_classes {
         text_elem.add_class(class);
     }
     if !multiline {

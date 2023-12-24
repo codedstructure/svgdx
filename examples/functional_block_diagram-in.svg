@@ -10,10 +10,10 @@
     text, tspan { font-size: 2px; font-family: sans-serif; font-weight: bold; }
     rect.nool { stroke: none; }
     text, text * { dominant-baseline: central; text-anchor: middle; }
-    text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
-    text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
-    text.text-left, text.text-left * { text-anchor: start; }
-    text.text-right, text.text-right * { text-anchor: end; }
+    text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
+    text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
+    text.d-text-left, text.d-text-left * { text-anchor: start; }
+    text.d-text-right, text.d-text-right * { text-anchor: end; }
 
     line, polyline { marker-end: url(#arrow); }
   </style>

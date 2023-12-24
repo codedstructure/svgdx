@@ -5,11 +5,11 @@
     rect, line { fill: none; stroke: black; }
   </style>
   <rect id="in" x="10" y="2" width="20" height="10"/>
-  <text x="20" y="7" class="tbox">input</text>
+  <text x="20" y="7" class="d-tbox">input</text>
   <rect id="proc" x="50" y="2" width="20" height="10"/>
-  <text x="60" y="7" class="tbox">process</text>
+  <text x="60" y="7" class="d-tbox">process</text>
   <rect id="out" x="90" y="2" width="20" height="10"/>
-  <text x="100" y="7" class="tbox">output</text>
+  <text x="100" y="7" class="d-tbox">output</text>
 
   <line x1="30" y1="7" x2="50" y2="7"/>
   <line x1="70" y1="7" x2="90" y2="7"/>

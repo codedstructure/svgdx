@@ -24,7 +24,7 @@ fn test_transform_full_svg() {
   <rect x="0" y="14" width="5" height="5"/>
   <rect x="0" y="21" width="5" height="5"/>
   <ellipse cx="20" cy="30" rx="10" ry="5" style="font-size:1px" id="z"/>
-  <text x="20" y="30" style="font-size:1px" class="tbox">ellipse</text>
+  <text x="20" y="30" style="font-size:1px" class="d-tbox">ellipse</text>
   <line x1="5" y1="5" x2="10" y2="25"/>
 </svg>"##;
 

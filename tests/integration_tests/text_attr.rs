@@ -7,7 +7,7 @@ fn test_basic_rect_text() {
 "#;
     let expected = r#"
 <rect x="0" y="1" width="5" height="4"/>
-<text x="2.5" y="3" class="tbox">thing</text>
+<text x="2.5" y="3" class="d-tbox">thing</text>
 "#;
 
     compare(input, expected);
@@ -20,7 +20,7 @@ fn test_expanded_rect_text() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="20" class="tbox">thing</text>
+<text x="20" y="20" class="d-tbox">thing</text>
 "#;
 
     compare(input, expected);
@@ -33,7 +33,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="11" class="tbox text-top">thing</text>
+<text x="20" y="11" class="d-tbox d-text-top">thing</text>
 "#;
 
     compare(input, expected);
@@ -43,7 +43,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="11" y="29" class="tbox text-bottom text-left">thing</text>
+<text x="11" y="29" class="d-tbox d-text-bottom d-text-left">thing</text>
 "#;
 
     compare(input, expected);
@@ -56,7 +56,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="tbox">
+<text x="5" y="5" class="d-tbox">
 <tspan x="5" dy="-0.525em">multi</tspan><tspan x="5" dy="1.05em">line</tspan>
 </text>
 "#;
@@ -67,7 +67,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="1" class="tbox text-top">
+<text x="5" y="1" class="d-tbox d-text-top">
 <tspan x="5" dy="0em">multi</tspan><tspan x="5" dy="2em">line</tspan>
 </text>
 "#;
@@ -78,7 +78,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="9" y="9" class="tbox text-bottom text-right">
+<text x="9" y="9" class="d-tbox d-text-bottom d-text-right">
 <tspan x="9" dy="-1em">multi</tspan><tspan x="9" dy="1em">line</tspan>
 </text>
 "#;
@@ -90,7 +90,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="tbox">
+<text x="5" y="5" class="d-tbox">
 <tspan x="5" dy="-1.5em">multi</tspan><tspan x="5" dy="1em"></tspan><tspan x="5" dy="1em"></tspan><tspan x="5" dy="1em">line</tspan>
 </text>
 "#;
@@ -104,7 +104,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="7" y="5" class="tbox">blob</text>
+<text x="7" y="5" class="d-tbox">blob</text>
 "#;
     compare(input, expected);
 
@@ -113,7 +113,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="3" class="tbox">blob</text>
+<text x="5" y="3" class="d-tbox">blob</text>
 "#;
     compare(input, expected);
 
@@ -122,7 +122,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="6.5" y="8" class="tbox">blob</text>
+<text x="6.5" y="8" class="d-tbox">blob</text>
 "#;
     compare(input, expected);
 }
@@ -136,7 +136,7 @@ fn test_text_line() {
     // would it be better if default was 'above' the line?
     let expected = r#"
 <line x1="0" y1="0" x2="10" y2="0"/>
-<text x="5" y="0" class="tbox">blob</text>
+<text x="5" y="0" class="d-tbox">blob</text>
 "#;
     compare(input, expected);
 
@@ -145,7 +145,7 @@ fn test_text_line() {
 "#;
     let expected = r#"
 <line x1="0" y1="0" x2="10" y2="0"/>
-<text x="11" y="0" class="tbox text-left">blob</text>
+<text x="11" y="0" class="d-tbox d-text-left">blob</text>
 "#;
     compare(input, expected);
 }

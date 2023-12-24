@@ -70,7 +70,9 @@ impl SvgElement {
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
         attrs.insert(key, value);
-        SvgElement::new(self.name.as_str(), &attrs.to_vec())
+        let mut element = SvgElement::new(self.name.as_str(), &attrs.to_vec());
+        element.add_classes(&self.classes);
+        element
     }
 
     #[must_use]
@@ -81,7 +83,9 @@ impl SvgElement {
             .into_iter()
             .filter(|(k, _v)| k != key)
             .collect();
-        SvgElement::new(self.name.as_str(), &attrs)
+        let mut element = SvgElement::new(self.name.as_str(), &attrs);
+        element.add_classes(&self.classes);
+        element
     }
 
     /// copy attributes and classes from another element, returning the merged element

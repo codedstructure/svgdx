@@ -10,49 +10,49 @@
     text, tspan { font-size: 2px; font-family: sans-serif; font-weight: bold; }
     rect.nool { stroke: none; }
     text, text * { dominant-baseline: central; text-anchor: middle; }
-    text.text-top, text.text-top * { dominant-baseline: text-before-edge; }
-    text.text-bottom, text.text-bottom * { dominant-baseline: text-after-edge; }
-    text.text-left, text.text-left * { text-anchor: start; }
-    text.text-right, text.text-right * { text-anchor: end; }
+    text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
+    text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
+    text.d-text-left, text.d-text-left * { text-anchor: start; }
+    text.d-text-right, text.d-text-right * { text-anchor: end; }
 
     line, polyline { marker-end: url(#arrow); }
   </style>
   <rect id="ace" x="0" y="0" width="16" height="10"/>
-  <text x="8" y="5" class="tbox">
+  <text x="8" y="5" class="d-tbox">
   <tspan x="8" dy="-1.575em">ATTITUDE</tspan><tspan x="8" dy="1.05em">CONTROL</tspan><tspan x="8" dy="1.05em">ELECTRONICS</tspan><tspan x="8" dy="1.05em">(ACE)</tspan>
   </text>
   <rect id="prgp" x="0" y="24" width="16" height="8"/>
-  <text x="8" y="28" class="tbox">
+  <text x="8" y="28" class="d-tbox">
   <tspan x="8" dy="-1.05em">PRIMARY</tspan><tspan x="8" dy="1.05em">RATE GYRO</tspan><tspan x="8" dy="1.05em">PACKAGE</tspan>
   </text>
   <rect id="srgp" x="0" y="37" width="16" height="8"/>
-  <text x="8" y="41" class="tbox">
+  <text x="8" y="41" class="d-tbox">
   <tspan x="8" dy="-1.05em">SECONDARY</tspan><tspan x="8" dy="1.05em">RATE GYRO</tspan><tspan x="8" dy="1.05em">PACKAGE</tspan>
   </text>
 
   <rect id="oame" x="49" y="0" width="18" height="10"/>
-  <text x="58" y="5" class="tbox">
+  <text x="58" y="5" class="d-tbox">
   <tspan x="58" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="58" dy="1.05em">AND MANEUVER</tspan><tspan x="58" dy="1.05em">ELECTRONICS</tspan><tspan x="58" dy="1.05em">(OAME)</tspan>
   </text>
   <rect id="pi" x="51" y="24" width="14" height="8"/>
-  <text x="58" y="28" class="tbox">
+  <text x="58" y="28" class="d-tbox">
   <tspan x="58" dy="-0.525em">POWER</tspan><tspan x="58" dy="1.05em">INVERTER</tspan>
   </text>
 
   <rect id="ms" x="-27" y="-15" width="13" height="10" class="nool"/>
-  <text x="-26" y="-10" class="nool tbox text-left">
+  <text x="-26" y="-10" class="nool d-tbox d-text-left">
   <tspan x="-26" dy="-0.525em">MODE</tspan><tspan x="-26" dy="1.05em">SELECTION</tspan>
   </text>
   <rect id="as" x="-25" y="0" width="11" height="5" class="nool"/>
-  <text x="-24" y="2.5" class="nool tbox text-left">
+  <text x="-24" y="2.5" class="nool d-tbox d-text-left">
   <tspan x="-24" dy="-0.525em">ATTITUDE</tspan><tspan x="-24" dy="1.05em">SIGNALS</tspan>
   </text>
   <rect id="rrcs" x="75" y="-15" width="15" height="10" class="nool"/>
-  <text x="76" y="-10" class="nool tbox text-left">
+  <text x="76" y="-10" class="nool d-tbox d-text-left">
   <tspan x="76" dy="-1.575em">REENTRY</tspan><tspan x="76" dy="1.05em">REACTION</tspan><tspan x="76" dy="1.05em">CONTROL</tspan><tspan x="76" dy="1.05em">SYSTEM</tspan>
   </text>
   <rect id="oaamrcs" x="75" y="0" width="15" height="10" class="nool"/>
-  <text x="76" y="5" class="nool tbox text-left">
+  <text x="76" y="5" class="nool d-tbox d-text-left">
   <tspan x="76" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="76" dy="1.05em">AND MANEUVER</tspan><tspan x="76" dy="1.05em">REACTION CONTROL</tspan><tspan x="76" dy="1.05em">SYSTEM</tspan>
   </text>
 
@@ -60,9 +60,9 @@
   <circle id="jfc" r="0.75" cx="32" cy="5"/>
 
   <polyline points="0 28, -6 28, -6 7.5, 0 7.5"/>
-  <text x="-1" y="27" class="tbox text-bottom text-right">p,q,r</text>
+  <text x="-1" y="27" class="d-tbox d-text-bottom d-text-right">p,q,r</text>
   <polyline points="0 41, -12 41, -12 5, 0 5"/>
-  <text x="-1" y="40" class="tbox text-bottom text-right">p,q,r</text>
+  <text x="-1" y="40" class="d-tbox d-text-bottom d-text-right">p,q,r</text>
   <line x1="-14" y1="2.5" x2="0" y2="2.5"/>
 
   <polyline points="24 27.25, 24 15.175, 8 15.175, 8 10"/>
@@ -71,11 +71,11 @@
   <line x1="67" y1="5" x2="75" y2="5"/>
 
   <polyline points="16 5, 32.5 5, 32.5 5, 49 5"/>
-  <text x="24.5" y="5.2" class="tbox">
+  <text x="24.5" y="5.2" class="d-tbox">
   <tspan x="24.5" dy="-0.65em">JET FIRING</tspan><tspan x="24.5" dy="1.3em">COMMANDS</tspan>
   </text>
   <polyline points="51 28, 33.5 28, 33.5 28, 16 28"/>
-  <text x="33.5" y="27" class="tbox">26V, 400~</text>
+  <text x="33.5" y="27" class="d-tbox">26V, 400~</text>
 
   <polyline points="-14 -10, 8 -10, 8 0"/>
 </svg>

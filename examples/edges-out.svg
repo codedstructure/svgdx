@@ -38,19 +38,19 @@
 
     <rect x="-50" y="-50" width="200" height="200" class="background-grid"/>
     <rect x="0" y="0" width="10" height="30" id="base"/>
-    <text x="5" y="15" class="tbox">base</text>
+    <text x="5" y="15" class="d-tbox">base</text>
     <rect x="15" y="0" width="10" height="5" id="a"/>
-    <text x="20" y="2.5" class="tbox">a</text>
+    <text x="20" y="2.5" class="d-tbox">a</text>
     <rect x="15" y="10" width="10" height="5" id="b"/>
-    <text x="20" y="12.5" class="tbox">b</text>
+    <text x="20" y="12.5" class="d-tbox">b</text>
     <rect x="15" y="25" width="10" height="5" id="c"/>
-    <text x="20" y="27.5" class="tbox">c</text>
+    <text x="20" y="27.5" class="d-tbox">c</text>
     <rect x="5" y="40" width="20" height="5" id="d"/>
-    <text x="15" y="42.5" class="tbox">d</text>
+    <text x="15" y="42.5" class="d-tbox">d</text>
     <rect x="-15" y="15" width="10" height="30" id="e"/>
-    <text x="-10" y="30" class="tbox">e</text>
+    <text x="-10" y="30" class="d-tbox">e</text>
     <rect x="-15" y="7.5" width="10" height="5" id="f"/>
-    <text x="-10" y="10" class="tbox">f</text>
+    <text x="-10" y="10" class="d-tbox">f</text>
     <line x1="10" y1="2.5" x2="15" y2="2.5" marker-end="url(#arrow)"/>
     <line x1="10" y1="12.5" x2="15" y2="12.5" marker-end="url(#arrow)"/>
     <line x1="10" y1="27.5" x2="15" y2="27.5" marker-end="url(#arrow)"/>

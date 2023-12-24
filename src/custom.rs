@@ -36,16 +36,16 @@ pub fn process_custom(
                 }
             }
 
-            let rect_elem = SvgElement::new("rect", &rect_attrs).add_class("tbox");
+            let rect_elem = SvgElement::new("rect", &rect_attrs).add_class("d-tbox");
             // Assumption is that text should be centered within the rect,
             // and has styling via CSS to reflect this, e.g.:
-            //  text.tbox { dominant-baseline: central; text-anchor: middle; }
+            //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
             let cxy = rect_elem.bbox()?.unwrap().center().unwrap();
             text_attrs.push(("x".into(), fstr(cxy.0)));
             text_attrs.push(("y".into(), fstr(cxy.1)));
             let bbox = rect_elem.clone();
             events.push(SvgEvent::Empty(rect_elem));
-            let text_elem = SvgElement::new("text", &text_attrs).add_class("tbox");
+            let text_elem = SvgElement::new("text", &text_attrs).add_class("d-tbox");
             events.push(SvgEvent::Start(text_elem));
             // if this *isn't* empty, we'll now expect a text event, which will be passed through.
             // the corresponding </tbox> will be converted into a </text> element.

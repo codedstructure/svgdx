@@ -15,11 +15,11 @@
 
     <rect x="3" y="18" width="24" height="27" class="outline"/>
     <rect x="10" y="20" width="10" height="10" id="a"/>
-    <text x="15" y="25" class="tbox">a</text>
+    <text x="15" y="25" class="d-tbox">a</text>
     <rect x="5" y="35" width="8" height="8" id="b"/>
-    <text x="9" y="39" class="tbox">b</text>
+    <text x="9" y="39" class="d-tbox">b</text>
     <rect x="20" y="33" width="5" height="5" id="c"/>
-    <text x="22.5" y="35.5" class="tbox">c</text>
+    <text x="22.5" y="35.5" class="d-tbox">c</text>
     <polyline points="15 30, 15 31.25, 9 31.25, 9 35" marker-end="url(#arrow)"/>
     <polyline points="20 25, 22.5 25, 22.5 33" marker-end="url(#arrow)"/>
     <polyline points="10 25, 3.5 25, 3.5 39, 5 39" marker-end="url(#arrow)"/>

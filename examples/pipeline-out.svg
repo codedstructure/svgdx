@@ -39,21 +39,21 @@
     </style>
 
     <rect x="2" y="10" width="36" height="10"/>
-    <text x="20" y="15" class="tbox">State hypothesis</text>
+    <text x="20" y="15" class="d-tbox">State hypothesis</text>
     <rect x="2" y="28" width="36" height="10"/>
-    <text x="20" y="33" class="tbox">Design experiment</text>
+    <text x="20" y="33" class="d-tbox">Design experiment</text>
     <rect x="2" y="46" width="36" height="10"/>
-    <text x="20" y="51" class="tbox">Perform experiment</text>
+    <text x="20" y="51" class="d-tbox">Perform experiment</text>
     <rect x="2" y="64" width="36" height="10"/>
-    <text x="20" y="69" class="tbox">Gather data</text>
+    <text x="20" y="69" class="d-tbox">Gather data</text>
     <rect x="2" y="82" width="36" height="10"/>
-    <text x="20" y="87" class="tbox">Clean data</text>
+    <text x="20" y="87" class="d-tbox">Clean data</text>
     <rect x="2" y="100" width="36" height="10"/>
-    <text x="20" y="105" class="tbox">Create model</text>
+    <text x="20" y="105" class="d-tbox">Create model</text>
     <rect x="2" y="118" width="36" height="10"/>
-    <text x="20" y="123" class="tbox">Evaluate model</text>
+    <text x="20" y="123" class="d-tbox">Evaluate model</text>
     <rect x="2" y="136" width="36" height="10"/>
-    <text x="20" y="141" class="tbox">Check hypothesis</text>
+    <text x="20" y="141" class="d-tbox">Check hypothesis</text>
 
     <path d="M 48.75 20 a 3.75,7.5 0 0,0 0,15 a 3.75,7.5 0 0,0 0,-15 h 22.5 a 3.75,7.5 0 0,1 0,15 h -22.5" class=" pipeline"/>
     <rect x="43" y="18" width="34" height="19" style="fill:none"/>

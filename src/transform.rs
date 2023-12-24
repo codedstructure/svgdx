@@ -1,12 +1,12 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::custom::process_custom;
 use crate::expression::eval_attr;
-use crate::svg_defs;
+use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
 use crate::types::BoundingBox;
 use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
 
 use quick_xml::events::attributes::Attribute;
@@ -289,22 +289,8 @@ pub enum SvgEvent {
 }
 
 #[derive(Debug, Clone)]
-struct EventList<'a> {
+pub(crate) struct EventList<'a> {
     events: Vec<(Event<'a>, usize)>,
-}
-
-impl<'a> EventList<'a> {
-    fn new() -> Self {
-        Self { events: vec![] }
-    }
-
-    fn is_empty(&self) -> bool {
-        self.events.is_empty()
-    }
-
-    fn len(&self) -> usize {
-        self.events.len()
-    }
 }
 
 impl From<Event<'_>> for EventList<'_> {
@@ -324,6 +310,26 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
 }
 
 impl EventList<'_> {
+    fn new() -> Self {
+        Self { events: vec![] }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
+        self.events.iter()
+    }
+
+    fn push(&mut self, ev: &Event) {
+        self.events.push((ev.clone().into_owned(), 0));
+    }
+
     fn from_reader(reader: &mut dyn BufRead) -> Result<Self> {
         let mut reader = Reader::from_reader(reader);
 
@@ -372,8 +378,19 @@ impl EventList<'_> {
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
-        for event in &self.events {
-            writer.write_event(event.0.clone())?;
+        let blank_line_remover = Regex::new("\n[ \t]+\n").expect("Bad Regex");
+        for event_pos in &self.events {
+            // trim trailing whitespace.
+            // just using `trim_end()` on Text events won't work
+            // as Text event may be followed by a Start/Empty event.
+            // blank lines *within* Text can be trimmed.
+            let mut event = event_pos.0.clone();
+            if let Event::Text(t) = event {
+                let mut content = String::from_utf8(t.as_ref().to_vec())?;
+                content = blank_line_remover.replace_all(&content, "\n\n").to_string();
+                event = Event::Text(BytesText::new(&content).into_owned());
+            }
+            writer.write_event(event)?;
         }
         Ok(())
     }
@@ -404,22 +421,13 @@ impl EventList<'_> {
 
         (Self { events: before }, pivot, Self { events: after })
     }
-
-    fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
-        self.events.iter()
-    }
-
-    fn push(&mut self, ev: &Event) {
-        self.events.push((ev.clone().into_owned(), 0));
-    }
 }
 
 #[derive(Default, Debug)]
 pub struct Transformer {
     context: TransformerContext,
     debug: bool,
-    add_defs: bool,
-    add_style: bool,
+    add_auto_defs: bool,
 }
 
 impl Transformer {
@@ -428,8 +436,7 @@ impl Transformer {
             context: TransformerContext::new(),
             // TODO: expose these
             debug: false,
-            add_defs: false,
-            add_style: false,
+            add_auto_defs: true,
         }
     }
 
@@ -522,11 +529,18 @@ impl Transformer {
         // This also allows just using `<svg>` as the root element.
         let mut extent = BoundingBox::new();
         let mut elem_path = Vec::new();
+        // Collect the set of elements and classes so relevant styles can be
+        // automatically added.
+        let mut element_set = HashSet::new();
+        let mut class_set = HashSet::new();
         for (ev, _) in output.iter() {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
+                    let ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
+                    element_set.insert(ee_name);
                     let is_empty = matches!(ev, Event::Empty(_));
                     let event_element = SvgElement::try_from(e)?;
+                    class_set.extend(event_element.classes.to_vec());
                     if !is_empty {
                         elem_path.push(event_element.name.clone());
                     }
@@ -602,47 +616,62 @@ impl Transformer {
             output = remain;
         }
 
-        // Default behaviour: include default styles iff we have an SVG element,
+        // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element {
-            if self.add_defs {
-                output = Self::include_defaults(
-                    "defs",
-                    &EventList::from_str(svg_defs::SVG_DEFS).expect("Bad internal SVG definition"),
-                    &output,
-                    writer,
-                )?
-                .clone();
+        if has_svg_element && self.add_auto_defs {
+            let mut indent = self.context.last_indent.clone();
+            if indent.is_empty() {
+                indent = "\n  ".to_owned();
             }
-            if self.add_style {
-                output = Self::include_defaults(
-                    "style",
-                    &EventList::from_str(svg_defs::SVG_STYLES)
-                        .expect("Bad internal SVG definition"),
+            // TODO: also cope with merging (remove this condition and
+            // process in `include_defs()`)
+            if !element_set.contains("defs") {
+                // Messy: if we just need a style (no defs required) then
+                // ensure we start with a newline/indent. Ideally defs and
+                // styles should be treated the same, rather than events/str
+                // respectively.
+                if !element_set.contains("style") {
+                    writer.write_all(indent.as_bytes())?;
+                }
+                output = Self::include_defs(
+                    "defs",
+                    build_defs(&element_set, &class_set, &indent),
                     &output,
                     writer,
-                )?
-                .clone();
+                )?;
+            }
+            // TODO: also cope with merging (remove this condition and
+            // process in `include_defs()`)
+            if !element_set.contains("style") {
+                //writer.write_all(indent.as_bytes())?;
+                output = Self::include_defs(
+                    "style",
+                    build_styles(&element_set, &class_set, &indent),
+                    &output,
+                    writer,
+                )?;
             }
         }
 
         output.write_to(writer)
     }
 
-    fn include_defaults<'a>(
+    fn include_defs<'a>(
         name: &str,
-        def_content: &EventList<'a>,
+        content: String,
         ev_list: &EventList<'a>,
         writer: &mut dyn Write,
     ) -> Result<EventList<'a>> {
         let (before, style, after) = ev_list.partition(name);
+        let def_content = EventList::from_str(content).expect("Invalid element in include_defs");
         if let Some((def_start_event, _)) = style {
+            // TODO: if before is just a 'Text' event with only whitespace, may not want to include.
             before.write_to(writer)?;
             def_content.write_to(writer)?;
             EventList::from(def_start_event).write_to(writer)?;
             Ok(after.clone())
         } else {
-            // No existing style element, so we'll write one out immediately
+            // No existing style/defs element, so we'll write one out immediately
             // (having just written out the svg element).
             def_content.write_to(writer)?;
             Ok(before.clone())

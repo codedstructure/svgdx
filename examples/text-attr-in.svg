@@ -13,7 +13,7 @@
             stroke: none;
             fill: black;
         }
-        text.tbox {
+        text.d-tbox {
             dominant-baseline: central;
             text-anchor: middle;
         }

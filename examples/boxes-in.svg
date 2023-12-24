@@ -17,16 +17,16 @@
                 dominant-baseline: central;
                 text-anchor: middle;
             }
-            text.text-top {
+            text.d-text-top {
                 dominant-baseline: text-before-edge;
             }
-            text.text-bottom {
+            text.d-text-bottom {
                 dominant-baseline: text-after-edge;
             }
-            text.text-left {
+            text.d-text-left {
                 text-anchor: start;
             }
-            text.text-right {
+            text.d-text-right {
                 text-anchor: end;
             }
         ]]>
