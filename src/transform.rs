@@ -18,7 +18,7 @@ use anyhow::{bail, Context, Result};
 use regex::Regex;
 
 #[derive(Clone, Default, Debug)]
-pub struct TransformerContext {
+pub(crate) struct TransformerContext {
     pub(crate) elem_map: HashMap<String, SvgElement>,
     pub(crate) prev_element: Option<SvgElement>,
     pub(crate) variables: HashMap<String, String>,
@@ -26,7 +26,7 @@ pub struct TransformerContext {
 }
 
 impl TransformerContext {
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             elem_map: HashMap::new(),
             prev_element: None,
@@ -248,7 +248,7 @@ impl TransformerContext {
 }
 
 #[derive(Debug)]
-pub enum SvgEvent {
+pub(crate) enum SvgEvent {
     Text(String),
     Start(SvgElement),
     Empty(SvgElement),
@@ -375,7 +375,7 @@ impl Transformer {
         }
     }
 
-    pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
+    fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let mut output = EventList { events: vec![] };
 

@@ -1,3 +1,13 @@
+//! # svgdx
+//!
+//! Entry point for `svgdx` when used as a library.
+//!
+//! `svgdx` is normally run as a command line tool. Support as a library
+//! is currently limited, but it is possible to use the key `transform`
+//! functionality which converts an input wrapped in a `Reader` to a
+//! corresponding `Writer`. This allows use of the tool without needing
+//! to install or run `svgdx` as a command line subprocess.
+
 use std::{
     io::{BufRead, Cursor, IsTerminal, Read, Write},
     num::ParseFloatError,
@@ -27,6 +37,12 @@ mod expression;
 mod svg_defs;
 mod text;
 
+/// The main entry point once any command line or other initialisation
+/// has been completed.
+///
+/// Reads from the `reader` stream, performs processing and conversion
+/// as required, and writes to the `writer`. Note the entire stream may
+/// be read before any converted data is written to `writer`.
 pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
     let mut t = Transformer::new();
     t.transform(reader, writer)
@@ -187,6 +203,7 @@ fn transform(input: Option<String>, output: Option<String>) -> Result<()> {
     Ok(())
 }
 
+/// Configuration used by svgdx
 pub struct Config {
     input: Option<String>,
     output: Option<String>,
@@ -206,6 +223,10 @@ impl Config {
         })
     }
 
+    /// Create a `Config` object set up given a command line string.
+    ///
+    /// The string is parsed using `shlex::split()`, so values containing
+    /// spaces or quotes should be quoted or escaped appropriately.
     pub fn from_cmdline(args: &str) -> Result<Self> {
         let args = shlex::split(args).unwrap_or_default();
         let args = Arguments::try_parse_from(args.iter())?;
@@ -213,11 +234,13 @@ impl Config {
     }
 }
 
+/// Create a `Config` object from arguments given to this process
 pub fn get_config() -> Result<Config> {
     let args = Arguments::parse();
     Config::from_args(args)
 }
 
+/// Start running svgdx with a given `Config`
 pub fn run(config: Config) -> Result<()> {
     if !config.watch {
         transform(config.input.clone(), config.output.clone())?;
