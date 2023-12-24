@@ -440,7 +440,11 @@ impl Transformer {
         }
     }
 
-    fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
+    pub(crate) fn transform(
+        &mut self,
+        reader: &mut dyn BufRead,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let mut output = EventList { events: vec![] };
 
