@@ -1,8 +1,9 @@
 # svgdx
 
-**svgdx** is a 'delta' on SVG; a preprocessor and transpiler which accepts a superset of SVG and outputs SVG.
+**svgdx** is a 'delta' on SVG; a preprocessor which accepts a superset of SVG and outputs SVG.
 
 It is intended to support 'typing a diagram' workflows, at a lower (and more flexible) level than structured tools such as [Mermaid](https://mermaid.js.org) or [Graphviz](https://graphviz.org).
+
 An important principle is that raw SVG can be included directly at any point in the input. This is analogous to Markdown, which provides the 'escape hatch' of using inline HTML tags. Markdown has been incredibly successful as a text based format allowing simple text files to carry both semantic and simple style information. Being able to do both of those in a single workflow - just by _typing_ - allows a flow which would otherwise not be achievable.
 
 Can the same be done for _drawing_ - specifically for **diagrams**? That's what **svgdx** aims to deliver.
@@ -36,28 +37,30 @@ SVG is a fairly simple language, and a small subset can be used to create a larg
 Out of these, text and positioning are frustrating in SVG, but it's still straightforward to make simple diagrams.
 
 ```xml
-<svg>
-  <rect x="10" y="2" width="20" height="10" />
-  <text x="11" y="8">input</text>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="116mm" height="22mm" viewBox="2 -4 116 22">
+  <style>
+    rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+  </style>
+  <rect id="in" x="10" y="2" width="20" height="10"/>
+  <text x="20" y="7" class="d-tbox">input</text>
+  <rect id="proc" x="50" y="2" width="20" height="10"/>
+  <text x="60" y="7" class="d-tbox">process</text>
+  <rect id="out" x="90" y="2" width="20" height="10"/>
+  <text x="100" y="7" class="d-tbox">output</text>
 
-  <line x1="30" y1="7" x2="40" y2="7" />
-
-  <rect x="40" y="2" width="20" height="10" />
-  <text x="41" y="8">process</text>
-
-  <line x1="60" y1="7" x2="70" y2="7" />
-
-  <rect x="70" y="2" width="20" height="10" />
-  <text x="71" y="8">output</text>
+  <line x1="30" y1="7" x2="50" y2="7"/>
+  <line x1="70" y1="7" x2="90" y2="7"/>
 </svg>
 ```
 
 renders as:
 
-![](simple.svg)
+![](examples/simple-out.svg)
 
 
-Not too tricky, but there are a lot of fiddly coordinate values, and I've omitted some boilerplate for styling and XML processing instructions. See the underlying file [here](simple.svg).
+Not too tricky, but there are a lot of fiddly coordinate values and boilerplate for styling and XML processing instructions. See the underlying file [here](examples/simple-out.svg).
 
 What if we could render the same thing from something more like the following?
 
@@ -75,7 +78,9 @@ What if we could render the same thing from something more like the following?
 This example shows just a few of the enhancements `svgdx` provides:
 
 * shortcut attributes, e.g. the use of `wh` rather than having to specify `width` and `height` separately.
-* relative positioning, either by reference to an id (e.g. `#in`), or to the previous element using the caret (`^`) symbol
+* relative positioning, either by reference to an id (e.g. `#in`), or to the previous element using the caret (`^`) symbol.
 * new attributes providing additional functionality - `text` within shapes, or `start` and `end` points on `<line>` elements to define connectors.
+* automatic calculation of root `<svg>` element `width`, `height` and `viewBox` derived from the bounding box of all elements.
+* automatic styles added to provide sensible defaults for 'box and line' diagrams.
 
 Many more features are provided by **svgdx**, with the goal of making a diagram something you can write, rather than draw.
