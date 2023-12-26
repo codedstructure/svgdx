@@ -1,5 +1,10 @@
 use std::collections::HashSet;
 
+static COLOUR_LIST: &[&str] = &[
+    "red", "green", "blue", "cyan", "magenta", "yellow", "black", "white", "none",
+];
+static DARK_COLOURS: &[&str] = &["red", "green", "blue", "magenta", "black"];
+
 pub(crate) fn build_styles(
     elements: &HashSet<String>,
     classes: &HashSet<String>,
@@ -51,6 +56,27 @@ pub(crate) fn build_styles(
         result.push(String::from(
             "line.d-arrow, polyline.d_arrow { marker-end: url(#d-arrow) }",
         ));
+    }
+    if classes.contains("d-dash") {
+        result.push(String::from(r#".d-dash { stroke-dasharray: 2 1.5; }"#));
+    }
+    if classes.contains("d-dot") {
+        result.push(String::from(r#".d-dot { stroke-dasharray: 0.5 1; }"#));
+    }
+    for colour in COLOUR_LIST {
+        if classes.contains(&format!("d-{colour}")) {
+            result.push(format!(".d-{colour} {{ stroke: {colour}; }}"));
+            result.push(format!("text.d-{colour}, text.d-{colour} * {{ stroke: none; }}"));
+        }
+    }
+    for colour in COLOUR_LIST {
+        if classes.contains(&format!("d-fill-{colour}")) {
+            result.push(format!(".d-fill-{colour} {{ fill: {colour}; }}"));
+            let text_colour = if DARK_COLOURS.contains(colour) { "white" } else { "black" };
+            result.push(format!(
+                "text.d-fill-{colour}, text.d-fill-{colour} * {{ fill: {text_colour}; }}"
+            ));
+        }
     }
     if !result.is_empty() {
         let mut style = String::from(&format!("<style>{indent}"));

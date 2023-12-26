@@ -25,9 +25,9 @@ impl BoundingBox {
     }
 
     /// dilate the bounding box by the given absolute amount in each direction
-    pub fn expand(&mut self, amount: f32) -> &Self {
+    pub fn expand(&mut self, exp_x: f32, exp_y: f32) -> &Self {
         if let BoundingBox::BBox(x1, y1, x2, y2) = self {
-            let new = BoundingBox::BBox(*x1 - amount, *y1 - amount, *x2 + amount, *y2 + amount);
+            let new = BoundingBox::BBox(*x1 - exp_x, *y1 - exp_y, *x2 + exp_x, *y2 + exp_y);
             *self = new;
         }
         self
@@ -341,7 +341,7 @@ mod test {
         bb.extend(&BoundingBox::BBox(25., 20., 25., 30.));
         assert_eq!(bb, BoundingBox::BBox(10., 0., 30., 30.));
 
-        bb.expand(10.);
+        bb.expand(10., 10.);
         assert_eq!(bb, BoundingBox::BBox(0., -10., 40., 40.));
 
         bb.scale(1.1);
