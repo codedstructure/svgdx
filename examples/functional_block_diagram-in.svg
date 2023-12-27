@@ -18,8 +18,8 @@
     line, polyline { marker-end: url(#arrow); }
   </style>
   <rect id="ace" xy="0" wh="16 10" text="ATTITUDE\nCONTROL\nELECTRONICS\n(ACE)" />
-  <rect id="prgp" xy="#ace@b" xy-loc="t" dy="14" wh="16 8" text="PRIMARY\nRATE GYRO\nPACKAGE" />
-  <rect id="srgp" xy="#prgp@b" xy-loc="t" dy="5" wh="16 8" text="SECONDARY\nRATE GYRO\nPACKAGE" />
+  <rect id="prgp" xy="#ace:v 14" wh="16 8" text="PRIMARY\nRATE GYRO\nPACKAGE" />
+  <rect id="srgp" xy="#prgp:v 5" wh="16 8" text="SECONDARY\nRATE GYRO\nPACKAGE" />
 
   <rect id="oame" xy="#ace@r" xy-loc="c" dx="42" wh="18 10" text="ORBIT ATTITUDE\nAND MANEUVER\nELECTRONICS\n(OAME)" />
   <rect id="pi" xy="#prgp@r" xy-loc="c" dx="42" wh="14 8" text="POWER\nINVERTER" />
@@ -27,7 +27,7 @@
   <rect id="ms" xy="#ace@tl" xy-loc="br" dxy="-14 -5" wh="13 10" text="MODE\nSELECTION" text-loc="l" class="nool"/>
   <rect id="as" xy="#ace@tl" xy-loc="tr" dx="-14" wh="11 5" text="ATTITUDE\nSIGNALS" text-loc="l" class="nool"/>
   <rect id="rrcs" xy="#oame@tr" xy-loc="bl" dxy="8 -5" wh="15 10" text="REENTRY\nREACTION\nCONTROL\nSYSTEM" text-loc="l" class="nool"/>
-  <rect id="oaamrcs" xy="#oame@r" xy-loc="l" dx="8" wh="15 10" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="nool"/>
+  <rect id="oaamrcs" xy="#oame:h 8" wh="15 10" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="nool"/>
 
   <circle id="ppi" r="0.75" cxy="#prgp@r" dx="8"/>
   <circle id="jfc" r="0.75" cxy="#ace@r" dx="16"/>
@@ -46,4 +46,3 @@
 
   <polyline start="#ms@r" end="#ace@t"/>
 </svg>
-
