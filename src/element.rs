@@ -317,6 +317,38 @@ impl SvgElement {
         new_elem
     }
 
+    pub(crate) fn position_from_bbox(&mut self, bb: &BoundingBox) -> Result<()> {
+        if let BoundingBox::BBox(x1, y1, _x2, _y2) = bb {
+            let width = bb.width().expect("must have width");
+            let height = bb.height().expect("must have height");
+            let (cx, cy) = bb.center().expect("must have center");
+            match self.name.as_str() {
+                "rect" => {
+                    self.attrs.insert("x", fstr(*x1));
+                    self.attrs.insert("y", fstr(*y1));
+                    self.attrs.insert("width", fstr(width));
+                    self.attrs.insert("height", fstr(height));
+                }
+                "circle" => {
+                    self.attrs.insert("cx", fstr(cx));
+                    self.attrs.insert("cy", fstr(cy));
+                    self.attrs
+                        .insert("r", fstr(0.5 * width.max(height) * 1.414));
+                }
+                "ellipse" => {
+                    self.attrs.insert("cx", fstr(cx));
+                    self.attrs.insert("cy", fstr(cy));
+                    self.attrs.insert("rx", fstr(0.5 * width * 1.414));
+                    self.attrs.insert("ry", fstr(0.5 * height * 1.414));
+                }
+                _ => {}
+            }
+        } else {
+            bail!("Could not determine position from bbox");
+        }
+        Ok(())
+    }
+
     fn eval_pos(&mut self, input: &str, context: &TransformerContext) -> Result<String> {
         // Relative positioning:
         //   ID LOC DX DY

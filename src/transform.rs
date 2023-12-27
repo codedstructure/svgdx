@@ -1,3 +1,4 @@
+use crate::attr_split;
 use crate::connector::{ConnectionType, Connector};
 use crate::custom::process_custom;
 use crate::expression::eval_attr;
@@ -128,6 +129,38 @@ impl TransformerContext {
         if let Some(comment) = e.pop_attr("__") {
             events.push(SvgEvent::Comment(comment));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+        }
+
+        if let Some(surround_list) = e.pop_attr("surround") {
+            let mut bbox = BoundingBox::new();
+
+            for elref in attr_split(&surround_list) {
+                if let Some(el) = self.elem_map.get(
+                    elref
+                        .strip_prefix('#')
+                        .context(format!("Invalid surround value {elref}"))?,
+                ) {
+                    if let Ok(Some(bb)) = el.bbox() {
+                        bbox.extend(&bb);
+                    }
+                }
+            }
+            if let Some(margin) = e.pop_attr("margin") {
+                let mut parts = attr_split_cycle(&margin).map(|v| strp_length(&v).unwrap());
+                let mx = parts.next().expect("cycle");
+                let my = parts.next().expect("cycle");
+
+                let bw = bbox
+                    .width()
+                    .context("Could not update surround bbox from margin")?;
+                let h_margin = mx.adjust(bw) - bw;
+                let bh = bbox
+                    .height()
+                    .context("Could not update surround bbox from margin")?;
+                let v_margin = my.adjust(bh) - bh;
+                bbox.expand(h_margin, v_margin);
+            }
+            e.position_from_bbox(&bbox)?;
         }
 
         e.expand_attributes(false, self)?;
@@ -569,7 +602,7 @@ impl Transformer {
         }
         // Expand by 5, then add 5%. Ensures small images get more than a couple
         // of pixels border, and large images still get a (relatively) decent border.
-        extent.expand(5.);
+        extent.expand(5., 5.);
         extent.scale(1.05);
         extent.round();
 

@@ -1,0 +1,29 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="120mm" height="69mm" viewBox="-10 -12 120 69">
+  <style>
+    rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    .d-dash { stroke-dasharray: 2 1.5; }
+    .d-dot { stroke-dasharray: 0.5 1; }
+    .d-blue { stroke: blue; }
+    text.d-blue, text.d-blue * { stroke: none; }
+    .d-red { stroke: red; }
+    text.d-red, text.d-red * { stroke: none; }
+    .d-fill-green { fill: green; }
+    text.d-fill-green, text.d-fill-green * { fill: white; }
+    .d-fill-magenta { fill: magenta; }
+    text.d-fill-magenta, text.d-fill-magenta * { fill: white; }
+    .d-fill-yellow { fill: yellow; }
+    text.d-fill-yellow, text.d-fill-yellow * { fill: black; }
+  </style>
+  <rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
+  <text x="10" y="10" class="d-red d-tbox">a</text>
+  <rect id="b" x="30" y="0" width="20" height="20" class="d-fill-green"/>
+  <text x="40" y="10" class="d-fill-green d-tbox">b</text>
+  <rect id="c" x="80" y="0" width="20" height="20" class="d-fill-yellow"/>
+  <text x="90" y="10" class="d-fill-yellow d-tbox">c</text>
+  <rect id="d" x="30" y="25" width="20" height="20" class="d-fill-magenta"/>
+  <text x="40" y="35" class="d-fill-magenta d-tbox">d</text>
+  <rect rx="3" x="25" y="-5" width="30" height="55" class="d-dot d-red"/>
+  <rect x="-2" y="-2" width="104" height="24" class="d-dash d-blue"/>
+</svg>
