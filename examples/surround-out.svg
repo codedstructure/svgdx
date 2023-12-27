@@ -5,10 +5,10 @@
     text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     .d-dash { stroke-dasharray: 2 1.5; }
     .d-dot { stroke-dasharray: 0.5 1; }
-    .d-red { stroke: red; }
-    text.d-red, text.d-red * { stroke: none; }
     .d-blue { stroke: blue; }
     text.d-blue, text.d-blue * { stroke: none; }
+    .d-red { stroke: red; }
+    text.d-red, text.d-red * { stroke: none; }
     .d-fill-green { fill: green; }
     text.d-fill-green, text.d-fill-green * { fill: white; }
     .d-fill-magenta { fill: magenta; }

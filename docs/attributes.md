@@ -58,6 +58,37 @@ Applies to: `<rect>`, `<circle>`, `<ellipse>`
 
 TODO
 
+### `surround`
+As an alternative to specifying position and size (e.g. `xy` and `wh`),
+the `surround` attribute can be given a list of element references,
+causing it to be positioned as the bounding box to those elements.
+May be used together with the [margin](#margin) attribute to visually
+group a set of related elements.
+
+Type: [List](#lists) of [Element ref](#element-ref) items.
+
+Applies to: `<rect>`, `<circle>`, `<ellipse>`
+
+Example:
+```xml
+<rect id="a" xy="0" wh="2" />
+<rect id="b" xy="5 0" wh="2" />
+<rect id="c" xy="0 5" wh="2" />
+<rect surround="#a #b" margin="1" class="d-dash" />
+```
+
+### `margin`
+**Note:** The behaviour of `margin` is context-dependent and has no
+meaning in isolation.
+
+Typically it represents added space / size (see also [dw / dh / dwh](#dw-dh-dwh))
+between elements.
+
+If only a single value is given it is used for both _x_ and _y_ axes; if two
+values are provided, they give the _x_ and _y_ values respectively.
+
+Type: [Expression pair](#expression-pair)
+
 ## Lines and connectors
 
 ### `xy1`
@@ -135,6 +166,12 @@ Type: [Location](#location)
 Applies to: Basic shapes
 
 # Types
+
+## Lists
+List attributes correspond to SVG 1.1's `<list-of-Ts>` datatype:
+> "A list consists of a separated sequence of values. Unless explicitly described differently, lists within SVG's XML attributes can be either comma-separated, with optional white space before or after the comma, or white space-separated."
+
+[source](https://www.w3.org/TR/SVG11/types.html#DataTypeList)
 
 ## Expression pair
 
