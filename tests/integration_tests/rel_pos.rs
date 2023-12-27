@@ -100,6 +100,84 @@ fn test_relv() {
 }
 
 #[test]
+fn test_elref_relh() {
+    // TO THE RIGHT
+    let rel_h_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:h" wh="10" />
+"##;
+    let expected_rect = r#"<rect id="z" x="20" y="20" width="10" height="10"/>"#;
+    contains(rel_h_input, expected_rect);
+
+    // with a gap
+    let rel_h_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:h 3" wh="10" />
+"##;
+    let expected_rect = r#"<rect id="z" x="23" y="20" width="10" height="10"/>"#;
+    contains(rel_h_input, expected_rect);
+
+    // TO THE LEFT
+    let rel_h_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:H" wh="8" />
+"##;
+    let expected_rect = r#"<rect id="z" x="2" y="21" width="8" height="8"/>"#;
+    contains(rel_h_input, expected_rect);
+
+    // with a gap
+    let rel_h_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:H 3" wh="8" />
+"##;
+    let expected_rect = r#"<rect id="z" x="-1" y="21" width="8" height="8"/>"#;
+    contains(rel_h_input, expected_rect);
+}
+
+#[test]
+fn test_elref_relv() {
+    // BELOW
+    let rel_v_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:v" wh="10" />
+"##;
+    let expected_rect = r#"<rect id="z" x="10" y="30" width="10" height="10"/>"#;
+    contains(rel_v_input, expected_rect);
+
+    // with a gap
+    let rel_v_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:v 3" wh="10" />
+"##;
+    let expected_rect = r#"<rect id="z" x="10" y="33" width="10" height="10"/>"#;
+    contains(rel_v_input, expected_rect);
+
+    // ABOVE
+    let rel_v_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:V" wh="8" />
+"##;
+    let expected_rect = r#"<rect id="z" x="11" y="12" width="8" height="8"/>"#;
+    contains(rel_v_input, expected_rect);
+
+    // with a gap
+    let rel_v_input = r##"
+<rect id="abc" xy="10 20" wh="10" />
+<rect id="def" xy="30" wh="2" />
+<rect id="z" xy="#abc:V 3" wh="8" />
+"##;
+    let expected_rect = r#"<rect id="z" x="11" y="9" width="8" height="8"/>"#;
+    contains(rel_v_input, expected_rect);
+}
+
+#[test]
 fn test_rel_dx_dy() {
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
