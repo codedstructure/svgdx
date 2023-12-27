@@ -7,7 +7,7 @@ Determines the top-left point of the given shape.
 
 Note that the top-left point is calculated via the bounding box, and may not actually be part of the shape itself, e.g. in the case of a `<circle>`.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: Basic shapes
 
@@ -21,7 +21,7 @@ Determines the center point of the given shape.
 
 Note that the center point is calculated via a bounding box on the shape, unless the SVG shape itself natively supports `cx`, `cy` (i.e. `<circle>`, `<ellipse>`)
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: Basic shapes
 
@@ -50,7 +50,7 @@ TODO
 ### `wh`
 Determines the width and height of the given shape.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: `<rect>`, `<circle>`, `<ellipse>`
 
@@ -94,7 +94,7 @@ Type: [Expression pair](#expression-pair)
 ### `xy1`
 Determines the starting point of a `<line>` element.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: `<line>` elements.
 
@@ -106,7 +106,7 @@ Example:
 ### `xy2`
 Determines the ending point of a `<line>` element.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: `<line>` elements.
 
@@ -119,7 +119,7 @@ Example:
 Determines the ending point of a connector.
 This may be a simple [expression pair](#expression-pair), (in which case it acts identically to `xy1`) but is typically relative to another shape element.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: `<line>`, `<polyline>` elements.
 
@@ -132,7 +132,7 @@ Example:
 Determines the ending point of a connector.
 This may be a simple [expression pair](#expression-pair), (in which case it acts identically to `xy2`) but is typically relative to another shape element.
 
-Type: [Expression pair](#expression-pair); [Relative specifier](#relative-specifier)
+Type: [Expression pair](#expression-pair); [Relative specifier](layout#relative-positioning)
 
 Applies to: `<line>`, `<polyline>` elements.
 
@@ -176,5 +176,3 @@ List attributes correspond to SVG 1.1's `<list-of-Ts>` datatype:
 ## Expression pair
 
 ## Location
-
-## Relative specifier

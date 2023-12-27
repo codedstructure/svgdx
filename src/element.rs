@@ -354,7 +354,12 @@ impl SvgElement {
         //   ID LOC DX DY
         // [#id][@loc] [dx] [dy]
         //   or
-        // ^(h|v|H|V) [gap]
+        // (^|#id:)(h|v|H|V) [gap]
+
+        // #abc@tl - top-left point of #abc
+        // @tl - prev element
+        // #abc:h - to-the-right of #abc
+        // ^h - prev element
 
         // Defaults:
         //   #id = previous element
@@ -368,7 +373,9 @@ impl SvgElement {
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re = Regex::new(r"^(\^[hvHV]|(?<id>#[^@]+)?(?<loc>@\S+)?)").expect("Bad Regex");
+        let rel_re =
+            Regex::new(r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?(?<loc>@\S+)?)")
+                .expect("Bad Regex");
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
@@ -385,53 +392,76 @@ impl SvgElement {
             let mut dx = 0.;
             let mut dy = 0.;
 
-            let default_rel = match ref_loc.as_str() {
-                "^h" => {
-                    dx = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                    "r"
-                }
-                "^H" => {
-                    dx = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                    "l"
-                }
-                "^v" => {
-                    dy = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                    "b"
-                }
-                "^V" => {
-                    dy = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                    "t"
-                }
-                _ => {
-                    dx = d1.context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
-                    dy = d2.context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
-                    "tr"
-                }
-            };
+            let mut ref_el = context.prev_element.as_ref();
+            let default_rel;
+            let mut loc = None;
 
-            // This is similar to the more generic `xy-loc` processing.
-            // assumes the bounding-box is well-defined by this point.
-            if let Some(bbox) = self.bbox()? {
-                let width = bbox.width().unwrap();
-                let height = bbox.height().unwrap();
-                let (xy_dx, xy_dy) = match default_rel {
-                    "b" => (width / 2., 0.),
-                    "l" => (width, height / 2.),
-                    "t" => (width / 2., height),
-                    "r" => (0., height / 2.),
-                    _ => (0., 0.),
+            if let Some(relhv) = caps.name("relhv") {
+                let rel_dir;
+                if let Some(relhv_id) = relhv.as_str().strip_prefix('#') {
+                    let mut parts = relhv_id.split(':');
+                    let ref_el_id = parts.next().expect("Regex match");
+                    rel_dir = parts.next();
+                    ref_el = context.elem_map.get(ref_el_id);
+                } else {
+                    rel_dir = relhv.as_str().strip_prefix('^');
+                }
+
+                default_rel = match rel_dir
+                    .context("Invalid relative direction (expected: hHvV)")?
+                {
+                    "h" => {
+                        dx = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                        "r"
+                    }
+                    "H" => {
+                        dx = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                        "l"
+                    }
+                    "v" => {
+                        dy = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                        "b"
+                    }
+                    "V" => {
+                        dy = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
+                        "t"
+                    }
+                    _ => {
+                        dx = d1
+                            .context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
+                        dy = d2
+                            .context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
+                        "tr"
+                    }
                 };
-                dx -= xy_dx;
-                dy -= xy_dy;
+
+                // This is similar to the more generic `xy-loc` processing.
+                // assumes the bounding-box is well-defined by this point.
+                if let Some(bbox) = self.bbox()? {
+                    let width = bbox.width().unwrap();
+                    let height = bbox.height().unwrap();
+                    let (xy_dx, xy_dy) = match default_rel {
+                        "b" => (width / 2., 0.),
+                        "l" => (width, height / 2.),
+                        "t" => (width / 2., height),
+                        "r" => (0., height / 2.),
+                        _ => (0., 0.),
+                    };
+                    dx -= xy_dx;
+                    dy -= xy_dy;
+                }
+            } else {
+                dx = d1.context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
+                dy = d2.context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
+                default_rel = "tr";
+                loc = caps
+                    .name("loc")
+                    .map(|v| v.as_str().strip_prefix('@').unwrap());
             }
 
-            let mut ref_el = context.prev_element.as_ref();
             let opt_id = caps
                 .name("id")
                 .map(|v| v.as_str().strip_prefix('#').unwrap());
-            let loc = caps
-                .name("loc")
-                .map(|v| v.as_str().strip_prefix('@').unwrap());
             if let Some(name) = opt_id {
                 ref_el = Some(
                     context

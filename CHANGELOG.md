@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add support for dirspec (h/H/v/V) relative positioning from a referenced element,
+  e.g. `xy="#abc:h"`
 - Add various auto-style classes: `d-{colour}` & `d-fill-{colour}` for various colours,
   `d-dot` / `d-dash` for stroke styling, `d-arrow` for arrowhead marker, etc.
 - Added `surround` attribute for rect / circle / ellipse which takes a list of
