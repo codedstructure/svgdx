@@ -251,6 +251,9 @@ pub(crate) fn build_styles(
             "text { font-family: sans-serif; font-size: 3px; }",
         ));
     }
+    if classes.contains("d-thin") {
+        result.push(String::from(".d-thin { stroke-width: 0.2; }"));
+    }
     if classes.contains("d-tbox") {
         result.push(String::from(
             r#"text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }"#,
@@ -290,6 +293,11 @@ pub(crate) fn build_styles(
     if classes.contains("d-arrow") {
         result.push(String::from(
             "line.d-arrow, polyline.d-arrow { marker-end: url(#d-arrow); }",
+        ));
+    }
+    if classes.contains("d-biarrow") {
+        result.push(String::from(
+            "line.d-biarrow, polyline.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
         ));
     }
     if classes.contains("d-dash") {
@@ -340,7 +348,7 @@ pub(crate) fn build_defs(
 
     if classes.contains("d-arrow") {
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill;"/>
     </marker>"#));
     }
 

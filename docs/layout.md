@@ -58,6 +58,29 @@ following abbreviations:
 
 Together an 'elref' and a 'locspec' denote a point in 2D user coordinates.
 
+**Edge Offset Spec** - as a special case of 'locspec', those locations which define the
+edge of an element (i.e. t,r,b,l) may be followed by an offset to vary the resulting
+point position along the edge. The offset is separated from the locspec by a colon
+(`:`), and may be either a number or a percentage.
+
+Each edge starts at the 'left' (`t` / `b` edges) or 'top' (`l` / `r` edges) and
+ends at the right/bottom of the edge respectively.
+
+If a percentage is given (e.g. `:30%`), this represents that percentage along the
+edge from the start. This implies that `#abc@t:0%` is equivalent to `#abc@tl`, and
+`#abc@t:100%` is equivalent to `#abc@tr`. Note that the value given is not restricted
+to 0%..100%, but can exceed this range.
+
+If the value is a number rather than a percentage, it is treated differently. A
+positive value is an offset from the start of the edge, while a negative offset
+moves *backwards* from the end of the edge. This is analogous to slice indexing in
+the Python language, where `a[-1]` represents the last item in the sequence `a`.
+
+Edge offsets can be useful where many connector lines are joining an element and
+it would be clearer to keep them separate; rather than having four connectors all
+join an element at `@b` for example, consider joining them at `@b:20%`, `@b:40%`,
+`@b:60%` and `@b:80%`.
+
 **Direction Spec** - ('dirspec') denotes a directional relation between
 two objects. The following dirspec values are supported:
 
@@ -74,17 +97,22 @@ allowing some separators to be omitted when
 context allows it.
 
 ```
-locspec  := @ [tl|t|tr|r|br|b|bl|l|c]
-dirspec  := [h|H|v|V]
-prevspec := ^
-ident    := alphanumeric
-ref      := # ident
-elref    := prevspec | ref
+length     := number | number %
+edgespec   := @ [t|r|b|l]
+offsetspec := edgespec : length
+locspec    := @ [tl|t|tr|r|br|b|bl|l|c]
+dirspec    := [h|H|v|V]
+prevspec   := ^
+ident      := alphanumeric
+ref        := # ident
+elref      := prevspec | ref
 
 relspec  := prevspec dirspec |
             ref : dirspec |
             locspec |
-            ref locspec
+            ref locspec |
+            edgespec offsetspec |
+            ref locspec offsetspec
 ```
 
 Following the `relspec` as defined above, additional values may be given to define

@@ -151,11 +151,22 @@ impl EvalState {
             .context("Could not evaluate variable")
     }
 
+    /// Extract a single numeric value according to the given spec.
+    ///
+    /// Example: `#abc.h` - height of element #abc
+    ///
+    /// The following values are available; all assuming a bounding box:
+    /// t - the y coordinate of the top of the element
+    /// r - the x coordinate of the right of the element
+    /// b - the y coordinate of the bottom of the element
+    /// l - the x coordinate of the left of the element
+    /// w - the width of the element
+    /// h - the height of the element
     fn element_ref(&self, v: &str) -> Result<f32> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
-        // <line x1="#abc:l" .../>
-        let re = Regex::new(r"#(?<id>[^:\s]+):(?<val>[trblwh])").expect("Bad Regex");
+        // <line x1="#abc.l" .../>
+        let re = Regex::new(r"#(?<id>[[:word:]]+)\.(?<val>[trblwh])").expect("Bad Regex");
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();

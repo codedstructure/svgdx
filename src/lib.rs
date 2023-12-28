@@ -71,6 +71,7 @@ fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
     input
         .split_whitespace()
         .flat_map(|v| v.split(','))
+        .filter(|&v| !v.is_empty())
         .map(|v| v.to_string())
 }
 
@@ -315,6 +316,35 @@ mod test {
         assert_eq!(strp_length("1.2.3").ok(), None);
         assert_eq!(strp_length("a").ok(), None);
         assert_eq!(strp_length("a%").ok(), None);
+    }
+
+    #[test]
+    fn test_attr_split() {
+        let mut parts = attr_split("0 1.5 23");
+        assert_eq!(parts.next(), Some(String::from("0")));
+        assert_eq!(parts.next(), Some(String::from("1.5")));
+        assert_eq!(parts.next(), Some(String::from("23")));
+        assert_eq!(parts.next(), None);
+
+        let mut parts = attr_split("0, 1.5, 23");
+        assert_eq!(parts.next(), Some(String::from("0")));
+        assert_eq!(parts.next(), Some(String::from("1.5")));
+        assert_eq!(parts.next(), Some(String::from("23")));
+        assert_eq!(parts.next(), None);
+    }
+
+    #[test]
+    fn test_attr_split_cycle() {
+        let mut parts = attr_split_cycle("0 1.5 23");
+        assert_eq!(parts.next(), Some(String::from("0")));
+        assert_eq!(parts.next(), Some(String::from("1.5")));
+        assert_eq!(parts.next(), Some(String::from("23")));
+        assert_eq!(parts.next(), Some(String::from("0")));
+        assert_eq!(parts.next(), Some(String::from("1.5")));
+        assert_eq!(parts.next(), Some(String::from("23")));
+        assert_eq!(parts.next(), Some(String::from("0")));
+        assert_eq!(parts.next(), Some(String::from("1.5")));
+        assert_eq!(parts.next(), Some(String::from("23")));
     }
 
     #[test]

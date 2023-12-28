@@ -1,0 +1,53 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="65mm" height="62mm" viewBox="-12 -35 65 62">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill;"/>
+    </marker>
+    <filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
+      <feOffset dx="1" dy="1"/>
+      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
+    </filter>
+  </defs>
+  <style>
+    rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    .d-thin { stroke-width: 0.2; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    .d-hardshadow { filter: url(#d-hardshadow); }
+    line.d-arrow, polyline.d-arrow { marker-end: url(#d-arrow); }
+    .d-dash { stroke-dasharray: 2 1.5; }
+    .d-blue { stroke: blue; }
+    text.d-blue, text.d-blue * { stroke: none; }
+    .d-fill-darkmagenta { fill: darkmagenta; }
+    text.d-fill-darkmagenta, text.d-fill-darkmagenta * { fill: white; }
+    .d-fill-grey { fill: grey; }
+    text.d-fill-grey, text.d-fill-grey * { fill: white; }
+    .d-fill-green { fill: green; }
+    text.d-fill-green, text.d-fill-green * { fill: white; }
+    .d-fill-lightgrey { fill: lightgrey; }
+    text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; }
+    .d-fill-whitesmoke { fill: whitesmoke; }
+    text.d-fill-whitesmoke, text.d-fill-whitesmoke * { fill: black; }
+  </style>
+  <rect id="base" width="40" height="20" class="d-fill-whitesmoke"/>
+  <rect id="in" x="-5" y="7.5" width="10" height="5" class="d-fill-green"/>
+  <text x="0" y="10" class="d-fill-green d-tbox">in</text>
+  <rect id="send" x="7" y="-2.5" width="10" height="5" class="d-fill-lightgrey"/>
+  <text x="12" y="0" class="d-fill-lightgrey d-tbox">send</text>
+  <rect id="return" x="23" y="-2.5" width="10" height="5" class="d-fill-grey"/>
+  <text x="28" y="0" class="d-fill-grey d-tbox">return</text>
+  <rect id="out" x="35" y="7.5" width="10" height="5" class="d-fill-red"/>
+  <text x="40" y="10" class="d-fill-red d-tbox">out</text>
+
+  <rect id="effect" x="10" y="-28" width="20" height="8" class="d-fill-darkmagenta"/>
+  <text x="20" y="-24" class="d-fill-darkmagenta d-tbox">effect</text>
+
+  <line x1="13.5" y1="-2.5" x2="13.5" y2="-20" class="d-arrow d-dash"/>
+  <line x1="26.5" y1="-20" x2="26.5" y2="-2.5" class="d-arrow d-dash"/>
+
+  <polyline points="-4 13 6 13 13 5.5 13 0.5 21 -21 29 0.5 29 5.5 36 13 46 13" class="d-arrow d-hardshadow d-blue d-thin"/>
+</svg>
+

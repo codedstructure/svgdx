@@ -4,7 +4,28 @@ use crate::types::{AttrMap, BoundingBox, ClassList};
 use crate::{attr_split, attr_split_cycle, fstr, strp, strp_length, Length};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
-use regex::Regex;
+use regex::{Captures, Regex};
+use std::collections::HashMap;
+
+fn expand_relspec(value: &str, elem_map: &HashMap<String, SvgElement>) -> String {
+    let locspec = Regex::new(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)").expect("Bad Regex");
+
+    let result = locspec.replace_all(value, |caps: &Captures| {
+        let elref = caps.name("id").expect("Regex Match").as_str();
+        let loc = caps.name("loc").expect("Regex Match").as_str();
+        if let Some(elem) = elem_map.get(elref) {
+            if let Ok(Some(pos)) = elem.coord(loc) {
+                format!("{} {}", fstr(pos.0), fstr(pos.1))
+            } else {
+                value.to_string()
+            }
+        } else {
+            value.to_string()
+        }
+    });
+
+    result.to_string()
+}
 
 #[derive(Clone, Debug)]
 pub(crate) struct SvgElement {
@@ -294,6 +315,15 @@ impl SvgElement {
                 }
                 "y" | "cy" | "y1" | "y2" => {
                     new_elem.set_attr(key, &fstr(strp(value).unwrap() + dy));
+                }
+                "points" => {
+                    let mut values = vec![];
+                    for (idx, part) in attr_split(value).enumerate() {
+                        values.push(fstr(
+                            strp(&part).unwrap() + if idx % 2 == 0 { dx } else { dy },
+                        ));
+                    }
+                    new_elem.set_attr(key, &values.join(" "));
                 }
                 _ => (),
             }
@@ -690,6 +720,9 @@ impl SvgElement {
                             pass_two_attrs.insert("cx", fstr(x + rx));
                             pass_two_attrs.insert("cy", fstr(y + ry));
                         }
+                    }
+                    ("points", "polyline" | "polygon") => {
+                        pass_two_attrs.insert("points", expand_relspec(&value, &context.elem_map));
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }
