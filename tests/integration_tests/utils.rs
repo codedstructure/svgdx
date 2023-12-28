@@ -11,7 +11,11 @@ pub fn compare(input: &str, expected: &str) {
     svg_transform(&mut input, &mut output).expect("Transform failure");
     let output = String::from_utf8(output).expect("not UTF8");
 
-    assert_eq!(output.trim(), expected.trim());
+    assert_eq!(
+        output.trim(),
+        expected.trim(),
+        "\noutput:\n{output}\nexpected:\n{expected}"
+    );
 }
 
 pub fn contains(input: &str, expected: &str) {
