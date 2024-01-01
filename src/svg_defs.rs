@@ -348,7 +348,7 @@ pub(crate) fn build_defs(
 
     if classes.contains("d-arrow") {
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill; stroke-dasharray: none;"/>
+      <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: black;"/>
     </marker>"#));
     }
 

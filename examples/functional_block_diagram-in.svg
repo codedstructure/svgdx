@@ -1,48 +1,30 @@
 <svg>
-  <defs>
-   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
-   </marker>
-  </defs>
-  <style>
-    rect, line, polyline { fill: none; stroke: black; stroke-width: 0.3; }
-    line, polyline { stroke-width: 0.4; }
-    text, tspan { font-size: 2px; font-family: sans-serif; font-weight: bold; }
-    rect.nool { stroke: none; }
-    text, text * { dominant-baseline: central; text-anchor: middle; }
-    text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
-    text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
-    text.d-text-left, text.d-text-left * { text-anchor: start; }
-    text.d-text-right, text.d-text-right * { text-anchor: end; }
+  <rect id="ace" xy="0" wh="25 15" text="ATTITUDE\nCONTROL\nELECTRONICS\n(ACE)" />
+  <rect id="prgp" xy="#ace:v 18" wh="25 12" text="PRIMARY\nRATE GYRO\nPACKAGE" />
+  <rect id="srgp" xy="#prgp:v 7" wh="25 12" text="SECONDARY\nRATE GYRO\nPACKAGE" />
 
-    line, polyline { marker-end: url(#arrow); }
-  </style>
-  <rect id="ace" xy="0" wh="16 10" text="ATTITUDE\nCONTROL\nELECTRONICS\n(ACE)" />
-  <rect id="prgp" xy="#ace:v 14" wh="16 8" text="PRIMARY\nRATE GYRO\nPACKAGE" />
-  <rect id="srgp" xy="#prgp:v 5" wh="16 8" text="SECONDARY\nRATE GYRO\nPACKAGE" />
+  <rect id="oame" xy="#ace@r" xy-loc="c" dx="62" wh="27 15" text="ORBIT ATTITUDE\nAND MANEUVER\nELECTRONICS\n(OAME)" />
+  <rect id="pi" xy="#prgp@r" xy-loc="c" dx="62" wh="22 12" text="POWER\nINVERTER" />
 
-  <rect id="oame" xy="#ace@r" xy-loc="c" dx="42" wh="18 10" text="ORBIT ATTITUDE\nAND MANEUVER\nELECTRONICS\n(OAME)" />
-  <rect id="pi" xy="#prgp@r" xy-loc="c" dx="42" wh="14 8" text="POWER\nINVERTER" />
+  <rect id="ms" xy="#ace@tl" xy-loc="br" dxy="-16 -5" wh="18 15" text="MODE\nSELECTION" text-loc="l" class="d-none"/>
+  <rect id="as" xy="#ace@tl" xy-loc="tr" dx="-16" wh="16 7" text="ATTITUDE\nSIGNALS" text-loc="l" class="d-none"/>
+  <rect id="rrcs" xy="#oame@tr" xy-loc="bl" dxy="10 -5" wh="18 15" text="REENTRY\nREACTION\nCONTROL\nSYSTEM" text-loc="l" class="d-none"/>
+  <rect id="oaamrcs" xy="#oame:h 10" wh="35 15" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="d-none"/>
 
-  <rect id="ms" xy="#ace@tl" xy-loc="br" dxy="-14 -5" wh="13 10" text="MODE\nSELECTION" text-loc="l" class="nool"/>
-  <rect id="as" xy="#ace@tl" xy-loc="tr" dx="-14" wh="11 5" text="ATTITUDE\nSIGNALS" text-loc="l" class="nool"/>
-  <rect id="rrcs" xy="#oame@tr" xy-loc="bl" dxy="8 -5" wh="15 10" text="REENTRY\nREACTION\nCONTROL\nSYSTEM" text-loc="l" class="nool"/>
-  <rect id="oaamrcs" xy="#oame:h 8" wh="15 10" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="nool"/>
+  <circle id="ppi" r="0.75" cxy="#prgp@r" dx="10" class="d-fill-black"/>
+  <circle id="jfc" r="0.75" cxy="#ace@r" dx="24" class="d-fill-black"/>
 
-  <circle id="ppi" r="0.75" cxy="#prgp@r" dx="8"/>
-  <circle id="jfc" r="0.75" cxy="#ace@r" dx="16"/>
+  <polyline start="#prgp@l" end="#ace@l:75%" corner-offset="8" text="p,q,r" text-loc="br" class="d-arrow"/>
+  <polyline start="#srgp@l" end="#ace@l:50%" corner-offset="14" text="p,q,r" text-loc="br" class="d-arrow"/>
+  <line start="#as" end="#ace" edge-type="h" class="d-arrow"/>
 
-  <polyline start="#prgp@l" end="#ace@l:75%" corner-offset="6" text="p,q,r" text-loc="br"/>
-  <polyline start="#srgp@l" end="#ace@l:50%" corner-offset="12" text="p,q,r" text-loc="br"/>
-  <line start="#as" end="#ace" edge-type="h"/>
+  <polyline start="#ppi@t" end="#ace@b" corner-offset="70%" class="d-arrow"/>
+  <polyline start="#ppi" end="#srgp@r" class="d-arrow"/>
+  <polyline start="#jfc@t" end="#rrcs@l" class="d-arrow"/>
+  <line start="#oame" end="#oaamrcs" class="d-arrow"/>
 
-  <polyline start="#ppi" end="#ace@b" corner-offset="70%"/>
-  <polyline start="#ppi" end="#srgp@r"/>
-  <polyline start="#jfc@t" end="#rrcs@l"/>
-  <line start="#oame" end="#oaamrcs"/>
+  <polyline start="#ace@r" end="#oame@l" text="JET FIRING\nCOMMANDS" text-dxy="-10 0.2" text-lsp="1.3" class="d-arrow"/>
+  <polyline start="#pi@l" end="#prgp@r" text="26V, 400~" text-dy="-2" class="d-arrow"/>
 
-  <polyline start="#ace@r" end="#oame@l" text="JET FIRING\nCOMMANDS" text-dxy="-8 0.2" text-lsp="1.3"/>
-  <polyline start="#pi@l" end="#prgp@r" text="26V, 400~" text-dy="-1"/>
-
-  <polyline start="#ms@r" end="#ace@t"/>
+  <polyline start="#ms@r" end="#ace@t" class="d-arrow"/>
 </svg>

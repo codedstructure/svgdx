@@ -1,81 +1,81 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="135mm" height="74mm" viewBox="-36 -22 135 74">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="200mm" height="100mm" viewBox="-44 -28 200 100">
   <defs>
-   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
-   </marker>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: black;"/>
+    </marker>
   </defs>
   <style>
-    rect, line, polyline { fill: none; stroke: black; stroke-width: 0.3; }
-    line, polyline { stroke-width: 0.4; }
-    text, tspan { font-size: 2px; font-family: sans-serif; font-weight: bold; }
-    rect.nool { stroke: none; }
-    text, text * { dominant-baseline: central; text-anchor: middle; }
-    text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
     text.d-text-left, text.d-text-left * { text-anchor: start; }
     text.d-text-right, text.d-text-right * { text-anchor: end; }
-
-    line, polyline { marker-end: url(#arrow); }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    .d-none { stroke: none; }
+    text.d-none, text.d-none * { stroke: none; }
+    .d-fill-black { fill: black; }
+    text.d-fill-black, text.d-fill-black * { fill: white; }
   </style>
-  <rect id="ace" x="0" y="0" width="16" height="10"/>
-  <text x="8" y="5" class="d-tbox">
-  <tspan x="8" dy="-1.575em">ATTITUDE</tspan><tspan x="8" dy="1.05em">CONTROL</tspan><tspan x="8" dy="1.05em">ELECTRONICS</tspan><tspan x="8" dy="1.05em">(ACE)</tspan>
+  <rect id="ace" x="0" y="0" width="25" height="15"/>
+  <text x="12.5" y="7.5" class="d-tbox">
+  <tspan x="12.5" dy="-1.575em">ATTITUDE</tspan><tspan x="12.5" dy="1.05em">CONTROL</tspan><tspan x="12.5" dy="1.05em">ELECTRONICS</tspan><tspan x="12.5" dy="1.05em">(ACE)</tspan>
   </text>
-  <rect id="prgp" x="0" y="24" width="16" height="8"/>
-  <text x="8" y="28" class="d-tbox">
-  <tspan x="8" dy="-1.05em">PRIMARY</tspan><tspan x="8" dy="1.05em">RATE GYRO</tspan><tspan x="8" dy="1.05em">PACKAGE</tspan>
+  <rect id="prgp" x="0" y="33" width="25" height="12"/>
+  <text x="12.5" y="39" class="d-tbox">
+  <tspan x="12.5" dy="-1.05em">PRIMARY</tspan><tspan x="12.5" dy="1.05em">RATE GYRO</tspan><tspan x="12.5" dy="1.05em">PACKAGE</tspan>
   </text>
-  <rect id="srgp" x="0" y="37" width="16" height="8"/>
-  <text x="8" y="41" class="d-tbox">
-  <tspan x="8" dy="-1.05em">SECONDARY</tspan><tspan x="8" dy="1.05em">RATE GYRO</tspan><tspan x="8" dy="1.05em">PACKAGE</tspan>
-  </text>
-
-  <rect id="oame" x="49" y="0" width="18" height="10"/>
-  <text x="58" y="5" class="d-tbox">
-  <tspan x="58" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="58" dy="1.05em">AND MANEUVER</tspan><tspan x="58" dy="1.05em">ELECTRONICS</tspan><tspan x="58" dy="1.05em">(OAME)</tspan>
-  </text>
-  <rect id="pi" x="51" y="24" width="14" height="8"/>
-  <text x="58" y="28" class="d-tbox">
-  <tspan x="58" dy="-0.525em">POWER</tspan><tspan x="58" dy="1.05em">INVERTER</tspan>
+  <rect id="srgp" x="0" y="52" width="25" height="12"/>
+  <text x="12.5" y="58" class="d-tbox">
+  <tspan x="12.5" dy="-1.05em">SECONDARY</tspan><tspan x="12.5" dy="1.05em">RATE GYRO</tspan><tspan x="12.5" dy="1.05em">PACKAGE</tspan>
   </text>
 
-  <rect id="ms" x="-27" y="-15" width="13" height="10" class="nool"/>
-  <text x="-26" y="-10" class="nool d-tbox d-text-left">
-  <tspan x="-26" dy="-0.525em">MODE</tspan><tspan x="-26" dy="1.05em">SELECTION</tspan>
+  <rect id="oame" x="73.5" y="0" width="27" height="15"/>
+  <text x="87" y="7.5" class="d-tbox">
+  <tspan x="87" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="87" dy="1.05em">AND MANEUVER</tspan><tspan x="87" dy="1.05em">ELECTRONICS</tspan><tspan x="87" dy="1.05em">(OAME)</tspan>
   </text>
-  <rect id="as" x="-25" y="0" width="11" height="5" class="nool"/>
-  <text x="-24" y="2.5" class="nool d-tbox d-text-left">
-  <tspan x="-24" dy="-0.525em">ATTITUDE</tspan><tspan x="-24" dy="1.05em">SIGNALS</tspan>
-  </text>
-  <rect id="rrcs" x="75" y="-15" width="15" height="10" class="nool"/>
-  <text x="76" y="-10" class="nool d-tbox d-text-left">
-  <tspan x="76" dy="-1.575em">REENTRY</tspan><tspan x="76" dy="1.05em">REACTION</tspan><tspan x="76" dy="1.05em">CONTROL</tspan><tspan x="76" dy="1.05em">SYSTEM</tspan>
-  </text>
-  <rect id="oaamrcs" x="75" y="0" width="15" height="10" class="nool"/>
-  <text x="76" y="5" class="nool d-tbox d-text-left">
-  <tspan x="76" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="76" dy="1.05em">AND MANEUVER</tspan><tspan x="76" dy="1.05em">REACTION CONTROL</tspan><tspan x="76" dy="1.05em">SYSTEM</tspan>
+  <rect id="pi" x="76" y="33" width="22" height="12"/>
+  <text x="87" y="39" class="d-tbox">
+  <tspan x="87" dy="-0.525em">POWER</tspan><tspan x="87" dy="1.05em">INVERTER</tspan>
   </text>
 
-  <circle id="ppi" r="0.75" cx="24" cy="28"/>
-  <circle id="jfc" r="0.75" cx="32" cy="5"/>
-
-  <polyline points="0 28, -6 28, -6 7.5, 0 7.5"/>
-  <text x="-1" y="27" class="d-tbox d-text-bottom d-text-right">p,q,r</text>
-  <polyline points="0 41, -12 41, -12 5, 0 5"/>
-  <text x="-1" y="40" class="d-tbox d-text-bottom d-text-right">p,q,r</text>
-  <line x1="-14" y1="2.5" x2="0" y2="2.5"/>
-
-  <polyline points="24 27.25, 24 15.175, 8 15.175, 8 10"/>
-  <polyline points="24 28.75, 24 41, 16 41"/>
-  <polyline points="32 4.25, 32 -10, 75 -10"/>
-  <line x1="67" y1="5" x2="75" y2="5"/>
-
-  <polyline points="16 5, 32.5 5, 32.5 5, 49 5"/>
-  <text x="24.5" y="5.2" class="d-tbox">
-  <tspan x="24.5" dy="-0.65em">JET FIRING</tspan><tspan x="24.5" dy="1.3em">COMMANDS</tspan>
+  <rect id="ms" x="-34" y="-20" width="18" height="15" class="d-none"/>
+  <text x="-33" y="-12.5" class="d-none d-tbox d-text-left">
+  <tspan x="-33" dy="-0.525em">MODE</tspan><tspan x="-33" dy="1.05em">SELECTION</tspan>
   </text>
-  <polyline points="51 28, 33.5 28, 33.5 28, 16 28"/>
-  <text x="33.5" y="27" class="d-tbox">26V, 400~</text>
+  <rect id="as" x="-32" y="0" width="16" height="7" class="d-none"/>
+  <text x="-31" y="3.5" class="d-none d-tbox d-text-left">
+  <tspan x="-31" dy="-0.525em">ATTITUDE</tspan><tspan x="-31" dy="1.05em">SIGNALS</tspan>
+  </text>
+  <rect id="rrcs" x="110.5" y="-20" width="18" height="15" class="d-none"/>
+  <text x="111.5" y="-12.5" class="d-none d-tbox d-text-left">
+  <tspan x="111.5" dy="-1.575em">REENTRY</tspan><tspan x="111.5" dy="1.05em">REACTION</tspan><tspan x="111.5" dy="1.05em">CONTROL</tspan><tspan x="111.5" dy="1.05em">SYSTEM</tspan>
+  </text>
+  <rect id="oaamrcs" x="110.5" y="0" width="35" height="15" class="d-none"/>
+  <text x="111.5" y="7.5" class="d-none d-tbox d-text-left">
+  <tspan x="111.5" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="111.5" dy="1.05em">AND MANEUVER</tspan><tspan x="111.5" dy="1.05em">REACTION CONTROL</tspan><tspan x="111.5" dy="1.05em">SYSTEM</tspan>
+  </text>
 
-  <polyline points="-14 -10, 8 -10, 8 0"/>
+  <circle id="ppi" r="0.75" cx="35" cy="39" class="d-fill-black"/>
+  <circle id="jfc" r="0.75" cx="49" cy="7.5" class="d-fill-black"/>
+
+  <polyline points="0 39, -8 39, -8 11.25, 0 11.25" class="d-arrow"/>
+  <text x="-1" y="38" class="d-arrow d-tbox d-text-bottom d-text-right">p,q,r</text>
+  <polyline points="0 58, -14 58, -14 7.5, 0 7.5" class="d-arrow"/>
+  <text x="-1" y="57" class="d-arrow d-tbox d-text-bottom d-text-right">p,q,r</text>
+  <line x1="-16" y1="3.5" x2="0" y2="3.5" class="d-arrow"/>
+
+  <polyline points="35 38.25, 35 21.975, 12.5 21.975, 12.5 15" class="d-arrow"/>
+  <polyline points="35 39.75, 35 58, 25 58" class="d-arrow"/>
+  <polyline points="49 6.75, 49 -12.5, 110.5 -12.5" class="d-arrow"/>
+  <line x1="100.5" y1="7.5" x2="110.5" y2="7.5" class="d-arrow"/>
+
+  <polyline points="25 7.5, 49.25 7.5, 49.25 7.5, 73.5 7.5" class="d-arrow"/>
+  <text x="39.25" y="7.7" class="d-arrow d-tbox">
+  <tspan x="39.25" dy="-0.65em">JET FIRING</tspan><tspan x="39.25" dy="1.3em">COMMANDS</tspan>
+  </text>
+  <polyline points="76 39, 50.5 39, 50.5 39, 25 39" class="d-arrow"/>
+  <text x="50.5" y="37" class="d-arrow d-tbox">26V, 400~</text>
+
+  <polyline points="-16 -12.5, 12.5 -12.5, 12.5 0" class="d-arrow"/>
 </svg>

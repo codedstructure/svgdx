@@ -1,18 +1,11 @@
 <svg>
- <style>
-   rect {fill:none;stroke:black;stroke-width:0.3;}
-   text {font-size:3px; font-family:sans-serif; text-anchor:middle; dominant-baseline:middle;}
- </style>
  <var h="10" x="0"/>
 
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n{{$h / 10}}"/>
+ <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
  <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n{{$h / 10}}"/>
+ <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
  <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n{{$h / 10}}"/>
+ <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
  <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n{{$h / 10}}"/>
- <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n{{$h / 10}}"/>
- <var h="{{$h * 2}}" x="{{$x + 1}}"/>
+ <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
 </svg>

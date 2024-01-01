@@ -1,8 +1,102 @@
-# svgdx
+# **svgdx** - _create SVG diagrams easily_
 
-**svgdx** is a 'delta' on SVG; a preprocessor which accepts a superset of SVG and outputs SVG.
+**svgdx** is a command-line tool to convert a superset of SVG into an SVG image.
 
-It is intended to support 'typing a diagram' workflows, at a lower (and more flexible) level than structured tools such as [Mermaid](https://mermaid.js.org) or [Graphviz](https://graphviz.org).
+> **This project is in early development, there are many known issues and frequent feature updates.**
+>
+> In particular, the input format is **not stable** at this point. Check the [CHANGELOG](CHANGELOG.md) for info.
+
+## Installation
+
+For now installation requires a working Rust toolchain, e.g. installed from [rustup.rs](https://rustup.rs).
+
+Install `svgdx` as follows:
+
+    cargo install svgdx
+
+## Usage
+
+    svgdx [INPUT] [-o OUTPUT] [-w]
+
+By default, `svgdx` reads from stdin and writes to standard output, so if run without any
+arguments it simply waits for input.
+
+The `-w` argument (which requires a non-stdin input file) 'watches' the input,
+regenerating the output whenever it changes. This is particularly useful alongside
+an SVG viewer / preview which also refreshes the view when the underlying file changes.
+
+## Example
+
+### Input
+
+Prepare an input file ([examples/simple-in.svg](examples/simple-in.svg)):
+
+```xml
+<svg>
+  <rect id="in" wh="20 10" text="input" />
+  <rect id="proc" xy="^h 10" wh="^" text="process" />
+  <rect id="out" xy="^h 10" wh="^" text="output" />
+
+  <line start="#in" end="#proc" class="d-arrow"/>
+  <line start="#proc" end="#out" class="d-arrow"/>
+</svg>
+```
+
+### Processing
+
+Process the input with `svgdx`:
+
+```bash
+$ svgdx examples/simple-in.svg -o examples/simple-out.svg
+```
+
+### Output
+Output file ([examples/simple-out.svg](examples/simple-out.svg)):
+
+![](examples/simple-out.svg)
+
+which is a rendering of the following generated SVG:
+
+```xml
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="96mm" height="22mm" viewBox="-8 -6 96 22">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill; stroke-dasharray: none;"/>
+    </marker>
+  </defs>
+  <style>
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+  </style>
+  <rect id="in" width="20" height="10"/>
+  <text x="10" y="5" class="d-tbox">input</text>
+  <rect id="proc" x="30" y="0" width="20" height="10"/>
+  <text x="40" y="5" class="d-tbox">process</text>
+  <rect id="out" x="60" y="0" width="20" height="10"/>
+  <text x="70" y="5" class="d-tbox">output</text>
+
+  <line x1="20" y1="5" x2="30" y2="5" class="d-arrow"/>
+  <line x1="50" y1="5" x2="60" y2="5" class="d-arrow"/>
+</svg>
+```
+
+This example shows just a few of the features `svgdx` provides:
+
+* shortcut attributes, e.g. the use of `wh` rather than having to specify `width` and `height` separately.
+* relative positioning, either by reference to an id (e.g. `#in`), or to the previous element using the caret (`^`) symbol.
+* new attributes providing additional functionality - `text` within shapes, or `start` and `end` points on `<line>` elements to define connectors.
+* automatic calculation of root `<svg>` element `width`, `height` and `viewBox` derived from the bounding box of all elements.
+* automatic styles added to provide sensible defaults for 'box and line' diagrams.
+
+Many more features are provided by **svgdx**, with the goal of making a diagram something you can write, rather than draw.
+
+See [more examples](examples/README.md)
+
+## Background
+
+SVGdx is intended to support 'typing a diagram' workflows, at a lower (and more flexible) level than structured tools such as [Mermaid](https://mermaid.js.org) or [Graphviz](https://graphviz.org).
 
 An important principle is that raw SVG can be included directly at any point in the input. This is analogous to Markdown, which provides the 'escape hatch' of using inline HTML tags. Markdown has been incredibly successful as a text based format allowing simple text files to carry both semantic and simple style information. Being able to do both of those in a single workflow - just by _typing_ - allows a flow which would otherwise not be achievable.
 
@@ -13,6 +107,8 @@ Text files provide a number of advantages over other formats:
 * Self-describing - text files are easy to (at least approximately) reverse engineer even in the absence of a clear spec or other tools
 * Application independence - additional tools can be written to deal with the format
 * Easy editing - at least for simple changes
+
+### Text-based diagramming tools
 
 There are several existing tools which convey diagrammatic information in textual form:
 
@@ -28,59 +124,12 @@ When abstraction fails, moving to a lower layer is often the answer. Rather than
 
 **[SVG](https://en.wikipedia.org/wiki/SVG)** is an XML-based language for defining vector images. The tools discussed above (with the exception of `ditaa`) can all output SVG images, and SVG is a (perhaps _the_)  lowest-common-denominator of graphics formats for diagramming tools.
 
-SVG is a fairly simple language, and a small subset can be used to create a large number of diagrams:
 
-* Rectangles
-* Lines
-* Text
+### Why 'svgdx'?
 
-Out of these, text and positioning are frustrating in SVG, but it's still straightforward to make simple diagrams.
+Project naming is hard.
 
-```xml
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="116mm" height="22mm" viewBox="2 -4 116 22">
-  <style>
-    rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; fill: none; }
-    text { font-family: sans-serif; font-size: 3px; }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
-  </style>
-  <rect id="in" x="10" y="2" width="20" height="10"/>
-  <text x="20" y="7" class="d-tbox">input</text>
-  <rect id="proc" x="50" y="2" width="20" height="10"/>
-  <text x="60" y="7" class="d-tbox">process</text>
-  <rect id="out" x="90" y="2" width="20" height="10"/>
-  <text x="100" y="7" class="d-tbox">output</text>
+I could write about how this tool is about improving the **d**eveloper e**x**perience of creating diagrams; perhaps the **d**iagramming e**x**perience. But primarily the `dx` in `svgdx` is intended to refer to a __delta__ of SVG.
 
-  <line x1="30" y1="7" x2="50" y2="7"/>
-  <line x1="70" y1="7" x2="90" y2="7"/>
-</svg>
-```
-
-renders as:
-
-![](examples/simple-out.svg)
-
-
-Not too tricky, but there are a lot of fiddly coordinate values and boilerplate for styling and XML processing instructions. See the underlying file [here](examples/simple-out.svg).
-
-What if we could render the same thing from something more like the following?
-
-```xml
-<svg>
-  <rect id="in" xy="10 2" wh="20 10" text="input" />
-  <rect id="proc" xy="^h 20" wh="^" text="process" />
-  <rect id="out" xy="^h 20" wh="^" text="output" />
-
-  <line start="#in" end="#proc" />
-  <line start="#proc" end="#out" />
-</svg>
-```
-
-This example shows just a few of the enhancements `svgdx` provides:
-
-* shortcut attributes, e.g. the use of `wh` rather than having to specify `width` and `height` separately.
-* relative positioning, either by reference to an id (e.g. `#in`), or to the previous element using the caret (`^`) symbol.
-* new attributes providing additional functionality - `text` within shapes, or `start` and `end` points on `<line>` elements to define connectors.
-* automatic calculation of root `<svg>` element `width`, `height` and `viewBox` derived from the bounding box of all elements.
-* automatic styles added to provide sensible defaults for 'box and line' diagrams.
-
-Many more features are provided by **svgdx**, with the goal of making a diagram something you can write, rather than draw.
+This is explicitly an _SVG_ tool, not some generic diagamming tool. It is most useful when combined with some experience of SVG.
+While the SVG standards progress slowly, this tool allows keeping everything good from SVG and adding just _a little bit more_.
