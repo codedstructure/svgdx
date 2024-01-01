@@ -36,6 +36,20 @@ impl TryFrom<String> for EdgeSpec {
     }
 }
 
+impl TryFrom<LocSpec> for EdgeSpec {
+    type Error = anyhow::Error;
+
+    fn try_from(value: LocSpec) -> Result<Self, Self::Error> {
+        match value {
+            LocSpec::Top => Ok(Self::Top),
+            LocSpec::Right => Ok(Self::Right),
+            LocSpec::Bottom => Ok(Self::Bottom),
+            LocSpec::Left => Ok(Self::Left),
+            _ => bail!("Cannot convert LocSpec value into EdgeSpec")
+        }
+    }
+}
+
 /// `LocSpec` defines a location on a `BoundingBox`
 #[derive(Clone, Copy)]
 pub enum LocSpec {

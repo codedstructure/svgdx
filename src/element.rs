@@ -374,7 +374,7 @@ impl SvgElement {
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
         let rel_re =
-            Regex::new(r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?(?<loc>@\S+)?)")
+            Regex::new(r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)")
                 .expect("Bad Regex");
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
@@ -395,6 +395,7 @@ impl SvgElement {
             let mut ref_el = context.prev_element.as_ref();
             let default_rel;
             let mut loc = None;
+            let mut len = None;
 
             if let Some(relhv) = caps.name("relhv") {
                 let rel_dir;
@@ -456,9 +457,12 @@ impl SvgElement {
                 default_rel = LocSpec::TopRight;
                 let loc_str = caps
                     .name("loc")
-                    .map(|v| v.as_str().strip_prefix('@').unwrap());
+                    .map(|v| v.as_str().strip_prefix('@').expect("Regex match"));
                 if let Some(loc_str) = loc_str {
                     loc = Some(LocSpec::try_from(loc_str)?);
+                }
+                if let Some(len_str) = caps.name("len") {
+                    len = Some(strp_length(len_str.as_str()).context("Invalid Length")?);
                 }
             }
 
@@ -492,7 +496,13 @@ impl SvgElement {
                     LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => margin_x,
                     _ => 0.,
                 };
-                if let Some(pos) = ref_el.bbox()?.map(|bb| bb.locspec(loc)) {
+
+                if let Some(bb) = ref_el.bbox()? {
+                    let pos = if let (Ok(es), Some(len)) = (EdgeSpec::try_from(loc), len) {
+                        bb.edgespec(es, len)
+                    } else {
+                        bb.locspec(loc)
+                    };
                     return Ok(format!(
                         "{} {}",
                         fstr(pos.0 + margin_x + dx),
