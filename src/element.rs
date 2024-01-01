@@ -1,6 +1,6 @@
 use crate::expression::eval_attr;
 pub(crate) use crate::transform::TransformerContext;
-use crate::types::{AttrMap, BoundingBox, ClassList};
+use crate::types::{AttrMap, BoundingBox, ClassList, EdgeSpec, LocSpec};
 use crate::{attr_split, attr_split_cycle, fstr, strp, strp_length, Length};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
@@ -152,7 +152,7 @@ impl SvgElement {
                     let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
                     let w = strp(w)?;
                     let h = strp(h)?;
-                    Ok(Some(BoundingBox::BBox(x, y, x + w, y + h)))
+                    Ok(Some(BoundingBox::new(x, y, x + w, y + h)))
                 } else {
                     Ok(None)
                 }
@@ -162,7 +162,7 @@ impl SvgElement {
                 let y1 = strp(self.attrs.get("y1").unwrap_or(&zstr))?;
                 let x2 = strp(self.attrs.get("x2").unwrap_or(&zstr))?;
                 let y2 = strp(self.attrs.get("y2").unwrap_or(&zstr))?;
-                Ok(Some(BoundingBox::BBox(
+                Ok(Some(BoundingBox::new(
                     x1.min(x2),
                     y1.min(y2),
                     x1.max(x2),
@@ -201,7 +201,7 @@ impl SvgElement {
                         }
                     }
                     if has_x && has_y {
-                        Ok(Some(BoundingBox::BBox(min_x, min_y, max_x, max_y)))
+                        Ok(Some(BoundingBox::new(min_x, min_y, max_x, max_y)))
                     } else {
                         bail!("Insufficient points for bbox")
                     }
@@ -214,7 +214,7 @@ impl SvgElement {
                     let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;
                     let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
                     let r = strp(r)?;
-                    Ok(Some(BoundingBox::BBox(cx - r, cy - r, cx + r, cy + r)))
+                    Ok(Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r)))
                 } else {
                     Ok(None)
                 }
@@ -225,7 +225,7 @@ impl SvgElement {
                     let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
                     let rx = strp(rx)?;
                     let ry = strp(ry)?;
-                    Ok(Some(BoundingBox::BBox(cx - rx, cy - ry, cx + rx, cy + ry)))
+                    Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))
                 } else {
                     Ok(None)
                 }
@@ -239,7 +239,7 @@ impl SvgElement {
                     let x = strp(x)?;
                     let y = strp(y)?;
                     let h = strp(h)?;
-                    Ok(Some(BoundingBox::BBox(x, y, x + h / 3., y + h)))
+                    Ok(Some(BoundingBox::new(x, y, x + h / 3., y + h)))
                 } else {
                     Ok(None)
                 }
@@ -248,59 +248,33 @@ impl SvgElement {
         }
     }
 
+    /// Get point from a string such as 'tl' (top-left of this element) or
+    /// 'r:30%' (30% down the right edge).
+    ///
+    /// TODO: should also support e.g. `start:10%` for a line etc
+    ///
+    /// TODO: support per-shape locs - e.g. "in" / "out" for pipeline
+    ///
+    /// Return `Err` if invalid string format, `Ok(None)` if no bounding box,
+    /// else `Ok(Some(coord))`
     pub fn coord(&self, loc: &str) -> Result<Option<(f32, f32)>> {
         let mut loc = loc;
         let mut len = Length::Ratio(0.5);
         let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").expect("Bad Regex");
         if let Some(caps) = re.captures(loc) {
-            loc = caps.name("loc").unwrap().as_str();
+            loc = caps.name("loc").expect("Regex Match").as_str();
             len = caps
                 .name("len")
                 .map_or(len, |v| strp_length(v.as_str()).expect("Invalid length"));
         }
-        // This assumes a rectangular bounding box
-        // TODO: support per-shape locs - e.g. "in" / "out" for pipeline
-        if let Some(BoundingBox::BBox(x1, y1, x2, y2)) = self.bbox()? {
-            let tl = (x1, y1);
-            let tr = (x2, y1);
-            let br = (x2, y2);
-            let bl = (x1, y2);
-            let c = ((x1 + x2) / 2., (y1 + y2) / 2.);
-            Ok(match loc {
-                "tl" => Some(tl),
-                "t" => Some((len.calc_offset(tl.0, tr.0), tl.1)),
-                "tr" => Some(tr),
-                "r" => Some((tr.0, len.calc_offset(tr.1, br.1))),
-                "br" => Some(br),
-                "b" => Some((len.calc_offset(bl.0, br.0), bl.1)),
-                "bl" => Some(bl),
-                "l" => Some((tl.0, len.calc_offset(tl.1, bl.1))),
-                "c" => Some(c),
-                _ => {
-                    if self.name == "line" {
-                        if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
-                            self.attrs.get("x1"),
-                            self.attrs.get("y1"),
-                            self.attrs.get("x2"),
-                            self.attrs.get("y2"),
-                        ) {
-                            let x1 = strp(x1)?;
-                            let y1 = strp(y1)?;
-                            let x2 = strp(x2)?;
-                            let y2 = strp(y2)?;
-                            match loc {
-                                "xy1" | "start" => Some((x1, y1)),
-                                "xy2" | "end" => Some((x2, y2)),
-                                _ => None,
-                            }
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-            })
+        if let Some(bb) = self.bbox()? {
+            if let Ok(edge) = EdgeSpec::try_from(loc) {
+                Ok(Some(bb.edgespec(edge, len)))
+            } else if let Ok(loc) = LocSpec::try_from(loc) {
+                Ok(Some(bb.locspec(loc)))
+            } else {
+                bail!("Invalid locspec in coord")
+            }
         } else {
             Ok(None)
         }
@@ -347,36 +321,32 @@ impl SvgElement {
         new_elem
     }
 
-    pub(crate) fn position_from_bbox(&mut self, bb: &BoundingBox) -> Result<()> {
-        if let BoundingBox::BBox(x1, y1, _x2, _y2) = bb {
-            let width = bb.width().expect("must have width");
-            let height = bb.height().expect("must have height");
-            let (cx, cy) = bb.center().expect("must have center");
-            match self.name.as_str() {
-                "rect" => {
-                    self.attrs.insert("x", fstr(*x1));
-                    self.attrs.insert("y", fstr(*y1));
-                    self.attrs.insert("width", fstr(width));
-                    self.attrs.insert("height", fstr(height));
-                }
-                "circle" => {
-                    self.attrs.insert("cx", fstr(cx));
-                    self.attrs.insert("cy", fstr(cy));
-                    self.attrs
-                        .insert("r", fstr(0.5 * width.max(height) * 1.414));
-                }
-                "ellipse" => {
-                    self.attrs.insert("cx", fstr(cx));
-                    self.attrs.insert("cy", fstr(cy));
-                    self.attrs.insert("rx", fstr(0.5 * width * 1.414));
-                    self.attrs.insert("ry", fstr(0.5 * height * 1.414));
-                }
-                _ => {}
+    pub(crate) fn position_from_bbox(&mut self, bb: &BoundingBox) {
+        let width = bb.width();
+        let height = bb.height();
+        let (cx, cy) = bb.center();
+        let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+        match self.name.as_str() {
+            "rect" => {
+                self.attrs.insert("x", fstr(x1));
+                self.attrs.insert("y", fstr(y1));
+                self.attrs.insert("width", fstr(width));
+                self.attrs.insert("height", fstr(height));
             }
-        } else {
-            bail!("Could not determine position from bbox");
+            "circle" => {
+                self.attrs.insert("cx", fstr(cx));
+                self.attrs.insert("cy", fstr(cy));
+                self.attrs
+                    .insert("r", fstr(0.5 * width.max(height) * 1.414));
+            }
+            "ellipse" => {
+                self.attrs.insert("cx", fstr(cx));
+                self.attrs.insert("cy", fstr(cy));
+                self.attrs.insert("rx", fstr(0.5 * width * 1.414));
+                self.attrs.insert("ry", fstr(0.5 * height * 1.414));
+            }
+            _ => {}
         }
-        Ok(())
     }
 
     fn eval_pos(&mut self, input: &str, context: &TransformerContext) -> Result<String> {
@@ -442,39 +412,39 @@ impl SvgElement {
                 {
                     "h" => {
                         dx = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        "r"
+                        LocSpec::Right
                     }
                     "H" => {
                         dx = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        "l"
+                        LocSpec::Left
                     }
                     "v" => {
                         dy = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        "b"
+                        LocSpec::Bottom
                     }
                     "V" => {
                         dy = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        "t"
+                        LocSpec::Top
                     }
                     _ => {
                         dx = d1
                             .context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
                         dy = d2
                             .context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
-                        "tr"
+                        LocSpec::TopRight
                     }
                 };
 
                 // This is similar to the more generic `xy-loc` processing.
                 // assumes the bounding-box is well-defined by this point.
                 if let Some(bbox) = self.bbox()? {
-                    let width = bbox.width().unwrap();
-                    let height = bbox.height().unwrap();
+                    let width = bbox.width();
+                    let height = bbox.height();
                     let (xy_dx, xy_dy) = match default_rel {
-                        "b" => (width / 2., 0.),
-                        "l" => (width, height / 2.),
-                        "t" => (width / 2., height),
-                        "r" => (0., height / 2.),
+                        LocSpec::Bottom => (width / 2., 0.),
+                        LocSpec::Left => (width, height / 2.),
+                        LocSpec::Top => (width / 2., height),
+                        LocSpec::Right => (0., height / 2.),
                         _ => (0., 0.),
                     };
                     dx -= xy_dx;
@@ -483,10 +453,13 @@ impl SvgElement {
             } else {
                 dx = d1.context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
                 dy = d2.context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
-                default_rel = "tr";
-                loc = caps
+                default_rel = LocSpec::TopRight;
+                let loc_str = caps
                     .name("loc")
                     .map(|v| v.as_str().strip_prefix('@').unwrap());
+                if let Some(loc_str) = loc_str {
+                    loc = Some(LocSpec::try_from(loc_str)?);
+                }
             }
 
             let opt_id = caps
@@ -510,16 +483,16 @@ impl SvgElement {
                 }
                 let loc = loc.unwrap_or(default_rel);
                 margin_y = match loc {
-                    "tl" | "t" | "tr" => -margin_y,
-                    "bl" | "b" | "br" => margin_y,
+                    LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => -margin_y,
+                    LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight => margin_y,
                     _ => 0.,
                 };
                 margin_x = match loc {
-                    "tl" | "l" | "bl" => -margin_x,
-                    "tr" | "r" | "br" => margin_x,
+                    LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => -margin_x,
+                    LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => margin_x,
                     _ => 0.,
                 };
-                if let Some(pos) = ref_el.coord(loc)? {
+                if let Some(pos) = ref_el.bbox()?.map(|bb| bb.locspec(loc)) {
                     return Ok(format!(
                         "{} {}",
                         fstr(pos.0 + margin_x + dx),

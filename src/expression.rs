@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
+use crate::types::ScalarSpec;
 use crate::{element::SvgElement, fstr};
 
 #[derive(Clone, PartialEq)]
@@ -170,18 +171,10 @@ impl EvalState {
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
+            let val = ScalarSpec::try_from(val).expect("Regex match");
             if let Some(elem) = self.elem_map.get(id) {
                 if let Some(bb) = elem.bbox()? {
-                    (match val {
-                        "t" => bb.top(),
-                        "r" => bb.right(),
-                        "b" => bb.bottom(),
-                        "l" => bb.left(),
-                        "w" => bb.width(),
-                        "h" => bb.height(),
-                        _ => None,
-                    })
-                    .context(format!("Could not determine {val} for #{id}"))
+                    Ok(bb.scalarspec(val))
                 } else {
                     bail!("No bounding box for #{}", id);
                 }

@@ -40,7 +40,7 @@ pub fn process_custom(
             // Assumption is that text should be centered within the rect,
             // and has styling via CSS to reflect this, e.g.:
             //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
-            let cxy = rect_elem.bbox()?.unwrap().center().unwrap();
+            let cxy = rect_elem.bbox()?.unwrap().center();
             text_attrs.push(("x".into(), fstr(cxy.0)));
             text_attrs.push(("y".into(), fstr(cxy.1)));
             let bbox = rect_elem.clone();

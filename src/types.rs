@@ -1,112 +1,237 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
 
+use crate::Length;
+use anyhow::bail;
+
+/// `EdgeSpec` defines one edge of a `BoundingBox`.
+///
+/// May be combined with a `Length` to refer to a point along an edge.
+#[derive(Clone, Copy)]
+pub enum EdgeSpec {
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
+impl TryFrom<&str> for EdgeSpec {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "t" => Ok(Self::Top),
+            "r" => Ok(Self::Right),
+            "b" => Ok(Self::Bottom),
+            "l" => Ok(Self::Left),
+            _ => bail!("Invalid EdgeSpec format {value}"),
+        }
+    }
+}
+
+impl TryFrom<String> for EdgeSpec {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+/// `LocSpec` defines a location on a `BoundingBox`
+#[derive(Clone, Copy)]
+pub enum LocSpec {
+    TopLeft,
+    Top,
+    TopRight,
+    Right,
+    BottomRight,
+    Bottom,
+    BottomLeft,
+    Left,
+    Center,
+}
+
+impl TryFrom<&str> for LocSpec {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "tl" => Ok(Self::TopLeft),
+            "t" => Ok(Self::Top),
+            "tr" => Ok(Self::TopRight),
+            "r" => Ok(Self::Right),
+            "br" => Ok(Self::BottomRight),
+            "b" => Ok(Self::Bottom),
+            "bl" => Ok(Self::BottomLeft),
+            "l" => Ok(Self::Left),
+            "c" => Ok(Self::Center),
+            _ => bail!("Invalid LocSpec format {value}"),
+        }
+    }
+}
+
+impl TryFrom<String> for LocSpec {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+/// `ScalarSpec` defines a single value from a `BoundingBox`
+///
+/// These are the min and max x & y values, together with width and height.
+#[derive(Clone, Copy)]
+pub enum ScalarSpec {
+    Minx,
+    Maxx,
+    Miny,
+    Maxy,
+    Width,
+    Height,
+}
+
+impl TryFrom<&str> for ScalarSpec {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "x1" | "l" => Ok(Self::Minx),
+            "y1" | "t" => Ok(Self::Miny),
+            "x2" | "r" => Ok(Self::Maxx),
+            "y2" | "b" => Ok(Self::Maxy),
+            "w" => Ok(Self::Width),
+            "h" => Ok(Self::Height),
+            _ => bail!("Invalid ScalarSpec format {value}"),
+        }
+    }
+}
+
+impl TryFrom<String> for ScalarSpec {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_str())
+    }
+}
+
+/// `BoundingBox` defines an axis-aligned rectangular region is user coordinates.
+///
+/// Many (not all) `SvgElement` instances will have a corresponding
+/// `BoundingBox`, indicating the position and size of the rendered
+/// element.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum BoundingBox {
-    Unknown,
-    BBox(f32, f32, f32, f32),
+pub struct BoundingBox {
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
 }
 
 impl BoundingBox {
-    pub const fn new() -> Self {
-        BoundingBox::Unknown
+    pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
+        Self { x1, y1, x2, y2 }
     }
 
-    pub fn extend(&mut self, other: &BoundingBox) -> &Self {
-        *self = match (&self, other) {
-            (Self::BBox(x1, y1, x2, y2), Self::BBox(ox1, oy1, ox2, oy2)) => {
-                Self::BBox(x1.min(*ox1), y1.min(*oy1), x2.max(*ox2), y2.max(*oy2))
-            }
-            (Self::BBox(_, _, _, _), Self::Unknown) => *self,
-            (Self::Unknown, Self::BBox(_, _, _, _)) => *other,
-            (Self::Unknown, Self::Unknown) => Self::Unknown,
-        };
-        self
+    pub fn locspec(&self, ls: LocSpec) -> (f32, f32) {
+        let tl = (self.x1, self.y1);
+        let tr = (self.x2, self.y1);
+        let br = (self.x2, self.y2);
+        let bl = (self.x1, self.y2);
+        let c = ((self.x1 + self.x2) / 2., (self.y1 + self.y2) / 2.);
+        match ls {
+            LocSpec::TopLeft => tl,
+            LocSpec::Top => ((self.x1 + self.x2) / 2., self.y1),
+            LocSpec::TopRight => tr,
+            LocSpec::Right => (self.x2, (self.y1 + self.y2) / 2.),
+            LocSpec::BottomRight => br,
+            LocSpec::Bottom => ((self.x1 + self.x2) / 2., self.y2),
+            LocSpec::BottomLeft => bl,
+            LocSpec::Left => (self.x1, (self.y1 + self.y2) / 2.),
+            LocSpec::Center => c,
+        }
+    }
+
+    pub fn scalarspec(&self, ss: ScalarSpec) -> f32 {
+        match ss {
+            ScalarSpec::Minx => self.x1,
+            ScalarSpec::Maxx => self.x2,
+            ScalarSpec::Miny => self.y1,
+            ScalarSpec::Maxy => self.y2,
+            ScalarSpec::Width => self.x2 - self.x1,
+            ScalarSpec::Height => self.y2 - self.y1,
+        }
+    }
+
+    pub fn edgespec(&self, es: EdgeSpec, len: Length) -> (f32, f32) {
+        match es {
+            EdgeSpec::Top => (len.calc_offset(self.x1, self.x2), self.y1),
+            EdgeSpec::Right => (self.x2, len.calc_offset(self.y1, self.y2)),
+            EdgeSpec::Bottom => (len.calc_offset(self.x1, self.x2), self.y2),
+            EdgeSpec::Left => (self.x1, len.calc_offset(self.y1, self.y2)),
+        }
+    }
+
+    pub fn union(&self, other: &BoundingBox) -> Self {
+        Self::new(
+            self.x1.min(other.x1),
+            self.y1.min(other.y1),
+            self.x2.max(other.x2),
+            self.y2.max(other.y2),
+        )
+    }
+
+    pub fn combine(bb_iter: impl IntoIterator<Item = Self>) -> Option<Self> {
+        let bb_iter = bb_iter.into_iter();
+        bb_iter.reduce(|bb1, bb2| bb1.union(&bb2))
     }
 
     /// dilate the bounding box by the given absolute amount in each direction
     pub fn expand(&mut self, exp_x: f32, exp_y: f32) -> &Self {
-        if let BoundingBox::BBox(x1, y1, x2, y2) = self {
-            let new = BoundingBox::BBox(*x1 - exp_x, *y1 - exp_y, *x2 + exp_x, *y2 + exp_y);
-            *self = new;
-        }
+        *self = Self {
+            x1: self.x1 - exp_x,
+            y1: self.y1 - exp_y,
+            x2: self.x2 + exp_x,
+            y2: self.y2 + exp_y,
+        };
         self
     }
 
-    pub fn top(&self) -> Option<f32> {
-        if let Self::BBox(_, y1, _, _) = self {
-            Some(*y1)
-        } else {
-            None
-        }
+    pub fn width(&self) -> f32 {
+        self.x2 - self.x1
     }
 
-    pub fn right(&self) -> Option<f32> {
-        if let Self::BBox(_, _, x2, _) = self {
-            Some(*x2)
-        } else {
-            None
-        }
+    pub fn height(&self) -> f32 {
+        self.y2 - self.y1
     }
 
-    pub fn bottom(&self) -> Option<f32> {
-        if let Self::BBox(_, _, _, y2) = self {
-            Some(*y2)
-        } else {
-            None
-        }
-    }
-
-    pub fn left(&self) -> Option<f32> {
-        if let Self::BBox(x1, _, _, _) = self {
-            Some(*x1)
-        } else {
-            None
-        }
-    }
-
-    pub fn width(&self) -> Option<f32> {
-        if let Self::BBox(x1, _, x2, _) = self {
-            Some(x2 - x1)
-        } else {
-            None
-        }
-    }
-
-    pub fn height(&self) -> Option<f32> {
-        if let Self::BBox(_, y1, _, y2) = self {
-            Some(y2 - y1)
-        } else {
-            None
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn center(&self) -> Option<(f32, f32)> {
-        if let Self::BBox(x1, y1, x2, y2) = self {
-            Some((x1 + (x2 - x1) / 2., y1 + (y2 - y1) / 2.))
-        } else {
-            None
-        }
+    pub fn center(&self) -> (f32, f32) {
+        (
+            self.x1 + (self.x2 - self.x1) / 2.,
+            self.y1 + (self.y2 - self.y1) / 2.,
+        )
     }
 
     /// Scale the bounding box by the given amount with origin at the center
     pub fn scale(&mut self, amount: f32) -> &Self {
-        if let BoundingBox::BBox(x1, y1, x2, y2) = &self {
-            let width = x2 - x1;
-            let height = y2 - y1;
-            let dx_by_2 = (width * amount - width) / 2.;
-            let dy_by_2 = (height * amount - height) / 2.;
-            *self = BoundingBox::BBox(*x1 - dx_by_2, *y1 - dy_by_2, *x2 + dx_by_2, *y2 + dy_by_2);
-        }
+        let width = self.x2 - self.x1;
+        let height = self.y2 - self.y1;
+        let dx_by_2 = (width * amount - width) / 2.;
+        let dy_by_2 = (height * amount - height) / 2.;
+        *self = Self {
+            x1: self.x1 - dx_by_2,
+            y1: self.y1 - dy_by_2,
+            x2: self.x2 + dx_by_2,
+            y2: self.y2 + dy_by_2,
+        };
         self
     }
 
     /// Expand (floor/ceil) `BBox` to integer coords surrounding current extent.
     pub fn round(&mut self) -> &Self {
-        if let BoundingBox::BBox(x1, y1, x2, y2) = &self {
-            *self = BoundingBox::BBox(x1.floor(), y1.floor(), x2.ceil(), y2.ceil());
-        }
+        *self = Self {
+            x1: self.x1.floor(),
+            y1: self.y1.floor(),
+            x2: self.x2.ceil(),
+            y2: self.y2.ceil(),
+        };
         self
     }
 }
@@ -287,7 +412,7 @@ impl ClassList {
     }
 }
 
-impl fmt::Display for ClassList {
+impl Display for ClassList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ClassList{:?}", self.to_vec())
     }
@@ -335,17 +460,16 @@ mod test {
 
     #[test]
     fn test_bbox() {
-        let mut bb = BoundingBox::new();
-        bb.extend(&BoundingBox::BBox(10., 0., 10., 10.));
-        bb.extend(&BoundingBox::BBox(20., 10., 30., 15.));
-        bb.extend(&BoundingBox::BBox(25., 20., 25., 30.));
-        assert_eq!(bb, BoundingBox::BBox(10., 0., 30., 30.));
+        let mut bb = BoundingBox::new(10., 0., 10., 10.);
+        bb = bb.union(&BoundingBox::new(20., 10., 30., 15.));
+        bb = bb.union(&BoundingBox::new(25., 20., 25., 30.));
+        assert_eq!(bb, BoundingBox::new(10., 0., 30., 30.));
 
         bb.expand(10., 10.);
-        assert_eq!(bb, BoundingBox::BBox(0., -10., 40., 40.));
+        assert_eq!(bb, BoundingBox::new(0., -10., 40., 40.));
 
         bb.scale(1.1);
-        assert_eq!(bb, BoundingBox::BBox(-2., -12.5, 42., 42.5));
+        assert_eq!(bb, BoundingBox::new(-2., -12.5, 42., 42.5));
     }
 
     #[test]

@@ -4,7 +4,7 @@ use crate::custom::process_custom;
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::BoundingBox;
+use crate::types::{BoundingBox, LocSpec};
 use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
 
 use std::collections::{HashMap, HashSet};
@@ -132,7 +132,7 @@ impl TransformerContext {
         }
 
         if let Some(surround_list) = e.pop_attr("surround") {
-            let mut bbox = BoundingBox::new();
+            let mut bbox_list = vec![];
 
             for elref in attr_split(&surround_list) {
                 if let Some(el) = self.elem_map.get(
@@ -140,27 +140,29 @@ impl TransformerContext {
                         .strip_prefix('#')
                         .context(format!("Invalid surround value {elref}"))?,
                 ) {
-                    if let Ok(Some(bb)) = el.bbox() {
-                        bbox.extend(&bb);
+                    if let Ok(Some(el_bb)) = el.bbox() {
+                        bbox_list.push(el_bb);
                     }
                 }
             }
+            let mut bbox = BoundingBox::combine(bbox_list);
+
             if let Some(margin) = e.pop_attr("margin") {
                 let mut parts = attr_split_cycle(&margin).map(|v| strp_length(&v).unwrap());
                 let mx = parts.next().expect("cycle");
                 let my = parts.next().expect("cycle");
 
-                let bw = bbox
-                    .width()
-                    .context("Could not update surround bbox from margin")?;
-                let h_margin = mx.adjust(bw) - bw;
-                let bh = bbox
-                    .height()
-                    .context("Could not update surround bbox from margin")?;
-                let v_margin = my.adjust(bh) - bh;
-                bbox.expand(h_margin, v_margin);
+                if let Some(bb) = &mut bbox {
+                    let bw = bb.width();
+                    let h_margin = mx.adjust(bw) - bw;
+                    let bh = bb.height();
+                    let v_margin = my.adjust(bh) - bh;
+                    bb.expand(h_margin, v_margin);
+                }
             }
-            e.position_from_bbox(&bbox)?;
+            if let Some(bb) = bbox {
+                e.position_from_bbox(&bb);
+            }
         }
 
         e.expand_attributes(false, self)?;
@@ -197,19 +199,19 @@ impl TransformerContext {
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
         if let (Some(bbox), Some(xy_loc)) = (e.bbox()?, e.pop_attr("xy-loc")) {
-            let width = bbox.width().unwrap();
-            let height = bbox.height().unwrap();
-            let (dx, dy) = match xy_loc.as_str() {
-                "tl" => (0., 0.),
-                "t" => (width / 2., 0.),
-                "tr" => (width, 0.),
-                "r" => (width, height / 2.),
-                "br" => (width, height),
-                "b" => (width / 2., height),
-                "bl" => (0., height),
-                "l" => (0., height / 2.),
-                "c" => (width / 2., height / 2.),
-                _ => (0., 0.),
+            let xy_loc = LocSpec::try_from(xy_loc.as_str()).context("Invalid xy-loc value")?;
+            let width = bbox.width();
+            let height = bbox.height();
+            let (dx, dy) = match xy_loc {
+                LocSpec::TopLeft => (0., 0.),
+                LocSpec::Top => (width / 2., 0.),
+                LocSpec::TopRight => (width, 0.),
+                LocSpec::Right => (width, height / 2.),
+                LocSpec::BottomRight => (width, height),
+                LocSpec::Bottom => (width / 2., height),
+                LocSpec::BottomLeft => (0., height),
+                LocSpec::Left => (0., height / 2.),
+                LocSpec::Center => (width / 2., height / 2.),
             };
             e = e.translated(-dx, -dy);
             Self::update_elem_map(&mut self.elem_map, &e);
@@ -562,14 +564,14 @@ impl Transformer {
             changed_output = output.len() != old_len;
         }
 
-        // Calculate bounding box of diagram and use as new viewBox for the image.
-        // This also allows just using `<svg>` as the root element.
-        let mut extent = BoundingBox::new();
         let mut elem_path = Vec::new();
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
         let mut element_set = HashSet::new();
         let mut class_set = HashSet::new();
+        // Calculate bounding box of diagram and use as new viewBox for the image.
+        // This also allows just using `<svg>` as the root element.
+        let mut bbox_list = vec![];
         for (ev, _) in output.iter() {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
@@ -589,8 +591,8 @@ impl Transformer {
                     if !(elem_path.contains(&"defs".to_string())
                         || elem_path.contains(&"symbol".to_string()))
                     {
-                        if let Some(bb) = &event_element.bbox()? {
-                            extent.extend(bb);
+                        if let Some(bb) = event_element.bbox()? {
+                            bbox_list.push(bb);
                         }
                     }
                 }
@@ -602,9 +604,12 @@ impl Transformer {
         }
         // Expand by 5, then add 5%. Ensures small images get more than a couple
         // of pixels border, and large images still get a (relatively) decent border.
-        extent.expand(5., 5.);
-        extent.scale(1.05);
-        extent.round();
+        let mut extent = BoundingBox::combine(bbox_list);
+        if let Some(extent) = &mut extent {
+            extent.expand(5., 5.);
+            extent.scale(1.05);
+            extent.round();
+        }
 
         let mut has_svg_element = false;
         if let (pre_svg, Some(first_svg), remain) = output.partition("svg") {
@@ -628,9 +633,9 @@ impl Transformer {
             if !orig_svg_attrs.contains(&"xmlns".to_owned()) {
                 new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
             }
-            if let BoundingBox::BBox(minx, miny, maxx, maxy) = extent {
-                let width = fstr(maxx - minx);
-                let height = fstr(maxy - miny);
+            if let Some(bb) = extent {
+                let width = fstr(bb.width());
+                let height = fstr(bb.height());
                 if !orig_svg_attrs.contains(&"width".to_owned()) {
                     new_svg_bs
                         .push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
@@ -642,9 +647,10 @@ impl Transformer {
                     )));
                 }
                 if !orig_svg_attrs.contains(&"viewBox".to_owned()) {
+                    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
                     new_svg_bs.push_attribute(Attribute::from((
                         "viewBox",
-                        format!("{} {} {} {}", fstr(minx), fstr(miny), width, height).as_str(),
+                        format!("{} {} {} {}", fstr(x1), fstr(y1), width, height).as_str(),
                     )));
                 }
             }

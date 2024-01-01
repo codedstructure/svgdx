@@ -110,6 +110,7 @@ fn shortest_link(
 }
 
 impl Connector {
+    // TODO: This should take a LocSpec
     fn loc_to_dir(loc: &str) -> Option<Direction> {
         // loc may have a 'length' part following a colon, ignore that
         match loc.split(':').next().expect("always at least once") {
@@ -259,17 +260,15 @@ impl Connector {
                 // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let y_top = start_el
-                            .coord("t")?
-                            .unwrap()
-                            .1
-                            .max(end_el.coord("t")?.unwrap().1);
-                        let y_bottom = start_el
-                            .coord("b")?
-                            .unwrap()
-                            .1
-                            .min(end_el.coord("b")?.unwrap().1);
-                        (y_top + y_bottom) / 2.
+                        let start_bb = start_el.bbox()?.context("start element bbox")?;
+                        let end_bb = end_el.bbox()?.context("end element bbox")?;
+                        let overlap_top = start_bb
+                            .scalarspec(crate::types::ScalarSpec::Miny)
+                            .max(end_bb.scalarspec(crate::types::ScalarSpec::Miny));
+                        let overlap_bottom = start_bb
+                            .scalarspec(crate::types::ScalarSpec::Maxy)
+                            .min(end_bb.scalarspec(crate::types::ScalarSpec::Maxy));
+                        (overlap_top + overlap_bottom) / 2.
                     } else {
                         y1
                     };
@@ -288,17 +287,15 @@ impl Connector {
                 // If we have start and end elements, use midpoint of overlapping region
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let rightmost_left = start_el
-                            .coord("l")?
-                            .unwrap()
-                            .0
-                            .max(end_el.coord("l")?.unwrap().0);
-                        let leftmost_right = start_el
-                            .coord("r")?
-                            .unwrap()
-                            .0
-                            .min(end_el.coord("r")?.unwrap().0);
-                        (rightmost_left + leftmost_right) / 2.
+                        let start_bb = start_el.bbox()?.context("start element bbox")?;
+                        let end_bb = end_el.bbox()?.context("end element bbox")?;
+                        let overlap_left = start_bb
+                            .scalarspec(crate::types::ScalarSpec::Minx)
+                            .max(end_bb.scalarspec(crate::types::ScalarSpec::Minx));
+                        let overlap_right = start_bb
+                            .scalarspec(crate::types::ScalarSpec::Maxx)
+                            .min(end_bb.scalarspec(crate::types::ScalarSpec::Maxx));
+                        (overlap_left + overlap_right) / 2.
                     } else {
                         x1
                     };

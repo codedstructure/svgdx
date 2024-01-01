@@ -1,7 +1,8 @@
 use crate::element::SvgElement;
+use crate::types::LocSpec;
 use crate::{attr_split_cycle, fstr, strp};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use regex::{Captures, Regex};
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
@@ -57,7 +58,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let mut text_attrs = vec![];
     let mut text_classes = vec!["d-tbox"];
-    let text_loc = orig_elem.pop_attr("text-loc").unwrap_or("c".into());
+    let text_loc = LocSpec::try_from(orig_elem.pop_attr("text-loc").unwrap_or("c".into()))?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without inset text squishes to the edge and can be unreadable
@@ -68,59 +69,71 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // text associated with a line is pushed 'outside' the line,
     // where with other shapes it's pulled 'inside'. The classes
     // and dx/dy values are opposite.
-    if ["t", "tl", "tr"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line {
-            "d-text-bottom"
-        } else {
-            "d-text-top"
-        });
-        if t_dy.is_none() {
-            t_dy = Some(if is_line { -text_inset } else { text_inset });
+    match text_loc {
+        LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => {
+            text_classes.push(if is_line {
+                "d-text-bottom"
+            } else {
+                "d-text-top"
+            });
+            if t_dy.is_none() {
+                t_dy = Some(if is_line { -text_inset } else { text_inset });
+            }
         }
-    } else if ["b", "bl", "br"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line {
-            "d-text-top"
-        } else {
-            "d-text-bottom"
-        });
-        if t_dy.is_none() {
-            t_dy = Some(if is_line { text_inset } else { -text_inset });
+        LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
+            text_classes.push(if is_line {
+                "d-text-top"
+            } else {
+                "d-text-bottom"
+            });
+            if t_dy.is_none() {
+                t_dy = Some(if is_line { text_inset } else { -text_inset });
+            }
         }
-    }
-    if ["l", "tl", "bl"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line {
-            "d-text-right"
-        } else {
-            "d-text-left"
-        });
-        if t_dx.is_none() {
-            t_dx = Some(if is_line { -text_inset } else { text_inset });
-        }
-    } else if ["r", "br", "tr"].iter().any(|&s| s == text_loc) {
-        text_classes.push(if is_line {
-            "d-text-left"
-        } else {
-            "d-text-right"
-        });
-        if t_dx.is_none() {
-            t_dx = Some(if is_line { text_inset } else { -text_inset });
-        }
+        _ => (),
     }
 
-    let first_line_offset = match (is_line, text_loc.as_str()) {
+    match text_loc {
+        LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => {
+            text_classes.push(if is_line {
+                "d-text-right"
+            } else {
+                "d-text-left"
+            });
+            if t_dx.is_none() {
+                t_dx = Some(if is_line { -text_inset } else { text_inset });
+            }
+        }
+        LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
+            text_classes.push(if is_line {
+                "d-text-left"
+            } else {
+                "d-text-right"
+            });
+            if t_dx.is_none() {
+                t_dx = Some(if is_line { text_inset } else { -text_inset });
+            }
+        }
+        _ => (),
+    }
+
+    let first_line_offset = match (is_line, text_loc) {
         // shapes - text 'inside'
-        (false, "tl" | "t" | "tr") => WRAP_DOWN,
-        (false, "bl" | "b" | "br") => WRAP_UP,
+        (false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
+        (false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
         // lines - text 'beyond'
-        (true, "tl" | "t" | "tr") => WRAP_UP,
-        (true, "bl" | "b" | "br") => WRAP_DOWN,
+        (true, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
+        (true, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_DOWN,
         (_, _) => WRAP_MID,
     };
 
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = orig_elem.coord(&text_loc)?.unwrap();
+    let (mut tdx, mut tdy) = orig_elem
+        .bbox()?
+        .context("No BoundingBox")?
+        .locspec(text_loc);
     if let Some(dx) = t_dx {
         tdx += dx;
     }
