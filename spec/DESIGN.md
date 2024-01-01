@@ -76,14 +76,14 @@ The corresponding *locations* (for relative positioning) are given by the follow
 
 Many attributes which are pairs in SVG may be combined for more concise specification.
 
-|Attribute|Maps to|
-|-|-|
-| `xy` | `x` and `y` |
-| `rxy` | `rx` and `ry` |
-| `wh` | `width` and `height` |
-| `cxy` | `cx` and `cy` |
-| `xy1` | `x1` and `y1` |
-| `xy2` | `x2` and `y2` |
+| Attribute | Maps to              |
+|-----------|----------------------|
+| `xy`      | `x` and `y`          |
+| `rxy`     | `rx` and `ry`        |
+| `wh`      | `width` and `height` |
+| `cxy`     | `cx` and `cy`        |
+| `xy1`     | `x1` and `y1`        |
+| `xy2`     | `x2` and `y2`        |
 
 
 > **Notes**
