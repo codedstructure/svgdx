@@ -707,6 +707,9 @@ impl SvgElement {
                     ("points", "polyline" | "polygon") => {
                         pass_two_attrs.insert("points", expand_relspec(&value, &context.elem_map));
                     }
+                    ("d", "path") => {
+                        pass_two_attrs.insert("d", expand_relspec(&value, &context.elem_map));
+                    }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }
             }

@@ -45,7 +45,7 @@ impl TryFrom<LocSpec> for EdgeSpec {
             LocSpec::Right => Ok(Self::Right),
             LocSpec::Bottom => Ok(Self::Bottom),
             LocSpec::Left => Ok(Self::Left),
-            _ => bail!("Cannot convert LocSpec value into EdgeSpec")
+            _ => bail!("Cannot convert LocSpec value into EdgeSpec"),
         }
     }
 }

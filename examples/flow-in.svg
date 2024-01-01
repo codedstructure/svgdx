@@ -13,5 +13,16 @@
 
   <polyline points="#in@l, #in@r, #send@b, #send@t, #effect@c, #return@t, #return@b, #out@l, #out@r"
             dxy="1 3" class="d-arrow d-hardshadow d-blue d-thin"/>
-</svg>
 
+  <!-- TODO: get the following using refspec... -->
+  <path d="M -4 13
+  L 6 13
+  C 13 13 13 13 13 5.5
+  L 13 0.5
+  C 13 -21 13 -21 21 -21
+  C 29 -21 29 -21 29 0.5
+  L 29 5.5
+  C 29 13 29 13 36 13
+  L 46 13
+  " class="d-arrow d-hardshadow d-blue d-dot"/>
+</svg>

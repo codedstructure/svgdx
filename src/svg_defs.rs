@@ -244,7 +244,7 @@ pub(crate) fn build_styles(
     let mut result = Vec::new();
 
     result.push(String::from(
-        "rect, circle, ellipse, line, polyline, polygon { stroke-width: 0.5; stroke: black; fill: none; }",
+        "rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }",
     ));
     if elements.contains("text") {
         result.push(String::from(
@@ -292,19 +292,19 @@ pub(crate) fn build_styles(
     }
     if classes.contains("d-arrow") {
         result.push(String::from(
-            "line.d-arrow, polyline.d-arrow { marker-end: url(#d-arrow); }",
+            "line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }",
         ));
     }
     if classes.contains("d-biarrow") {
         result.push(String::from(
-            "line.d-biarrow, polyline.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
+            "line.d-biarrow, polyline.d-biarrow, path.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
         ));
     }
     if classes.contains("d-dash") {
-        result.push(String::from(r#".d-dash { stroke-dasharray: 2 1.5; }"#));
+        result.push(String::from(r#".d-dash { stroke-dasharray: 1.5 0.75; }"#));
     }
     if classes.contains("d-dot") {
-        result.push(String::from(r#".d-dot { stroke-dasharray: 0.5 1; }"#));
+        result.push(String::from(r#".d-dot { stroke-dasharray: 0.5 0.5; }"#));
     }
     for colour in COLOUR_LIST {
         if classes.contains(&format!("d-{colour}")) {
@@ -348,7 +348,7 @@ pub(crate) fn build_defs(
 
     if classes.contains("d-arrow") {
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill;"/>
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-fill; stroke-dasharray: none;"/>
     </marker>"#));
     }
 

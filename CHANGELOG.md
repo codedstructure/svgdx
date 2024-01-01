@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Initial support for `<path>` elements, though currently very limited.
 - Changed: single value refspec is now #abc.x to avoid #abc.h (height of #abc) conflicting
   with #abc:h (position horizontally on the right of #abc). Mnemonic: '.' has a single dot
   and returns a single numeric value...
