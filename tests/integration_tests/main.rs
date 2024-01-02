@@ -1,5 +1,3 @@
-pub mod utils;
-
 mod attr_expansion;
 mod auto_styles;
 mod cmdline;

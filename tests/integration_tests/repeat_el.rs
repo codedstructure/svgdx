@@ -1,4 +1,4 @@
-use crate::utils::compare;
+use svgdx::transform_str;
 
 #[test]
 fn test_repeat_simple() {
@@ -12,7 +12,7 @@ fn test_repeat_simple() {
 <rect x="4" y="0" width="2" height="2"/>
 <rect x="6" y="0" width="2" height="2"/>
 "#;
-    compare(rep_input, expected);
+    assert_eq!(transform_str(rep_input).unwrap().trim(), expected.trim());
 }
 
 #[test]
@@ -24,5 +24,5 @@ fn test_repeat_zero() {
     let expected = r#"
 <rect x="0" y="0" width="2" height="2"/>
 "#;
-    compare(rep_input, expected);
+    assert_eq!(transform_str(rep_input).unwrap().trim(), expected.trim());
 }

@@ -5,7 +5,7 @@
 // `<!--rect x="-->"/>` will be treated as a comment followed by the
 // Text type containing `"/>`.
 
-use crate::utils::transform;
+use svgdx::transform_str;
 
 #[test]
 fn test_error_bad_tag() {
@@ -13,7 +13,7 @@ fn test_error_bad_tag() {
     <rect>
     </svg>"##;
 
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 }
 
 #[test]
@@ -22,7 +22,7 @@ fn test_error_bad_element() {
     <rect
     </svg>"##;
 
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 }
 
 #[test]
@@ -31,7 +31,7 @@ fn test_error_bad_comment() {
     <!--rect>
     </svg>"##;
 
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 }
 
 #[test]
@@ -39,22 +39,22 @@ fn test_error_attr() {
     let input = r##"<svg>
     <rect x=y/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 
     let input = r##"<svg>
     <rect x="y/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 
     let input = r##"<svg>
     <rect x='y"/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 
     let input = r##"<svg>
     <rect x="y" a/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 }
 
 #[test]
@@ -62,15 +62,15 @@ fn test_error_bad_attr_value() {
     let input = r##"<svg>
     <rect xy="#a"/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 
     let input = r##"<svg>
     <rect xy="0" dx="abc"/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 
     let input = r##"<svg>
     <rect xy="0" dx="0.a"/>
     </svg>"##;
-    assert!(transform(input).is_err());
+    assert!(transform_str(input).is_err());
 }

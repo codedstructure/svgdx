@@ -1,4 +1,4 @@
-use crate::utils::contains;
+use svgdx::transform_str;
 
 #[test]
 fn test_surround_single_rect() {
@@ -8,7 +8,7 @@ fn test_surround_single_rect() {
 "##;
     let expected = r#"<rect id="s" x="0" y="0" width="5" height="5"/>"#;
 
-    contains(input, expected);
+    assert!(transform_str(input).unwrap().contains(expected));
 }
 
 #[test]
@@ -19,7 +19,7 @@ fn test_surround_single_margin() {
 "##;
     let expected = r#"<rect id="s" x="-1" y="-1" width="7" height="7"/>"#;
 
-    contains(input, expected);
+    assert!(transform_str(input).unwrap().contains(expected));
 }
 
 #[test]
@@ -32,7 +32,7 @@ fn test_surround_multi_rect() {
 "##;
     let expected = r#"<rect id="s" x="0" y="0" width="9" height="12"/>"#;
 
-    contains(input, expected);
+    assert!(transform_str(input).unwrap().contains(expected));
 }
 
 #[test]
@@ -45,5 +45,5 @@ fn test_surround_multi_margin() {
 "##;
     let expected = r#"<rect id="s" x="-1.25" y="-3" width="11.5" height="18"/>"#;
 
-    contains(input, expected);
+    assert!(transform_str(input).unwrap().contains(expected));
 }
