@@ -1,7 +1,7 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="65mm" height="62mm" viewBox="-12 -35 65 62">
   <defs>
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: black;"/>
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
     </marker>
     <filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
       <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>

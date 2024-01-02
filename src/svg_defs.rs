@@ -347,8 +347,10 @@ pub(crate) fn build_defs(
     let mut result = Vec::new();
 
     if classes.contains("d-arrow") {
+        // Note use of context-stroke for both stroke and fill;
+        // typically lines/paths with markers have `fill: none`
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: black;"/>
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
     </marker>"#));
     }
 
