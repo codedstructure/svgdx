@@ -1,7 +1,9 @@
 use crate::expression::eval_attr;
 pub(crate) use crate::transform::TransformerContext;
-use crate::types::{AttrMap, BoundingBox, ClassList, EdgeSpec, LocSpec};
-use crate::{attr_split, attr_split_cycle, fstr, strp, strp_length, Length};
+use crate::types::{
+    attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
+    EdgeSpec, Length, LocSpec,
+};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use regex::{Captures, Regex};

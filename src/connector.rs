@@ -1,6 +1,6 @@
 use crate::element::SvgElement;
 use crate::transform::TransformerContext;
-use crate::{attr_split, fstr, strp, strp_length, Length};
+use crate::types::{attr_split, fstr, strp, strp_length, Length};
 use regex::Regex;
 
 use anyhow::{Context, Result};

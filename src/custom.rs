@@ -1,6 +1,6 @@
 use crate::element::SvgElement;
-use crate::fstr;
 use crate::transform::SvgEvent;
+use crate::types::fstr;
 
 use anyhow::Result;
 

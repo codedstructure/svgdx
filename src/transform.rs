@@ -1,11 +1,10 @@
-use crate::attr_split;
 use crate::connector::{ConnectionType, Connector};
 use crate::custom::process_custom;
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::{BoundingBox, LocSpec};
-use crate::{attr_split_cycle, element::SvgElement, fstr, strp, strp_length};
+use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
+use crate::{element::SvgElement, Config};
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
@@ -458,20 +457,16 @@ impl EventList<'_> {
     }
 }
 
-#[derive(Default, Debug)]
 pub struct Transformer {
     context: TransformerContext,
-    debug: bool,
-    add_auto_defs: bool,
+    config: Config,
 }
 
 impl Transformer {
     pub fn new() -> Self {
         Self {
             context: TransformerContext::new(),
-            // TODO: expose these
-            debug: false,
-            add_auto_defs: true,
+            config: Config::new(),
         }
     }
 
@@ -505,7 +500,7 @@ impl Transformer {
                             todo!("Repeat is not implemented for non-empty elements");
                         }
                     }
-                    if self.debug {
+                    if self.config.debug {
                         // Prefix replaced element(s) with a representation of the original element
                         //
                         // Replace double quote with backtick to avoid messy XML entity conversion
@@ -634,8 +629,10 @@ impl Transformer {
                 new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
             }
             if let Some(bb) = extent {
-                let width = fstr(bb.width());
-                let height = fstr(bb.height());
+                let view_width = fstr(bb.width());
+                let view_height = fstr(bb.height());
+                let width = fstr(bb.width() * self.config.scale);
+                let height = fstr(bb.height() * self.config.scale);
                 if !orig_svg_attrs.contains(&"width".to_owned()) {
                     new_svg_bs
                         .push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
@@ -650,7 +647,8 @@ impl Transformer {
                     let (x1, y1) = bb.locspec(LocSpec::TopLeft);
                     new_svg_bs.push_attribute(Attribute::from((
                         "viewBox",
-                        format!("{} {} {} {}", fstr(x1), fstr(y1), width, height).as_str(),
+                        format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
+                            .as_str(),
                     )));
                 }
             }
@@ -661,7 +659,7 @@ impl Transformer {
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && self.add_auto_defs {
+        if has_svg_element && self.config.add_auto_defs {
             let mut indent = self.context.last_indent.clone();
             if indent.is_empty() {
                 indent = "\n  ".to_owned();

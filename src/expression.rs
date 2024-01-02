@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
-use crate::types::ScalarSpec;
-use crate::{element::SvgElement, fstr};
+use crate::element::SvgElement;
+use crate::types::{fstr, ScalarSpec};
 
 #[derive(Clone, PartialEq)]
 enum Token {

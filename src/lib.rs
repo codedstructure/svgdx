@@ -8,10 +8,7 @@
 //! corresponding `Writer`. This allows use of the tool without needing
 //! to install or run `svgdx` as a command line subprocess.
 
-use std::{
-    io::{BufRead, Cursor, IsTerminal, Read, Write},
-    num::ParseFloatError,
-};
+use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -26,16 +23,16 @@ use std::{
 };
 use tempfile::NamedTempFile;
 
-mod transform;
-mod types;
-
-pub(crate) use transform::Transformer;
 mod connector;
 mod custom;
 mod element;
 mod expression;
 mod svg_defs;
 mod text;
+mod transform;
+mod types;
+
+use transform::Transformer;
 
 /// The main entry point once any command line or other initialisation
 /// has been completed.
@@ -48,179 +45,121 @@ pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result
     t.transform(reader, writer)
 }
 
-/// Return a 'minimal' representation of the given number
-fn fstr(x: f32) -> String {
-    if x == (x as i32) as f32 {
-        return (x as i32).to_string();
-    }
-    let result = format!("{x:.3}");
-    if result.contains('.') {
-        result.trim_end_matches('0').trim_end_matches('.').into()
-    } else {
-        result
-    }
-}
-
-/// Parse a string to an f32
-fn strp(s: &str) -> Result<f32> {
-    s.parse().map_err(|e: ParseFloatError| e.into())
-}
-
-/// Returns iterator over whitespace-or-comma separated values
-fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
-    input
-        .split_whitespace()
-        .flat_map(|v| v.split(','))
-        .filter(|&v| !v.is_empty())
-        .map(|v| v.to_string())
-}
-
-/// Returns iterator *cycling* over whitespace-or-comma separated values
-fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
-    let x: Vec<String> = attr_split(input).collect();
-    x.into_iter().cycle()
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-enum Length {
-    Absolute(f32),
-    Ratio(f32),
-}
-
-impl Default for Length {
-    fn default() -> Self {
-        Self::Absolute(0.)
-    }
-}
-
-impl Length {
-    #[allow(dead_code)]
-    const fn ratio(&self) -> Option<f32> {
-        if let Self::Ratio(result) = self {
-            Some(*result)
+/// Read file from `input` ('-' for stdin), process the result,
+/// and write to file given by `output` ('-' for stdout).
+pub fn transform_file(input: &str, output: &str) -> Result<()> {
+    let mut in_reader = if input == "-" {
+        let mut stdin = std::io::stdin().lock();
+        if stdin.is_terminal() {
+            // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
+            // enough to signal end-of-input, even when given at the start of a line.
+            // Work around this by reading entire input, then wrapping in a Cursor to
+            // provide a buffered reader.
+            // It would be nice to improve this.
+            let mut buf = Vec::new();
+            stdin.read_to_end(&mut buf).unwrap();
+            Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
         } else {
-            None
+            Box::new(stdin) as Box<dyn BufRead>
         }
+    } else {
+        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
+    };
+
+    if output == "-" {
+        svg_transform(&mut in_reader, &mut std::io::stdout())?;
+    } else {
+        let mut out_temp = NamedTempFile::new()?;
+        svg_transform(&mut in_reader, &mut out_temp)?;
+        // Copy content rather than rename (by .persist()) since this
+        // could cross filesystems; some apps (e.g. eog) also fail to
+        // react to 'moved-over' files.
+        fs::copy(out_temp.path(), output)?;
     }
 
-    const fn absolute(&self) -> Option<f32> {
-        if let Self::Absolute(result) = self {
-            Some(*result)
-        } else {
-            None
-        }
-    }
-
-    /// Given a single value, update it (scale or addition) from
-    /// the current Length value
-    fn adjust(&self, value: f32) -> f32 {
-        match self {
-            Self::Absolute(abs) => value + abs,
-            Self::Ratio(ratio) => value * ratio,
-        }
-    }
-
-    /// Given a range, return a value (typically) in the range
-    /// where a positive Absolute is 'from start', a negative Absolute
-    /// is 'backwards from end' and Ratios scale as 0%=start, 100%=end
-    /// but ratio values are not limited to 0..100 at either end.
-    fn calc_offset(&self, start: f32, end: f32) -> f32 {
-        match self {
-            Self::Absolute(abs) => {
-                let mult = if end < start { -1. } else { 1. };
-                if abs < &0. {
-                    // '+' here since abs is negative and
-                    // we're going 'back' from the end.
-                    end + abs * mult
-                } else {
-                    start + abs * mult
-                }
-            }
-            Self::Ratio(ratio) => start + (end - start) * ratio,
-        }
-    }
+    Ok(())
 }
 
-/// Parse a ratio (float or %age) to an f32
-/// Note this deliberately does not clamp to 0..1
-fn strp_length(s: &str) -> Result<Length> {
-    if let Some(s) = s.strip_suffix('%') {
-        Ok(Length::Ratio(strp(s)? * 0.01))
-    } else {
-        Ok(Length::Absolute(strp(s)?))
-    }
+pub fn transform_str<T: Into<String>>(input: T) -> Result<String> {
+    let input = input.into();
+
+    let mut input = Cursor::new(input);
+    let mut output: Vec<u8> = vec![];
+
+    svg_transform(&mut input, &mut output)?;
+
+    Ok(String::from_utf8(output).expect("Non-UTF8 output generated"))
 }
 
 /// Transform given file to SVG
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)] // Read from Cargo.toml
 struct Arguments {
-    /// file to process (defaults to stdin)
-    file: Option<String>,
+    /// File to process ('-' for stdin)
+    #[arg(default_value = "-")]
+    file: String,
 
-    /// watch file for changes; update output on change. (FILE must be given)
+    /// Watch file for changes; update output on change. (FILE must be given)
     #[arg(short, long, requires = "file")]
     watch: bool,
 
-    /// target output file; omit for stdout
-    #[arg(short, long)]
-    output: Option<String>,
-}
+    /// Target output file ('-' for stdout)
+    #[arg(short, long, default_value = "-")]
+    output: String,
 
-fn transform(input: Option<String>, output: Option<String>) -> Result<()> {
-    let mut in_reader = match input {
-        None => {
-            let mut stdin = std::io::stdin().lock();
-            if stdin.is_terminal() {
-                // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
-                // enough to signal end-of-input, even when given at the start of a line.
-                // Work around this by reading entire input, then wrapping in a Cursor to
-                // provide a buffered reader.
-                // It would be nice to improve this.
-                let mut buf = Vec::new();
-                stdin.read_to_end(&mut buf).unwrap();
-                Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
-            } else {
-                Box::new(stdin) as Box<dyn BufRead>
-            }
-        }
-        Some(x) => Box::new(BufReader::new(File::open(x)?)) as Box<dyn BufRead>,
-    };
+    /// Scale of user-units to mm for root svg element width/height
+    #[arg(long, default_value = "2")]
+    scale: f32,
 
-    match output {
-        Some(x) => {
-            let mut out_temp = NamedTempFile::new()?;
-            svg_transform(&mut in_reader, &mut out_temp)?;
-            // Copy content rather than rename (by .persist()) since this
-            // could cross filesystems; some apps (e.g. eog) also fail to
-            // react to 'moved-over' files.
-            fs::copy(out_temp.path(), x)?;
-        }
-        None => {
-            svg_transform(&mut in_reader, &mut std::io::stdout())?;
-        }
-    }
+    /// Don't add referenced styles automatically
+    #[arg(long)]
+    no_auto_style: bool,
 
-    Ok(())
+    /// Add debug info (e.g. input source) to output
+    #[arg(long)]
+    debug: bool,
 }
 
 /// Configuration used by svgdx
 pub struct Config {
-    input: Option<String>,
-    output: Option<String>,
-    watch: bool,
+    /// Path to input file, or '-' for stdin
+    pub input_path: String,
+    /// Path to output file, or '-' for stdout
+    pub output_path: String,
+    /// Stay monitoring `input_path` for changes (Requires input_path is not stdin)
+    pub watch: bool,
+    /// Add debug info (e.g. input source) to output
+    pub debug: bool,
+    /// Add style & defs entries based on class usage
+    pub add_auto_defs: bool,
+    /// Overall output image scale (in mm as scale of user units)
+    pub scale: f32,
 }
 
 impl Config {
+    pub(crate) fn new() -> Self {
+        Self {
+            input_path: String::from("-"),
+            output_path: String::from("-"),
+            watch: false,
+            debug: false,
+            add_auto_defs: true,
+            scale: 1.0,
+        }
+    }
+
     pub(crate) fn from_args(args: Arguments) -> Result<Self> {
-        if args.watch && args.file.is_none() {
+        if args.watch && args.file == "-" {
             // Should already be enforced by clap validation
-            bail!("Filename must be provided with -w/--watch argument");
+            bail!("A non-stdin file must be provided with -w/--watch argument");
         }
         Ok(Config {
-            input: args.file,
-            output: args.output,
+            input_path: args.file,
+            output_path: args.output,
             watch: args.watch,
+            debug: args.debug,
+            add_auto_defs: !args.no_auto_style,
+            scale: args.scale,
         })
     }
 
@@ -244,8 +183,9 @@ pub fn get_config() -> Result<Config> {
 /// Start running svgdx with a given `Config`
 pub fn run(config: Config) -> Result<()> {
     if !config.watch {
-        transform(config.input.clone(), config.output.clone())?;
-    } else if let Some(watch) = config.input {
+        transform_file(&config.input_path, &config.output_path)?;
+    } else if config.input_path != "-" {
+        let watch = config.input_path;
         let (tx, rx) = channel();
         let mut watcher =
             new_debouncer(Duration::from_millis(250), tx).expect("Could not create watcher");
@@ -253,7 +193,7 @@ pub fn run(config: Config) -> Result<()> {
         watcher
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)?;
-        transform(Some(watch.clone()), config.output.clone()).unwrap_or_else(|e| {
+        transform_file(&watch, &config.output_path).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });
         eprintln!("Watching {watch} for changes");
@@ -264,11 +204,9 @@ pub fn run(config: Config) -> Result<()> {
                         if event.path.canonicalize().unwrap() == watch_path.canonicalize().unwrap()
                         {
                             eprintln!("{} changed", event.path.to_string_lossy());
-                            transform(Some(watch.clone()), config.output.clone()).unwrap_or_else(
-                                |e| {
-                                    eprintln!("transform failed: {e:?}");
-                                },
-                            );
+                            transform_file(&watch, &config.output_path).unwrap_or_else(|e| {
+                                eprintln!("transform failed: {e:?}");
+                            });
                         }
                     }
                 }
@@ -279,101 +217,4 @@ pub fn run(config: Config) -> Result<()> {
     }
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_fstr() {
-        assert_eq!(fstr(1.0), "1");
-        assert_eq!(fstr(-100.0), "-100");
-        assert_eq!(fstr(1.2345678), "1.235");
-        assert_eq!(fstr(-1.2345678), "-1.235");
-        assert_eq!(fstr(91.0004), "91");
-        // Large-ish integers (up to 24 bit mantissa) should be fine
-        assert_eq!(fstr(12345678.0), "12345678");
-        assert_eq!(fstr(12340000.0), "12340000");
-    }
-
-    #[test]
-    fn test_strp() {
-        assert_eq!(strp("1").ok(), Some(1.));
-        assert_eq!(strp("100").ok(), Some(100.));
-        assert_eq!(strp("-100").ok(), Some(-100.));
-        assert_eq!(strp("-0.00123").ok(), Some(-0.00123));
-        assert_eq!(strp("1234567.8").ok(), Some(1234567.8));
-    }
-
-    #[test]
-    fn test_strp_length() {
-        assert_eq!(strp_length("1").ok(), Some(Length::Absolute(1.)));
-        assert_eq!(strp_length("123").ok(), Some(Length::Absolute(123.)));
-        assert_eq!(strp_length("-0.0123").ok(), Some(Length::Absolute(-0.0123)));
-        assert_eq!(strp_length("0.5%").ok(), Some(Length::Ratio(0.005)));
-        assert_eq!(strp_length("150%").ok(), Some(Length::Ratio(1.5)));
-        assert_eq!(strp_length("1.2.3").ok(), None);
-        assert_eq!(strp_length("a").ok(), None);
-        assert_eq!(strp_length("a%").ok(), None);
-    }
-
-    #[test]
-    fn test_attr_split() {
-        let mut parts = attr_split("0 1.5 23");
-        assert_eq!(parts.next(), Some(String::from("0")));
-        assert_eq!(parts.next(), Some(String::from("1.5")));
-        assert_eq!(parts.next(), Some(String::from("23")));
-        assert_eq!(parts.next(), None);
-
-        let mut parts = attr_split("0, 1.5, 23");
-        assert_eq!(parts.next(), Some(String::from("0")));
-        assert_eq!(parts.next(), Some(String::from("1.5")));
-        assert_eq!(parts.next(), Some(String::from("23")));
-        assert_eq!(parts.next(), None);
-    }
-
-    #[test]
-    fn test_attr_split_cycle() {
-        let mut parts = attr_split_cycle("0 1.5 23");
-        assert_eq!(parts.next(), Some(String::from("0")));
-        assert_eq!(parts.next(), Some(String::from("1.5")));
-        assert_eq!(parts.next(), Some(String::from("23")));
-        assert_eq!(parts.next(), Some(String::from("0")));
-        assert_eq!(parts.next(), Some(String::from("1.5")));
-        assert_eq!(parts.next(), Some(String::from("23")));
-        assert_eq!(parts.next(), Some(String::from("0")));
-        assert_eq!(parts.next(), Some(String::from("1.5")));
-        assert_eq!(parts.next(), Some(String::from("23")));
-    }
-
-    #[test]
-    fn test_length_calc_offset() {
-        assert_eq!(strp_length("25%").expect("test").calc_offset(10., 50.), 20.);
-        assert_eq!(
-            strp_length("50%").expect("test").calc_offset(-10., -9.),
-            -9.5
-        );
-        assert_eq!(
-            strp_length("200%").expect("test").calc_offset(10., 50.),
-            90.
-        );
-        assert_eq!(
-            strp_length("-3.5").expect("test").calc_offset(10., 50.),
-            46.5
-        );
-        assert_eq!(
-            strp_length("3.5").expect("test").calc_offset(-10., 90.),
-            -6.5
-        );
-    }
-
-    #[test]
-    fn test_length_adjust() {
-        assert_eq!(strp_length("25%").expect("test").adjust(10.), 2.5);
-        assert_eq!(strp_length("-50%").expect("test").adjust(150.), -75.);
-        assert_eq!(strp_length("125%").expect("test").adjust(20.), 25.);
-        assert_eq!(strp_length("1").expect("test").adjust(23.), 24.);
-        assert_eq!(strp_length("-12").expect("test").adjust(123.), 111.);
-    }
 }

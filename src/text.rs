@@ -1,6 +1,5 @@
 use crate::element::SvgElement;
-use crate::types::LocSpec;
-use crate::{attr_split_cycle, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp, LocSpec};
 
 use anyhow::{Context, Result};
 use regex::{Captures, Regex};
