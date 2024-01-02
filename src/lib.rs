@@ -99,25 +99,25 @@ struct Arguments {
     #[arg(default_value = "-")]
     file: String,
 
-    /// Watch file for changes; update output on change. (FILE must be given)
-    #[arg(short, long, requires = "file")]
-    watch: bool,
-
     /// Target output file ('-' for stdout)
     #[arg(short, long, default_value = "-")]
     output: String,
 
-    /// Scale of user-units to mm for root svg element width/height
-    #[arg(long, default_value = "2")]
-    scale: f32,
+    /// Watch file for changes; update output on change. (FILE must be given)
+    #[arg(short, long, requires = "file")]
+    watch: bool,
+
+    /// Add debug info (e.g. input source) to output
+    #[arg(long)]
+    debug: bool,
 
     /// Don't add referenced styles automatically
     #[arg(long)]
     no_auto_style: bool,
 
-    /// Add debug info (e.g. input source) to output
-    #[arg(long)]
-    debug: bool,
+    /// Scale of user-units to mm for root svg element width/height
+    #[arg(long, default_value = "1.0")]
+    scale: f32,
 }
 
 /// Configuration used by svgdx
