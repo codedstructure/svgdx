@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: more consistent public API; `get_config()` and `run()` are still top-level
+  functions, but the various `transform_*` functions allow a range of input/output options
+  for processing documents.
+- Changed: split `svgdx::TransformConfig` out of `svgdx::Config` to handle per-transform
+  settings, leaving top-level `Config` for 'front-end' options from the `svgdx` command-line
+  program.
+- Added: additional command-line options to tweak transformation:
+  - `--scale` to allow scales other than 1 user-unit == 1mm
+  - `--debug` to include more debugging info in the generated document
+  - `--no-auto-style` to prevent svgdx automatically adding style/defs entries
+
 ## [0.2.0] - 2024-01-01
 
 - Added: Initial support for `<path>` elements, though currently very limited.

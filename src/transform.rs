@@ -4,7 +4,7 @@ use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
-use crate::{element::SvgElement, Config};
+use crate::{element::SvgElement, TransformConfig};
 
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, Write};
@@ -459,14 +459,14 @@ impl EventList<'_> {
 
 pub struct Transformer {
     context: TransformerContext,
-    config: Config,
+    config: TransformConfig,
 }
 
 impl Transformer {
-    pub fn new() -> Self {
+    pub fn from_config(config: &TransformConfig) -> Self {
         Self {
             context: TransformerContext::new(),
-            config: Config::new(),
+            config: config.to_owned(),
         }
     }
 

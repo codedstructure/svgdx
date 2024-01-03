@@ -1,12 +1,30 @@
-//! # svgdx
+//! ## svgdx - create SVG diagrams easily
 //!
-//! Entry point for `svgdx` when used as a library.
+//! `svgdx` is normally run as a command line tool, taking an input file and processing
+//! it into an SVG output file.
 //!
-//! `svgdx` is normally run as a command line tool. Support as a library
-//! is currently limited, but it is possible to use the key `transform`
-//! functionality which converts an input wrapped in a `Reader` to a
-//! corresponding `Writer`. This allows use of the tool without needing
-//! to install or run `svgdx` as a command line subprocess.
+//! ## Library use
+//!
+//! Support as a library is supported primarily to allow other front-ends to convert
+//! svgdx documents to SVG without having to call `svgdx` as a command-line subprocess.
+//!
+//! A `TransformConfig` object should be created as appropriate to configure the
+//! transform process, and the appropriate `transform_*` function called passing
+//! this and appropriate input / output parameters as required.
+//!
+//! Errors in processing are handled via `anyhow::Result`; currently these are mainly
+//! useful in providing basic error messages suitable for end-users.
+//!
+//! ## Example
+//!
+//! ```
+//! let cfg = svgdx::TransformConfig::default();
+//!
+//! let input = r#"<rect wh="50" text="Hello!"/>"#;
+//! let output = svgdx::transform_str(input, &cfg).unwrap();
+//!
+//! println!("{output}");
+//! ```
 
 use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
 
@@ -34,20 +52,50 @@ mod types;
 
 use transform::Transformer;
 
-/// The main entry point once any command line or other initialisation
-/// has been completed.
+/// Settings to configure a single transformation.
 ///
-/// Reads from the `reader` stream, performs processing and conversion
-/// as required, and writes to the `writer`. Note the entire stream may
-/// be read before any converted data is written to `writer`.
-pub fn svg_transform(reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
-    let mut t = Transformer::new();
+/// Note the settings here are specific to a single transformation; alternate front-ends
+/// may use this directly rather than `Config` which wraps this struct when `svgdx` is
+/// run as a command-line program.
+#[derive(Clone)]
+pub struct TransformConfig {
+    /// Add debug info (e.g. input source) to output
+    pub debug: bool,
+    /// Add style & defs entries based on class usage
+    pub add_auto_defs: bool,
+    /// Overall output image scale (in mm as scale of user units)
+    pub scale: f32,
+}
+
+impl Default for TransformConfig {
+    fn default() -> Self {
+        Self {
+            debug: false,
+            add_auto_defs: true,
+            scale: 1.0,
+        }
+    }
+}
+
+/// Reads from the `reader` stream, processes document, and writes to `writer`.
+///
+/// Note the entire stream may be read before any converted data is written to `writer`.
+///
+/// The transform can be modified by providing a suitable `TransformConfig` value.
+pub fn transform_stream(
+    reader: &mut dyn BufRead,
+    writer: &mut dyn Write,
+    config: &TransformConfig,
+) -> Result<()> {
+    let mut t = Transformer::from_config(config);
     t.transform(reader, writer)
 }
 
 /// Read file from `input` ('-' for stdin), process the result,
 /// and write to file given by `output` ('-' for stdout).
-pub fn transform_file(input: &str, output: &str) -> Result<()> {
+///
+/// The transform can be modified by providing a suitable `TransformConfig` value.
+pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
     let mut in_reader = if input == "-" {
         let mut stdin = std::io::stdin().lock();
         if stdin.is_terminal() {
@@ -67,10 +115,10 @@ pub fn transform_file(input: &str, output: &str) -> Result<()> {
     };
 
     if output == "-" {
-        svg_transform(&mut in_reader, &mut std::io::stdout())?;
+        transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
     } else {
         let mut out_temp = NamedTempFile::new()?;
-        svg_transform(&mut in_reader, &mut out_temp)?;
+        transform_stream(&mut in_reader, &mut out_temp, cfg)?;
         // Copy content rather than rename (by .persist()) since this
         // could cross filesystems; some apps (e.g. eog) also fail to
         // react to 'moved-over' files.
@@ -80,18 +128,28 @@ pub fn transform_file(input: &str, output: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn transform_str<T: Into<String>>(input: T) -> Result<String> {
+/// Transform `input` provided as a string, returning the result as a string.
+///
+/// The transform can be modified by providing a suitable `TransformConfig` value.
+pub fn transform_str<T: Into<String>>(input: T, cfg: &TransformConfig) -> Result<String> {
     let input = input.into();
 
     let mut input = Cursor::new(input);
     let mut output: Vec<u8> = vec![];
 
-    svg_transform(&mut input, &mut output)?;
+    transform_stream(&mut input, &mut output, cfg)?;
 
     Ok(String::from_utf8(output).expect("Non-UTF8 output generated"))
 }
 
-/// Transform given file to SVG
+/// Transform the provided `input` string using default config, returning the result string.
+///
+/// Uses default `TransformConfig` settings.
+pub fn transform_str_default<T: Into<String>>(input: T) -> Result<String> {
+    transform_str(input, &TransformConfig::default())
+}
+
+/// Command line arguments
 #[derive(Parser)]
 #[command(author, version, about, long_about=None)] // Read from Cargo.toml
 struct Arguments {
@@ -120,7 +178,14 @@ struct Arguments {
     scale: f32,
 }
 
-/// Configuration used by svgdx
+/// Top-level configuration used by the `svgdx` command-line process.
+///
+/// This is typically derived from command line arguments and passed to `run()`.
+///
+/// 'front-end' program settings (e.g. input/output filenames, whether to continually
+/// process input on change, etc) are stored directly in this struct. Per-transform
+/// ('back-end') settings are stored in the embedded `TransformConfig` struct.
+#[derive(Clone)]
 pub struct Config {
     /// Path to input file, or '-' for stdin
     pub input_path: String,
@@ -128,26 +193,11 @@ pub struct Config {
     pub output_path: String,
     /// Stay monitoring `input_path` for changes (Requires input_path is not stdin)
     pub watch: bool,
-    /// Add debug info (e.g. input source) to output
-    pub debug: bool,
-    /// Add style & defs entries based on class usage
-    pub add_auto_defs: bool,
-    /// Overall output image scale (in mm as scale of user units)
-    pub scale: f32,
+    /// transform config options
+    pub transform: TransformConfig,
 }
 
 impl Config {
-    pub(crate) fn new() -> Self {
-        Self {
-            input_path: String::from("-"),
-            output_path: String::from("-"),
-            watch: false,
-            debug: false,
-            add_auto_defs: true,
-            scale: 1.0,
-        }
-    }
-
     pub(crate) fn from_args(args: Arguments) -> Result<Self> {
         if args.watch && args.file == "-" {
             // Should already be enforced by clap validation
@@ -157,9 +207,11 @@ impl Config {
             input_path: args.file,
             output_path: args.output,
             watch: args.watch,
-            debug: args.debug,
-            add_auto_defs: !args.no_auto_style,
-            scale: args.scale,
+            transform: TransformConfig {
+                debug: args.debug,
+                add_auto_defs: !args.no_auto_style,
+                scale: args.scale,
+            },
         })
     }
 
@@ -174,16 +226,16 @@ impl Config {
     }
 }
 
-/// Create a `Config` object from arguments given to this process
+/// Create a `Config` object from process arguments.
 pub fn get_config() -> Result<Config> {
     let args = Arguments::parse();
     Config::from_args(args)
 }
 
-/// Start running svgdx with a given `Config`
+/// Run the `svgdx` program with a given `Config`.
 pub fn run(config: Config) -> Result<()> {
     if !config.watch {
-        transform_file(&config.input_path, &config.output_path)?;
+        transform_file(&config.input_path, &config.output_path, &config.transform)?;
     } else if config.input_path != "-" {
         let watch = config.input_path;
         let (tx, rx) = channel();
@@ -193,7 +245,7 @@ pub fn run(config: Config) -> Result<()> {
         watcher
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)?;
-        transform_file(&watch, &config.output_path).unwrap_or_else(|e| {
+        transform_file(&watch, &config.output_path, &config.transform).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });
         eprintln!("Watching {watch} for changes");
@@ -204,9 +256,10 @@ pub fn run(config: Config) -> Result<()> {
                         if event.path.canonicalize().unwrap() == watch_path.canonicalize().unwrap()
                         {
                             eprintln!("{} changed", event.path.to_string_lossy());
-                            transform_file(&watch, &config.output_path).unwrap_or_else(|e| {
-                                eprintln!("transform failed: {e:?}");
-                            });
+                            transform_file(&watch, &config.output_path, &config.transform)
+                                .unwrap_or_else(|e| {
+                                    eprintln!("transform failed: {e:?}");
+                                });
                         }
                     }
                 }
