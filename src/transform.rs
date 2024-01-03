@@ -167,35 +167,6 @@ impl TransformerContext {
 
         e.expand_attributes(false, self)?;
 
-        // Size adjustments must be computed before updating position,
-        // as they affect any xy-loc other than default top-left.
-        // NOTE: these attributes may be removed once variable arithmetic
-        // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
-        // with $var="20 30" or similar (the reference form of wh already
-        // supports inline dw / dh).
-        {
-            let dw = e.pop_attr("dw");
-            let dh = e.pop_attr("dh");
-            let dwh = e.pop_attr("dwh");
-            let mut d_w = None;
-            let mut d_h = None;
-            if let Some(dwh) = dwh {
-                let mut parts = attr_split_cycle(&dwh).map(|v| strp_length(&v).unwrap());
-                d_w = parts.next();
-                d_h = parts.next();
-            }
-            if let Some(dw) = dw {
-                d_w = Some(strp_length(&dw)?);
-            }
-            if let Some(dh) = dh {
-                d_h = Some(strp_length(&dh)?);
-            }
-            if d_w.is_some() || d_h.is_some() {
-                e = e.resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default());
-                Self::update_elem_map(&mut self.elem_map, &e);
-            }
-        }
-
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
         if let (Some(bbox), Some(xy_loc)) = (e.bbox()?, e.pop_attr("xy-loc")) {

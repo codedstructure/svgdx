@@ -100,3 +100,20 @@ fn test_rel_size_recursive() {
         .unwrap()
         .contains(expected_rect));
 }
+
+#[test]
+fn test_rel_size_dwh() {
+    // Check that cxy can still centrally position a shape with a dwh
+    let input = r##"
+<rect wh="50" id="a"/>
+<rect cxy="#a@t" wh="10" dwh="10 -5" id="b" text="b"/>
+<rect cxy="#b@br" wh="1" id="z" />
+"##;
+    let expected_rect = r#"
+<rect x="34.5" y="2" width="1" height="1" id="z"/>
+"#;
+
+    assert!(transform_str_default(input)
+        .unwrap()
+        .contains(expected_rect));
+}

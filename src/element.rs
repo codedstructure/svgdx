@@ -613,6 +613,36 @@ impl SvgElement {
         self.attrs = new_attrs;
         let mut new_attrs = AttrMap::new();
 
+        // Size adjustments must be computed before updating position,
+        // as they affect any xy-loc other than default top-left.
+        // NOTE: these attributes may be removed once variable arithmetic
+        // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
+        // with $var="20 30" or similar (the reference form of wh already
+        // supports inline dw / dh).
+        {
+            let dw = self.pop_attr("dw");
+            let dh = self.pop_attr("dh");
+            let dwh = self.pop_attr("dwh");
+            let mut d_w = None;
+            let mut d_h = None;
+            if let Some(dwh) = dwh {
+                let mut parts = attr_split_cycle(&dwh).map(|v| strp_length(&v).unwrap());
+                d_w = parts.next();
+                d_h = parts.next();
+            }
+            if let Some(dw) = dw {
+                d_w = Some(strp_length(&dw)?);
+            }
+            if let Some(dh) = dh {
+                d_h = Some(strp_length(&dh)?);
+            }
+            if d_w.is_some() || d_h.is_some() {
+                self.attrs = self
+                    .resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default())
+                    .attrs;
+            }
+        }
+
         // Step 2: Evaluate position
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
