@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--border` to specify width of border around entire image
   - `--no-auto-style` to prevent svgdx automatically adding style/defs entries
   - `--background` to specify background colour (default none)
+- Fixed: Blank lines in multi-line text are now rendered correctly.
 
 ## [0.2.0] - 2024-01-01
 

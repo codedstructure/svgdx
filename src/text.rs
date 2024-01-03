@@ -175,7 +175,14 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 line_spacing
             };
             tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
-            tspan.content = Some(text_fragment.to_string());
+            tspan.content = Some(if text_fragment.is_empty() {
+                // Empty tspans don't take up vertical space, so use a zero-width space.
+                // Without this "a\n\nb" would render three tspans, but it would appear
+                // to have 'b' immediately below 'a' without a blank line between them.
+                "\u{200B}".to_string()
+            } else {
+                text_fragment.to_string()
+            });
             text_elements.push(tspan);
         }
     }
