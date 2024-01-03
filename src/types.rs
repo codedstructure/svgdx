@@ -327,6 +327,7 @@ impl BoundingBox {
     }
 
     /// Scale the bounding box by the given amount with origin at the center
+    #[allow(dead_code)]
     pub fn scale(&mut self, amount: f32) -> &Self {
         let width = self.x2 - self.x1;
         let height = self.y2 - self.y1;

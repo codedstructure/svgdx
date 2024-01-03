@@ -1,11 +1,14 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="200mm" height="100mm" viewBox="-44 -28 200 100">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="190mm" height="94mm" viewBox="-39 -25 190 94">
   <defs>
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
       <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
     </marker>
   </defs>
   <style>
-    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }
+    svg { background: white; }
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
     text { font-family: sans-serif; font-size: 3px; }
     text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }

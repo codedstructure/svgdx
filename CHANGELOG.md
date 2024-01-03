@@ -11,12 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   functions, but the various `transform_*` functions allow a range of input/output options
   for processing documents.
 - Changed: split `svgdx::TransformConfig` out of `svgdx::Config` to handle per-transform
-  settings, leaving top-level `Config` for 'front-end' options from the `svgdx` command-line
-  program.
+  settings, leaving top-level `Config` for 'front-end' options from the `svgdx`
+  command-line program.
+- Changed: default styles now use `fill: white` for shapes to improve appearance of
+  overlapping shapes. Shapes using `surround` still have no fill via a `d-surround` class.
 - Added: additional command-line options to tweak transformation:
-  - `--scale` to allow scales other than 1 user-unit == 1mm
   - `--debug` to include more debugging info in the generated document
+  - `--scale` to allow scales other than 1 user-unit == 1mm
+  - `--border` to specify width of border around entire image
   - `--no-auto-style` to prevent svgdx automatically adding style/defs entries
+  - `--background` to specify background colour (default none)
 
 ## [0.2.0] - 2024-01-01
 

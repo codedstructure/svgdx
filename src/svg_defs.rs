@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::TransformConfig;
+
 // List taken from https://www.w3.org/TR/SVG11/types.html#ColorKeywords
 static COLOUR_LIST: &[&str] = &[
     "aliceblue",
@@ -239,13 +241,20 @@ static DARK_COLOURS: &[&str] = &[
 pub(crate) fn build_styles(
     elements: &HashSet<String>,
     classes: &HashSet<String>,
+    config: &TransformConfig,
     indent: &str,
 ) -> String {
     let mut result = Vec::new();
 
-    result.push(String::from(
-        "rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }",
-    ));
+    // Default styles suitable for box-and-line diagrams
+    if config.background != "none" {
+        result.push(format!("svg {{ background: {}; }}", config.background));
+    }
+    result.extend(vec![
+        String::from("rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }"),
+        String::from("rect, circle, ellipse, polygon { fill: white; }"),
+        String::from("line, polyline, path { fill: none; }"),
+    ]);
     if elements.contains("text") {
         result.push(String::from(
             "text { font-family: sans-serif; font-size: 3px; }",
@@ -301,10 +310,13 @@ pub(crate) fn build_styles(
         ));
     }
     if classes.contains("d-dash") {
-        result.push(String::from(r#".d-dash { stroke-dasharray: 1.5 0.75; }"#));
+        result.push(String::from(".d-dash { stroke-dasharray: 1.5 0.75; }"));
     }
     if classes.contains("d-dot") {
-        result.push(String::from(r#".d-dot { stroke-dasharray: 0.5 0.5; }"#));
+        result.push(String::from(".d-dot { stroke-dasharray: 0.5 0.5; }"));
+    }
+    if classes.contains("d-surround") {
+        result.push(String::from(".d-surround { fill: none; }"));
     }
     for colour in COLOUR_LIST {
         if classes.contains(&format!("d-{colour}")) {
@@ -342,6 +354,7 @@ pub(crate) fn build_styles(
 pub(crate) fn build_defs(
     _elements: &HashSet<String>,
     classes: &HashSet<String>,
+    _config: &TransformConfig,
     indent: &str,
 ) -> String {
     let mut result = Vec::new();

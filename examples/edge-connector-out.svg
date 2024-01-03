@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="35mm" height="32mm" viewBox="4 12 35 32">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="33mm" height="30mm" viewBox="5 13 33 30">
     <defs>
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
         <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>

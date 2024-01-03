@@ -57,22 +57,28 @@ use transform::Transformer;
 /// Note the settings here are specific to a single transformation; alternate front-ends
 /// may use this directly rather than `Config` which wraps this struct when `svgdx` is
 /// run as a command-line program.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TransformConfig {
     /// Add debug info (e.g. input source) to output
     pub debug: bool,
-    /// Add style & defs entries based on class usage
-    pub add_auto_defs: bool,
     /// Overall output image scale (in mm as scale of user units)
     pub scale: f32,
+    /// Border width (user-units, default 5)
+    pub border: u16,
+    /// Add style & defs entries based on class usage
+    pub add_auto_defs: bool,
+    /// Background colour (default "none")
+    pub background: String,
 }
 
 impl Default for TransformConfig {
     fn default() -> Self {
         Self {
             debug: false,
-            add_auto_defs: true,
             scale: 1.0,
+            border: 5,
+            add_auto_defs: true,
+            background: "none".to_owned(),
         }
     }
 }
@@ -169,13 +175,21 @@ struct Arguments {
     #[arg(long)]
     debug: bool,
 
+    /// Scale of user-units to mm for root svg element width/height
+    #[arg(long, default_value = "1.0")]
+    scale: f32,
+
+    /// Border width around image (user-units)
+    #[arg(long, default_value = "5")]
+    border: u16,
+
     /// Don't add referenced styles automatically
     #[arg(long)]
     no_auto_style: bool,
 
-    /// Scale of user-units to mm for root svg element width/height
-    #[arg(long, default_value = "1.0")]
-    scale: f32,
+    /// Default background colour if auto-styles are active
+    #[arg(long, default_value = "none")]
+    background: String,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -209,8 +223,10 @@ impl Config {
             watch: args.watch,
             transform: TransformConfig {
                 debug: args.debug,
-                add_auto_defs: !args.no_auto_style,
                 scale: args.scale,
+                border: args.border,
+                add_auto_defs: !args.no_auto_style,
+                background: args.background,
             },
         })
     }
