@@ -83,19 +83,15 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             ' ' | '\t' => Token::Whitespace,
             _ => Token::Other,
         };
-        match next_token {
-            Token::Other => {
-                buffer.push(ch);
+        if next_token == Token::Other {
+            buffer.push(ch);
+        } else {
+            if !buffer.is_empty() {
+                let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
+                buffer.clear();
+                tokens.push(buffer_token);
             }
-            Token::Whitespace => {
-                continue;
-            }
-            _ => {
-                if !buffer.is_empty() {
-                    let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
-                    buffer.clear();
-                    tokens.push(buffer_token);
-                }
+            if next_token != Token::Whitespace {
                 tokens.push(next_token);
             }
         }
@@ -436,13 +432,9 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)"] {
-            assert!(evaluate(
-                tokenize(expr).expect("test"),
-                &HashMap::new(),
-                &HashMap::new()
-            )
-            .is_err());
+        let variables = HashMap::from([("numbers".to_owned(), "20 40".to_owned())]);
+        for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
+            assert!(evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).is_err());
         }
     }
 
@@ -481,6 +473,7 @@ mod tests {
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
+            ("numbers", "20  40"),
         ]
         .iter()
         .map(|v| (v.0.to_string(), v.1.to_string()))
@@ -502,5 +495,7 @@ mod tests {
             ),
             "Made by Ben in 2023"
         );
+        // This should 'fail' evaluation and be preserved as the variable value
+        assert_eq!(eval_vars(r"$numbers", &vars), "20  40");
     }
 }
