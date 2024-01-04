@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2024-01-04
+
+- Fixed: expressions including a variable as e.g. "20 24" would become "2024" with
+  whitespace collapsed. When used in numeric contexts this would create problems.
+  It now remains as the text value "20 24" as intended.
+- Fixed: panic resolving element size with `dwh` (etc) when `wh` referred to a
+  variable or other expression.
+
 ## [0.3.0] - 2024-01-03
 
 - Changed: more consistent public API; `get_config()` and `run()` are still top-level
