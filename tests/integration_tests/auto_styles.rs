@@ -48,13 +48,39 @@ fn test_style_fill_colour() {
 
 #[test]
 fn test_style_arrow() {
-    let colour_input = r#"<svg><line xy1="0" xy2="10" class="d-arrow" /></svg>"#;
+    let input = r#"<svg><line xy1="0" xy2="10" class="d-arrow" /></svg>"#;
     let expected_style = r#".d-arrow { marker-end: url(#d-arrow); }"#;
-    assert!(transform_str_default(colour_input)
-        .unwrap()
-        .contains(expected_style));
+    let output = transform_str_default(input).unwrap();
+    assert!(output.contains(expected_style));
     let expected_defs = r#"<marker id="d-arrow" "#;
-    assert!(transform_str_default(colour_input)
-        .unwrap()
-        .contains(expected_defs));
+    assert!(output.contains(expected_defs));
+
+    let input = r#"<svg><line xy1="0" xy2="10" class="d-biarrow" /></svg>"#;
+    let expected_style =
+        r#".d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }"#;
+    let output = transform_str_default(input).unwrap();
+    assert!(output.contains(expected_style));
+    let expected_defs = r#"<marker id="d-arrow" "#;
+    assert!(output.contains(expected_defs));
+}
+
+#[test]
+fn test_style_shadow() {
+    let input = r#"<svg><rect wh="10" class="d-hardshadow" /></svg>"#;
+    let expected_style = r#".d-hardshadow { filter: url(#d-hardshadow); }"#;
+    let expected_defs = r#"<filter id="d-hardshadow""#;
+    let output = transform_str_default(input).unwrap();
+    assert!(output.contains(expected_style));
+    assert!(output.contains(expected_defs));
+    let expected_defs = r#"<feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>"#;
+    assert!(output.contains(expected_defs));
+
+    let input = r#"<svg><rect wh="10" class="d-softshadow" /></svg>"#;
+    let expected_style = r#".d-softshadow { filter: url(#d-softshadow); }"#;
+    let expected_defs = r#"<filter id="d-softshadow""#;
+    let output = transform_str_default(input).unwrap();
+    assert!(output.contains(expected_style));
+    assert!(output.contains(expected_defs));
+    let expected_defs = r#"<feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>"#;
+    assert!(output.contains(expected_defs));
 }

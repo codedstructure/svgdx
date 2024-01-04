@@ -23,6 +23,21 @@ fn test_connector() {
 }
 
 #[test]
+fn test_connector_closest() {
+    let input = format!(r##"{RECT_SVG}<line start="#a" end="#d" />"##);
+    let expected_line = r#"<line x1="5" y1="5" x2="20" y2="20"/>"#;
+    assert!(transform_str_default(input)
+        .unwrap()
+        .contains(expected_line));
+
+    let input = format!(r##"{RECT_SVG}<line start="#a" end="#b" />"##);
+    let expected_line = r#"<line x1="5" y1="2.5" x2="20" y2="2.5"/>"#;
+    assert!(transform_str_default(input)
+        .unwrap()
+        .contains(expected_line));
+}
+
+#[test]
 fn test_connector_fixed_start() {
     let input = format!(r##"{RECT_SVG}<line start="3 7" end="#d@t" />"##);
     let expected_line = r#"<line x1="3" y1="7" x2="22.5" y2="20"/>"#;

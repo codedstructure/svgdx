@@ -10,11 +10,10 @@ pub(crate) fn fstr(x: f32) -> String {
         return (x as i32).to_string();
     }
     let result = format!("{x:.3}");
-    if result.contains('.') {
-        result.trim_end_matches('0').trim_end_matches('.').into()
-    } else {
-        result
-    }
+    // Remove trailing 0s and then trailing '.' if it exists.
+    // Note: this assumes `result` is a well-formatted f32, and always
+    // contains a '.' - otherwise '1000' would become '1'...
+    result.trim_end_matches('0').trim_end_matches('.').into()
 }
 
 /// Parse a string to an f32
@@ -707,6 +706,23 @@ mod test {
     }
 
     #[test]
+    fn test_length() {
+        let def_len = Length::default();
+        assert_eq!(def_len.absolute(), Some(0.));
+        assert_eq!(def_len.ratio(), None);
+
+        let abs_len = Length::Absolute(123.5);
+        assert_eq!(abs_len.absolute(), Some(123.5));
+        assert_eq!(abs_len.ratio(), None);
+        assert_eq!(abs_len.adjust(3.125), 123.5 + 3.125);
+
+        let ratio_len = Length::Ratio(0.75);
+        assert_eq!(ratio_len.absolute(), None);
+        assert_eq!(ratio_len.ratio(), Some(0.75));
+        assert_eq!(ratio_len.adjust(3.125), 0.75 * 3.125);
+    }
+
+    #[test]
     fn test_attr_split() {
         let mut parts = attr_split("0 1.5 23");
         assert_eq!(parts.next(), Some(String::from("0")));
@@ -754,6 +770,12 @@ mod test {
             strp_length("3.5").expect("test").calc_offset(-10., 90.),
             -6.5
         );
+        // Test with start > end
+        assert_eq!(
+            strp_length("3.5").expect("test").calc_offset(30., 10.),
+            26.5
+        );
+        assert_eq!(strp_length("10%").expect("test").calc_offset(30., 10.), 28.);
     }
 
     #[test]

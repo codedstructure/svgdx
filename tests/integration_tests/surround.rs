@@ -47,3 +47,33 @@ fn test_surround_multi_margin() {
 
     assert!(transform_str_default(input).unwrap().contains(expected));
 }
+
+#[test]
+fn test_surround_non_rect() {
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2 0" wh="5" />
+<circle id="s" surround="#a #b" margin="1 2"/>
+"##;
+    let expected = r#"<circle id="s" cx="3.5" cy="2.5" r="6.363" class="d-surround"/>"#;
+    let output = transform_str_default(input).expect("test");
+
+    assert!(
+        output.contains(expected),
+        "{expected}\n not found in\n{output}"
+    );
+
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2 0" wh="5" />
+<ellipse id="s" surround="#a #b" margin="2 1"/>
+"##;
+    let expected =
+        r#"<ellipse id="s" cx="3.5" cy="2.5" rx="7.777" ry="4.949" class="d-surround"/>"#;
+    let output = transform_str_default(input).expect("test");
+
+    assert!(
+        output.contains(expected),
+        "{expected}\n not found in\n{output}"
+    );
+}

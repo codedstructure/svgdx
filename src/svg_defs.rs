@@ -359,7 +359,7 @@ pub(crate) fn build_defs(
 ) -> String {
     let mut result = Vec::new();
 
-    if classes.contains("d-arrow") {
+    if classes.contains("d-arrow") || classes.contains("d-biarrow") {
         // Note use of context-stroke for both stroke and fill;
         // typically lines/paths with markers have `fill: none`
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
