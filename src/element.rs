@@ -619,7 +619,7 @@ impl SvgElement {
         // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
         // with $var="20 30" or similar (the reference form of wh already
         // supports inline dw / dh).
-        {
+        if !simple {
             let dw = self.pop_attr("dw");
             let dh = self.pop_attr("dh");
             let dwh = self.pop_attr("dwh");
