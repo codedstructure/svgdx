@@ -156,7 +156,7 @@ impl Connector {
             let name = &caps["id"];
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             start_dir = Self::loc_to_dir(&start_loc);
-            start_el = context.elem_map.get(name);
+            start_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
             start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
@@ -165,7 +165,7 @@ impl Connector {
             let name = &caps["id"];
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             end_dir = Self::loc_to_dir(&end_loc);
-            end_el = context.elem_map.get(name);
+            end_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
             end_point = Some((parts.next().unwrap(), parts.next().unwrap()));

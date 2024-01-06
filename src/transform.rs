@@ -17,9 +17,9 @@ use quick_xml::writer::Writer;
 use anyhow::{bail, Context, Result};
 use regex::Regex;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Default, Debug)]
 pub(crate) struct TransformerContext {
-    pub(crate) elem_map: HashMap<String, SvgElement>,
+    elem_map: HashMap<String, SvgElement>,
     pub(crate) prev_element: Option<SvgElement>,
     pub(crate) variables: HashMap<String, String>,
     last_indent: String,
@@ -33,6 +33,14 @@ impl TransformerContext {
             variables: HashMap::new(),
             last_indent: String::new(),
         }
+    }
+
+    pub(crate) fn get_element(&self, id: &str) -> Option<&SvgElement> {
+        self.elem_map.get(id)
+    }
+
+    pub(crate) fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
+        self.elem_map.get_mut(id)
     }
 
     fn populate(&mut self, events: &EventList) -> Result<()> {
@@ -108,7 +116,7 @@ impl TransformerContext {
                 // Note comments in `var` elements are permitted (and encouraged!)
                 // in the input, but not propagated to the output.
                 if key != "_" && key != "__" {
-                    let value = eval_attr(&value, &self.variables, &self.elem_map);
+                    let value = eval_attr(&value, self);
                     new_vars.insert(key, value);
                 }
             }
@@ -119,7 +127,7 @@ impl TransformerContext {
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = e.pop_attr("_") {
             // Expressions in comments are evaluated
-            let value = eval_attr(&comment, &self.variables, &self.elem_map);
+            let value = eval_attr(&comment, self);
             events.push(SvgEvent::Comment(value));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
         }
@@ -448,9 +456,13 @@ impl Transformer {
         writer: &mut dyn Write,
     ) -> Result<()> {
         let input = EventList::from_reader(reader)?;
-        let mut output = EventList { events: vec![] };
-
         self.context.populate(&input)?;
+        let output = self.process_events(input.clone())?;
+        self.postprocess(output, writer)
+    }
+
+    fn process_events<'a>(&mut self, input: EventList<'a>) -> Result<EventList<'a>> {
+        let mut output = EventList { events: vec![] };
 
         let mut changed_output = false;
         for (ev, pos) in input.iter() {
@@ -531,6 +543,10 @@ impl Transformer {
             changed_output = output.len() != old_len;
         }
 
+        Ok(output)
+    }
+
+    fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {
         let mut elem_path = Vec::new();
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
@@ -569,8 +585,7 @@ impl Transformer {
                 _ => {}
             }
         }
-        // Expand by 5, then add 5%. Ensures small images get more than a couple
-        // of pixels border, and large images still get a (relatively) decent border.
+        // Expand by given border width
         let mut extent = BoundingBox::combine(bbox_list);
         if let Some(extent) = &mut extent {
             extent.expand(self.config.border as f32, self.config.border as f32);

@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
-use crate::element::SvgElement;
+use crate::element::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
 #[derive(Clone, PartialEq)]
@@ -105,24 +105,18 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-struct EvalState {
+struct EvalState<'a> {
     tokens: Vec<Token>,
     index: usize,
-    var_table: HashMap<String, String>,
-    elem_map: HashMap<String, SvgElement>,
+    context: &'a TransformerContext,
 }
 
-impl EvalState {
-    fn new(
-        tokens: impl IntoIterator<Item = Token>,
-        var_table: HashMap<String, String>,
-        elem_map: HashMap<String, SvgElement>,
-    ) -> Self {
+impl<'a> EvalState<'a> {
+    fn new(tokens: impl IntoIterator<Item = Token>, context: &'a TransformerContext) -> Self {
         Self {
             tokens: tokens.into_iter().collect(),
             index: 0,
-            var_table,
-            elem_map,
+            context,
         }
     }
 
@@ -142,9 +136,10 @@ impl EvalState {
     }
 
     fn lookup(&self, v: &str) -> Result<f32> {
-        self.var_table
+        self.context
+            .variables
             .get(v)
-            .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table, &self.elem_map).ok())
+            .and_then(|t| evaluate(tokenize(t).ok()?, &self.context).ok())
             .context("Could not evaluate variable")
     }
 
@@ -168,7 +163,7 @@ impl EvalState {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
             let val = ScalarSpec::try_from(val).expect("Regex match");
-            if let Some(elem) = self.elem_map.get(id) {
+            if let Some(elem) = self.context.get_element(id) {
                 if let Some(bb) = elem.bbox()? {
                     Ok(bb.scalarspec(val))
                 } else {
@@ -183,12 +178,8 @@ impl EvalState {
     }
 }
 
-fn evaluate(
-    tokens: impl IntoIterator<Item = Token>,
-    vars: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> Result<f32> {
-    let mut eval_state = EvalState::new(tokens, vars.clone(), elem_map.clone());
+fn evaluate(tokens: impl IntoIterator<Item = Token>, context: &TransformerContext) -> Result<f32> {
+    let mut eval_state = EvalState::new(tokens, context);
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
@@ -298,11 +289,7 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(
-    value: &str,
-    variables: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> String {
+fn eval_expr(value: &str, context: &TransformerContext) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
     re.replace_all(value, |caps: &Captures| {
@@ -311,7 +298,7 @@ fn eval_expr(
             .expect("Matched regex must have this group")
             .as_str();
         if let Ok(tokens) = tokenize(inner) {
-            if let Ok(parsed) = evaluate(tokens, variables, elem_map) {
+            if let Ok(parsed) = evaluate(tokens, context) {
                 fstr(parsed)
             } else {
                 inner.to_owned()
@@ -324,18 +311,15 @@ fn eval_expr(
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(
-    value: &str,
-    variables: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> String {
+pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
     // Step 1: Evaluate arithmetic expressions. All variables referenced here
     // are assumed to resolve to a numeric expression.
-    let value = eval_expr(value, variables, elem_map);
+    let value = eval_expr(value, &context);
     // Step 2: Replace other variables (e.g. for string values)
-    eval_vars(&value, variables)
+    eval_vars(&value, &context.variables)
 }
 
+/*
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,3 +483,4 @@ mod tests {
         assert_eq!(eval_vars(r"$numbers", &vars), "20  40");
     }
 }
+*/

@@ -7,15 +7,14 @@ use crate::types::{
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use regex::{Captures, Regex};
-use std::collections::HashMap;
 
-fn expand_relspec(value: &str, elem_map: &HashMap<String, SvgElement>) -> String {
+fn expand_relspec(value: &str, context: &TransformerContext) -> String {
     let locspec = Regex::new(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)").expect("Bad Regex");
 
     let result = locspec.replace_all(value, |caps: &Captures| {
         let elref = caps.name("id").expect("Regex Match").as_str();
         let loc = caps.name("loc").expect("Regex Match").as_str();
-        if let Some(elem) = elem_map.get(elref) {
+        if let Some(elem) = context.get_element(elref) {
             if let Ok(Some(pos)) = elem.coord(loc) {
                 format!("{} {}", fstr(pos.0), fstr(pos.1))
             } else {
@@ -405,7 +404,7 @@ impl SvgElement {
                     let mut parts = relhv_id.split(':');
                     let ref_el_id = parts.next().expect("Regex match");
                     rel_dir = parts.next();
-                    ref_el = context.elem_map.get(ref_el_id);
+                    ref_el = context.get_element(ref_el_id);
                 } else {
                     rel_dir = relhv.as_str().strip_prefix('^');
                 }
@@ -474,8 +473,7 @@ impl SvgElement {
             if let Some(name) = opt_id {
                 ref_el = Some(
                     context
-                        .elem_map
-                        .get(name)
+                        .get_element(name)
                         .context(format!(r#"id '{name}' not found in eval_pos("{input}")"#))?,
                 );
             }
@@ -542,7 +540,7 @@ impl SvgElement {
                 .context("ref is mandatory in regex")?
                 .as_str();
             if let Some(ref_str) = ref_str.strip_prefix('#') {
-                ref_el = Some(context.elem_map.get(ref_str).context(format!(
+                ref_el = Some(context.get_element(ref_str).context(format!(
                     "Could not find reference '{ref_str}' in eval_size({input})"
                 ))?);
             }
@@ -576,7 +574,7 @@ impl SvgElement {
         let mut new_attrs = AttrMap::new();
 
         for (key, value) in self.attrs.clone() {
-            let replace = eval_attr(&value, &context.variables, &context.elem_map);
+            let replace = eval_attr(&value, context);
             self.attrs.insert(&key, &replace);
         }
 
@@ -737,10 +735,10 @@ impl SvgElement {
                         }
                     }
                     ("points", "polyline" | "polygon") => {
-                        pass_two_attrs.insert("points", expand_relspec(&value, &context.elem_map));
+                        pass_two_attrs.insert("points", expand_relspec(&value, &context));
                     }
                     ("d", "path") => {
-                        pass_two_attrs.insert("d", expand_relspec(&value, &context.elem_map));
+                        pass_two_attrs.insert("d", expand_relspec(&value, &context));
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }
@@ -753,7 +751,7 @@ impl SvgElement {
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
-            if let Some(elem) = context.elem_map.get_mut(&elem_id) {
+            if let Some(elem) = context.get_element_mut(&elem_id) {
                 *elem = updated;
             }
         }
