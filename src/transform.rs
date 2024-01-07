@@ -20,8 +20,8 @@ use regex::Regex;
 #[derive(Default, Debug)]
 pub(crate) struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
-    pub(crate) prev_element: Option<SvgElement>,
-    pub(crate) variables: HashMap<String, String>,
+    prev_element: Option<SvgElement>,
+    variables: HashMap<String, String>,
     last_indent: String,
 }
 
@@ -41,6 +41,19 @@ impl TransformerContext {
 
     pub(crate) fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
         self.elem_map.get_mut(id)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_var(&mut self, name: &str, value: &str) {
+        self.variables.insert(name.into(), value.into());
+    }
+
+    pub(crate) fn get_var(&self, name: &str) -> Option<&String> {
+        self.variables.get(name)
+    }
+
+    pub(crate) fn get_prev_element(&self) -> Option<&SvgElement> {
+        self.prev_element.as_ref()
     }
 
     fn populate(&mut self, events: &EventList) -> Result<()> {

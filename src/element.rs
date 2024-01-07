@@ -393,7 +393,7 @@ impl SvgElement {
             let mut dx = 0.;
             let mut dy = 0.;
 
-            let mut ref_el = context.prev_element.as_ref();
+            let mut ref_el = context.get_prev_element();
             let default_rel;
             let mut loc = None;
             let mut len = None;
@@ -534,7 +534,7 @@ impl SvgElement {
         if let Some(caps) = rel_re.captures(&ref_loc) {
             let dw = parts.next().unwrap_or("0".to_owned());
             let dh = parts.next().unwrap_or("0".to_owned());
-            let mut ref_el = context.prev_element.as_ref();
+            let mut ref_el = context.get_prev_element();
             let ref_str = caps
                 .name("ref")
                 .context("ref is mandatory in regex")?
@@ -735,10 +735,10 @@ impl SvgElement {
                         }
                     }
                     ("points", "polyline" | "polygon") => {
-                        pass_two_attrs.insert("points", expand_relspec(&value, &context));
+                        pass_two_attrs.insert("points", expand_relspec(&value, context));
                     }
                     ("d", "path") => {
-                        pass_two_attrs.insert("d", expand_relspec(&value, &context));
+                        pass_two_attrs.insert("d", expand_relspec(&value, context));
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }

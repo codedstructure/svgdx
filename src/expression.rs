@@ -1,6 +1,5 @@
 /// Recursive descent expression parser
 use regex::{Captures, Regex};
-use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
@@ -137,9 +136,8 @@ impl<'a> EvalState<'a> {
 
     fn lookup(&self, v: &str) -> Result<f32> {
         self.context
-            .variables
-            .get(v)
-            .and_then(|t| evaluate(tokenize(t).ok()?, &self.context).ok())
+            .get_var(v)
+            .and_then(|t| evaluate(tokenize(t).ok()?, self.context).ok())
             .context("Could not evaluate variable")
     }
 
@@ -256,7 +254,7 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
 
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
-pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
+pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
     let re =
         Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
             .expect("invalid regex");
@@ -277,8 +275,8 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
                 caps.name("var_simple")
                     .expect("Matched regex must have var_simple or var_brace")
             });
-            variables
-                .get(&cap.as_str().to_string())
+            context
+                .get_var(cap.as_str())
                 .unwrap_or(&inner.as_str().to_string())
                 .to_string()
         }
@@ -314,57 +312,59 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
 pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
     // Step 1: Evaluate arithmetic expressions. All variables referenced here
     // are assumed to resolve to a numeric expression.
-    let value = eval_expr(value, &context);
+    let value = eval_expr(value, context);
     // Step 2: Replace other variables (e.g. for string values)
-    eval_vars(&value, &context.variables)
+    eval_vars(&value, context)
 }
 
-/*
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_eval_var() {
-        let vars: HashMap<String, String> = [
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
-        ]
-        .iter()
-        .map(|v| (v.0.to_string(), v.1.to_string()))
-        .collect();
+        ] {
+            ctx.set_var(name, value);
+        }
 
-        assert_eq!(eval_vars("$one", &vars), "1");
-        assert_eq!(eval_vars("${one}", &vars), "1");
-        assert_eq!(eval_vars("$two", &vars), "$two");
-        assert_eq!(eval_vars("${two}", &vars), "${two}");
-        assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
-        assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
-        assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
-        assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
-        assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
-        assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
-        assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
-        assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
-        assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
+        assert_eq!(eval_vars("$one", &ctx), "1");
+        assert_eq!(eval_vars("${one}", &ctx), "1");
+        assert_eq!(eval_vars("$two", &ctx), "$two");
+        assert_eq!(eval_vars("${two}", &ctx), "${two}");
+        assert_eq!(eval_vars(r"\${one}", &ctx), "${one}");
+        assert_eq!(eval_vars(r"$one$empty$one$one", &ctx), "111");
+        assert_eq!(eval_vars(r"$one$emptyone$one$one", &ctx), "1$emptyone11");
+        assert_eq!(eval_vars(r"$one${empty}one$one$one", &ctx), "1one11");
+        assert_eq!(eval_vars(r"$one $one $one $one", &ctx), "1 1 1 1");
+        assert_eq!(eval_vars(r"${one}${one}$one$one", &ctx), "1111");
+        assert_eq!(eval_vars(r"${one}${one}\$one$one", &ctx), "11$one1");
+        assert_eq!(eval_vars(r"${one}${one}\${one}$one", &ctx), "11${one}1");
+        assert_eq!(eval_vars(r"Thing1${empty}Thing2", &ctx), "Thing1Thing2");
         assert_eq!(
-            eval_vars(r"Created in ${this_year} by ${me}", &vars),
+            eval_vars(r"Created in ${this_year} by ${me}", &ctx),
             "Created in 2023 by Ben"
         );
     }
 
     #[test]
     fn test_valid_expressions() {
-        let variables = HashMap::from([
-            ("pi".to_owned(), "3.1415927".to_owned()),
-            ("tau".to_owned(), "(2. * $pi)".to_owned()),
-            ("milli".to_owned(), "0.001".to_owned()),
-            ("micro".to_owned(), "($milli * $milli)".to_owned()),
-            ("kilo".to_owned(), "1000".to_owned()),
-            ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
-        ]);
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
+            ("pi", "3.1415927"),
+            ("tau", "(2. * $pi)"),
+            ("milli", "0.001"),
+            ("micro", "($milli * $milli)"),
+            ("kilo", "1000"),
+            ("mega", "($kilo * $kilo)"),
+        ] {
+            ctx.set_var(name, value);
+        }
         for (expr, expected) in [
             ("2 * 2", Some(4.)),
             ("2 * 2 + 1", Some(5.)),
@@ -378,10 +378,7 @@ mod tests {
             ("${tau} - 6", Some(0.28318548)),
             ("0.125 * $mega", Some(125000.)),
         ] {
-            assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).ok(),
-                expected
-            );
+            assert_eq!(evaluate(tokenize(expr).expect("test"), &ctx).ok(), expected);
         }
     }
 
@@ -416,9 +413,10 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        let variables = HashMap::from([("numbers".to_owned(), "20 40".to_owned())]);
+        let mut ctx = TransformerContext::default();
+        ctx.set_var("numbers", "20 40");
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
-            assert!(evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).is_err());
+            assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
         }
     }
 
@@ -441,8 +439,7 @@ mod tests {
             assert_eq!(
                 evaluate(
                     tokenize(expr).expect("test"),
-                    &HashMap::new(),
-                    &HashMap::new()
+                    &TransformerContext::default(),
                 )
                 .ok(),
                 expected
@@ -452,35 +449,26 @@ mod tests {
 
     #[test]
     fn test_eval_attr() {
-        let vars: HashMap<String, String> = [
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
             ("numbers", "20  40"),
-        ]
-        .iter()
-        .map(|v| (v.0.to_string(), v.1.to_string()))
-        .collect();
+        ] {
+            ctx.set_var(name, value);
+        }
 
         assert_eq!(
-            eval_attr(
-                "Made by ${me} in 20{{20 + ${one} * 3}}",
-                &vars,
-                &HashMap::new()
-            ),
+            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &ctx),
             "Made by Ben in 2023"
         );
         assert_eq!(
-            eval_attr(
-                "Made by ${me} in {{5*4}}{{20 + ${one} * 3}}",
-                &vars,
-                &HashMap::new()
-            ),
+            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &ctx),
             "Made by Ben in 2023"
         );
         // This should 'fail' evaluation and be preserved as the variable value
-        assert_eq!(eval_vars(r"$numbers", &vars), "20  40");
+        assert_eq!(eval_vars(r"$numbers", &ctx), "20  40");
     }
 }
-*/
