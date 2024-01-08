@@ -56,7 +56,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
     result
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Connector {
     source_element: SvgElement,
     start_el: Option<SvgElement>,

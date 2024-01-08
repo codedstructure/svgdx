@@ -166,7 +166,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     text_elements.push(text_elem);
     if multiline {
         let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
-        tspan_elem.attrs.remove("y");
+        tspan_elem.attrs.pop("y");
         for (idx, text_fragment) in lines.iter().enumerate() {
             let mut tspan = tspan_elem.clone();
             let line_offset = if idx == 0 {

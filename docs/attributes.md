@@ -1,5 +1,23 @@
 # Attributes
 
+## General attributes
+
+### `id`
+This has the same meaning as in normal SVG (and XML); it should be unique within the document, and will be transferred as-is to the output.
+
+### `class`
+This has the same meaning as in normal SVG, but a set of built-in [auto-styles](auto_styles.md) may have side-effects which affect conversion to SVG.
+
+### `_`, `__`
+These attributes are used to attach a comment to an input element, which will be converted into an XML Comment prior to the generated element(s).
+
+Expressions and variables in the `_` attribute will be evaluated, while `__` is a 'raw' comment, with no special processing.
+
+Example
+```xml
+<rect id="base" wh="10" _="All other elements are positioned relative to this"/>
+```
+
 ## Position and size
 
 ### `xy`

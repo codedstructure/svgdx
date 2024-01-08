@@ -17,7 +17,7 @@ use quick_xml::writer::Writer;
 use anyhow::{bail, Context, Result};
 use regex::Regex;
 
-#[derive(Default, Debug)]
+#[derive(Default)]
 pub(crate) struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
@@ -36,7 +36,12 @@ impl TransformerContext {
     }
 
     pub(crate) fn get_element(&self, id: &str) -> Option<&SvgElement> {
-        self.elem_map.get(id)
+        let e = self.elem_map.get(id);
+        println!(
+            ">> get_element({id}) -> {}",
+            e.map_or("None".to_string(), |ee| ee.to_string())
+        );
+        e
     }
 
     pub(crate) fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
@@ -144,7 +149,7 @@ impl TransformerContext {
             e.add_class("d-surround");
         }
 
-        e.expand_attributes(false, self)?;
+        e.expand_attributes(self)?;
 
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
@@ -184,6 +189,7 @@ impl TransformerContext {
             }
         }
 
+        // Process dx / dy / dxy if not a text element (where these could be useful)
         if e.name != "text" && e.name != "tspan" {
             let dx = e.pop_attr("dx");
             let dy = e.pop_attr("dy");
@@ -245,7 +251,7 @@ impl TransformerContext {
         }
 
         if !omit {
-            e.expand_attributes(true, self)?;
+            //e.expand_attributes(true, self)?;
             let new_elem = e.clone();
             if empty {
                 events.push(SvgEvent::Empty(new_elem.clone()));
@@ -264,7 +270,6 @@ impl TransformerContext {
     }
 }
 
-#[derive(Debug)]
 pub(crate) enum SvgEvent {
     Comment(String),
     Text(String),
@@ -438,23 +443,11 @@ impl Transformer {
         for (ev, pos) in input.iter() {
             let old_len = output.len();
             match ev {
-                Event::Eof => {
-                    // should never happen, as handled in EventList::from_reader()
-                    break;
-                }
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
-                    let mut repeat = 1;
                     let mut event_element = SvgElement::try_from(e)
                         .context(format!("could not extract element at line {pos}"))?;
                     self.context.update_element(&event_element);
-                    if let Some(rep_count) = event_element.pop_attr("repeat") {
-                        if is_empty {
-                            repeat = rep_count.parse().unwrap_or(1);
-                        } else {
-                            todo!("Repeat is not implemented for non-empty elements");
-                        }
-                    }
                     if self.config.debug {
                         // Prefix replaced element(s) with a representation of the original element
                         //
@@ -467,6 +460,14 @@ impl Transformer {
                             "\n{}",
                             self.context.last_indent
                         ))));
+                    }
+                    let mut repeat = 1;
+                    if let Some(rep_count) = event_element.pop_attr("repeat") {
+                        if is_empty {
+                            repeat = rep_count.parse().unwrap_or(1);
+                        } else {
+                            todo!("Repeat is not implemented for non-empty elements");
+                        }
                     }
                     for rep_idx in 0..repeat {
                         let events = transform_element(&event_element, &mut self.context, is_empty)
@@ -492,9 +493,8 @@ impl Transformer {
                 }
                 Event::Text(e) => {
                     if !changed_output {
-                        // if a previous input event didn't generate any
-                        // output events, ignore any text following that
-                        // input event.
+                        // if a previous input event didn't generate any output events,
+                        // ignore text following that event to avoid blank lines in output.
                         continue;
                     }
                     // Extract any trailing whitespace following newlines as the current indentation level
@@ -699,6 +699,9 @@ impl Transformer {
 impl TryFrom<&BytesStart<'_>> for SvgElement {
     type Error = anyhow::Error;
 
+    /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
+    /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
+    /// semantic about svgdx / svg formats.
     fn try_from(e: &BytesStart) -> Result<Self, Self::Error> {
         let elem_name: String =
             String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
