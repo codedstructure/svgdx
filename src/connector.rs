@@ -204,7 +204,10 @@ impl Connector {
                 )
             }
             (None, None) => {
-                let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
+                let (start_el, end_el) = (
+                    start_el.context("no start_el")?,
+                    end_el.context("no end_el")?,
+                );
                 if start_loc.is_empty() && end_loc.is_empty() {
                     (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);

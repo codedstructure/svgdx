@@ -56,56 +56,14 @@ impl TransformerContext {
         self.prev_element.as_ref()
     }
 
-    fn populate(&mut self, events: &EventList) -> Result<()> {
-        let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
-
-        for (ev, pos) in events.iter() {
-            match ev {
-                Event::Eof => {
-                    // should never happen, as handled in EventList::from_reader()
-                    break;
-                }
-                Event::Start(e) | Event::Empty(e) => {
-                    let elem_name: String =
-                        String::from_utf8(e.name().into_inner().to_vec()).unwrap();
-                    let mut attr_list = vec![];
-                    let mut id_opt = None;
-                    for a in e.attributes() {
-                        let aa = a.context(format!("Invalid attribute at {pos}"))?;
-
-                        let key =
-                            String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
-                        let value = aa.unescape_value().expect("XML decode error").into_owned();
-
-                        if &key == "id" {
-                            id_opt = Some(value);
-                        } else {
-                            attr_list.push((key, value.clone()));
-                        }
-                    }
-                    if let Some(id) = id_opt {
-                        let mut elem = SvgElement::new(&elem_name, &attr_list);
-                        // Expand anything we can given the current context
-                        elem.expand_attributes(true, self)?;
-                        elem_map.insert(id.clone(), elem);
-                    }
-                }
-                _ => {}
-            }
+    pub(crate) fn update_element(&mut self, el: &SvgElement) {
+        if let Some(id) = el.get_attr("id") {
+            self.elem_map.insert(id, el.clone());
         }
-        self.elem_map = elem_map;
-
-        Ok(())
     }
 
     pub(crate) fn set_indent(&mut self, indent: String) {
         self.last_indent = indent;
-    }
-
-    fn update_elem_map(elem_map: &mut HashMap<String, SvgElement>, e: &SvgElement) {
-        if let Some(el_id) = e.get_attr("id") {
-            elem_map.insert(el_id, e.clone());
-        }
     }
 
     /// Process a given `SvgElement` into a list of `SvgEvent`s
@@ -206,7 +164,7 @@ impl TransformerContext {
                 LocSpec::Center => (width / 2., height / 2.),
             };
             e = e.translated(-dx, -dy);
-            Self::update_elem_map(&mut self.elem_map, &e);
+            self.update_element(&e);
         }
 
         if e.is_connector() {
@@ -245,7 +203,7 @@ impl TransformerContext {
             }
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
-                Self::update_elem_map(&mut self.elem_map, &e);
+                self.update_element(&e);
             }
         }
 
@@ -469,8 +427,7 @@ impl Transformer {
         writer: &mut dyn Write,
     ) -> Result<()> {
         let input = EventList::from_reader(reader)?;
-        self.context.populate(&input)?;
-        let output = self.process_events(input.clone())?;
+        let output = self.process_events(input)?;
         self.postprocess(output, writer)
     }
 
@@ -490,6 +447,7 @@ impl Transformer {
                     let mut repeat = 1;
                     let mut event_element = SvgElement::try_from(e)
                         .context(format!("could not extract element at line {pos}"))?;
+                    self.context.update_element(&event_element);
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
