@@ -113,11 +113,15 @@ impl TransformerContext {
             let mut bbox_list = vec![];
 
             for elref in attr_split(&surround_list) {
-                if let Some(el) = self.elem_map.get(
-                    elref
-                        .strip_prefix('#')
-                        .context(format!("Invalid surround value {elref}"))?,
-                ) {
+                let el = self
+                    .elem_map
+                    .get(
+                        elref
+                            .strip_prefix('#')
+                            .context(format!("Invalid surround value {elref}"))?,
+                    )
+                    .context("Ref lookup failed at this time")?;
+                {
                     if let Ok(Some(el_bb)) = el.bbox() {
                         bbox_list.push(el_bb);
                     }
