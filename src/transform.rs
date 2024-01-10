@@ -124,6 +124,8 @@ impl TransformerContext {
                 {
                     if let Ok(Some(el_bb)) = el.bbox() {
                         bbox_list.push(el_bb);
+                    } else {
+                        bail!("Element #{elref} has no bounding box at this time");
                     }
                 }
             }
@@ -503,6 +505,7 @@ impl Transformer {
                         ee_name = String::from("text");
                     }
                     gen_events.push(&Event::End(BytesEnd::new(ee_name)));
+                    last_idx = idx;
                 }
                 Event::Text(e) => {
                     if gen_events.is_empty() {
