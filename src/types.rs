@@ -199,23 +199,33 @@ impl TryFrom<String> for LocSpec {
 pub enum ScalarSpec {
     Minx,
     Maxx,
+    Cx,
     Miny,
     Maxy,
+    Cy,
     Width,
+    Rx,
     Height,
+    Ry,
 }
 
 impl TryFrom<&str> for ScalarSpec {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // TODO: 'r' here is ambiguous vs circle's radius attribute.
+        // Perhaps require uppercase 'T/R/B/L' for edge values.
         match value {
-            "x1" | "l" => Ok(Self::Minx),
-            "y1" | "t" => Ok(Self::Miny),
+            "x" | "x1" | "l" => Ok(Self::Minx),
+            "y" | "y1" | "t" => Ok(Self::Miny),
+            "cx" => Ok(Self::Cx),
             "x2" | "r" => Ok(Self::Maxx),
             "y2" | "b" => Ok(Self::Maxy),
-            "w" => Ok(Self::Width),
-            "h" => Ok(Self::Height),
+            "cy" => Ok(Self::Cy),
+            "w" | "width" => Ok(Self::Width),
+            "rx" => Ok(Self::Rx),
+            "h" | "height" => Ok(Self::Height),
+            "ry" => Ok(Self::Ry),
             _ => bail!("Invalid ScalarSpec format {value}"),
         }
     }
@@ -271,8 +281,12 @@ impl BoundingBox {
             ScalarSpec::Maxx => self.x2,
             ScalarSpec::Miny => self.y1,
             ScalarSpec::Maxy => self.y2,
-            ScalarSpec::Width => self.x2 - self.x1,
-            ScalarSpec::Height => self.y2 - self.y1,
+            ScalarSpec::Width => (self.x2 - self.x1).abs(),
+            ScalarSpec::Height => (self.y2 - self.y1).abs(),
+            ScalarSpec::Cx => (self.x1 + self.x2) / 2.,
+            ScalarSpec::Cy => (self.y1 + self.y2) / 2.,
+            ScalarSpec::Rx => (self.x2 - self.x1).abs() / 2.,
+            ScalarSpec::Ry => (self.y2 - self.y1).abs() / 2.,
         }
     }
 

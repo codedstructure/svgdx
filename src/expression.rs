@@ -156,11 +156,12 @@ impl<'a> EvalState<'a> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
-        let re = Regex::new(r"#(?<id>[[:word:]]+)\.(?<val>[trblwh])").expect("Bad Regex");
+        let re = Regex::new(r"#(?<id>[[:alpha:]][[:word:]]*)\.(?<val>[[:alpha:]][[:word:]]*)")
+            .expect("Bad Regex");
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
-            let val = ScalarSpec::try_from(val).expect("Regex match");
+            let val = ScalarSpec::try_from(val)?;
             if let Some(elem) = self.context.get_element(id) {
                 if let Some(bb) = elem.bbox()? {
                     Ok(bb.scalarspec(val))
