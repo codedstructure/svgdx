@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Additional values for scalar specs, including `cx`, `cy`, `rx`, `ry`.
+  Existing scalar values can now be referenced by alternate names, e.g. `width`
+  in addition to `w` or `y` in addition to `t`. The intent here is that SVG
+  attribute names (e.g. `y` or `height` for a rectangle) are used as scalar names.
+
+- Added: support for out-of-order references in `surround` and other contexts.
+
+  Since `surround` is intended to support 'background' fills around shapes,
+  it needs to be painted before the shapes in contains - and therefore
+  reference elements occurring later in the document (which may in turn
+  reference other elements later in the document to establish placement).
+
+  A more general approach to these 'recursive' references is implemented,
+  though it may be slow in the general case with large documents.
+  The previous `populate()` stage followed by 'simple' / 'not-simple' calls
+  to `expand_attributes()` have beeb replaced by repeated 'process remaining
+  elements which couldn't be handled' stages until success (no further
+  elements) or stall (couldn't reduce the number of renamining elements).
+
+  NOTE: one (temporary) limitation of the approach here is the generated
+  indentation/newline placement is less consistent, as output elements are
+  no longer processed in document order.
+
+- Internal: Made fields of `TransformerContext` private with appropriate
+  access methods, e.g. `elem_map.get()` -> `get_element()`. Evaluation functions
+  now take a `&TransformerContext` where previously they took `&HashMap`s etc
+  corresponding to the internal types.
+
+- Internal: `pop_idx` / `insert_idx` functions on `SvgElement`, to allow an
+  attribute to be removed and replaced 'in sequence' with multiple other
+  attributes without having to iterate through all existing attributes and
+  rebuild a new `AttrList`. NOTE: This isn't a nice API and may change.
+
+
 ## [0.3.1] - 2024-01-04
 
 - Fixed: expressions including a variable as e.g. "20 24" would become "2024" with

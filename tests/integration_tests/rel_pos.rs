@@ -266,3 +266,21 @@ fn test_rel_recursive() {
         .unwrap()
         .contains(expected_rect));
 }
+
+#[test]
+fn test_rel_multi_recursive() {
+    // Ensure a relative position can be derived through many recursive references
+    let rel_refid_input = r##"
+<rect id="a" xy="#b:H" wh="2" />
+<rect id="b" xy="#c:H" wh="2" />
+<rect id="c" xy="#d:H" wh="2" />
+<rect id="d" xy="#e:H" wh="2" />
+<rect id="e" xy="#f:H" wh="2" />
+<rect id="f" xy="#g:H" wh="2" />
+<rect id="g" xy="50" wh="2" />
+"##;
+    let expected_rect = r#"<rect id="a" x="38" y="50" width="2" height="2"/>"#;
+    assert!(transform_str_default(rel_refid_input)
+        .unwrap()
+        .contains(expected_rect));
+}

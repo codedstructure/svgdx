@@ -215,6 +215,9 @@ impl TryFrom<&str> for ScalarSpec {
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         // TODO: 'r' here is ambiguous vs circle's radius attribute.
         // Perhaps require uppercase 'T/R/B/L' for edge values.
+        // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
+        // *not* required that the *attributes* x1 < x2 or y1 < y2.
+        // Perhaps a separate 'attribute spec' concept is needed...
         match value {
             "x" | "x1" | "l" => Ok(Self::Minx),
             "y" | "y1" | "t" => Ok(Self::Miny),
