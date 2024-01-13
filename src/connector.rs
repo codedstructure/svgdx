@@ -213,7 +213,11 @@ impl Connector {
                     start_dir = Self::loc_to_dir(&start_loc);
                     end_dir = Self::loc_to_dir(&end_loc);
                 } else if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_el.coord(&end_loc)?.unwrap(), conn_type)?;
+                    start_loc = closest_loc(
+                        start_el,
+                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
+                        conn_type,
+                    )?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
                     end_loc = closest_loc(
@@ -232,7 +236,10 @@ impl Connector {
                             .context("no coord for start_loc")?,
                         start_dir,
                     ),
-                    Endpoint::new(end_el.coord(&end_loc)?.unwrap(), end_dir),
+                    Endpoint::new(
+                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
+                        end_dir,
+                    ),
                 )
             }
         };

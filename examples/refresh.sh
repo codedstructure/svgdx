@@ -2,5 +2,5 @@
 
 for SVG_IN in *-in.svg; do
     SVG_OUT="${SVG_IN/-in.svg/-out.svg}"
-    cargo run --release -q -- "$SVG_IN" -o "$SVG_OUT"
+    cargo run --release -q -- "$SVG_IN" -o "$SVG_OUT" || echo "Failed to render ${SVG_IN}"
 done

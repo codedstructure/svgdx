@@ -19,12 +19,11 @@
 
   <rect x="0" y="0" width="20" height="30" />
 
-  <tbox cxy="0 5" wh="10 5" text="a"/>
+  <rect cxy="0 5" wh="10 5" text="a"/>
 
-  <tbox cxy="0 15" wh="10 5" text="b"/>
+  <rect cxy="0 15" wh="10 5" text="b"/>
 
-  <tbox cxy="0 25" wh="10 5" text="c"/>
+  <rect cxy="0 25" wh="10 5" text="c"/>
 
-  <!-- text can be given as a 'text' attribute or as element text -->
-  <tbox cxy="20 15" wh="10 5">out</tbox>
+  <rect cxy="20 15" wh="10 5" text="out"/>
 </svg>

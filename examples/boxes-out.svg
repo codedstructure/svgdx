@@ -37,20 +37,17 @@
 
     <rect id="b1" x="20" y="20" width="80" height="20"/>
     <text x="60" y="30" class="d-tbox">Box 1</text>
-    <line x1="60" y1="40" x2="60" y2="50"/>
-    <rect id="b2" x="20" y="50" width="20" height="30"/>
+    <line x1="60" y1="40" x2="60" y2="50"/><rect id="b2" x="20" y="50" width="20" height="30"/>
     <text x="30" y="51" class="d-tbox d-text-top">Box 2</text>
     <rect x="22" y="61" width="16" height="5"/>
     <rect x="22" y="67" width="16" height="5"/>
     <rect x="22" y="73" width="16" height="5"/>
-    <line x1="40" y1="65" x2="50" y2="65"/>
-    <rect id="b3" x="50" y="50" width="20" height="30"/>
+    <line x1="40" y1="65" x2="50" y2="65"/><rect id="b3" x="50" y="50" width="20" height="30"/>
     <text x="60" y="51" class="d-tbox d-text-top">Box 3</text>
     <rect x="52" y="61" width="16" height="5"/>
     <rect x="52" y="67" width="16" height="5"/>
     <rect x="52" y="73" width="16" height="5"/>
-    <line x1="70" y1="65" x2="80" y2="65"/>
-    <rect id="b4" x="80" y="50" width="20" height="30"/>
+    <line x1="70" y1="65" x2="80" y2="65"/><rect id="b4" x="80" y="50" width="20" height="30"/>
     <text x="90" y="51" class="d-tbox d-text-top">Box 4</text>
     <rect x="82" y="61" width="16" height="5"/>
     <rect x="82" y="67" width="16" height="5"/>

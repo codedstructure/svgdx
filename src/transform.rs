@@ -9,6 +9,7 @@ use crate::{element::SvgElement, TransformConfig};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 
+use itertools::Itertools;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
@@ -187,6 +188,8 @@ impl TransformerContext {
             ) {
                 // replace with rendered connection element
                 e = conn.render()?.without_attr("edge-type");
+            } else {
+                bail!("Cannot create connector {e}");
             }
         }
 
@@ -548,7 +551,13 @@ impl Transformer {
             let last_len = remain.len();
             remain = self.process_seq(remain, &mut idx_output)?;
             if last_len == remain.len() {
-                bail!("Could not resolve");
+                bail!(
+                    "Could not resolve the following elements:\n{}",
+                    remain
+                        .iter()
+                        .map(|r| format!("{:4}: {:?}", r.2, r.1))
+                        .join("\n")
+                );
             }
         }
 
