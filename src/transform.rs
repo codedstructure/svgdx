@@ -16,7 +16,7 @@ use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
 use anyhow::{bail, Context, Result};
-use regex::Regex;
+use lazy_regex::regex;
 
 #[derive(Default)]
 pub(crate) struct TransformerContext {
@@ -367,7 +367,7 @@ impl EventList<'_> {
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
-        let blank_line_remover = Regex::new("\n[ \t]+\n").expect("Bad Regex");
+        let blank_line_remover = regex!("\n[ \t]+\n");
         for event_pos in &self.events {
             // trim trailing whitespace.
             // just using `trim_end()` on Text events won't work
@@ -517,7 +517,7 @@ impl Transformer {
                         continue;
                     }
                     // Extract any trailing whitespace following newlines as the current indentation level
-                    let re = Regex::new(r"(?ms)\n.*^(\s+)*").expect("Bad Regex");
+                    let re = regex!(r"(?ms)\n.*^(\s+)*");
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
                     if let Some(captures) = re.captures(&text) {
                         let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());

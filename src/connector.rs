@@ -1,7 +1,7 @@
 use crate::element::SvgElement;
 use crate::transform::TransformerContext;
 use crate::types::{attr_split, fstr, strp, strp_length, Length};
-use regex::Regex;
+use lazy_regex::regex;
 
 use anyhow::{Context, Result};
 
@@ -150,7 +150,7 @@ impl Connector {
         let mut end_dir = None;
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").expect("Bad RegEx");
+        let re = regex!(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$");
 
         if let Some(caps) = re.captures(&start_ref) {
             let name = &caps["id"];

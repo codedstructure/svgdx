@@ -1,5 +1,6 @@
 /// Recursive descent expression parser
-use regex::{Captures, Regex};
+use lazy_regex::regex;
+use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
@@ -36,7 +37,7 @@ enum Token {
 }
 
 fn valid_variable_name(var: &str) -> Result<&str> {
-    let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").expect("Bad Regex");
+    let re = regex!(r"[a-zA-Z][a-zA-Z0-9_]*");
     if !re.is_match(var) {
         bail!("Invalid variable name");
     }
@@ -156,8 +157,7 @@ impl<'a> EvalState<'a> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
-        let re = Regex::new(r"#(?<id>[[:alpha:]][[:word:]]*)\.(?<val>[[:alpha:]][[:word:]]*)")
-            .expect("Bad Regex");
+        let re = regex!(r"#(?<id>[[:alpha:]][[:word:]]*)\.(?<val>[[:alpha:]][[:word:]]*)");
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
@@ -256,9 +256,7 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
 pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
-    let re =
-        Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
-            .expect("invalid regex");
+    let re = regex!(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))");
     let value = re.replace_all(value, |caps: &Captures| {
         let inner = caps
             .name("inner")
@@ -283,14 +281,14 @@ pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
         }
     });
     // Following that, replace any escaped "\$" back into "$"" characters
-    let re = Regex::new(r"\\\$").expect("invalid regex");
+    let re = regex!(r"\\\$");
     re.replace_all(&value, r"$").into_owned()
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
 fn eval_expr(value: &str, context: &TransformerContext) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
-    let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
+    let re = regex!(r"\{\{(?<inner>.+?)\}\}");
     re.replace_all(value, |caps: &Captures| {
         let inner = caps
             .name("inner")

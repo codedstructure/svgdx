@@ -40,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   attributes without having to iterate through all existing attributes and
   rebuild a new `AttrList`. NOTE: This isn't a nice API and may change.
 
+- Internal: switch to using `lazy_regex` for performance.
 
 ## [0.3.1] - 2024-01-04
 

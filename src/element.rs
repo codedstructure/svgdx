@@ -6,10 +6,11 @@ use crate::types::{
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
-use regex::{Captures, Regex};
+use lazy_regex::regex;
+use regex::Captures;
 
 fn expand_relspec(value: &str, context: &TransformerContext) -> String {
-    let locspec = Regex::new(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)").expect("Bad Regex");
+    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
 
     let result = locspec.replace_all(value, |caps: &Captures| {
         let elref = caps.name("id").expect("Regex Match").as_str();
@@ -261,7 +262,7 @@ impl SvgElement {
     pub fn coord(&self, loc: &str) -> Result<Option<(f32, f32)>> {
         let mut loc = loc;
         let mut len = Length::Ratio(0.5);
-        let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").expect("Bad Regex");
+        let re = regex!(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$");
         if let Some(caps) = re.captures(loc) {
             loc = caps.name("loc").expect("Regex Match").as_str();
             len = caps
@@ -374,9 +375,9 @@ impl SvgElement {
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re =
-            Regex::new(r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)")
-                .expect("Bad Regex");
+        let rel_re = regex!(
+            r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)"
+        );
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
@@ -530,7 +531,7 @@ impl SvgElement {
         // TODO: allow mixed relative and absolute values...
         let mut parts = attr_split(input);
         let ref_loc = parts.next().expect("always at least one");
-        let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").expect("Bad Regex");
+        let rel_re = regex!(r"^(?<ref>(#\S+|\^))");
         if let Some(caps) = rel_re.captures(&ref_loc) {
             let dw = parts.next().unwrap_or("0".to_owned());
             let dh = parts.next().unwrap_or("0".to_owned());
