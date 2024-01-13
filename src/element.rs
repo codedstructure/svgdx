@@ -6,16 +6,16 @@ use crate::types::{
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
-use regex::{Captures, Regex};
-use std::collections::HashMap;
+use lazy_regex::regex;
+use regex::Captures;
 
-fn expand_relspec(value: &str, elem_map: &HashMap<String, SvgElement>) -> String {
-    let locspec = Regex::new(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)").expect("Bad Regex");
+fn expand_relspec(value: &str, context: &TransformerContext) -> String {
+    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
 
     let result = locspec.replace_all(value, |caps: &Captures| {
         let elref = caps.name("id").expect("Regex Match").as_str();
         let loc = caps.name("loc").expect("Regex Match").as_str();
-        if let Some(elem) = elem_map.get(elref) {
+        if let Some(elem) = context.get_element(elref) {
             if let Ok(Some(pos)) = elem.coord(loc) {
                 format!("{} {}", fstr(pos.0), fstr(pos.1))
             } else {
@@ -29,7 +29,7 @@ fn expand_relspec(value: &str, elem_map: &HashMap<String, SvgElement>) -> String
     result.to_string()
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub(crate) struct SvgElement {
     pub name: String,
     pub attrs: AttrMap,
@@ -124,7 +124,7 @@ impl SvgElement {
     }
 
     pub fn pop_attr(&mut self, key: &str) -> Option<String> {
-        self.attrs.remove(key)
+        self.attrs.pop(key)
     }
 
     pub fn get_attr(&self, key: &str) -> Option<String> {
@@ -262,7 +262,7 @@ impl SvgElement {
     pub fn coord(&self, loc: &str) -> Result<Option<(f32, f32)>> {
         let mut loc = loc;
         let mut len = Length::Ratio(0.5);
-        let re = Regex::new(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$").expect("Bad Regex");
+        let re = regex!(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$");
         if let Some(caps) = re.captures(loc) {
             loc = caps.name("loc").expect("Regex Match").as_str();
             len = caps
@@ -375,9 +375,9 @@ impl SvgElement {
         //   xy="@tr 10 0"   - position to right of previous element with gap of 10
         //   cxy="@b"        - position centre at bottom of previous element
         // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re =
-            Regex::new(r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)")
-                .expect("Bad Regex");
+        let rel_re = regex!(
+            r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)"
+        );
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
@@ -394,7 +394,7 @@ impl SvgElement {
             let mut dx = 0.;
             let mut dy = 0.;
 
-            let mut ref_el = context.prev_element.as_ref();
+            let mut ref_el = context.get_prev_element();
             let default_rel;
             let mut loc = None;
             let mut len = None;
@@ -405,7 +405,7 @@ impl SvgElement {
                     let mut parts = relhv_id.split(':');
                     let ref_el_id = parts.next().expect("Regex match");
                     rel_dir = parts.next();
-                    ref_el = context.elem_map.get(ref_el_id);
+                    ref_el = context.get_element(ref_el_id);
                 } else {
                     rel_dir = relhv.as_str().strip_prefix('^');
                 }
@@ -474,8 +474,7 @@ impl SvgElement {
             if let Some(name) = opt_id {
                 ref_el = Some(
                     context
-                        .elem_map
-                        .get(name)
+                        .get_element(name)
                         .context(format!(r#"id '{name}' not found in eval_pos("{input}")"#))?,
                 );
             }
@@ -532,17 +531,17 @@ impl SvgElement {
         // TODO: allow mixed relative and absolute values...
         let mut parts = attr_split(input);
         let ref_loc = parts.next().expect("always at least one");
-        let rel_re = Regex::new(r"^(?<ref>(#\S+|\^))").expect("Bad Regex");
+        let rel_re = regex!(r"^(?<ref>(#\S+|\^))");
         if let Some(caps) = rel_re.captures(&ref_loc) {
             let dw = parts.next().unwrap_or("0".to_owned());
             let dh = parts.next().unwrap_or("0".to_owned());
-            let mut ref_el = context.prev_element.as_ref();
+            let mut ref_el = context.get_prev_element();
             let ref_str = caps
                 .name("ref")
                 .context("ref is mandatory in regex")?
                 .as_str();
             if let Some(ref_str) = ref_str.strip_prefix('#') {
-                ref_el = Some(context.elem_map.get(ref_str).context(format!(
+                ref_el = Some(context.get_element(ref_str).context(format!(
                     "Could not find reference '{ref_str}' in eval_size({input})"
                 ))?);
             }
@@ -568,49 +567,35 @@ impl SvgElement {
     }
 
     /// Process and expand attributes as needed
-    pub fn expand_attributes(
-        &mut self,
-        simple: bool,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        let mut new_attrs = AttrMap::new();
-
+    pub fn expand_attributes(&mut self, context: &mut TransformerContext) -> Result<()> {
+        // Step 0: Resolve any attributes
         for (key, value) in self.attrs.clone() {
-            let replace = eval_attr(&value, &context.variables, &context.elem_map);
+            let replace = eval_attr(&value, context);
             self.attrs.insert(&key, &replace);
         }
 
-        // In the following steps, every attribute is either replaced by one
-        // or more other attributes, or copied as-is into `new_attrs`.
-
         // Step 1: Evaluate size from wh attributes
-        for (key, value) in self.attrs.clone() {
-            let mut value = value.clone();
-            if !simple && key.as_str() == "wh" {
-                // TODO: support rxy for ellipses, with scaling factor
-                value = self.eval_size(value.as_str(), context)?;
-            }
+        if let Some((wh, idx)) = self.attrs.pop_idx("wh") {
+            let value = self.eval_size(&wh, context)?;
             let mut parts = attr_split_cycle(&value);
-            match (key.as_str(), self.name.as_str()) {
-                ("wh", "rect" | "tbox" | "pipeline") => {
-                    new_attrs.insert("width", parts.next().expect("cycle"));
-                    new_attrs.insert("height", parts.next().expect("cycle"));
+            let w = parts.next().expect("cycle");
+            let h = parts.next().expect("cycle");
+            match self.name.as_str() {
+                "rect" => {
+                    self.attrs.insert_idx("width", w, idx);
+                    self.attrs.insert_idx("height", h, idx + 1);
                 }
-                ("wh", "circle") => {
-                    let diameter: f32 = strp(&parts.next().expect("cycle")).unwrap();
-                    new_attrs.insert("r", fstr(diameter / 2.));
+                "circle" => {
+                    self.attrs.insert_idx("r", fstr(strp(&w)? / 2.), idx);
                 }
-                ("wh", "ellipse") => {
-                    let dia_x: f32 = strp(&parts.next().expect("cycle")).unwrap();
-                    let dia_y: f32 = strp(&parts.next().expect("cycle")).unwrap();
-                    new_attrs.insert("rx", fstr(dia_x / 2.));
-                    new_attrs.insert("ry", fstr(dia_y / 2.));
+                "ellipse" => {
+                    self.attrs.insert_idx("rx", fstr(strp(&w)? / 2.), idx);
+                    self.attrs.insert_idx("ry", fstr(strp(&h)? / 2.), idx + 1);
                 }
-                _ => new_attrs.insert(key.clone(), value.clone()),
+                _ => {}
             }
         }
 
-        self.attrs = new_attrs;
         let mut new_attrs = AttrMap::new();
 
         // Size adjustments must be computed before updating position,
@@ -619,7 +604,7 @@ impl SvgElement {
         // is implemented; currently key use-case is e.g. wh="$var" dw="-4"
         // with $var="20 30" or similar (the reference form of wh already
         // supports inline dw / dh).
-        if !simple {
+        {
             let dw = self.pop_attr("dw");
             let dh = self.pop_attr("dh");
             let dwh = self.pop_attr("dwh");
@@ -646,14 +631,12 @@ impl SvgElement {
         // Step 2: Evaluate position
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
-            if !simple {
-                match key.as_str() {
-                    "xy" | "cxy" | "xy1" | "xy2" => {
-                        // TODO: maybe split up? pos may depende on size, but size doesn't depend on pos
-                        value = self.eval_pos(value.as_str(), context)?;
-                    }
-                    _ => (),
+            match key.as_str() {
+                "xy" | "cxy" | "xy1" | "xy2" => {
+                    // TODO: maybe split up? pos may depende on size, but size doesn't depend on pos
+                    value = self.eval_pos(value.as_str(), context)?;
                 }
+                _ => (),
             }
 
             // The first pass is straightforward 'expansion', where the current
@@ -684,7 +667,7 @@ impl SvgElement {
             }
         }
 
-        if !simple {
+        {
             // A second pass is used where the processed values of other attributes
             // (which may be given in any order and so not available on first pass)
             // are required, e.g. updating cxy for rect-like objects, which requires
@@ -737,10 +720,10 @@ impl SvgElement {
                         }
                     }
                     ("points", "polyline" | "polygon") => {
-                        pass_two_attrs.insert("points", expand_relspec(&value, &context.elem_map));
+                        pass_two_attrs.insert("points", expand_relspec(&value, context));
                     }
                     ("d", "path") => {
-                        pass_two_attrs.insert("d", expand_relspec(&value, &context.elem_map));
+                        pass_two_attrs.insert("d", expand_relspec(&value, context));
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }
@@ -753,7 +736,7 @@ impl SvgElement {
         if let Some(elem_id) = self.get_attr("id") {
             let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
-            if let Some(elem) = context.elem_map.get_mut(&elem_id) {
+            if let Some(elem) = context.get_element_mut(&elem_id) {
                 *elem = updated;
             }
         }

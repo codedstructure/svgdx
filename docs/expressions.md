@@ -48,14 +48,30 @@ Expressions may include the following. Note these are listed in order of precede
 
 The following scalar values may be referred to from an element reference:
 
-* `t` - top, the y coordinate of the top of the given element
-* `r` - right, the x coordinate of the right-hand-side of the given element
-* `b` - bottom, the y coordinate of the bottom of the given element
-* `l` - left, the x coordinate of the left-hand-side of the given element
-* `w` - the width of the given element
-* `h` - the height of the given element
+* `t`, `y`, `y1` - top, the y coordinate of the top of the given element
+* `r`, `x2` - right, the x coordinate of the right-hand-side of the given element
+* `b`, `y2` - bottom, the y coordinate of the bottom of the given element
+* `l`, `x`, `x1` - left, the x coordinate of the left-hand-side of the given element
+* `w`, `width` - the width of the given element
+* `h`, `height` - the height of the given element
+* `cx` - the x coordinate of the centre of the given element
+* `cy` - the y coordinate of the centre of the given element
+* `rx` - the x-radius of the given element
+* `ry` - the y-radius of the given element
 
 These are accessed by providing an element reference (e.g. `#abc`) followed by a
 dot (`.`), followed by the appropriate entry from the list above.
 
 Note these are different to the relative locations which may be derived from an element.
+
+> NOTE: this currently has two overlapping use-cases:
+>
+> * get scalar geometric values from an element
+> * get the (numeric) value from an attribute of an element
+>
+> In many cases these are equivalent, but in some cases they can have different
+> meanings. For example: `rx` on a `<rect>` vs an `<ellipse>`, or `x2` to mean
+> the right-hand side of an element - when > a `<line>` may have an `x2` attribute
+> less than its `x1` value.
+>
+> The cleanest way to resolve this is likely splitting up the ScalarSpec type.

@@ -1,0 +1,28 @@
+<svg>
+  <rect surround="#o2 #o5" margin="2" class="d-fill-white"/>
+  <rect id="o2" surround="#o3 #o4" margin="5" class="d-fill-grey" opacity="0.4"/>
+  <rect id="o3" surround="#inp #proc1 #proc2 #out" margin="3" class="d-fill-grey d-dash" opacity="0.4"/>
+  <rect id="o4" surround="#xinp #xproc1 #xproc2 #xout" margin="3" class="d-fill-grey" opacity="0.4"/>
+  <!-- TODO: would be nice to specify xy on o5, (e.g. xy="#o3:v 10") and have elements organise within -->
+  <rect id="o5" surround="#group #yproc2 #yout" margin="3" class="d-fill-grey" opacity="0.4"/>
+
+  <rect id="inp" text="input" wh="20 8"/>
+  <rect id="proc1" xy="#inp:v 2" text="process 1" wh="^"/>
+  <rect id="proc2" xy="#proc1:v 2" text="process 2" wh="^" dh="200%"/>
+  <rect id="out" xy="#proc2:v 2" text="out" wh="^"/>
+
+  <rect id="xinp" xy="#inp:h 15" text="input" wh="20 8"/>
+  <rect id="xproc1" xy="#xinp:v 2" text="process 1" wh="^"/>
+  <rect id="xproc2" xy="#xproc1:v 2" text="process 2" wh="^"/>
+  <rect id="xout" xy="#xproc2:v 2" text="out" wh="^"/>
+
+  <rect id="yinp" xy="#o2:v 6" text="input" wh="20 8"/>
+  <rect id="yproc1" xy="#yinp:h 2" text="preprocess" wh="^"/>
+  <rect id="group" surround="#yinp #yproc1" class="d-none"/>
+  <!-- TODO: would be nice to be able to use '^:v' rather than #group:v -->
+  <rect id="yproc2" xy="#group:v 2" text="process 2" wh="^"/>
+  <rect id="yout" xy="#yproc2:v 2" text="out" wh="^"/>
+
+  <polyline start="#o3@r" end="#o4" edge-type="h"/>
+  <polyline start="#out@r" end="#yinp@t"/>
+</svg>

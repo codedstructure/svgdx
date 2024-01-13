@@ -1,0 +1,17 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="15mm" viewBox="-5 -5 40 15">
+  <style>
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+  </style>
+  <!-- if it fails on an element it needs to just carry on... -->
+  <rect id="a" x="25" y="0" width="5" height="5"/>
+<text x="27.5" y="2.5" class="d-tbox">a</text><rect id="b" x="20" y="0" width="5" height="5"/>
+<text x="22.5" y="2.5" class="d-tbox">b</text><rect id="c" x="15" y="0" width="5" height="5"/>
+<text x="17.5" y="2.5" class="d-tbox">c</text><rect id="d" x="10" y="0" width="5" height="5"/>
+<text x="12.5" y="2.5" class="d-tbox">d</text><rect id="e" x="5" y="0" width="5" height="5"/>
+<text x="7.5" y="2.5" class="d-tbox">e</text><rect id="f" x="0" y="0" width="5" height="5"/>
+  <text x="2.5" y="2.5" class="d-tbox">f</text>
+</svg>

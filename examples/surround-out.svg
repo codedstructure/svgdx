@@ -8,18 +8,20 @@
     .d-dash { stroke-dasharray: 1.5 0.75; }
     .d-dot { stroke-dasharray: 0.5 0.5; }
     .d-surround { fill: none; }
-    .d-blue { stroke: blue; }
-    text.d-blue, text.d-blue * { stroke: none; }
     .d-red { stroke: red; }
     text.d-red, text.d-red * { stroke: none; }
+    .d-fill-blue { fill: blue; }
+    text.d-fill-blue, text.d-fill-blue * { fill: white; }
     .d-fill-green { fill: green; }
     text.d-fill-green, text.d-fill-green * { fill: white; }
     .d-fill-magenta { fill: magenta; }
     text.d-fill-magenta, text.d-fill-magenta * { fill: white; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; }
     .d-fill-yellow { fill: yellow; }
     text.d-fill-yellow, text.d-fill-yellow * { fill: black; }
   </style>
-  <rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
+  <rect opacity="0.5" x="-2" y="-2" width="104" height="24" class="d-dash d-fill-blue d-surround"/><rect rx="3" opacity="0.5" x="25" y="-5" width="30" height="55" class="d-dot d-fill-red d-surround"/><rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
   <text x="10" y="10" class="d-red d-tbox">a</text>
   <rect id="b" x="30" y="0" width="20" height="20" class="d-fill-green"/>
   <text x="40" y="10" class="d-fill-green d-tbox">b</text>
@@ -27,6 +29,4 @@
   <text x="90" y="10" class="d-fill-yellow d-tbox">c</text>
   <rect id="d" x="30" y="25" width="20" height="20" class="d-fill-magenta"/>
   <text x="40" y="35" class="d-fill-magenta d-tbox">d</text>
-  <rect rx="3" x="25" y="-5" width="30" height="55" class="d-dot d-red d-surround"/>
-  <rect x="-2" y="-2" width="104" height="24" class="d-dash d-blue d-surround"/>
 </svg>

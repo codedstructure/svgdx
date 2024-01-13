@@ -1,7 +1,7 @@
 use crate::element::SvgElement;
 use crate::transform::TransformerContext;
 use crate::types::{attr_split, fstr, strp, strp_length, Length};
-use regex::Regex;
+use lazy_regex::regex;
 
 use anyhow::{Context, Result};
 
@@ -56,7 +56,7 @@ fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
     result
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Connector {
     source_element: SvgElement,
     start_el: Option<SvgElement>,
@@ -150,13 +150,13 @@ impl Connector {
         let mut end_dir = None;
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = Regex::new(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$").expect("Bad RegEx");
+        let re = regex!(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$");
 
         if let Some(caps) = re.captures(&start_ref) {
             let name = &caps["id"];
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             start_dir = Self::loc_to_dir(&start_loc);
-            start_el = context.elem_map.get(name);
+            start_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
             start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
@@ -165,7 +165,7 @@ impl Connector {
             let name = &caps["id"];
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             end_dir = Self::loc_to_dir(&end_loc);
-            end_el = context.elem_map.get(name);
+            end_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
             end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
@@ -204,13 +204,20 @@ impl Connector {
                 )
             }
             (None, None) => {
-                let (start_el, end_el) = (start_el.unwrap(), end_el.unwrap());
+                let (start_el, end_el) = (
+                    start_el.context("no start_el")?,
+                    end_el.context("no end_el")?,
+                );
                 if start_loc.is_empty() && end_loc.is_empty() {
                     (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                     end_dir = Self::loc_to_dir(&end_loc);
                 } else if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_el.coord(&end_loc)?.unwrap(), conn_type)?;
+                    start_loc = closest_loc(
+                        start_el,
+                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
+                        conn_type,
+                    )?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
                     end_loc = closest_loc(
@@ -229,7 +236,10 @@ impl Connector {
                             .context("no coord for start_loc")?,
                         start_dir,
                     ),
-                    Endpoint::new(end_el.coord(&end_loc)?.unwrap(), end_dir),
+                    Endpoint::new(
+                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
+                        end_dir,
+                    ),
                 )
             }
         };

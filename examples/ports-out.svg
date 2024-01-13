@@ -19,15 +19,15 @@
 
   <rect x="0" y="0" width="20" height="30"/>
 
-  <tbox x="-5" y="2.5" width="10" height="5"/>
-  <text x="0" y="5" class="d-tbox">a</text><rect x="-5" y="2.5" width="10" height="5" class="d-tbox"/><text x="0" y="5" class="d-tbox">a</text>
+  <rect x="-5" y="2.5" width="10" height="5"/>
+  <text x="0" y="5" class="d-tbox">a</text>
 
-  <tbox x="-5" y="12.5" width="10" height="5"/>
-  <text x="0" y="15" class="d-tbox">b</text><rect x="-5" y="12.5" width="10" height="5" class="d-tbox"/><text x="0" y="15" class="d-tbox">b</text>
+  <rect x="-5" y="12.5" width="10" height="5"/>
+  <text x="0" y="15" class="d-tbox">b</text>
 
-  <tbox x="-5" y="22.5" width="10" height="5"/>
-  <text x="0" y="25" class="d-tbox">c</text><rect x="-5" y="22.5" width="10" height="5" class="d-tbox"/><text x="0" y="25" class="d-tbox">c</text>
+  <rect x="-5" y="22.5" width="10" height="5"/>
+  <text x="0" y="25" class="d-tbox">c</text>
 
-  <!-- text can be given as a 'text' attribute or as element text -->
-  <rect x="15" y="12.5" width="10" height="5" class="d-tbox"/><text x="20" y="15" class="d-tbox">out</text>
+  <rect x="15" y="12.5" width="10" height="5"/>
+  <text x="20" y="15" class="d-tbox">out</text>
 </svg>

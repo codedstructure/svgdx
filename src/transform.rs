@@ -6,22 +6,23 @@ use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
 use crate::{element::SvgElement, TransformConfig};
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 
+use itertools::Itertools;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
 use anyhow::{bail, Context, Result};
-use regex::Regex;
+use lazy_regex::regex;
 
-#[derive(Clone, Default, Debug)]
+#[derive(Default)]
 pub(crate) struct TransformerContext {
-    pub(crate) elem_map: HashMap<String, SvgElement>,
-    pub(crate) prev_element: Option<SvgElement>,
-    pub(crate) variables: HashMap<String, String>,
+    elem_map: HashMap<String, SvgElement>,
+    prev_element: Option<SvgElement>,
+    variables: HashMap<String, String>,
     last_indent: String,
 }
 
@@ -35,56 +36,35 @@ impl TransformerContext {
         }
     }
 
-    fn populate(&mut self, events: &EventList) -> Result<()> {
-        let mut elem_map: HashMap<String, SvgElement> = HashMap::new();
+    pub(crate) fn get_element(&self, id: &str) -> Option<&SvgElement> {
+        self.elem_map.get(id)
+    }
 
-        for (ev, pos) in events.iter() {
-            match ev {
-                Event::Eof => {
-                    // should never happen, as handled in EventList::from_reader()
-                    break;
-                }
-                Event::Start(e) | Event::Empty(e) => {
-                    let elem_name: String =
-                        String::from_utf8(e.name().into_inner().to_vec()).unwrap();
-                    let mut attr_list = vec![];
-                    let mut id_opt = None;
-                    for a in e.attributes() {
-                        let aa = a.context(format!("Invalid attribute at {pos}"))?;
+    pub(crate) fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
+        self.elem_map.get_mut(id)
+    }
 
-                        let key =
-                            String::from_utf8(aa.key.into_inner().to_vec()).expect("not UTF8");
-                        let value = aa.unescape_value().expect("XML decode error").into_owned();
+    #[cfg(test)]
+    pub(crate) fn set_var(&mut self, name: &str, value: &str) {
+        self.variables.insert(name.into(), value.into());
+    }
 
-                        if &key == "id" {
-                            id_opt = Some(value);
-                        } else {
-                            attr_list.push((key, value.clone()));
-                        }
-                    }
-                    if let Some(id) = id_opt {
-                        let mut elem = SvgElement::new(&elem_name, &attr_list);
-                        // Expand anything we can given the current context
-                        elem.expand_attributes(true, self)?;
-                        elem_map.insert(id.clone(), elem);
-                    }
-                }
-                _ => {}
-            }
+    pub(crate) fn get_var(&self, name: &str) -> Option<&String> {
+        self.variables.get(name)
+    }
+
+    pub(crate) fn get_prev_element(&self) -> Option<&SvgElement> {
+        self.prev_element.as_ref()
+    }
+
+    pub(crate) fn update_element(&mut self, el: &SvgElement) {
+        if let Some(id) = el.get_attr("id") {
+            self.elem_map.insert(id, el.clone());
         }
-        self.elem_map = elem_map;
-
-        Ok(())
     }
 
     pub(crate) fn set_indent(&mut self, indent: String) {
         self.last_indent = indent;
-    }
-
-    fn update_elem_map(elem_map: &mut HashMap<String, SvgElement>, e: &SvgElement) {
-        if let Some(el_id) = e.get_attr("id") {
-            elem_map.insert(el_id, e.clone());
-        }
     }
 
     /// Process a given `SvgElement` into a list of `SvgEvent`s
@@ -108,7 +88,7 @@ impl TransformerContext {
                 // Note comments in `var` elements are permitted (and encouraged!)
                 // in the input, but not propagated to the output.
                 if key != "_" && key != "__" {
-                    let value = eval_attr(&value, &self.variables, &self.elem_map);
+                    let value = eval_attr(&value, self);
                     new_vars.insert(key, value);
                 }
             }
@@ -119,7 +99,7 @@ impl TransformerContext {
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = e.pop_attr("_") {
             // Expressions in comments are evaluated
-            let value = eval_attr(&comment, &self.variables, &self.elem_map);
+            let value = eval_attr(&comment, self);
             events.push(SvgEvent::Comment(value));
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
         }
@@ -134,13 +114,19 @@ impl TransformerContext {
             let mut bbox_list = vec![];
 
             for elref in attr_split(&surround_list) {
-                if let Some(el) = self.elem_map.get(
-                    elref
-                        .strip_prefix('#')
-                        .context(format!("Invalid surround value {elref}"))?,
-                ) {
+                let el = self
+                    .elem_map
+                    .get(
+                        elref
+                            .strip_prefix('#')
+                            .context(format!("Invalid surround value {elref}"))?,
+                    )
+                    .context("Ref lookup failed at this time")?;
+                {
                     if let Ok(Some(el_bb)) = el.bbox() {
                         bbox_list.push(el_bb);
+                    } else {
+                        bail!("Element #{elref} has no bounding box at this time");
                     }
                 }
             }
@@ -165,7 +151,7 @@ impl TransformerContext {
             e.add_class("d-surround");
         }
 
-        e.expand_attributes(false, self)?;
+        e.expand_attributes(self)?;
 
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
@@ -185,7 +171,7 @@ impl TransformerContext {
                 LocSpec::Center => (width / 2., height / 2.),
             };
             e = e.translated(-dx, -dy);
-            Self::update_elem_map(&mut self.elem_map, &e);
+            self.update_element(&e);
         }
 
         if e.is_connector() {
@@ -202,9 +188,12 @@ impl TransformerContext {
             ) {
                 // replace with rendered connection element
                 e = conn.render()?.without_attr("edge-type");
+            } else {
+                bail!("Cannot create connector {e}");
             }
         }
 
+        // Process dx / dy / dxy if not a text element (where these could be useful)
         if e.name != "text" && e.name != "tspan" {
             let dx = e.pop_attr("dx");
             let dy = e.pop_attr("dy");
@@ -224,7 +213,7 @@ impl TransformerContext {
             }
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
-                Self::update_elem_map(&mut self.elem_map, &e);
+                self.update_element(&e);
             }
         }
 
@@ -266,7 +255,6 @@ impl TransformerContext {
         }
 
         if !omit {
-            e.expand_attributes(true, self)?;
             let new_elem = e.clone();
             if empty {
                 events.push(SvgEvent::Empty(new_elem.clone()));
@@ -285,7 +273,6 @@ impl TransformerContext {
     }
 }
 
-#[derive(Debug)]
 pub(crate) enum SvgEvent {
     Comment(String),
     Text(String),
@@ -322,10 +309,6 @@ impl EventList<'_> {
 
     fn is_empty(&self) -> bool {
         self.events.is_empty()
-    }
-
-    fn len(&self) -> usize {
-        self.events.len()
     }
 
     fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
@@ -384,7 +367,7 @@ impl EventList<'_> {
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
-        let blank_line_remover = Regex::new("\n[ \t]+\n").expect("Bad Regex");
+        let blank_line_remover = regex!("\n[ \t]+\n");
         for event_pos in &self.events {
             // trim trailing whitespace.
             // just using `trim_end()` on Text events won't work
@@ -448,23 +431,47 @@ impl Transformer {
         writer: &mut dyn Write,
     ) -> Result<()> {
         let input = EventList::from_reader(reader)?;
-        let mut output = EventList { events: vec![] };
+        let output = self.process_events(input)?;
+        self.postprocess(output, writer)
+    }
 
-        self.context.populate(&input)?;
+    fn process_seq<'a, 'b>(
+        &mut self,
+        seq: impl IntoIterator<Item = (usize, &'b Event<'b>, usize)>,
+        idx_output: &mut BTreeMap<usize, EventList>,
+    ) -> Result<Vec<(usize, &'b Event<'b>, usize)>> {
+        let mut remain = Vec::<(usize, &Event, usize)>::new();
+        let mut gen_events = EventList::new();
+        let mut last_idx = 102340;
 
-        let mut changed_output = false;
-        for (ev, pos) in input.iter() {
-            let old_len = output.len();
+        'ev: for (idx, ev, pos) in seq {
             match ev {
-                Event::Eof => {
-                    // should never happen, as handled in EventList::from_reader()
-                    break;
-                }
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
-                    let mut repeat = 1;
                     let mut event_element = SvgElement::try_from(e)
                         .context(format!("could not extract element at line {pos}"))?;
+
+                    if !gen_events.is_empty() {
+                        idx_output.insert(last_idx, gen_events);
+                        gen_events = EventList::new();
+                    }
+                    last_idx = idx;
+
+                    self.context.update_element(&event_element);
+                    if self.config.debug {
+                        // Prefix replaced element(s) with a representation of the original element
+                        //
+                        // Replace double quote with backtick to avoid messy XML entity conversion
+                        // (i.e. &quot; or &apos; if single quotes were used)
+                        gen_events.push(&Event::Comment(BytesText::new(
+                            &format!(" {event_element}",).replace('"', "`"),
+                        )));
+                        gen_events.push(&Event::Text(BytesText::new(&format!(
+                            "\n{}",
+                            self.context.last_indent
+                        ))));
+                    }
+                    let mut repeat = 1;
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
@@ -472,28 +479,23 @@ impl Transformer {
                             todo!("Repeat is not implemented for non-empty elements");
                         }
                     }
-                    if self.config.debug {
-                        // Prefix replaced element(s) with a representation of the original element
-                        //
-                        // Replace double quote with backtick to avoid messy XML entity conversion
-                        // (i.e. &quot; or &apos; if single quotes were used)
-                        output.push(&Event::Comment(BytesText::new(
-                            &format!(" {event_element}",).replace('"', "`"),
-                        )));
-                        output.push(&Event::Text(BytesText::new(&format!(
-                            "\n{}",
-                            self.context.last_indent
-                        ))));
-                    }
                     for rep_idx in 0..repeat {
                         let events = transform_element(&event_element, &mut self.context, is_empty)
-                            .context(format!("processing element on line {pos}"))?;
+                            .context(format!("processing element on line {pos}"));
+                        if events.is_err() {
+                            remain.push((idx, ev, pos));
+                            // discard any events generated by this element.
+                            gen_events = EventList::new();
+                            continue 'ev;
+                        }
+                        let events = events.unwrap();
+
                         for ev in events.iter() {
-                            output.push(&ev.0);
+                            gen_events.push(&ev.0);
                         }
 
                         if !events.is_empty() && rep_idx < (repeat - 1) {
-                            output.push(&Event::Text(BytesText::new(&format!(
+                            gen_events.push(&Event::Text(BytesText::new(&format!(
                                 "\n{}",
                                 self.context.last_indent
                             ))));
@@ -505,32 +507,68 @@ impl Transformer {
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    output.push(&Event::End(BytesEnd::new(ee_name)));
+                    gen_events.push(&Event::End(BytesEnd::new(ee_name)));
+                    last_idx = idx;
                 }
                 Event::Text(e) => {
-                    if !changed_output {
-                        // if a previous input event didn't generate any
-                        // output events, ignore any text following that
-                        // input event.
+                    if gen_events.is_empty() {
+                        // if a previous input event didn't generate any output events,
+                        // ignore text following that event to avoid blank lines in output.
                         continue;
                     }
                     // Extract any trailing whitespace following newlines as the current indentation level
-                    let re = Regex::new(r"(?ms)\n.*^(\s+)*").expect("Bad Regex");
+                    let re = regex!(r"(?ms)\n.*^(\s+)*");
                     let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
                     if let Some(captures) = re.captures(&text) {
                         let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());
                         self.context.set_indent(indent);
                     }
 
-                    output.push(&Event::Text(e.borrow()));
+                    gen_events.push(&Event::Text(e.borrow()));
                 }
                 _ => {
-                    output.push(ev);
+                    gen_events.push(ev);
                 }
             }
-            changed_output = output.len() != old_len;
         }
 
+        if !gen_events.is_empty() {
+            idx_output.insert(last_idx, gen_events);
+        }
+        Ok(remain)
+    }
+
+    fn process_events<'a>(&mut self, input: EventList<'a>) -> Result<EventList<'a>> {
+        let mut output = EventList { events: vec![] };
+        let mut idx_output = BTreeMap::<usize, EventList>::new();
+
+        let seq = input.iter().enumerate().map(|x| (x.0, &x.1 .0, x.1 .1));
+
+        // First pass with original input data
+        let mut remain = self.process_seq(seq, &mut idx_output)?;
+        // Repeatedly process remaining elements while useful
+        while !remain.is_empty() {
+            let last_len = remain.len();
+            remain = self.process_seq(remain, &mut idx_output)?;
+            if last_len == remain.len() {
+                bail!(
+                    "Could not resolve the following elements:\n{}",
+                    remain
+                        .iter()
+                        .map(|r| format!("{:4}: {:?}", r.2, r.1))
+                        .join("\n")
+                );
+            }
+        }
+
+        for (_idx, events) in idx_output {
+            output.events.extend(events.events);
+        }
+
+        Ok(output)
+    }
+
+    fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {
         let mut elem_path = Vec::new();
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
@@ -569,8 +607,7 @@ impl Transformer {
                 _ => {}
             }
         }
-        // Expand by 5, then add 5%. Ensures small images get more than a couple
-        // of pixels border, and large images still get a (relatively) decent border.
+        // Expand by given border width
         let mut extent = BoundingBox::combine(bbox_list);
         if let Some(extent) = &mut extent {
             extent.expand(self.config.border as f32, self.config.border as f32);
@@ -713,6 +750,9 @@ impl Transformer {
 impl TryFrom<&BytesStart<'_>> for SvgElement {
     type Error = anyhow::Error;
 
+    /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
+    /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
+    /// semantic about svgdx / svg formats.
     fn try_from(e: &BytesStart) -> Result<Self, Self::Error> {
         let elem_name: String =
             String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");

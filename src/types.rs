@@ -199,23 +199,36 @@ impl TryFrom<String> for LocSpec {
 pub enum ScalarSpec {
     Minx,
     Maxx,
+    Cx,
     Miny,
     Maxy,
+    Cy,
     Width,
+    Rx,
     Height,
+    Ry,
 }
 
 impl TryFrom<&str> for ScalarSpec {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // TODO: 'r' here is ambiguous vs circle's radius attribute.
+        // Perhaps require uppercase 'T/R/B/L' for edge values.
+        // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
+        // *not* required that the *attributes* x1 < x2 or y1 < y2.
+        // Perhaps a separate 'attribute spec' concept is needed...
         match value {
-            "x1" | "l" => Ok(Self::Minx),
-            "y1" | "t" => Ok(Self::Miny),
+            "x" | "x1" | "l" => Ok(Self::Minx),
+            "y" | "y1" | "t" => Ok(Self::Miny),
+            "cx" => Ok(Self::Cx),
             "x2" | "r" => Ok(Self::Maxx),
             "y2" | "b" => Ok(Self::Maxy),
-            "w" => Ok(Self::Width),
-            "h" => Ok(Self::Height),
+            "cy" => Ok(Self::Cy),
+            "w" | "width" => Ok(Self::Width),
+            "rx" => Ok(Self::Rx),
+            "h" | "height" => Ok(Self::Height),
+            "ry" => Ok(Self::Ry),
             _ => bail!("Invalid ScalarSpec format {value}"),
         }
     }
@@ -271,8 +284,12 @@ impl BoundingBox {
             ScalarSpec::Maxx => self.x2,
             ScalarSpec::Miny => self.y1,
             ScalarSpec::Maxy => self.y2,
-            ScalarSpec::Width => self.x2 - self.x1,
-            ScalarSpec::Height => self.y2 - self.y1,
+            ScalarSpec::Width => (self.x2 - self.x1).abs(),
+            ScalarSpec::Height => (self.y2 - self.y1).abs(),
+            ScalarSpec::Cx => (self.x1 + self.x2) / 2.,
+            ScalarSpec::Cy => (self.y1 + self.y2) / 2.,
+            ScalarSpec::Rx => (self.x2 - self.x1).abs() / 2.,
+            ScalarSpec::Ry => (self.y2 - self.y1).abs() / 2.,
         }
     }
 
@@ -397,9 +414,22 @@ impl AttrMap {
         let key = key.into();
         let value = value.into();
         let index = *self.index_map.entry(key.clone()).or_insert_with(|| {
-            self.next_index += 1;
+            // Provide a gap so additional attributes can be inserted 'between' these,
+            // e.g. in the case of removal with `pop_idx` and insertion of replacement
+            // attributes with `insert_idx`.
+            // TODO: The value here should ideally be > the max number of attributes supported
+            // by this struct so we never have an overlap, though that assumes sensible
+            // use of `insert_idx` by clients - not sustainable. Should improve the API here.
+            self.next_index += 256;
             self.next_index
         });
+        self.attrs.insert((index, key), value);
+    }
+
+    pub fn insert_idx(&mut self, key: impl Into<String>, value: impl Into<String>, idx: usize) {
+        let key = key.into();
+        let value = value.into();
+        let index = *self.index_map.entry(key.clone()).or_insert_with(|| idx);
         self.attrs.insert((index, key), value);
     }
 
@@ -418,7 +448,7 @@ impl AttrMap {
         self.attrs.iter().map(|item| (&item.0 .1, item.1))
     }
 
-    pub fn remove(&mut self, key: impl Into<String>) -> Option<String> {
+    pub fn pop(&mut self, key: impl Into<String>) -> Option<String> {
         let key = key.into();
         if let Some(&index) = self.index_map.get(&key) {
             self.index_map.remove(&key);
@@ -426,6 +456,17 @@ impl AttrMap {
         } else {
             None
         }
+    }
+
+    pub fn pop_idx(&mut self, key: impl Into<String>) -> Option<(String, usize)> {
+        let key = key.into();
+        if let Some(&index) = self.index_map.get(&key) {
+            let idx = self.index_map.remove(&key).expect("invariant");
+            if let Some(value) = self.attrs.remove(&(index, key)) {
+                return Some((value, idx));
+            }
+        }
+        None
     }
 
     pub fn to_vec(&self) -> Vec<(String, String)> {
@@ -618,7 +659,7 @@ mod test {
 
         assert_eq!(am.iter().collect::<Vec<_>>(), target_state_ref);
 
-        am.remove("a");
+        am.pop("a");
 
         assert_eq!(
             am.iter().collect::<Vec<_>>(),

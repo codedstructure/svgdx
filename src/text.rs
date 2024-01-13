@@ -2,7 +2,8 @@ use crate::element::SvgElement;
 use crate::types::{attr_split_cycle, fstr, strp, LocSpec};
 
 use anyhow::{Context, Result};
-use regex::{Captures, Regex};
+use lazy_regex::regex;
+use regex::Captures;
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
     // Different conversions from line count to first-line offset based on whether
@@ -36,7 +37,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
     // Convert unescaped '\n' into newline characters for multi-line text
-    let re = Regex::new(r"\\n").expect("invalid regex");
+    let re = regex!(r"\\n");
     let text_value = re.replace_all(&text_value, |caps: &Captures| {
         let inner = caps.get(0).expect("Matched regex must have this group");
         // Check if the newline is escaped; do this here rather than within the regex
@@ -52,7 +53,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     });
     // Following that, replace any escaped "\\n" into literal '\'+'n' characters
-    let re = Regex::new(r"\\\\n").expect("invalid regex");
+    let re = regex!(r"\\\\n");
     let text_value = re.replace_all(&text_value, "\\n").into_owned();
 
     let mut text_attrs = vec![];
@@ -166,7 +167,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     text_elements.push(text_elem);
     if multiline {
         let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
-        tspan_elem.attrs.remove("y");
+        tspan_elem.attrs.pop("y");
         for (idx, text_fragment) in lines.iter().enumerate() {
             let mut tspan = tspan_elem.clone();
             let line_offset = if idx == 0 {

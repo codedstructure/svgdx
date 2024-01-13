@@ -1,10 +1,10 @@
 /// Recursive descent expression parser
-use regex::{Captures, Regex};
-use std::collections::HashMap;
+use lazy_regex::regex;
+use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
-use crate::element::SvgElement;
+use crate::element::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
 #[derive(Clone, PartialEq)]
@@ -37,7 +37,7 @@ enum Token {
 }
 
 fn valid_variable_name(var: &str) -> Result<&str> {
-    let re = Regex::new(r"[a-zA-Z][a-zA-Z0-9_]*").expect("Bad Regex");
+    let re = regex!(r"[a-zA-Z][a-zA-Z0-9_]*");
     if !re.is_match(var) {
         bail!("Invalid variable name");
     }
@@ -105,24 +105,18 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-struct EvalState {
+struct EvalState<'a> {
     tokens: Vec<Token>,
     index: usize,
-    var_table: HashMap<String, String>,
-    elem_map: HashMap<String, SvgElement>,
+    context: &'a TransformerContext,
 }
 
-impl EvalState {
-    fn new(
-        tokens: impl IntoIterator<Item = Token>,
-        var_table: HashMap<String, String>,
-        elem_map: HashMap<String, SvgElement>,
-    ) -> Self {
+impl<'a> EvalState<'a> {
+    fn new(tokens: impl IntoIterator<Item = Token>, context: &'a TransformerContext) -> Self {
         Self {
             tokens: tokens.into_iter().collect(),
             index: 0,
-            var_table,
-            elem_map,
+            context,
         }
     }
 
@@ -142,9 +136,9 @@ impl EvalState {
     }
 
     fn lookup(&self, v: &str) -> Result<f32> {
-        self.var_table
-            .get(v)
-            .and_then(|t| evaluate(tokenize(t).ok()?, &self.var_table, &self.elem_map).ok())
+        self.context
+            .get_var(v)
+            .and_then(|t| evaluate(tokenize(t).ok()?, self.context).ok())
             .context("Could not evaluate variable")
     }
 
@@ -163,12 +157,12 @@ impl EvalState {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
-        let re = Regex::new(r"#(?<id>[[:word:]]+)\.(?<val>[trblwh])").expect("Bad Regex");
+        let re = regex!(r"#(?<id>[[:alpha:]][[:word:]]*)\.(?<val>[[:alpha:]][[:word:]]*)");
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
-            let val = ScalarSpec::try_from(val).expect("Regex match");
-            if let Some(elem) = self.elem_map.get(id) {
+            let val = ScalarSpec::try_from(val)?;
+            if let Some(elem) = self.context.get_element(id) {
                 if let Some(bb) = elem.bbox()? {
                     Ok(bb.scalarspec(val))
                 } else {
@@ -183,12 +177,8 @@ impl EvalState {
     }
 }
 
-fn evaluate(
-    tokens: impl IntoIterator<Item = Token>,
-    vars: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> Result<f32> {
-    let mut eval_state = EvalState::new(tokens, vars.clone(), elem_map.clone());
+fn evaluate(tokens: impl IntoIterator<Item = Token>, context: &TransformerContext) -> Result<f32> {
+    let mut eval_state = EvalState::new(tokens, context);
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
@@ -265,10 +255,8 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
 
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
-pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
-    let re =
-        Regex::new(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))")
-            .expect("invalid regex");
+pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
+    let re = regex!(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))");
     let value = re.replace_all(value, |caps: &Captures| {
         let inner = caps
             .name("inner")
@@ -286,32 +274,28 @@ pub fn eval_vars(value: &str, variables: &HashMap<String, String>) -> String {
                 caps.name("var_simple")
                     .expect("Matched regex must have var_simple or var_brace")
             });
-            variables
-                .get(&cap.as_str().to_string())
+            context
+                .get_var(cap.as_str())
                 .unwrap_or(&inner.as_str().to_string())
                 .to_string()
         }
     });
     // Following that, replace any escaped "\$" back into "$"" characters
-    let re = Regex::new(r"\\\$").expect("invalid regex");
+    let re = regex!(r"\\\$");
     re.replace_all(&value, r"$").into_owned()
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(
-    value: &str,
-    variables: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> String {
+fn eval_expr(value: &str, context: &TransformerContext) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
-    let re = Regex::new(r"\{\{(?<inner>.+?)\}\}").expect("invalid regex");
+    let re = regex!(r"\{\{(?<inner>.+?)\}\}");
     re.replace_all(value, |caps: &Captures| {
         let inner = caps
             .name("inner")
             .expect("Matched regex must have this group")
             .as_str();
         if let Ok(tokens) = tokenize(inner) {
-            if let Ok(parsed) = evaluate(tokens, variables, elem_map) {
+            if let Ok(parsed) = evaluate(tokens, context) {
                 fstr(parsed)
             } else {
                 inner.to_owned()
@@ -324,16 +308,12 @@ fn eval_expr(
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(
-    value: &str,
-    variables: &HashMap<String, String>,
-    elem_map: &HashMap<String, SvgElement>,
-) -> String {
+pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
     // Step 1: Evaluate arithmetic expressions. All variables referenced here
     // are assumed to resolve to a numeric expression.
-    let value = eval_expr(value, variables, elem_map);
+    let value = eval_expr(value, context);
     // Step 2: Replace other variables (e.g. for string values)
-    eval_vars(&value, variables)
+    eval_vars(&value, context)
 }
 
 #[cfg(test)]
@@ -342,45 +322,48 @@ mod tests {
 
     #[test]
     fn test_eval_var() {
-        let vars: HashMap<String, String> = [
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
-        ]
-        .iter()
-        .map(|v| (v.0.to_string(), v.1.to_string()))
-        .collect();
+        ] {
+            ctx.set_var(name, value);
+        }
 
-        assert_eq!(eval_vars("$one", &vars), "1");
-        assert_eq!(eval_vars("${one}", &vars), "1");
-        assert_eq!(eval_vars("$two", &vars), "$two");
-        assert_eq!(eval_vars("${two}", &vars), "${two}");
-        assert_eq!(eval_vars(r"\${one}", &vars), "${one}");
-        assert_eq!(eval_vars(r"$one$empty$one$one", &vars), "111");
-        assert_eq!(eval_vars(r"$one$emptyone$one$one", &vars), "1$emptyone11");
-        assert_eq!(eval_vars(r"$one${empty}one$one$one", &vars), "1one11");
-        assert_eq!(eval_vars(r"$one $one $one $one", &vars), "1 1 1 1");
-        assert_eq!(eval_vars(r"${one}${one}$one$one", &vars), "1111");
-        assert_eq!(eval_vars(r"${one}${one}\$one$one", &vars), "11$one1");
-        assert_eq!(eval_vars(r"${one}${one}\${one}$one", &vars), "11${one}1");
-        assert_eq!(eval_vars(r"Thing1${empty}Thing2", &vars), "Thing1Thing2");
+        assert_eq!(eval_vars("$one", &ctx), "1");
+        assert_eq!(eval_vars("${one}", &ctx), "1");
+        assert_eq!(eval_vars("$two", &ctx), "$two");
+        assert_eq!(eval_vars("${two}", &ctx), "${two}");
+        assert_eq!(eval_vars(r"\${one}", &ctx), "${one}");
+        assert_eq!(eval_vars(r"$one$empty$one$one", &ctx), "111");
+        assert_eq!(eval_vars(r"$one$emptyone$one$one", &ctx), "1$emptyone11");
+        assert_eq!(eval_vars(r"$one${empty}one$one$one", &ctx), "1one11");
+        assert_eq!(eval_vars(r"$one $one $one $one", &ctx), "1 1 1 1");
+        assert_eq!(eval_vars(r"${one}${one}$one$one", &ctx), "1111");
+        assert_eq!(eval_vars(r"${one}${one}\$one$one", &ctx), "11$one1");
+        assert_eq!(eval_vars(r"${one}${one}\${one}$one", &ctx), "11${one}1");
+        assert_eq!(eval_vars(r"Thing1${empty}Thing2", &ctx), "Thing1Thing2");
         assert_eq!(
-            eval_vars(r"Created in ${this_year} by ${me}", &vars),
+            eval_vars(r"Created in ${this_year} by ${me}", &ctx),
             "Created in 2023 by Ben"
         );
     }
 
     #[test]
     fn test_valid_expressions() {
-        let variables = HashMap::from([
-            ("pi".to_owned(), "3.1415927".to_owned()),
-            ("tau".to_owned(), "(2. * $pi)".to_owned()),
-            ("milli".to_owned(), "0.001".to_owned()),
-            ("micro".to_owned(), "($milli * $milli)".to_owned()),
-            ("kilo".to_owned(), "1000".to_owned()),
-            ("mega".to_owned(), "($kilo * $kilo)".to_owned()),
-        ]);
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
+            ("pi", "3.1415927"),
+            ("tau", "(2. * $pi)"),
+            ("milli", "0.001"),
+            ("micro", "($milli * $milli)"),
+            ("kilo", "1000"),
+            ("mega", "($kilo * $kilo)"),
+        ] {
+            ctx.set_var(name, value);
+        }
         for (expr, expected) in [
             ("2 * 2", Some(4.)),
             ("2 * 2 + 1", Some(5.)),
@@ -394,10 +377,7 @@ mod tests {
             ("${tau} - 6", Some(0.28318548)),
             ("0.125 * $mega", Some(125000.)),
         ] {
-            assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).ok(),
-                expected
-            );
+            assert_eq!(evaluate(tokenize(expr).expect("test"), &ctx).ok(), expected);
         }
     }
 
@@ -432,9 +412,10 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        let variables = HashMap::from([("numbers".to_owned(), "20 40".to_owned())]);
+        let mut ctx = TransformerContext::default();
+        ctx.set_var("numbers", "20 40");
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
-            assert!(evaluate(tokenize(expr).expect("test"), &variables, &HashMap::new()).is_err());
+            assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
         }
     }
 
@@ -457,8 +438,7 @@ mod tests {
             assert_eq!(
                 evaluate(
                     tokenize(expr).expect("test"),
-                    &HashMap::new(),
-                    &HashMap::new()
+                    &TransformerContext::default(),
                 )
                 .ok(),
                 expected
@@ -468,34 +448,26 @@ mod tests {
 
     #[test]
     fn test_eval_attr() {
-        let vars: HashMap<String, String> = [
+        let mut ctx = TransformerContext::default();
+        for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
             ("numbers", "20  40"),
-        ]
-        .iter()
-        .map(|v| (v.0.to_string(), v.1.to_string()))
-        .collect();
+        ] {
+            ctx.set_var(name, value);
+        }
 
         assert_eq!(
-            eval_attr(
-                "Made by ${me} in 20{{20 + ${one} * 3}}",
-                &vars,
-                &HashMap::new()
-            ),
+            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &ctx),
             "Made by Ben in 2023"
         );
         assert_eq!(
-            eval_attr(
-                "Made by ${me} in {{5*4}}{{20 + ${one} * 3}}",
-                &vars,
-                &HashMap::new()
-            ),
+            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &ctx),
             "Made by Ben in 2023"
         );
         // This should 'fail' evaluation and be preserved as the variable value
-        assert_eq!(eval_vars(r"$numbers", &vars), "20  40");
+        assert_eq!(eval_vars(r"$numbers", &ctx), "20  40");
     }
 }
