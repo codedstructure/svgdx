@@ -22,3 +22,4 @@ lazy-regex = "3.1.0"
 
 [dev-dependencies]
 assert_cmd = "2.0.12"
+assertables = "7.0.1"

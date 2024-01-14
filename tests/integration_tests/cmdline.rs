@@ -1,4 +1,5 @@
 use assert_cmd::{crate_name, Command};
+use assertables::{assert_contains, assert_contains_as_result};
 use std::io::Write;
 use svgdx::Config;
 use tempfile::NamedTempFile;
@@ -15,7 +16,7 @@ fn test_cmdline_help() {
     let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
     let output = String::from_utf8(cmd.arg("-h").assert().success().get_output().stdout.clone())
         .expect("non-UTF8");
-    assert!(output.contains("Usage"));
+    assert_contains!(output, "Usage");
 }
 
 #[test]

@@ -1,3 +1,4 @@
+use assertables::{assert_contains, assert_contains_as_result};
 use svgdx::transform_str_default;
 
 const RECT_SVG: &str = r#"
@@ -11,48 +12,42 @@ const RECT_SVG: &str = r#"
 fn test_connector() {
     let input = format!(r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" />"##);
     let expected_line = r#"<polyline points="2.5 5, 2.5 12.5, 22.5 12.5, 22.5 20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     let input = format!(r##"{RECT_SVG}<polyline start="#a@r" end="#d@t" />"##);
     let expected_line = r#"<polyline points="5 2.5, 22.5 2.5, 22.5 20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
 fn test_connector_closest() {
     let input = format!(r##"{RECT_SVG}<line start="#a" end="#d" />"##);
     let expected_line = r#"<line x1="5" y1="5" x2="20" y2="20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     let input = format!(r##"{RECT_SVG}<line start="#a" end="#b" />"##);
     let expected_line = r#"<line x1="5" y1="2.5" x2="20" y2="2.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
 fn test_connector_fixed_start() {
     let input = format!(r##"{RECT_SVG}<line start="3 7" end="#d@t" />"##);
     let expected_line = r#"<line x1="3" y1="7" x2="22.5" y2="20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
 fn test_connector_fixed_end() {
     let input = format!(r##"{RECT_SVG}<line start="#a@r" end="10 17" />"##);
     let expected_line = r#"<line x1="5" y1="2.5" x2="10" y2="17"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -62,9 +57,8 @@ fn test_connector_h() {
 <rect x="20" y="2" width="5" height="5" id="b" />
 <line start="#a" end="#b" edge-type="h"/>"##;
     let expected_line = r#"<line x1="5" y1="3.5" x2="20" y2="3.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -74,9 +68,8 @@ fn test_connector_v() {
 <rect x="1" y="20" width="5" height="5" id="b" />
 <line start="#a" end="#b" edge-type="v"/>"##;
     let expected_line = r#"<line x1="3" y1="5" x2="3" y2="20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -87,9 +80,8 @@ fn test_connector_u_bb() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@b" end="#b@b" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="2.5 5, 2.5 7, 12.5 7, 12.5 5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -97,9 +89,8 @@ fn test_connector_u_bb() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@b" end="#b@b"/>"##;
     let expected_line = r#"<polyline points="2.5 5, 2.5 8, 12.5 8, 12.5 5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -110,9 +101,8 @@ fn test_connector_u_tt() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@t" end="#b@t" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="2.5 0, 2.5 -2, 12.5 -2, 12.5 0"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -120,9 +110,8 @@ fn test_connector_u_tt() {
 <rect xy="10 0" wh="5" id="b" />
 <polyline start="#a@t" end="#b@t"/>"##;
     let expected_line = r#"<polyline points="2.5 0, 2.5 -3, 12.5 -3, 12.5 0"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -133,9 +122,8 @@ fn test_connector_u_ll() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@l" end="#b@l" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="0 2.5, -2 2.5, -2 12.5, 0 12.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -143,9 +131,8 @@ fn test_connector_u_ll() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@l" end="#b@l"/>"##;
     let expected_line = r#"<polyline points="0 2.5, -3 2.5, -3 12.5, 0 12.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
@@ -156,9 +143,8 @@ fn test_connector_u_rr() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@r" end="#b@r" corner-offset="2"/>"##;
     let expected_line = r#"<polyline points="5 2.5, 7 2.5, 7 12.5, 5 12.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     // default corner-offset for this edge type is 3
     let input = r##"
@@ -166,22 +152,19 @@ fn test_connector_u_rr() {
 <rect xy="0 10" wh="5" id="b" />
 <polyline start="#a@r" end="#b@r"/>"##;
     let expected_line = r#"<polyline points="5 2.5, 8 2.5, 8 12.5, 5 12.5"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
 
 #[test]
 fn test_connector_offset() {
     let input = format!(r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="2" />"##);
     let expected_line = r#"<polyline points="2.5 5, 2.5 7, 22.5 7, 22.5 20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 
     let input = format!(r##"{RECT_SVG}<polyline start="#a@b" end="#d@t" corner-offset="75%" />"##);
     let expected_line = r#"<polyline points="2.5 5, 2.5 16.25, 22.5 16.25, 22.5 20"/>"#;
-    assert!(transform_str_default(input)
-        .unwrap()
-        .contains(expected_line));
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
 }
