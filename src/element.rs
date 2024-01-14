@@ -1,5 +1,5 @@
 use crate::expression::eval_attr;
-pub(crate) use crate::transform::TransformerContext;
+use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
     EdgeSpec, Length, LocSpec,
@@ -30,7 +30,7 @@ fn expand_relspec(value: &str, context: &TransformerContext) -> String {
 }
 
 #[derive(Clone)]
-pub(crate) struct SvgElement {
+pub struct SvgElement {
     pub name: String,
     pub attrs: AttrMap,
     pub classes: ClassList,
@@ -93,7 +93,7 @@ impl SvgElement {
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut attrs = self.attrs.clone();
         attrs.insert(key, value);
-        let mut element = SvgElement::new(self.name.as_str(), &attrs.to_vec());
+        let mut element = Self::new(self.name.as_str(), &attrs.to_vec());
         element.add_classes(&self.classes);
         element
     }
@@ -106,19 +106,19 @@ impl SvgElement {
             .into_iter()
             .filter(|(k, _v)| k != key)
             .collect();
-        let mut element = SvgElement::new(self.name.as_str(), &attrs);
+        let mut element = Self::new(self.name.as_str(), &attrs);
         element.add_classes(&self.classes);
         element
     }
 
     /// copy attributes and classes from another element, returning the merged element
     #[must_use]
-    pub fn with_attrs_from(&self, other: &SvgElement) -> Self {
+    pub fn with_attrs_from(&self, other: &Self) -> Self {
         let mut attrs = self.attrs.clone();
         for (k, v) in &other.attrs {
             attrs.insert(k, v);
         }
-        let mut element = SvgElement::new(self.name.as_str(), &attrs.to_vec());
+        let mut element = Self::new(self.name.as_str(), &attrs.to_vec());
         element.add_classes(&other.classes);
         element
     }
@@ -323,7 +323,7 @@ impl SvgElement {
         new_elem
     }
 
-    pub(crate) fn position_from_bbox(&mut self, bb: &BoundingBox) {
+    pub fn position_from_bbox(&mut self, bb: &BoundingBox) {
         let width = bb.width();
         let height = bb.height();
         let (cx, cy) = bb.center();
@@ -734,7 +734,7 @@ impl SvgElement {
 
         self.attrs = new_attrs;
         if let Some(elem_id) = self.get_attr("id") {
-            let mut updated = SvgElement::new(&self.name, &self.attrs.to_vec());
+            let mut updated = Self::new(&self.name, &self.attrs.to_vec());
             updated.add_classes(&self.classes);
             if let Some(elem) = context.get_element_mut(&elem_id) {
                 *elem = updated;

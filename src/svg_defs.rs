@@ -238,7 +238,7 @@ static DARK_COLOURS: &[&str] = &[
     "tomato",
 ];
 
-pub(crate) fn build_styles(
+pub fn build_styles(
     elements: &HashSet<String>,
     classes: &HashSet<String>,
     config: &TransformConfig,
@@ -351,7 +351,7 @@ pub(crate) fn build_styles(
     }
 }
 
-pub(crate) fn build_defs(
+pub fn build_defs(
     _elements: &HashSet<String>,
     classes: &HashSet<String>,
     _config: &TransformConfig,
@@ -391,7 +391,7 @@ pub(crate) fn build_defs(
         for rule in result {
             defs.push_str(&format!("  {rule}{indent}"));
         }
-        defs.push_str(&format!("</defs>{indent}").to_owned());
+        defs.push_str(&format!("</defs>{indent}"));
         defs
     } else {
         String::new()

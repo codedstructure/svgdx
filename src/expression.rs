@@ -4,7 +4,7 @@ use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
-use crate::element::TransformerContext;
+use crate::transform::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
 #[derive(Clone, PartialEq)]

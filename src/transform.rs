@@ -19,7 +19,7 @@ use anyhow::{bail, Context, Result};
 use lazy_regex::regex;
 
 #[derive(Default)]
-pub(crate) struct TransformerContext {
+pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
@@ -27,7 +27,7 @@ pub(crate) struct TransformerContext {
 }
 
 impl TransformerContext {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             elem_map: HashMap::new(),
             prev_element: None,
@@ -36,34 +36,34 @@ impl TransformerContext {
         }
     }
 
-    pub(crate) fn get_element(&self, id: &str) -> Option<&SvgElement> {
+    pub fn get_element(&self, id: &str) -> Option<&SvgElement> {
         self.elem_map.get(id)
     }
 
-    pub(crate) fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
+    pub fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
         self.elem_map.get_mut(id)
     }
 
     #[cfg(test)]
-    pub(crate) fn set_var(&mut self, name: &str, value: &str) {
+    pub fn set_var(&mut self, name: &str, value: &str) {
         self.variables.insert(name.into(), value.into());
     }
 
-    pub(crate) fn get_var(&self, name: &str) -> Option<&String> {
+    pub fn get_var(&self, name: &str) -> Option<&String> {
         self.variables.get(name)
     }
 
-    pub(crate) fn get_prev_element(&self) -> Option<&SvgElement> {
+    pub fn get_prev_element(&self) -> Option<&SvgElement> {
         self.prev_element.as_ref()
     }
 
-    pub(crate) fn update_element(&mut self, el: &SvgElement) {
+    pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
             self.elem_map.insert(id, el.clone());
         }
     }
 
-    pub(crate) fn set_indent(&mut self, indent: String) {
+    pub fn set_indent(&mut self, indent: String) {
         self.last_indent = indent;
     }
 
@@ -273,7 +273,7 @@ impl TransformerContext {
     }
 }
 
-pub(crate) enum SvgEvent {
+pub enum SvgEvent {
     Comment(String),
     Text(String),
     Start(SvgElement),
@@ -282,7 +282,7 @@ pub(crate) enum SvgEvent {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct EventList<'a> {
+pub struct EventList<'a> {
     events: Vec<(Event<'a>, usize)>,
 }
 
@@ -384,7 +384,7 @@ impl EventList<'_> {
         Ok(())
     }
 
-    /// Split an EventList into (up to) 3 parts: before, pivot, after.
+    /// Split an `EventList` into (up to) 3 parts: before, pivot, after.
     fn partition(&self, name: &str) -> (Self, Option<(Event, usize)>, Self) {
         let mut before = vec![];
         let mut pivot = None;
@@ -425,11 +425,7 @@ impl Transformer {
         }
     }
 
-    pub(crate) fn transform(
-        &mut self,
-        reader: &mut dyn BufRead,
-        writer: &mut dyn Write,
-    ) -> Result<()> {
+    pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let output = self.process_events(input)?;
         self.postprocess(output, writer)
@@ -442,7 +438,7 @@ impl Transformer {
     ) -> Result<Vec<(usize, &'b Event<'b>, usize)>> {
         let mut remain = Vec::<(usize, &Event, usize)>::new();
         let mut gen_events = EventList::new();
-        let mut last_idx = 102340;
+        let mut last_idx = 0;
 
         'ev: for (idx, ev, pos) in seq {
             match ev {
@@ -681,7 +677,7 @@ impl Transformer {
                 Event::Text(BytesText::new(&indent)),
                 Event::Comment(BytesText::new(&format!(" Config: {:?} ", self.config))),
             ])
-            .write_to(writer)?
+            .write_to(writer)?;
         }
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
@@ -766,7 +762,7 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
                 Ok((key, value))
             })
             .collect();
-        Ok(SvgElement::new(&elem_name, &attrs?))
+        Ok(Self::new(&elem_name, &attrs?))
     }
 }
 

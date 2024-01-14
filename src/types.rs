@@ -5,7 +5,7 @@ use std::num::ParseFloatError;
 use anyhow::bail;
 
 /// Return a 'minimal' representation of the given number
-pub(crate) fn fstr(x: f32) -> String {
+pub fn fstr(x: f32) -> String {
     if x == (x as i32) as f32 {
         return (x as i32).to_string();
     }
@@ -17,12 +17,12 @@ pub(crate) fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-pub(crate) fn strp(s: &str) -> anyhow::Result<f32> {
+pub fn strp(s: &str) -> anyhow::Result<f32> {
     s.parse().map_err(|e: ParseFloatError| e.into())
 }
 
 /// Returns iterator over whitespace-or-comma separated values
-pub(crate) fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
+pub fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
     input
         .split_whitespace()
         .flat_map(|v| v.split(','))
@@ -31,13 +31,13 @@ pub(crate) fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
 }
 
 /// Returns iterator *cycling* over whitespace-or-comma separated values
-pub(crate) fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
+pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
     let x: Vec<String> = attr_split(input).collect();
     x.into_iter().cycle()
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub(crate) enum Length {
+pub enum Length {
     Absolute(f32),
     Ratio(f32),
 }
@@ -50,7 +50,7 @@ impl Default for Length {
 
 impl Length {
     #[allow(dead_code)]
-    pub(crate) const fn ratio(&self) -> Option<f32> {
+    pub const fn ratio(&self) -> Option<f32> {
         if let Self::Ratio(result) = self {
             Some(*result)
         } else {
@@ -58,7 +58,7 @@ impl Length {
         }
     }
 
-    pub(crate) const fn absolute(&self) -> Option<f32> {
+    pub const fn absolute(&self) -> Option<f32> {
         if let Self::Absolute(result) = self {
             Some(*result)
         } else {
@@ -68,7 +68,7 @@ impl Length {
 
     /// Given a single value, update it (scale or addition) from
     /// the current Length value
-    pub(crate) fn adjust(&self, value: f32) -> f32 {
+    pub fn adjust(&self, value: f32) -> f32 {
         match self {
             Self::Absolute(abs) => value + abs,
             Self::Ratio(ratio) => value * ratio,
@@ -79,7 +79,7 @@ impl Length {
     /// where a positive Absolute is 'from start', a negative Absolute
     /// is 'backwards from end' and Ratios scale as 0%=start, 100%=end
     /// but ratio values are not limited to 0..100 at either end.
-    pub(crate) fn calc_offset(&self, start: f32, end: f32) -> f32 {
+    pub fn calc_offset(&self, start: f32, end: f32) -> f32 {
         match self {
             Self::Absolute(abs) => {
                 let mult = if end < start { -1. } else { 1. };
@@ -98,7 +98,7 @@ impl Length {
 
 /// Parse a ratio (float or %age) to an f32
 /// Note this deliberately does not clamp to 0..1
-pub(crate) fn strp_length(s: &str) -> anyhow::Result<Length> {
+pub fn strp_length(s: &str) -> anyhow::Result<Length> {
     if let Some(s) = s.strip_suffix('%') {
         Ok(Length::Ratio(strp(s)? * 0.01))
     } else {
@@ -302,7 +302,7 @@ impl BoundingBox {
         }
     }
 
-    pub fn union(&self, other: &BoundingBox) -> Self {
+    pub fn union(&self, other: &Self) -> Self {
         Self::new(
             self.x1.min(other.x1),
             self.y1.min(other.y1),

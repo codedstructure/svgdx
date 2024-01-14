@@ -5,8 +5,8 @@
 //!
 //! ## Library use
 //!
-//! Support as a library is supported primarily to allow other front-ends to convert
-//! svgdx documents to SVG without having to call `svgdx` as a command-line subprocess.
+//! Support as a library is primarily to allow other front-ends to convert svgdx
+//! documents to SVG without having to call `svgdx` as a command-line subprocess.
 //!
 //! A `TransformConfig` object should be created as appropriate to configure the
 //! transform process, and the appropriate `transform_*` function called passing
@@ -217,7 +217,7 @@ impl Config {
             // Should already be enforced by clap validation
             bail!("A non-stdin file must be provided with -w/--watch argument");
         }
-        Ok(Config {
+        Ok(Self {
             input_path: args.file,
             output_path: args.output,
             watch: args.watch,
