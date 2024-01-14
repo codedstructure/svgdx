@@ -11,7 +11,7 @@ use std::io::{BufRead, Write};
 
 use itertools::Itertools;
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 
@@ -683,63 +683,75 @@ impl Transformer {
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
         if has_svg_element && self.config.add_auto_defs {
-            let mut indent = self.context.last_indent.clone();
-            if indent.is_empty() {
-                indent = "\n  ".to_owned();
-            }
-            // TODO: also cope with merging (remove this condition and
-            // process in `include_defs()`)
-            if !element_set.contains("defs") {
-                // Messy: if we just need a style (no defs required) then
-                // ensure we start with a newline/indent. Ideally defs and
-                // styles should be treated the same, rather than events/str
-                // respectively.
-                if !element_set.contains("style") {
-                    writer.write_all(indent.as_bytes())?;
+            let indent = 2;
+            let auto_defs = build_defs(&element_set, &class_set, &self.config);
+            let auto_styles = build_styles(&element_set, &class_set, &self.config);
+            if !auto_defs.is_empty() {
+                let indent_line = format!("\n{}", " ".repeat(indent));
+                let mut event_vec = vec![
+                    Event::Text(BytesText::new(&indent_line)),
+                    Event::Start(BytesStart::new("defs")),
+                    Event::Text(BytesText::new("\n")),
+                ];
+                let eee = EventList::from_str(Self::indent_all(auto_defs, indent + 2).join("\n"))?;
+                event_vec.extend(eee.events.iter().map(|e| e.0.clone()));
+                event_vec.extend(vec![
+                    Event::Text(BytesText::new(&indent_line)),
+                    Event::End(BytesEnd::new("defs")),
+                ]);
+                let auto_defs_events = EventList::from(event_vec);
+                let (before, defs_pivot, after) = output.partition("defs");
+                if let Some((existing_defs, _)) = defs_pivot {
+                    before.write_to(writer)?;
+                    auto_defs_events.write_to(writer)?;
+                    EventList::from(existing_defs).write_to(writer)?;
+                    output = after;
+                } else {
+                    auto_defs_events.write_to(writer)?;
                 }
-                output = Self::include_defs(
-                    "defs",
-                    build_defs(&element_set, &class_set, &self.config, &indent),
-                    &output,
-                    writer,
-                )?;
             }
-            // TODO: also cope with merging (remove this condition and
-            // process in `include_defs()`)
-            if !element_set.contains("style") {
-                //writer.write_all(indent.as_bytes())?;
-                output = Self::include_defs(
-                    "style",
-                    build_styles(&element_set, &class_set, &self.config, &indent),
-                    &output,
-                    writer,
-                )?;
+            if !auto_styles.is_empty() {
+                let auto_styles_events = EventList::from(vec![
+                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                    Event::Start(BytesStart::new("style")),
+                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                    Event::CData(BytesCData::new(&format!(
+                        "\n{}\n{}",
+                        Self::indent_all(auto_styles, indent + 2).join("\n"),
+                        " ".repeat(indent)
+                    ))),
+                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                    Event::End(BytesEnd::new("style")),
+                ]);
+                let (before, style_pivot, after) = output.partition("styles");
+                if let Some((existing_styles, _)) = style_pivot {
+                    before.write_to(writer)?;
+                    auto_styles_events.write_to(writer)?;
+                    EventList::from(existing_styles).write_to(writer)?;
+                    output = after;
+                } else {
+                    auto_styles_events.write_to(writer)?;
+                }
             }
         }
 
         output.write_to(writer)
     }
 
-    fn include_defs<'a>(
-        name: &str,
-        content: String,
-        ev_list: &EventList<'a>,
-        writer: &mut dyn Write,
-    ) -> Result<EventList<'a>> {
-        let (before, style, after) = ev_list.partition(name);
-        let def_content = EventList::from_str(content).expect("Invalid element in include_defs");
-        if let Some((def_start_event, _)) = style {
-            // TODO: if before is just a 'Text' event with only whitespace, may not want to include.
-            before.write_to(writer)?;
-            def_content.write_to(writer)?;
-            EventList::from(def_start_event).write_to(writer)?;
-            Ok(after.clone())
-        } else {
-            // No existing style/defs element, so we'll write one out immediately
-            // (having just written out the svg element).
-            def_content.write_to(writer)?;
-            Ok(before.clone())
+    fn indent_all(s: Vec<String>, indent: usize) -> Vec<String> {
+        let mut result = vec![];
+        for entry in s {
+            let mut rs = String::new();
+            for (idx, line) in entry.lines().enumerate() {
+                if idx > 0 {
+                    rs.push('\n');
+                }
+                rs.push_str(&" ".repeat(indent).to_owned());
+                rs.push_str(line);
+            }
+            result.push(rs);
         }
+        result
     }
 }
 

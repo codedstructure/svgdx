@@ -5,6 +5,7 @@
     </marker>
   </defs>
   <style>
+  <![CDATA[
     svg { background: white; }
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
     rect, circle, ellipse, polygon { fill: white; }
@@ -19,6 +20,7 @@
     text.d-none, text.d-none * { stroke: none; }
     .d-fill-black { fill: black; }
     text.d-fill-black, text.d-fill-black * { fill: white; }
+  ]]>
   </style>
   <rect id="ace" x="0" y="0" width="25" height="15"/>
   <text x="12.5" y="7.5" class="d-tbox">

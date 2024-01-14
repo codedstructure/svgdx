@@ -1,5 +1,6 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="85mm" height="121mm" viewBox="-15 -15 85 121">
   <style>
+  <![CDATA[
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
     rect, circle, ellipse, polygon { fill: white; }
     line, polyline, path { fill: none; }
@@ -13,6 +14,7 @@
     text.d-fill-grey, text.d-fill-grey * { fill: white; }
     .d-fill-white { fill: white; }
     text.d-fill-white, text.d-fill-white * { fill: black; }
+  ]]>
   </style>
   <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/><rect id="o2" opacity="0.4" x="-8" y="-8" width="71" height="70" class="d-fill-grey d-surround"/><rect id="o3" opacity="0.4" x="-3" y="-3" width="26" height="60" class="d-fill-grey d-dash d-surround"/><rect id="o4" opacity="0.4" x="32" y="-3" width="26" height="44" class="d-fill-grey d-surround"/><rect id="o5" opacity="0.4" x="14.5" y="65" width="48" height="34" class="d-fill-grey d-surround"/><rect id="inp" width="20" height="8"/>
   <text x="10" y="4" class="d-tbox">input</text>

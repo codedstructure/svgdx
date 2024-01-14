@@ -10,6 +10,7 @@
     </filter>
   </defs>
   <style>
+  <![CDATA[
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
     rect, circle, ellipse, polygon { fill: white; }
     line, polyline, path { fill: none; }
@@ -34,6 +35,7 @@
     text.d-fill-red, text.d-fill-red * { fill: white; }
     .d-fill-whitesmoke { fill: whitesmoke; }
     text.d-fill-whitesmoke, text.d-fill-whitesmoke * { fill: black; }
+  ]]>
   </style>
   <rect id="base" width="40" height="20" class="d-fill-whitesmoke"/>
   <rect id="in" x="-5" y="7.5" width="10" height="5" class="d-fill-green"/>

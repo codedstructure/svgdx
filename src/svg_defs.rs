@@ -242,8 +242,7 @@ pub fn build_styles(
     elements: &HashSet<String>,
     classes: &HashSet<String>,
     config: &TransformConfig,
-    indent: &str,
-) -> String {
+) -> Vec<String> {
     let mut result = Vec::new();
 
     // Default styles suitable for box-and-line diagrams
@@ -339,61 +338,43 @@ pub fn build_styles(
             ));
         }
     }
-    if !result.is_empty() {
-        let mut style = String::from(&format!("<style>{indent}"));
-        for rule in result {
-            style.push_str(&format!("  {rule}{indent}"));
-        }
-        style.push_str("</style>");
-        style
-    } else {
-        String::new()
-    }
+
+    result
 }
 
 pub fn build_defs(
     _elements: &HashSet<String>,
     classes: &HashSet<String>,
     _config: &TransformConfig,
-    indent: &str,
-) -> String {
+) -> Vec<String> {
     let mut result = Vec::new();
 
     if classes.contains("d-arrow") || classes.contains("d-biarrow") {
         // Note use of context-stroke for both stroke and fill;
         // typically lines/paths with markers have `fill: none`
         result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
-    </marker>"#));
+  <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+</marker>"#));
     }
 
     if classes.contains("d-softshadow") {
         result.push(String::from(
             r#"<filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
-      <feOffset dx="1" dy="1"/>
-      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
-    </filter>"#,
+  <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+  <feOffset dx="1" dy="1"/>
+  <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
+</filter>"#,
         ));
     }
     if classes.contains("d-hardshadow") {
         result.push(String::from(
             r#"<filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
-      <feOffset dx="1" dy="1"/>
-      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
-    </filter>"#,
+  <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
+  <feOffset dx="1" dy="1"/>
+  <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
+</filter>"#,
         ));
     }
 
-    if !result.is_empty() {
-        let mut defs = String::from(&format!("<defs>{indent}"));
-        for rule in result {
-            defs.push_str(&format!("  {rule}{indent}"));
-        }
-        defs.push_str(&format!("</defs>{indent}"));
-        defs
-    } else {
-        String::new()
-    }
+    result
 }

@@ -3,7 +3,7 @@
     <![CDATA[
     * {
         stroke-width: 0.5;
-        fill: none;
+        rect, circle, ellipse, polygon { fill: none; }
     }
     rect { stroke: blue; }
     circle { stroke: red; }

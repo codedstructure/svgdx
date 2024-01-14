@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+- Changed: auto-styles are no-longer suppressed when user-defined styles / defs
+  are present. Note this may require changing user-styles to increase priority
+  over auto-styles.
 
 - Added: Additional values for scalar specs, including `cx`, `cy`, `rx`, `ry`.
   Existing scalar values can now be referenced by alternate names, e.g. `width`

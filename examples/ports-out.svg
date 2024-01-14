@@ -1,5 +1,14 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="40mm" viewBox="-10 -5 40 40">
   <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+  ]]>
+  </style>
+  <style>
     <![CDATA[
         rect, line {
             stroke-width: 0.5;

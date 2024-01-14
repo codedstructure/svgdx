@@ -1,5 +1,12 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="36mm" height="85mm" viewBox="-5 -5 36 85">
   <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+  ]]>
+  </style>
+  <style>
     <![CDATA[
     * { stroke-width: 0.2; fill: none; stroke: black; }
     .red {fill: red;}
