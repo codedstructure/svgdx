@@ -67,34 +67,24 @@ impl TransformerContext {
         self.last_indent = indent;
     }
 
-    /// Process a given `SvgElement` into a list of `SvgEvent`s
-    ///
-    /// Called once per element, and may have side-effects such
-    /// as updating variable values.
-    fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Result<Vec<SvgEvent>> {
-        let mut prev_element = self.prev_element.clone();
-
-        let mut omit = false;
-        let mut events = vec![];
-
-        let mut e = e.clone();
-
-        if &e.name == "var" {
-            // variables are updated 'in parallel' rather than one-by-one,
-            // allowing e.g. swap in a single `<var>` element:
-            // `<var a="$b" b="$a" />`
-            let mut new_vars = HashMap::new();
-            for (key, value) in e.attrs.clone() {
-                // Note comments in `var` elements are permitted (and encouraged!)
-                // in the input, but not propagated to the output.
-                if key != "_" && key != "__" {
-                    let value = eval_attr(&value, self);
-                    new_vars.insert(key, value);
-                }
+    fn handle_vars(&mut self, e: &mut SvgElement) {
+        // variables are updated 'in parallel' rather than one-by-one,
+        // allowing e.g. swap in a single `<var>` element:
+        // `<var a="$b" b="$a" />`
+        let mut new_vars = HashMap::new();
+        for (key, value) in e.attrs.clone() {
+            // Note comments in `var` elements are permitted (and encouraged!)
+            // in the input, but not propagated to the output.
+            if key != "_" && key != "__" {
+                let value = eval_attr(&value, self);
+                new_vars.insert(key, value);
             }
-            self.variables.extend(new_vars);
-            return Ok(vec![]);
         }
+        self.variables.extend(new_vars);
+    }
+
+    fn handle_comments(&self, e: &mut SvgElement) -> Vec<SvgEvent> {
+        let mut events = vec![];
 
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = e.pop_attr("_") {
@@ -110,6 +100,10 @@ impl TransformerContext {
             events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
         }
 
+        events
+    }
+
+    fn handle_surround(&mut self, e: &mut SvgElement) -> Result<()> {
         if let Some(surround_list) = e.pop_attr("surround") {
             let mut bbox_list = vec![];
 
@@ -150,6 +144,28 @@ impl TransformerContext {
             }
             e.add_class("d-surround");
         }
+
+        Ok(())
+    }
+
+    /// Process a given `SvgElement` into a list of `SvgEvent`s
+    ///
+    /// Called once per element, and may have side-effects such
+    /// as updating variable values.
+    fn handle_element(&mut self, e: &SvgElement, empty: bool) -> Result<Vec<SvgEvent>> {
+        let mut prev_element = self.prev_element.clone();
+
+        let mut omit = false;
+        let mut events = vec![];
+
+        let mut e = e.clone();
+
+        if &e.name == "var" {
+            self.handle_vars(&mut e);
+            return Ok(vec![]);
+        }
+        events.extend(self.handle_comments(&mut e));
+        self.handle_surround(&mut e)?;
 
         e.expand_attributes(self)?;
 

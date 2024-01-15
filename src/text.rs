@@ -5,35 +5,8 @@ use anyhow::{Context, Result};
 use lazy_regex::regex;
 use regex::Captures;
 
-pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
-    // Different conversions from line count to first-line offset based on whether
-    // top, center, or bottom justification.
-    const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
-    const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
-    const WRAP_MID: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) / 2. * spacing;
-
-    let mut orig_elem = element.clone();
-
-    let mut t_dx = None;
-    let mut t_dy = None;
-    {
-        let dx = orig_elem.pop_attr("text-dx");
-        let dy = orig_elem.pop_attr("text-dy");
-        let dxy = orig_elem.pop_attr("text-dxy");
-        if let Some(dxy) = dxy {
-            let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
-            t_dx = parts.next();
-            t_dy = parts.next();
-        }
-        if let Some(dx) = dx {
-            t_dx = Some(strp(&dx)?);
-        }
-        if let Some(dy) = dy {
-            t_dy = Some(strp(&dy)?);
-        }
-    }
-
-    let text_value = orig_elem
+fn get_text_value(element: &mut SvgElement) -> String {
+    let text_value = element
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
     // Convert unescaped '\n' into newline characters for multi-line text
@@ -54,18 +27,38 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     });
     // Following that, replace any escaped "\\n" into literal '\'+'n' characters
     let re = regex!(r"\\\\n");
-    let text_value = re.replace_all(&text_value, "\\n").into_owned();
+    re.replace_all(&text_value, "\\n").into_owned()
+}
 
-    let mut text_attrs = vec![];
+fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec, Vec<&'a str>)> {
+    let mut t_dx = None;
+    let mut t_dy = None;
+    {
+        let dx = element.pop_attr("text-dx");
+        let dy = element.pop_attr("text-dy");
+        let dxy = element.pop_attr("text-dxy");
+        if let Some(dxy) = dxy {
+            let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
+            t_dx = parts.next();
+            t_dy = parts.next();
+        }
+        if let Some(dx) = dx {
+            t_dx = Some(strp(&dx)?);
+        }
+        if let Some(dy) = dy {
+            t_dy = Some(strp(&dy)?);
+        }
+    }
+
     let mut text_classes = vec!["d-tbox"];
-    let text_loc = LocSpec::try_from(orig_elem.pop_attr("text-loc").unwrap_or("c".into()))?;
+    let text_loc = LocSpec::try_from(element.pop_attr("text-loc").unwrap_or("c".into()))?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without inset text squishes to the edge and can be unreadable
     // Any specified dx/dy override this behaviour.
     let text_inset = 1.;
 
-    let is_line = orig_elem.name == "line";
+    let is_line = element.name == "line";
     // text associated with a line is pushed 'outside' the line,
     // where with other shapes it's pulled 'inside'. The classes
     // and dx/dy values are opposite.
@@ -117,31 +110,35 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         _ => (),
     }
 
-    let first_line_offset = match (is_line, text_loc) {
-        // shapes - text 'inside'
-        (false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
-        (false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
-        // lines - text 'beyond'
-        (true, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
-        (true, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_DOWN,
-        (_, _) => WRAP_MID,
-    };
-
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = orig_elem
-        .bbox()?
-        .context("No BoundingBox")?
-        .locspec(text_loc);
+    let (mut tdx, mut tdy) = element.bbox()?.context("No BoundingBox")?.locspec(text_loc);
     if let Some(dx) = t_dx {
         tdx += dx;
     }
     if let Some(dy) = t_dy {
         tdy += dy;
     }
-    text_attrs.push(("x".into(), fstr(tdx)));
-    text_attrs.push(("y".into(), fstr(tdy)));
+
+    Ok((tdx, tdy, text_loc, text_classes))
+}
+
+pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
+    // Different conversions from line count to first-line offset based on whether
+    // top, center, or bottom justification.
+    const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
+    const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
+    const WRAP_MID: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) / 2. * spacing;
+
+    let mut orig_elem = element.clone();
+
+    let text_value = get_text_value(&mut orig_elem);
+
+    let (tdx, tdy, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
+    text_classes.push("d-tbox");
+
+    let text_attrs = vec![("x".into(), fstr(tdx)), ("y".into(), fstr(tdy))];
     let mut text_elements = Vec::new();
     let lines: Vec<_> = text_value.lines().collect();
     let line_count = lines.len();
@@ -166,6 +163,17 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
     text_elements.push(text_elem);
     if multiline {
+        let is_line = element.name == "line";
+        let first_line_offset = match (is_line, text_loc) {
+            // shapes - text 'inside'
+            (false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
+            (false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
+            // lines - text 'beyond'
+            (true, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
+            (true, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_DOWN,
+            (_, _) => WRAP_MID,
+        };
+
         let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
         tspan_elem.attrs.pop("y");
         for (idx, text_fragment) in lines.iter().enumerate() {
