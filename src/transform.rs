@@ -170,7 +170,7 @@ impl TransformerContext {
                 LocSpec::Left => (0., height / 2.),
                 LocSpec::Center => (width / 2., height / 2.),
             };
-            e = e.translated(-dx, -dy);
+            e = e.translated(-dx, -dy)?;
             self.update_element(&e);
         }
 
@@ -212,7 +212,7 @@ impl TransformerContext {
                 d_y = Some(strp(&dy)?);
             }
             if d_x.is_some() || d_y.is_some() {
-                e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default());
+                e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
                 self.update_element(&e);
             }
         }
@@ -226,10 +226,13 @@ impl TransformerContext {
                 [] => {}
                 [elem] => {
                     events.push(SvgEvent::Start(elem.clone()));
-                    events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                    events.push(SvgEvent::Text(
+                        elem.clone().content.expect("should have content"),
+                    ));
                     events.push(SvgEvent::End("text".to_string()));
                 }
                 _ => {
+                    // Multiple text spans
                     let text_elem = &text_elements[0];
                     events.push(SvgEvent::Start(text_elem.clone()));
                     events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
@@ -238,7 +241,9 @@ impl TransformerContext {
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
                         events.push(SvgEvent::Start(elem.clone()));
-                        events.push(SvgEvent::Text(elem.clone().content.unwrap()));
+                        events.push(SvgEvent::Text(
+                            elem.clone().content.expect("should have content"),
+                        ));
                         events.push(SvgEvent::End("tspan".to_string()));
                     }
                     events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
@@ -484,7 +489,7 @@ impl Transformer {
                             gen_events = EventList::new();
                             continue 'ev;
                         }
-                        let events = events.unwrap();
+                        let events = events?;
 
                         for ev in events.iter() {
                             gen_events.push(&ev.0);
@@ -499,7 +504,7 @@ impl Transformer {
                     }
                 }
                 Event::End(e) => {
-                    let mut ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
+                    let mut ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
@@ -576,7 +581,7 @@ impl Transformer {
         for (ev, _) in output.iter() {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
-                    let ee_name = String::from_utf8(e.name().as_ref().to_vec()).unwrap();
+                    let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     element_set.insert(ee_name);
                     let is_empty = matches!(ev, Event::Empty(_));
                     let event_element = SvgElement::try_from(e)?;

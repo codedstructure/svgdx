@@ -159,7 +159,10 @@ impl Connector {
             start_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
-            start_point = Some((parts.next().unwrap(), parts.next().unwrap()));
+            start_point = Some((
+                parts.next().context("missing start point x value")?,
+                parts.next().context("missing start point y value")?,
+            ));
         }
         if let Some(caps) = re.captures(&end_ref) {
             let name = &caps["id"];
@@ -168,7 +171,10 @@ impl Connector {
             end_el = context.get_element(name);
         } else {
             let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
-            end_point = Some((parts.next().unwrap(), parts.next().unwrap()));
+            end_point = Some((
+                parts.next().context("missing end point x value")?,
+                parts.next().context("missing end point y value")?,
+            ));
         }
 
         let (start, end) = match (start_point, end_point) {
@@ -177,18 +183,21 @@ impl Connector {
                 Endpoint::new(end_point, end_dir),
             ),
             (Some(start_point), None) => {
-                let end_el = end_el.unwrap();
+                let end_el = end_el.context("no end_el")?;
                 if end_loc.is_empty() {
                     end_loc = closest_loc(end_el, start_point, conn_type)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
                 (
                     Endpoint::new(start_point, start_dir),
-                    Endpoint::new(end_el.coord(&end_loc)?.unwrap(), end_dir),
+                    Endpoint::new(
+                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
+                        end_dir,
+                    ),
                 )
             }
             (None, Some(end_point)) => {
-                let start_el = start_el.unwrap();
+                let start_el = start_el.context("no start_el")?;
                 if start_loc.is_empty() {
                     start_loc = closest_loc(start_el, end_point, conn_type)?;
                     start_dir = Self::loc_to_dir(&start_loc);

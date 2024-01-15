@@ -282,45 +282,43 @@ impl SvgElement {
         }
     }
 
-    pub fn translated(&self, dx: f32, dy: f32) -> Self {
+    pub fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
         for (key, value) in &self.attrs {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dx));
+                    new_elem.set_attr(key, &fstr(strp(value)? + dx));
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    new_elem.set_attr(key, &fstr(strp(value).unwrap() + dy));
+                    new_elem.set_attr(key, &fstr(strp(value)? + dy));
                 }
                 "points" => {
                     let mut values = vec![];
                     for (idx, part) in attr_split(value).enumerate() {
-                        values.push(fstr(
-                            strp(&part).unwrap() + if idx % 2 == 0 { dx } else { dy },
-                        ));
+                        values.push(fstr(strp(&part)? + if idx % 2 == 0 { dx } else { dy }));
                     }
                     new_elem.set_attr(key, &values.join(" "));
                 }
                 _ => (),
             }
         }
-        new_elem
+        Ok(new_elem)
     }
 
-    pub fn resized_by(&self, dw: Length, dh: Length) -> Self {
+    pub fn resized_by(&self, dw: Length, dh: Length) -> Result<Self> {
         let mut new_elem = self.clone();
         for (key, value) in &self.attrs {
             match key.as_str() {
                 "width" => {
-                    new_elem.set_attr(key, &fstr(dw.adjust(strp(value).unwrap())));
+                    new_elem.set_attr(key, &fstr(dw.adjust(strp(value)?)));
                 }
                 "height" => {
-                    new_elem.set_attr(key, &fstr(dh.adjust(strp(value).unwrap())));
+                    new_elem.set_attr(key, &fstr(dh.adjust(strp(value)?)));
                 }
                 _ => (),
             }
         }
-        new_elem
+        Ok(new_elem)
     }
 
     pub fn position_from_bbox(&mut self, bb: &BoundingBox) {
@@ -381,7 +379,7 @@ impl SvgElement {
         let mut parts = attr_split(input);
         let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
         if let Some(caps) = rel_re.captures(&ref_loc) {
-            if caps.get(0).unwrap().is_empty() {
+            if caps.get(0).expect("Should always have group 0").is_empty() {
                 // We need either id or loc or both; since they are both optional in
                 // the regex we check that we did actually match some text here...
                 return Ok(input.to_owned());
@@ -483,8 +481,8 @@ impl SvgElement {
                 let mut margin_y = 0.;
                 if let Some(margin) = ref_el.get_attr("margin") {
                     let mut margin_parts = attr_split_cycle(&margin);
-                    margin_x = strp(&margin_parts.next().expect("cycle")).unwrap();
-                    margin_y = strp(&margin_parts.next().expect("cycle")).unwrap();
+                    margin_x = strp(&margin_parts.next().expect("cycle"))?;
+                    margin_y = strp(&margin_parts.next().expect("cycle"))?;
                 }
                 let loc = loc.unwrap_or(default_rel);
                 margin_y = match loc {
@@ -623,7 +621,7 @@ impl SvgElement {
             }
             if d_w.is_some() || d_h.is_some() {
                 self.attrs = self
-                    .resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default())
+                    .resized_by(d_w.unwrap_or_default(), d_h.unwrap_or_default())?
                     .attrs;
             }
         }

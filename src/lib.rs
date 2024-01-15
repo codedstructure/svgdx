@@ -111,7 +111,9 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
             // provide a buffered reader.
             // It would be nice to improve this.
             let mut buf = Vec::new();
-            stdin.read_to_end(&mut buf).unwrap();
+            stdin
+                .read_to_end(&mut buf)
+                .expect("stdin should be readable to EOF");
             Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
         } else {
             Box::new(stdin) as Box<dyn BufRead>
@@ -269,8 +271,7 @@ pub fn run(config: Config) -> Result<()> {
             match rx.recv() {
                 Ok(Ok(events)) => {
                     for event in events {
-                        if event.path.canonicalize().unwrap() == watch_path.canonicalize().unwrap()
-                        {
+                        if event.path.canonicalize()? == watch_path.canonicalize()? {
                             eprintln!("{} changed", event.path.to_string_lossy());
                             transform_file(&watch, &config.output_path, &config.transform)
                                 .unwrap_or_else(|e| {

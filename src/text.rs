@@ -151,7 +151,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // There will always be a text element; if not multiline this is the only element.
     let mut text_elem = SvgElement::new("text", &text_attrs);
     // line spacing (in 'em').
-    let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned())).unwrap();
+    let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
 
     // Copy style and class(es) from original element
     if let Some(style) = orig_elem.get_attr("style") {
