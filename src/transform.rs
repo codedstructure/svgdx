@@ -127,9 +127,9 @@ impl TransformerContext {
             let mut bbox = BoundingBox::combine(bbox_list);
 
             if let Some(margin) = e.pop_attr("margin") {
-                let mut parts = attr_split_cycle(&margin).map(|v| strp_length(&v).unwrap());
-                let mx = parts.next().expect("cycle");
-                let my = parts.next().expect("cycle");
+                let mut parts = attr_split_cycle(&margin).map_while(|v| strp_length(&v).ok());
+                let mx = parts.next().context("mx from margin should be numeric")?;
+                let my = parts.next().context("my from margin should be numeric")?;
 
                 if let Some(bb) = &mut bbox {
                     let bw = bb.width();
@@ -217,9 +217,9 @@ impl TransformerContext {
             let mut d_x = None;
             let mut d_y = None;
             if let Some(dxy) = dxy {
-                let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
-                d_x = parts.next();
-                d_y = parts.next();
+                let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
+                d_x = Some(parts.next().context("dx from dxy should be numeric")?);
+                d_y = Some(parts.next().context("dy from dxy should be numeric")?);
             }
             if let Some(dx) = dx {
                 d_x = Some(strp(&dx)?);

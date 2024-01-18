@@ -158,10 +158,10 @@ impl Connector {
             start_dir = Self::loc_to_dir(&start_loc);
             start_el = context.get_element(name);
         } else {
-            let mut parts = attr_split(&start_ref).map(|v| strp(&v).unwrap());
+            let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
             start_point = Some((
-                parts.next().context("missing start point x value")?,
-                parts.next().context("missing start point y value")?,
+                parts.next().context("start_ref x should be numeric")?,
+                parts.next().context("start_ref y should be numeric")?,
             ));
         }
         if let Some(caps) = re.captures(&end_ref) {
@@ -170,10 +170,10 @@ impl Connector {
             end_dir = Self::loc_to_dir(&end_loc);
             end_el = context.get_element(name);
         } else {
-            let mut parts = attr_split(&end_ref).map(|v| strp(&v).unwrap());
+            let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
             end_point = Some((
-                parts.next().context("missing end point x value")?,
-                parts.next().context("missing end point y value")?,
+                parts.next().context("end_ref x should be numeric")?,
+                parts.next().context("end_ref y should be numeric")?,
             ));
         }
 

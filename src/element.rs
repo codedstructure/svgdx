@@ -466,9 +466,11 @@ impl SvgElement {
                 }
             }
 
-            let opt_id = caps
-                .name("id")
-                .map(|v| v.as_str().strip_prefix('#').unwrap());
+            let opt_id = caps.name("id").map(|v| {
+                v.as_str()
+                    .strip_prefix('#')
+                    .expect("Regex should require a # prefix on id")
+            });
             if let Some(name) = opt_id {
                 ref_el = Some(
                     context
@@ -609,9 +611,9 @@ impl SvgElement {
             let mut d_w = None;
             let mut d_h = None;
             if let Some(dwh) = dwh {
-                let mut parts = attr_split_cycle(&dwh).map(|v| strp_length(&v).unwrap());
-                d_w = parts.next();
-                d_h = parts.next();
+                let mut parts = attr_split_cycle(&dwh).map_while(|v| strp_length(&v).ok());
+                d_w = Some(parts.next().context("dw from dwh should be numeric")?);
+                d_h = Some(parts.next().context("dh from dwh should be numeric")?);
             }
             if let Some(dw) = dw {
                 d_w = Some(strp_length(&dw)?);
@@ -681,40 +683,41 @@ impl SvgElement {
                         // Requires width / height to be specified in order to evaluate
                         // the centre point.
                         // TODO: also support specifying other attributes; xy+cxy should be sufficient
-                        let width = new_attrs.get("width").map(|z| strp(z).unwrap());
-                        let height = new_attrs.get("height").map(|z| strp(z).unwrap());
+                        let width = new_attrs.get("width").map(|z| strp(z));
+                        let height = new_attrs.get("height").map(|z| strp(z));
                         let cx = strp(&parts.next().expect("cycle"))
                             .context("Could not derive cx from cxy")?;
                         let cy = strp(&parts.next().expect("cycle"))
                             .context("Could not derive cy from cxy")?;
                         if let (Some(width), Some(height)) = (width, height) {
-                            pass_two_attrs.insert("x", fstr(cx - width / 2.));
-                            pass_two_attrs.insert("y", fstr(cy - height / 2.));
+                            pass_two_attrs.insert("x", fstr(cx - width? / 2.));
+                            pass_two_attrs.insert("y", fstr(cy - height? / 2.));
                         }
                     }
                     ("xy", "circle") => {
                         // Requires xy / r
-                        let r = new_attrs.get("r").map(|z| strp(z).unwrap());
+                        let r = new_attrs.get("r").map(|z| strp(z));
                         let x = strp(&parts.next().expect("cycle"))
                             .context("Could not derive x from xy")?;
                         let y = strp(&parts.next().expect("cycle"))
                             .context("Could not derive y from xy")?;
                         if let Some(r) = r {
+                            let r = r?;
                             pass_two_attrs.insert("cx", fstr(x + r));
                             pass_two_attrs.insert("cy", fstr(y + r));
                         }
                     }
                     ("xy", "ellipse") => {
                         // Requires xy / rx / ry
-                        let rx = new_attrs.get("rx").map(|z| strp(z).unwrap());
-                        let ry = new_attrs.get("ry").map(|z| strp(z).unwrap());
+                        let rx = new_attrs.get("rx").map(|z| strp(z));
+                        let ry = new_attrs.get("ry").map(|z| strp(z));
                         let x = strp(&parts.next().expect("cycle"))
                             .context("Could not derive x from xy")?;
                         let y = strp(&parts.next().expect("cycle"))
                             .context("Could not derive y from xy")?;
                         if let (Some(rx), Some(ry)) = (rx, ry) {
-                            pass_two_attrs.insert("cx", fstr(x + rx));
-                            pass_two_attrs.insert("cy", fstr(y + ry));
+                            pass_two_attrs.insert("cx", fstr(x + rx?));
+                            pass_two_attrs.insert("cy", fstr(y + ry?));
                         }
                     }
                     ("points", "polyline" | "polygon") => {

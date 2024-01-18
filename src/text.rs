@@ -38,9 +38,9 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
         let dy = element.pop_attr("text-dy");
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
-            let mut parts = attr_split_cycle(&dxy).map(|v| strp(&v).unwrap());
-            t_dx = parts.next();
-            t_dy = parts.next();
+            let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
+            t_dx = Some(parts.next().context("dx from text-dxy should be numeric")?);
+            t_dy = Some(parts.next().context("dy from text-dxy should be numeric")?);
         }
         if let Some(dx) = dx {
             t_dx = Some(strp(&dx)?);
