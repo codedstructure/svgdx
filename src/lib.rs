@@ -28,7 +28,7 @@
 
 use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use clap::Parser;
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
@@ -218,6 +218,23 @@ impl Config {
         if args.watch && args.file == "-" {
             // Should already be enforced by clap validation
             bail!("A non-stdin file must be provided with -w/--watch argument");
+        }
+        if args.file != "-" && args.output != "-" {
+            // Arguably creating this struct shouldn't do any IO, but this is a
+            // deliberate UX safety restriction on the CLI which is worth keeping
+            // as high-level as possible to keep the lower level API cleaner.
+            let in_path = Path::new(&args.file);
+            let out_path = Path::new(&args.output);
+            if out_path.exists()
+                && out_path
+                    .canonicalize()
+                    .context("output path should be valid")?
+                    == in_path
+                        .canonicalize()
+                        .context("input path should be valid")?
+            {
+                bail!("Output path must not refer to the same file as the input file.");
+            }
         }
         Ok(Self {
             input_path: args.file,

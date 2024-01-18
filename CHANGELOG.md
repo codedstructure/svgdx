@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved error handling, with fewer panics caused by invalid input.
+
+- Added a check that the output won't override the input file (after being
+  bitten by exactly this...)
+
 ## [0.4.0] - 2024-01-15
 
 - Changed: auto-styles are no-longer suppressed when user-defined styles / defs

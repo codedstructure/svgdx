@@ -46,3 +46,35 @@ fn test_cmdline_config() {
     .expect("cmdline should be valid");
     svgdx::run(config).expect("run failed");
 }
+
+#[test]
+fn test_cmdline_same_file() {
+    let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
+    write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
+
+    let cwd = tmpfile.path().parent().unwrap();
+    let filename = tmpfile.path().file_name().unwrap();
+
+    // Different files: should succeed
+    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    cmd.current_dir(cwd)
+        .args([
+            filename.to_str().unwrap(),
+            "-o",
+            &format!("./{}x", filename.to_str().unwrap()),
+        ])
+        .assert()
+        .success();
+
+    // Same file (even with different 'spelling') - should fail.
+    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    cmd.current_dir(cwd)
+        .args([
+            filename.to_str().unwrap(),
+            "-o",
+            &format!("./{}", filename.to_str().unwrap()),
+        ])
+        .assert()
+        .failure()
+        .code(1);
+}
