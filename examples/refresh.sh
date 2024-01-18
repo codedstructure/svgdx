@@ -1,6 +1,6 @@
 #/usr/bin/env bash
 
-for SVG_IN in *-in.svg; do
-    SVG_OUT="${SVG_IN/-in.svg/-out.svg}"
-    cargo run --release -q -- "$SVG_IN" -o "$SVG_OUT" || echo "Failed to render ${SVG_IN}"
+for INPUT in *.xml; do
+    SVG_OUT="${INPUT/.xml/.svg}"
+    cargo run --release -q -- "$INPUT" -o "$SVG_OUT" || echo "Failed to render ${INPUT}"
 done

@@ -29,7 +29,7 @@ an SVG viewer / preview which also refreshes the view when the underlying file c
 
 ### Input
 
-Prepare an input file ([examples/simple-in.svg](examples/simple-in.svg)):
+Prepare an input file ([examples/simple.xml](examples/simple.xml)):
 
 ```xml
 <svg>
@@ -47,13 +47,13 @@ Prepare an input file ([examples/simple-in.svg](examples/simple-in.svg)):
 Process the input with `svgdx`:
 
 ```bash
-$ svgdx examples/simple-in.svg -o examples/simple-out.svg
+$ svgdx examples/simple.svg -o examples/simple.svg
 ```
 
 ### Output
-Output file ([examples/simple-out.svg](examples/simple-out.svg)):
+Output file ([examples/simple.svg](examples/simple.svg)):
 
-![](examples/simple-out.svg)
+![](examples/simple.svg)
 
 which is a rendering of the following generated SVG:
 

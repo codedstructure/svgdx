@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added a check that the output won't override the input file (after being
   bitten by exactly this...)
 
+- Updated examples to use `.xml` / `.svg` for input and output filenames
+  respectively, rather than `-in.svg` / `-out.svg`. While the auto-completion
+  for input files which `.svg` might provide in some editors is useful,
+  the extension lies about it being a valid SVG file which can be confusing,
+  e.g. when viewing input source for examples in GitHub.
+
 ## [0.4.0] - 2024-01-15
 
 - Changed: auto-styles are no-longer suppressed when user-defined styles / defs

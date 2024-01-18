@@ -24,88 +24,88 @@ This is the sort of diagram `svgdx` targets; boxes and lines, with layout provid
 
 An SVG reproduction of this diagram created using `svgdx` is shown below:
 
-![](functional_block_diagram-out.svg)
+![](functional_block_diagram.svg)
 
-[source](functional_block_diagram-out.svg)
+[source](functional_block_diagram.svg)
 
-[input file](functional_block_diagram-in.svg)
+[input file](functional_block_diagram.xml)
 
 ## Connectors
 
-![](edge-connector-out.svg)
+![](edge-connector.svg)
 
-[source](edge-connector-out.svg)
+[source](edge-connector.svg)
 
-[input file](edge-connector-in.svg)
+[input file](edge-connector.xml)
 
 ## More connectors
 
-![](corner-lines-out.svg)
+![](corner-lines.svg)
 
-[source](corner-lines-out.svg)
+[source](corner-lines.svg)
 
-[input file](corner-lines-in.svg)
+[input file](corner-lines.xml)
 
 ## Text boxes
 
-![](rect-text-out.svg)
+![](rect-text.svg)
 
-[source](rect-text-out.svg)
+[source](rect-text.svg)
 
-[input file](rect-text-in.svg)
+[input file](rect-text.xml)
 
 ## Multi-line text alignment
 
-![](multiline-text-out.svg)
+![](multiline-text.svg)
 
-[source](multiline-text-out.svg)
+[source](multiline-text.svg)
 
-[input file](multiline-text-in.svg)
+[input file](multiline-text.xml)
 
 ## Text associated with lines
 
-![](line-text-out.svg)
+![](line-text.svg)
 
-[source](line-text-out.svg)
+[source](line-text.svg)
 
-[input file](line-text-in.svg)
+[input file](line-text.xml)
 
 ## Relative positioning
 
-![](loc-out.svg)
+![](loc.svg)
 
-[source](loc-out.svg)
+[source](loc.svg)
 
-[input file](loc-in.svg)
+[input file](loc.xml)
 
 ## Surrounding shapes
 
-![](surround-out.svg)
+![](surround.svg)
 
-[source](surround-out.svg)
+[source](surround.svg)
 
-[input file](surround-in.svg)
+[input file](surround.xml)
 
 ## Text within shapes
 
-![](text-attr-out.svg)
+![](text-attr.svg)
 
-[source](text-attr-out.svg)
+[source](text-attr.svg)
 
-[input file](text-attr-in.svg)
+[input file](text-attr.xml)
 
 ## Repeating elements
 
-![](repeat-out.svg)
+![](repeat.svg)
 
-[source](repeat-out.svg)
+[source](repeat.svg)
 
-[input file](repeat-in.svg)
+[input file](repeat.xml)
 
 ## Variables and expressions
 
-![](define-out.svg)
+![](define.svg)
 
-[source](define-out.svg)
+[source](define.svg)
 
-[input file](define-in.svg)
+[input file](define.xml)
