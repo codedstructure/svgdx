@@ -1,5 +1,17 @@
 # **svgdx** examples
 
+## svgdx
+
+![](svgdx.svg)
+
+```
+svgdx svgdx.xml -o svgdx.svg
+```
+
+[svgdx.svg](svgdx.svg)
+
+[svgdx.xml](svgdx.xml)
+
 ## Functional Block Diagram
 
 From the Wikipedia [Functional block diagram](https://en.wikipedia.org/wiki/Functional_block_diagram) page, the following diagram shows "the attitude control and maneuvering electronics system of the Gemini spacecraft".
@@ -17,7 +29,6 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 [source](functional_block_diagram-out.svg)
 
 [input file](functional_block_diagram-in.svg)
-
 
 ## Connectors
 

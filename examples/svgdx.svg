@@ -1,0 +1,37 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="140mm" height="40mm" viewBox="-55 -15 140 40">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    .d-dash { stroke-dasharray: 1.5 0.75; }
+    .d-dot { stroke-dasharray: 0.5 0.5; }
+    .d-surround { fill: none; }
+    .d-fill-green { fill: green; }
+    text.d-fill-green, text.d-fill-green * { fill: white; }
+    .d-fill-orange { fill: orange; }
+    text.d-fill-orange, text.d-fill-orange * { fill: white; }
+    .d-fill-papayawhip { fill: papayawhip; }
+    text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; }
+  ]]>
+  </style>
+    <style>text {font-weight: bold; font-size:4px}</style>
+    <rect x="-50" y="-10" width="130" height="30" class="d-fill-papayawhip d-surround"/><rect opacity="0.5" x="-44" y="-5" width="78" height="18" class="d-dash d-fill-red d-surround"/><rect opacity="0.5" x="-4" y="-3" width="78" height="18" class="d-dot d-fill-green d-surround"/><rect id="svgdx" width="30" height="10" class="d-fill-orange"/>
+    <text x="15" y="5" class="d-fill-orange d-tbox">svgdx</text>
+    <rect id="input" x="-40" y="0" width="30" height="10" rx="3" class="d-fill-red"/>
+    <text x="-25" y="5" class="d-fill-red d-tbox">svgdx.xml</text>
+    <rect id="output" x="40" y="0" width="30" height="10" rx="3" class="d-fill-green"/>
+    <text x="55" y="5" class="d-fill-green d-tbox">svgdx.svg</text>
+    <line x1="-10" y1="5" x2="0" y2="5" class="d-arrow"/>
+    <line x1="30" y1="5" x2="40" y2="5" class="d-arrow"/>
+</svg>
