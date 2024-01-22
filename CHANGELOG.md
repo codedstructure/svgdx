@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1 - 2024-01-22]
+
 - Improved error handling, with fewer panics caused by invalid input.
 
 - Added a check that the output won't override the input file (after being
@@ -17,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for input files which `.svg` might provide in some editors is useful,
   the extension lies about it being a valid SVG file which can be confusing,
   e.g. when viewing input source for examples in GitHub.
+
+- Update shlex to address RUSTSEC-2024-0006 (no relevant parts of the affected
+  API are used in svgdx.)
 
 ## [0.4.0] - 2024-01-15
 
