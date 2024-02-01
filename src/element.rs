@@ -35,6 +35,7 @@ pub struct SvgElement {
     pub attrs: AttrMap,
     pub classes: ClassList,
     pub content: Option<String>,
+    pub indent: usize,
 }
 
 impl Display for SvgElement {
@@ -66,7 +67,12 @@ impl SvgElement {
             attrs: attr_map,
             classes,
             content: None,
+            indent: 0,
         }
+    }
+
+    pub fn set_indent(&mut self, indent: usize) {
+        self.indent = indent;
     }
 
     pub fn add_class(&mut self, class: &str) -> Self {

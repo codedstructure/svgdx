@@ -5,6 +5,7 @@ mod comments;
 mod connector;
 mod error_handling;
 mod eval_locs;
+mod indent;
 mod rel_pos;
 mod rel_size;
 mod repeat_el;

@@ -23,7 +23,9 @@
     text.d-fill-yellow, text.d-fill-yellow * { fill: black; }
   ]]>
   </style>
-  <rect opacity="0.5" x="-2" y="-2" width="104" height="24" class="d-dash d-fill-blue d-surround"/><rect rx="3" opacity="0.5" x="25" y="-5" width="30" height="55" class="d-dot d-fill-red d-surround"/><rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
+  <rect opacity="0.5" x="-2" y="-2" width="104" height="24" class="d-dash d-fill-blue d-surround"/>
+  <rect rx="3" opacity="0.5" x="25" y="-5" width="30" height="55" class="d-dot d-fill-red d-surround"/>
+  <rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
   <text x="10" y="10" class="d-red d-tbox">a</text>
   <rect id="b" x="30" y="0" width="20" height="20" class="d-fill-green"/>
   <text x="40" y="10" class="d-fill-green d-tbox">b</text>

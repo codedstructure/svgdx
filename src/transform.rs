@@ -23,7 +23,6 @@ pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
-    last_indent: String,
 }
 
 impl TransformerContext {
@@ -32,7 +31,6 @@ impl TransformerContext {
             elem_map: HashMap::new(),
             prev_element: None,
             variables: HashMap::new(),
-            last_indent: String::new(),
         }
     }
 
@@ -63,10 +61,6 @@ impl TransformerContext {
         }
     }
 
-    pub fn set_indent(&mut self, indent: String) {
-        self.last_indent = indent;
-    }
-
     fn handle_vars(&mut self, e: &mut SvgElement) {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
@@ -91,13 +85,13 @@ impl TransformerContext {
             // Expressions in comments are evaluated
             let value = eval_attr(&comment, self);
             events.push(SvgEvent::Comment(value));
-            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
         }
 
         // 'Raw' comment: no evaluation of expressions occurs here
         if let Some(comment) = e.pop_attr("__") {
             events.push(SvgEvent::Comment(comment));
-            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
         }
 
         events
@@ -237,7 +231,7 @@ impl TransformerContext {
             let (orig_elem, text_elements) = process_text_attr(&e)?;
             prev_element = Some(e.clone());
             events.push(SvgEvent::Empty(orig_elem));
-            events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
             match text_elements.as_slice() {
                 [] => {}
                 [elem] => {
@@ -251,7 +245,7 @@ impl TransformerContext {
                     // Multiple text spans
                     let text_elem = &text_elements[0];
                     events.push(SvgEvent::Start(text_elem.clone()));
-                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
                     for elem in &text_elements[1..] {
                         // Note: we can't insert a newline/last_indent here as whitespace
                         // following a tspan is compressed to a single space and causes
@@ -262,7 +256,7 @@ impl TransformerContext {
                         ));
                         events.push(SvgEvent::End("tspan".to_string()));
                     }
-                    events.push(SvgEvent::Text(format!("\n{}", self.last_indent)));
+                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
                     events.push(SvgEvent::End("text".to_string()));
                 }
             }
@@ -301,16 +295,15 @@ pub enum SvgEvent {
     Empty(SvgElement),
     End(String),
 }
-
 #[derive(Debug, Clone)]
 pub struct EventList<'a> {
-    events: Vec<(Event<'a>, usize)>,
+    events: Vec<(Event<'a>, usize, usize)>,
 }
 
 impl From<Event<'_>> for EventList<'_> {
     fn from(value: Event) -> Self {
         Self {
-            events: vec![(value.into_owned(), 0)],
+            events: vec![(value.into_owned(), 0, 0)],
         }
     }
 }
@@ -318,7 +311,7 @@ impl From<Event<'_>> for EventList<'_> {
 impl From<Vec<Event<'_>>> for EventList<'_> {
     fn from(value: Vec<Event>) -> Self {
         Self {
-            events: value.into_iter().map(|v| (v.into_owned(), 0)).collect(),
+            events: value.into_iter().map(|v| (v.into_owned(), 0, 0)).collect(),
         }
     }
 }
@@ -332,12 +325,12 @@ impl EventList<'_> {
         self.events.is_empty()
     }
 
-    fn iter(&self) -> impl Iterator<Item = &(Event, usize)> + '_ {
+    fn iter(&self) -> impl Iterator<Item = &(Event, usize, usize)> + '_ {
         self.events.iter()
     }
 
     fn push(&mut self, ev: &Event) {
-        self.events.push((ev.clone().into_owned(), 0));
+        self.events.push((ev.clone().into_owned(), 0, 0));
     }
 
     fn from_reader(reader: &mut dyn BufRead) -> Result<Self> {
@@ -347,6 +340,7 @@ impl EventList<'_> {
         let mut buf = Vec::new();
 
         let mut line_count = 1;
+        let mut indent = 0;
         loop {
             let ev = reader.read_event_into(&mut buf);
             if let Ok(ok_ev) = ev.clone() {
@@ -354,7 +348,16 @@ impl EventList<'_> {
             }
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(e) => events.push((e.clone().into_owned(), line_count)),
+                Ok(Event::Text(t)) => {
+                    let mut t_str = String::from_utf8(t.to_vec())?;
+                    if let Some((_, rest)) = t_str.rsplit_once('\n') {
+                        t_str = rest.to_string();
+                    }
+                    indent = t_str.len() - t_str.trim_end_matches(' ').len();
+
+                    events.push((ev.expect("match").clone().into_owned(), line_count, indent));
+                }
+                Ok(e) => events.push((e.clone().into_owned(), line_count, indent)),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
 
@@ -371,6 +374,7 @@ impl EventList<'_> {
 
         // TODO: remove duplication between this and `from_reader`
         let mut line_count = 1;
+        let mut indent = 0;
         loop {
             let ev = reader.read_event();
             if let Ok(ok_ev) = ev.clone() {
@@ -378,7 +382,15 @@ impl EventList<'_> {
             }
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(e) => events.push((e.clone().into_owned(), line_count)),
+                Ok(Event::Text(t)) => {
+                    let t_str = String::from_utf8(t.to_vec())?;
+                    if let Some((_, rest)) = t_str.rsplit_once('\n') {
+                        indent = rest.len() - rest.trim_end_matches(' ').len();
+                    }
+
+                    events.push((ev.expect("match").clone().into_owned(), line_count, indent));
+                }
+                Ok(e) => events.push((e.clone().into_owned(), line_count, indent)),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
         }
@@ -406,25 +418,25 @@ impl EventList<'_> {
     }
 
     /// Split an `EventList` into (up to) 3 parts: before, pivot, after.
-    fn partition(&self, name: &str) -> (Self, Option<(Event, usize)>, Self) {
+    fn partition(&self, name: &str) -> (Self, Option<(Event, usize, usize)>, Self) {
         let mut before = vec![];
         let mut pivot = None;
         let mut after = vec![];
-        for (event, pos) in self.iter().cloned() {
+        for (event, pos, indent) in self.iter().cloned() {
             if pivot.is_some() {
-                after.push((event.clone().into_owned(), pos));
+                after.push((event.clone().into_owned(), pos, indent));
             } else {
                 match event {
                     Event::Start(ref e) | Event::Empty(ref e) => {
                         let elem_name: String =
                             String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
                         if elem_name == name {
-                            pivot = Some((event.clone(), pos));
+                            pivot = Some((event.clone(), pos, indent));
                         } else {
-                            before.push((event.clone().into_owned(), pos));
+                            before.push((event.clone().into_owned(), pos, indent));
                         }
                     }
-                    _ => before.push((event.clone().into_owned(), pos)),
+                    _ => before.push((event.clone().into_owned(), pos, indent)),
                 }
             }
         }
@@ -454,19 +466,23 @@ impl Transformer {
 
     fn process_seq<'a, 'b>(
         &mut self,
-        seq: impl IntoIterator<Item = (usize, &'b Event<'b>, usize)>,
+        seq: impl IntoIterator<Item = (usize, &'b Event<'b>, usize, usize)>,
         idx_output: &mut BTreeMap<usize, EventList>,
-    ) -> Result<Vec<(usize, &'b Event<'b>, usize)>> {
-        let mut remain = Vec::<(usize, &Event, usize)>::new();
+    ) -> Result<Vec<(usize, &'b Event<'b>, usize, usize)>> {
+        let mut remain = Vec::<(usize, &Event, usize, usize)>::new();
         let mut gen_events = EventList::new();
         let mut last_idx = 0;
 
-        'ev: for (idx, ev, pos) in seq {
+        let mut defer_next_text = false;
+        let mut discard_next_text = false;
+
+        'ev: for (idx, ev, pos, indent) in seq {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
                     let mut event_element = SvgElement::try_from(e)
                         .context(format!("could not extract element at line {pos}"))?;
+                    event_element.set_indent(indent);
 
                     if !gen_events.is_empty() {
                         idx_output.insert(last_idx, gen_events);
@@ -485,7 +501,7 @@ impl Transformer {
                         )));
                         gen_events.push(&Event::Text(BytesText::new(&format!(
                             "\n{}",
-                            self.context.last_indent
+                            " ".repeat(indent)
                         ))));
                     }
                     let mut repeat = 1;
@@ -500,21 +516,28 @@ impl Transformer {
                         let events = transform_element(&event_element, &mut self.context, is_empty)
                             .context(format!("processing element on line {pos}"));
                         if events.is_err() {
-                            remain.push((idx, ev, pos));
+                            remain.push((idx, ev, pos, indent));
+                            defer_next_text = true;
                             // discard any events generated by this element.
                             gen_events = EventList::new();
                             continue 'ev;
                         }
                         let events = events?;
+                        if events.is_empty() {
+                            // if an input event doesn't generate any output events,
+                            // ignore text following that event to avoid blank lines in output.
+                            discard_next_text = true;
+                            continue 'ev;
+                        }
 
                         for ev in events.iter() {
                             gen_events.push(&ev.0);
                         }
 
-                        if !events.is_empty() && rep_idx < (repeat - 1) {
+                        if rep_idx < (repeat - 1) {
                             gen_events.push(&Event::Text(BytesText::new(&format!(
                                 "\n{}",
-                                self.context.last_indent
+                                " ".repeat(indent)
                             ))));
                         }
                     }
@@ -528,25 +551,23 @@ impl Transformer {
                     last_idx = idx;
                 }
                 Event::Text(e) => {
-                    if gen_events.is_empty() {
-                        // if a previous input event didn't generate any output events,
-                        // ignore text following that event to avoid blank lines in output.
+                    if discard_next_text {
                         continue;
                     }
-                    // Extract any trailing whitespace following newlines as the current indentation level
-                    let re = regex!(r"(?ms)\n.*^(\s+)*");
-                    let text = String::from_utf8(e.to_vec()).expect("Non-UTF8 in input file");
-                    if let Some(captures) = re.captures(&text) {
-                        let indent = captures.get(1).map_or(String::new(), |m| m.as_str().into());
-                        self.context.set_indent(indent);
+                    if defer_next_text {
+                        remain.push((idx, ev, pos, indent));
+                    } else {
+                        gen_events.push(&Event::Text(e.borrow()));
                     }
-
-                    gen_events.push(&Event::Text(e.borrow()));
                 }
                 _ => {
                     gen_events.push(ev);
                 }
             }
+
+            // These are deliberately skipped by `continue` statements in the above match()
+            defer_next_text = false;
+            discard_next_text = false;
         }
 
         if !gen_events.is_empty() {
@@ -559,7 +580,10 @@ impl Transformer {
         let mut output = EventList { events: vec![] };
         let mut idx_output = BTreeMap::<usize, EventList>::new();
 
-        let seq = input.iter().enumerate().map(|x| (x.0, &x.1 .0, x.1 .1));
+        let seq = input
+            .iter()
+            .enumerate()
+            .map(|x| (x.0, &x.1 .0, x.1 .1, x.1 .2));
 
         // First pass with original input data
         let mut remain = self.process_seq(seq, &mut idx_output)?;
@@ -594,7 +618,7 @@ impl Transformer {
         // Calculate bounding box of diagram and use as new viewBox for the image.
         // This also allows just using `<svg>` as the root element.
         let mut bbox_list = vec![];
-        for (ev, _) in output.iter() {
+        for (ev, _, _) in output.iter() {
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
@@ -638,7 +662,7 @@ impl Transformer {
 
             let mut new_svg_bs = BytesStart::new("svg");
             let mut orig_svg_attrs = vec![];
-            if let (Event::Start(orig_svg), _) = first_svg {
+            if let (Event::Start(orig_svg), _, _) = first_svg {
                 new_svg_bs = orig_svg;
                 orig_svg_attrs = new_svg_bs
                     .attributes()
@@ -683,10 +707,7 @@ impl Transformer {
         }
 
         if self.config.debug {
-            let mut indent = self.context.last_indent.clone();
-            if indent.is_empty() {
-                indent = "\n  ".to_owned();
-            }
+            let indent = "\n  ".to_owned();
 
             EventList::from(vec![
                 Event::Text(BytesText::new(&indent)),
@@ -722,7 +743,7 @@ impl Transformer {
                 ]);
                 let auto_defs_events = EventList::from(event_vec);
                 let (before, defs_pivot, after) = output.partition("defs");
-                if let Some((existing_defs, _)) = defs_pivot {
+                if let Some((existing_defs, _, _)) = defs_pivot {
                     before.write_to(writer)?;
                     auto_defs_events.write_to(writer)?;
                     EventList::from(existing_defs).write_to(writer)?;
@@ -745,7 +766,7 @@ impl Transformer {
                     Event::End(BytesEnd::new("style")),
                 ]);
                 let (before, style_pivot, after) = output.partition("styles");
-                if let Some((existing_styles, _)) = style_pivot {
+                if let Some((existing_styles, _, _)) = style_pivot {
                     before.write_to(writer)?;
                     auto_styles_events.write_to(writer)?;
                     EventList::from(existing_styles).write_to(writer)?;

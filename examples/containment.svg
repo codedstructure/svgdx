@@ -16,7 +16,13 @@
     text.d-fill-white, text.d-fill-white * { fill: black; }
   ]]>
   </style>
-  <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/><rect id="o2" opacity="0.4" x="-8" y="-8" width="71" height="70" class="d-fill-grey d-surround"/><rect id="o3" opacity="0.4" x="-3" y="-3" width="26" height="60" class="d-fill-grey d-dash d-surround"/><rect id="o4" opacity="0.4" x="32" y="-3" width="26" height="44" class="d-fill-grey d-surround"/><rect id="o5" opacity="0.4" x="14.5" y="65" width="48" height="34" class="d-fill-grey d-surround"/><rect id="inp" width="20" height="8"/>
+  <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/>
+  <rect id="o2" opacity="0.4" x="-8" y="-8" width="71" height="70" class="d-fill-grey d-surround"/>
+  <rect id="o3" opacity="0.4" x="-3" y="-3" width="26" height="60" class="d-fill-grey d-dash d-surround"/>
+  <rect id="o4" opacity="0.4" x="32" y="-3" width="26" height="44" class="d-fill-grey d-surround"/>
+  <rect id="o5" opacity="0.4" x="14.5" y="65" width="48" height="34" class="d-fill-grey d-surround"/>
+
+  <rect id="inp" width="20" height="8"/>
   <text x="10" y="4" class="d-tbox">input</text>
   <rect id="proc1" x="0" y="10" width="20" height="8"/>
   <text x="10" y="14" class="d-tbox">process 1</text>
@@ -35,7 +41,15 @@
   <text x="45" y="34" class="d-tbox">out</text>
 
   <rect id="yinp" x="17.5" y="68" width="20" height="8"/>
-<text x="27.5" y="72" class="d-tbox">input</text><rect id="yproc1" x="39.5" y="68" width="20" height="8"/>
-<text x="49.5" y="72" class="d-tbox">preprocess</text><rect id="group" x="17.5" y="68" width="42" height="8" class="d-none d-surround"/><rect id="yproc2" x="17.5" y="78" width="42" height="8"/>
-<text x="38.5" y="82" class="d-tbox">process 2</text><rect id="yout" x="17.5" y="88" width="42" height="8"/>
-<text x="38.5" y="92" class="d-tbox">out</text><line x1="23" y1="19" x2="32" y2="19"/><polyline points="20 46, 27.5 46, 27.5 68"/></svg>
+  <text x="27.5" y="72" class="d-tbox">input</text>
+  <rect id="yproc1" x="39.5" y="68" width="20" height="8"/>
+  <text x="49.5" y="72" class="d-tbox">preprocess</text>
+  <rect id="group" x="17.5" y="68" width="42" height="8" class="d-none d-surround"/>
+  <rect id="yproc2" x="17.5" y="78" width="42" height="8"/>
+  <text x="38.5" y="82" class="d-tbox">process 2</text>
+  <rect id="yout" x="17.5" y="88" width="42" height="8"/>
+  <text x="38.5" y="92" class="d-tbox">out</text>
+
+  <line x1="23" y1="19" x2="32" y2="19"/>
+  <polyline points="20 46, 27.5 46, 27.5 68"/>
+</svg>
