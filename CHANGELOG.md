@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed approach to indentation so this now works consistently with elements
+  processed out-of-order (e.g. geometry defined in terms of elements occurring
+  later in the document)
+
 ## [0.4.1 - 2024-01-22]
 
 - Improved error handling, with fewer panics caused by invalid input.
@@ -44,9 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A more general approach to these 'recursive' references is implemented,
   though it may be slow in the general case with large documents.
   The previous `populate()` stage followed by 'simple' / 'not-simple' calls
-  to `expand_attributes()` have beeb replaced by repeated 'process remaining
+  to `expand_attributes()` have been replaced by repeated 'process remaining
   elements which couldn't be handled' stages until success (no further
-  elements) or stall (couldn't reduce the number of renamining elements).
+  elements) or stall (couldn't reduce the number of remaining elements).
 
   NOTE: one (temporary) limitation of the approach here is the generated
   indentation/newline placement is less consistent, as output elements are
