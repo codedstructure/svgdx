@@ -19,15 +19,15 @@ where `$var0` would be a reference to the non-existent `var0` variable.
 
 ### Variable definition
 
-Variables are defined in a custom `<define>` element, where each attribute
-names and sets a variable. For example `<define var="1"/>` sets the variable `var` to be the value `1`.
+Variables are defined in a custom `<var>` element, where each attribute
+names and sets a variable. For example `<var key="1"/>` sets the variable `key` to be the value `1`.
 
 Variables are untyped; there is a single global namespace, and modifying
 variable values is performed by overriding the value.
 
 Example - increment `var1`
 ```xml
-<define var1="{{${var1} + 1}}" />
+<var var1="{{${var1} + 1}}" />
 ```
 
 

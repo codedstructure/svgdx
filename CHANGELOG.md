@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   processed out-of-order (e.g. geometry defined in terms of elements occurring
   later in the document)
 
+- Added a `config` element which can define config options within an input
+  document. See the [element docs](docs/elements#config) for more info. This
+  allows the [examples/refresh.sh](examples/refresh.sh) script to be run
+  cleanly over all the examples.
+
 ## [0.4.1 - 2024-01-22]
 
 - Improved error handling, with fewer panics caused by invalid input.

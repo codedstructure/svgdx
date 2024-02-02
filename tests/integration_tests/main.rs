@@ -2,6 +2,7 @@ mod attr_expansion;
 mod auto_styles;
 mod cmdline;
 mod comments;
+mod config;
 mod connector;
 mod error_handling;
 mod eval_locs;

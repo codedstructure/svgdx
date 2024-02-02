@@ -458,6 +458,20 @@ impl Transformer {
         }
     }
 
+    fn handle_config_element(&mut self, element: &SvgElement) -> Result<()> {
+        for (key, value) in &element.attrs {
+            match key.as_str() {
+                "scale" => self.config.scale = value.parse()?,
+                "debug" => self.config.debug = value.parse()?,
+                "add-auto-styles" => self.config.add_auto_defs = value.parse()?,
+                "border" => self.config.border = value.parse()?,
+                "background" => self.config.background = value.clone(),
+                _ => bail!("Unknown config setting {key}"),
+            }
+        }
+        Ok(())
+    }
+
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let output = self.process_events(input)?;
@@ -482,6 +496,13 @@ impl Transformer {
                     let is_empty = matches!(ev, Event::Empty(_));
                     let mut event_element = SvgElement::try_from(e)
                         .context(format!("could not extract element at line {pos}"))?;
+
+                    if event_element.name == "config" {
+                        self.handle_config_element(&event_element)?;
+                        discard_next_text = true;
+                        continue;
+                    }
+
                     event_element.set_indent(indent);
 
                     if !gen_events.is_empty() {
