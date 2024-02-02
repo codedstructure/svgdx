@@ -94,13 +94,15 @@ impl SvgElement {
         self.attrs.insert(key, value);
     }
 
+    fn replace_attrs(&mut self, attrs: AttrMap) {
+        self.attrs = attrs;
+    }
+
     #[allow(dead_code)]
     #[must_use]
     fn with_attr(&self, key: &str, value: &str) -> Self {
-        let mut attrs = self.attrs.clone();
-        attrs.insert(key, value);
-        let mut element = Self::new(self.name.as_str(), &attrs.to_vec());
-        element.add_classes(&self.classes);
+        let mut element = self.clone();
+        element.add_attr(key, value);
         element
     }
 
@@ -112,20 +114,23 @@ impl SvgElement {
             .into_iter()
             .filter(|(k, _v)| k != key)
             .collect();
-        let mut element = Self::new(self.name.as_str(), &attrs);
-        element.add_classes(&self.classes);
+        let mut element = self.clone();
+        element.replace_attrs(attrs.into());
         element
     }
 
-    /// copy attributes and classes from another element, returning the merged element
+    /// copy attributes, classes and indentation from another element,
+    /// returning the merged element
     #[must_use]
     pub fn with_attrs_from(&self, other: &Self) -> Self {
         let mut attrs = self.attrs.clone();
         for (k, v) in &other.attrs {
             attrs.insert(k, v);
         }
-        let mut element = Self::new(self.name.as_str(), &attrs.to_vec());
+        let mut element = self.clone();
+        element.replace_attrs(attrs);
         element.add_classes(&other.classes);
+        element.set_indent(other.indent);
         element
     }
 
@@ -639,7 +644,7 @@ impl SvgElement {
             let mut value = value.clone();
             match key.as_str() {
                 "xy" | "cxy" | "xy1" | "xy2" => {
-                    // TODO: maybe split up? pos may depende on size, but size doesn't depend on pos
+                    // TODO: maybe split up? pos may depend on size, but size doesn't depend on pos
                     value = self.eval_pos(value.as_str(), context)?;
                 }
                 _ => (),

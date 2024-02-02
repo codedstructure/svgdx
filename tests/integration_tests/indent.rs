@@ -1,4 +1,3 @@
-//use assertables::{assert_contains, assert_contains_as_result};
 use svgdx::transform_str_default;
 
 #[test]
@@ -52,13 +51,31 @@ fn test_indent_constant() {
 #[test]
 fn test_indent_out_of_order() {
     let input = r##"
-  <rect xy="#a" wh="1"/>
-  <rect xy="1" wh="0" id="a"/>
+  <line start="#a@l" end="#a@r" text="a"/>
+  <rect xy="1" wh="1" id="a"/>
 "##;
 
     let expected = r##"
-  <rect x="1" y="1" width="1" height="1"/>
-  <rect x="1" y="1" width="0" height="0" id="a"/>
+  <line x1="1" y1="1.5" x2="2" y2="1.5"/>
+  <text x="1.5" y="1.5" class="d-tbox">a</text>
+  <rect x="1" y="1" width="1" height="1" id="a"/>
+"##;
+
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, expected);
+}
+
+#[test]
+fn test_indent_ooo_varying() {
+    let input = r##"
+     <line start="#a@l" end="#a@r" text="a"/>
+   <rect xy="1" wh="1" id="a"/>
+"##;
+
+    let expected = r##"
+     <line x1="1" y1="1.5" x2="2" y2="1.5"/>
+     <text x="1.5" y="1.5" class="d-tbox">a</text>
+   <rect x="1" y="1" width="1" height="1" id="a"/>
 "##;
 
     let output = transform_str_default(input).unwrap();
