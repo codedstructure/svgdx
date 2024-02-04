@@ -1,4 +1,5 @@
 use crate::expression::eval_attr;
+use crate::path::path_bbox;
 use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
@@ -222,6 +223,7 @@ impl SvgElement {
                     Ok(None)
                 }
             }
+            "path" => Ok(Some(path_bbox(self)?)),
             "circle" => {
                 if let Some(r) = self.attrs.get("r") {
                     let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;

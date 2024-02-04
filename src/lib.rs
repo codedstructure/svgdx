@@ -45,6 +45,7 @@ mod connector;
 mod custom;
 mod element;
 mod expression;
+mod path;
 mod svg_defs;
 mod text;
 mod transform;

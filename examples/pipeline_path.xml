@@ -1,0 +1,12 @@
+<svg>
+  <!-- Draw a 'pipeline' shape using a path element -->
+
+  <var pipe_w="10" pipe_h="30" pipe_x="10" pipe_y="40"/>
+
+  <path d="M $pipe_x {{$pipe_y + $pipe_w / 4}}
+    a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
+    a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 -$pipe_w 0
+    v {{$pipe_h - $pipe_w / 2}}
+    a {{$pipe_x / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
+    v -{{$pipe_h - $pipe_w / 2}}" />
+</svg>
