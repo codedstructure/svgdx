@@ -30,7 +30,7 @@ fn expand_relspec(value: &str, context: &TransformerContext) -> String {
     result.to_string()
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SvgElement {
     pub name: String,
     pub attrs: AttrMap,
@@ -83,7 +83,9 @@ impl SvgElement {
 
     pub fn add_classes(&mut self, classes: &ClassList) {
         for class in classes {
-            self.add_class(class);
+            // update classes directly rather than use add_class which
+            // performs a clone() operation.
+            self.classes.insert(class.to_string());
         }
     }
 

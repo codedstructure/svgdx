@@ -21,6 +21,7 @@ use lazy_regex::regex;
 #[derive(Default)]
 pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
+    original_map: HashMap<String, SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
 }
@@ -29,6 +30,7 @@ impl TransformerContext {
     pub fn new() -> Self {
         Self {
             elem_map: HashMap::new(),
+            original_map: HashMap::new(),
             prev_element: None,
             variables: HashMap::new(),
         }
@@ -36,6 +38,10 @@ impl TransformerContext {
 
     pub fn get_element(&self, id: &str) -> Option<&SvgElement> {
         self.elem_map.get(id)
+    }
+
+    pub fn get_original_element(&self, id: &str) -> Option<&SvgElement> {
+        self.original_map.get(id)
     }
 
     pub fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
@@ -57,7 +63,9 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
-            self.elem_map.insert(id, el.clone());
+            if self.elem_map.insert(id.clone(), el.clone()).is_none() {
+                self.original_map.insert(id, el.clone());
+            }
         }
     }
 
@@ -489,6 +497,7 @@ impl Transformer {
 
         let mut defer_next_text = false;
         let mut discard_next_text = false;
+        let mut in_spec = false;
 
         'ev: for (idx, ev, pos, indent) in seq {
             match ev {
@@ -501,6 +510,13 @@ impl Transformer {
                         self.handle_config_element(&event_element)?;
                         discard_next_text = true;
                         continue;
+                    }
+
+                    if event_element.name == "spec" && !is_empty {
+                        if in_spec {
+                            bail!("Cannot nest <spec> elements");
+                        }
+                        in_spec = true;
                     }
 
                     event_element.set_indent(indent);
@@ -525,7 +541,35 @@ impl Transformer {
                             " ".repeat(indent)
                         ))));
                     }
-                    let mut repeat = 1;
+                    // support reuse element
+                    if event_element.name == "reuse" {
+                        let elref = event_element
+                            .pop_attr("href")
+                            .context("reuse element should have an href attribute")?;
+                        let target_indent = event_element.indent;
+                        let referenced_element = self
+                            .context
+                            .get_original_element(
+                                elref
+                                    .strip_prefix('#')
+                                    .context("href value should begin with '#'")?,
+                            )
+                            .context("unknown reference")?;
+                        let mut instance_element = referenced_element.clone();
+                        // the referenced element will have an `id` attribute (which it was
+                        // referenced by) but the new instance should not have this to avoid
+                        // multiple elements with the same id.
+                        instance_element.pop_attr("id");
+                        // the instanced element should have the same indent as the original
+                        // `reuse` element, as well as inherit `style` and `class` values.
+                        instance_element.set_indent(target_indent);
+                        if let Some(inst_style) = event_element.pop_attr("style") {
+                            instance_element.add_attr("style", &inst_style);
+                        }
+                        instance_element.add_classes(&event_element.classes);
+                        event_element = instance_element;
+                    }
+                    let mut repeat = if in_spec { 0 } else { 1 };
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
@@ -568,17 +612,26 @@ impl Transformer {
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    gen_events.push(&Event::End(BytesEnd::new(ee_name)));
+                    if ee_name.as_str() == "spec" {
+                        in_spec = false;
+                        discard_next_text = true;
+                        continue;
+                    } else {
+                        gen_events.push(&Event::End(BytesEnd::new(ee_name)));
+                    }
                     last_idx = idx;
                 }
                 Event::Text(e) => {
                     if discard_next_text {
+                        discard_next_text = false;
                         continue;
                     }
-                    if defer_next_text {
-                        remain.push((idx, ev, pos, indent));
-                    } else {
-                        gen_events.push(&Event::Text(e.borrow()));
+                    if !in_spec {
+                        if defer_next_text {
+                            remain.push((idx, ev, pos, indent));
+                        } else {
+                            gen_events.push(&Event::Text(e.borrow()));
+                        }
                     }
                 }
                 _ => {

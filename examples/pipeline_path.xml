@@ -1,12 +1,24 @@
 <svg>
   <!-- Draw a 'pipeline' shape using a path element -->
+  <style>
+    .coin { fill: gold; stroke: silver; }
+  </style>
 
-  <var pipe_w="10" pipe_h="30" pipe_x="10" pipe_y="40"/>
+  <spec>
+    <path id="pipeline" d="M $pipe_x {{$pipe_y + $pipe_w / 4}}
+      a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
+      a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 {{-$pipe_w}} 0
+      v {{$pipe_h - $pipe_w / 2}}
+      a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
+      v {{-$pipe_h - $pipe_w / 2}}" />
+  </spec>
 
-  <path d="M $pipe_x {{$pipe_y + $pipe_w / 4}}
-    a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
-    a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 -$pipe_w 0
-    v {{$pipe_h - $pipe_w / 2}}
-    a {{$pipe_x / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
-    v -{{$pipe_h - $pipe_w / 2}}" />
+  <var pipe_w="10" pipe_h="40" pipe_x="10" pipe_y="10"/>
+  <reuse href="#pipeline" style="fill:red"/>
+
+  <var pipe_w="20" pipe_h="13" pipe_x="30" pipe_y="10"/>
+  <reuse href="#pipeline" class="coin"/>
+
+  <var pipe_w="20" pipe_h="20" pipe_x="30" pipe_y="25"/>
+  <reuse href="#pipeline" style="stroke-width: 0.1; fill: limegreen;"/>
 </svg>

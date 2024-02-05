@@ -32,3 +32,22 @@ This element allows one or more variables to be set. These values can be referen
 Variables are set using a `varname="value"` attribute pair, and multiple variables can be set in a single `<var>` element.
 
 Note the `value` is considered to be an expressions, so variables can be set based on the value of other (or the same) variable.
+
+### `spec`
+
+This is a container element; the contents of it are not transferred to the rendered output, but may be referenced by other elements,
+in particular the `reuse` element.
+
+Elements within a `<spec>` section should generally have an `id` attribute so they can be referenced, otherwise they will have no effect on the rendered document.
+
+Note that `<spec>` elements may not be nested.
+
+### `reuse`
+
+The `<reuse>` element is analogous to SVG's `<use>` element, in that it takes an `href` attribute referring to another element.
+The difference is that where a `<use>` element will remain as-is in the rendered output, the `<reuse>` element is replaced by the referenced element.
+
+Typically this is used to refer to elements defined in the `<spec>` section of the document, using a `href` attribute analogous to the `<use>` element.
+(Note there should not be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
+
+The `style` attribute of the `<reuse>` element is applied to the rendered output, as are any classes defined for the element.
