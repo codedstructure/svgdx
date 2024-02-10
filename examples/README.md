@@ -109,3 +109,11 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 [source](define.svg)
 
 [input file](define.xml)
+
+## Reuse and templating
+
+![](reuse.svg)
+
+[source](reuse.svg)
+
+[input file](reuse.xml)

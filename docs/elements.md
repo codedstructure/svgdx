@@ -55,3 +55,5 @@ Typically this is used to refer to elements defined in the `<specs>` section of 
 (Note there should _not_ be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
 
 The `style` attribute of the `<reuse>` element is applied to the rendered output, as are any classes defined for the element.
+
+Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).

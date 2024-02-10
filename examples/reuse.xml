@@ -13,12 +13,9 @@
       v {{-$pipe_h - $pipe_w / 2}}" />
   </specs>
 
-  <var pipe_w="10" pipe_h="40" pipe_x="10" pipe_y="10"/>
-  <reuse href="#pipeline" style="fill:red"/>
+  <reuse href="#pipeline" pipe_w="10" pipe_h="40" pipe_x="10" pipe_y="10" style="fill:red"/>
 
-  <var pipe_w="20" pipe_h="13" pipe_x="30" pipe_y="10"/>
-  <reuse href="#pipeline" class="coin"/>
+  <reuse href="#pipeline" pipe_w="20" pipe_h="13" pipe_x="30" pipe_y="10" class="coin"/>
 
-  <var pipe_w="20" pipe_h="20" pipe_x="30" pipe_y="25"/>
-  <reuse href="#pipeline" style="stroke-width: 0.1; fill: limegreen;"/>
+  <reuse href="#pipeline" pipe_w="20" pipe_h="20" pipe_x="30" pipe_y="25" style="stroke-width: 0.1; fill: limegreen;"/>
 </svg>
