@@ -38,6 +38,22 @@
         ]]>
     </style>
 
+    <specs>
+        <path id="pipeline_v" d="M $x {{$y + $width / 4}}
+        a {{$width / 2}} {{$width / 4}} 0 0 0 $width 0
+        a {{$width / 2}} {{$width / 4}} 0 0 0 {{-$width}} 0
+        v {{$height - $width / 2}}
+        a {{$width / 2}} {{$width / 4}} 0 0 0 $width 0
+        v {{-$height - $width / 2}}" />
+
+        <path id="pipeline_h" d="M {{$x + $height / 4}} $y
+        a {{$height / 4}} {{$height / 2}} 0 0 0 0 $height
+        a {{$height / 4}} {{$height / 2}} 0 0 0 0 {{-$height}}
+        h {{$width - $height / 2}}
+        a {{$height / 4}} {{$height / 2}} 0 0 1 0 $height
+        h {{-$width - $height / 2}}" />
+    </specs>
+
     <rect x="2" y="10" width="36" height="10" text="State hypothesis"/>
     <rect xy="@bl 0 8" width="36" height="10" text="Design experiment"/>
     <rect xy="@bl 0 8" width="36" height="10" text="Perform experiment"/>
@@ -47,12 +63,12 @@
     <rect xy="@bl 0 8" width="36" height="10" text="Evaluate model"/>
     <rect xy="@bl 0 8" width="36" height="10" text="Check hypothesis"/>
 
-    <pipeline x="45" y="20" width="30" height="15"/>
+    <reuse href="#pipeline_h" x="45" y="20" width="30" height="16"/>
     <rect x="43" y="18" width="34" height="19" style="fill:none"/>
 
-    <pipeline x="45" y="60" width="10" height="65"/>
-    <pipeline xy="@tr 2 0" width="8" height="65"/>
-    <pipeline xy="@tr 2 0" width="5" height="65"/>
-    <pipeline xy="@tr 2 0" width="3" height="65"/>
+    <reuse href="#pipeline_v" x="45" y="60" width="10" height="65"/>
+    <reuse href="#pipeline_v" x="57" y="60" width="8" height="65"/>
+    <reuse href="#pipeline_v" x="67" y="60" width="5" height="65"/>
+    <reuse href="#pipeline_v" x="74" y="60" width="3" height="65"/>
 
 </svg>

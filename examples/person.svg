@@ -1,45 +1,47 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="202mm" height="110mm" viewBox="-5 -5 202 110">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="180mm" height="120mm" viewBox="-5 -5 180 120">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+    </marker>
+  </defs>
   <style>
   <![CDATA[
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
     rect, circle, ellipse, polygon { fill: white; }
     line, polyline, path { fill: none; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
   ]]>
   </style>
-  <defs>
-   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
-   </marker>
-  </defs>
   <style>
     <![CDATA[
-        rect, line {
-            stroke-width: 0.5;
-            stroke: black;
-            fill: none;
-        }
-        text {
-            font-family: "Ubuntu Mono", monospace;
-            font-size: 4px;
-        }
-        .person {
-            stroke:blue;
-        }
-        .Ben {
-            stroke:green;
-        }
-        .Charlotte {
-            stroke:pink;
-        }
-        .Rich {
-            stroke:red;
-        }
+        #alice { stroke: pink; }
+        #bob { stroke: blue; }
+        #charles { stroke: red; }
     ]]>
   </style>
-    <circle cx="8.333" cy="5.556" r="5.556" style="fill:none; stroke-width:0.5" id="me" class="Charlotte person"/><line x1="8.333" y1="11.111" x2="8.333" y2="30.556" id="me" class="Charlotte person"/><line x1="0" y1="16.667" x2="16.667" y2="16.667" id="me" class="Charlotte person"/><line x1="8.333" y1="30.556" x2="0" y2="50" id="me" class="Charlotte person"/><line x1="8.333" y1="30.556" x2="16.667" y2="50" id="me" class="Charlotte person"/>
-    <circle cx="108.333" cy="55.556" r="5.556" style="fill:none; stroke-width:0.5" id="Ben" class="Ben person"/><line x1="108.333" y1="61.111" x2="108.333" y2="80.556" id="Ben" class="Ben person"/><line x1="100" y1="66.667" x2="116.667" y2="66.667" id="Ben" class="Ben person"/><line x1="108.333" y1="80.556" x2="100" y2="100" id="Ben" class="Ben person"/><line x1="108.333" y1="80.556" x2="116.667" y2="100" id="Ben" class="Ben person"/>
-    <circle cx="183.333" cy="30.556" r="5.556" style="fill:none; stroke-width:0.5" id="Rich" class="Rich person"/><line x1="183.333" y1="36.111" x2="183.333" y2="55.556" id="Rich" class="Rich person"/><line x1="175" y1="41.667" x2="191.667" y2="41.667" id="Rich" class="Rich person"/><line x1="183.333" y1="55.556" x2="175" y2="75" id="Rich" class="Rich person"/><line x1="183.333" y1="55.556" x2="191.667" y2="75" id="Rich" class="Rich person"/>
-    <line x1="8.333" y1="25" x2="108.333" y2="75" marker-start="url(#arrow)"/>
-    <line x1="183.333" y1="50" x2="8.333" y2="25" marker-start="url(#arrow)"/>
-    <line x1="108.333" y1="75" x2="183.333" y2="50" marker-start="url(#arrow)"/>
+    <path d="M 0 26.667 h 20
+    M 10 20 v 20
+    M 0 60 l 10 -20 10 20
+    M 10 0
+    A 10 10 0 1 0 10 20
+    A 10 10 0 1 0 10 0
+    " id="alice" class="person"/>
+    <path d="M 150 26.667 h 20
+    M 160 20 v 20
+    M 150 60 l 10 -20 10 20
+    M 160 0
+    A 10 10 0 1 0 160 20
+    A 10 10 0 1 0 160 0
+    " id="bob" class="person"/>
+    <path d="M 75 76.667 h 20
+    M 85 70 v 20
+    M 75 110 l 10 -20 10 20
+    M 85 50
+    A 10 10 0 1 0 85 70
+    A 10 10 0 1 0 85 50
+    " id="charles" class="person"/>
+
+    <line x1="10" y1="30" x2="160" y2="30" class="d-arrow"/>
+    <line x1="85" y1="80" x2="10" y2="30" class="d-arrow"/>
+    <line x1="160" y1="30" x2="85" y2="80" class="d-arrow"/>
 </svg>

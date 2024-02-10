@@ -11,11 +11,21 @@ Variable names are case-sensitive; `abc` and `Abc` are two different variables.
 
 ### Variable references
 
-Variable values are introduced with the `$` symbol.
+Variable references are introduced with the `$` symbol.
+
 `$abc` in an attribute value will be replaced with the content of the variable `abc`, assuming it exists.
 An alternative format using braces may be used to avoid ambiguous variable references,
 e.g. if `var` is defined as `1`, `${var}0` will expand to `10` (in non-[arithmetic](#arithmetic) contexts),
-where `$var0` would be a reference to the non-existent `var0` variable.
+whereas `$var0` would be a reference to the (perhaps non-existent) `var0` variable.
+
+While there is only a single global namespaces for variables, lookups are first done on the current element's attributes (unless the current element is a `<var>` element, see note below).
+For example if an element defines has an `id="thing"` attribute, this may be referenced in the element's `text` attribute, as `text="Current element 'id' is: $id"`.
+
+These "attribute locals" shadow global variables, but do not modify them.
+
+> Note that in the context of the [`reuse`](elements#reuse) element, the attributes of the `<reuse>` element itself provide the local attribute values, rather than the target element.
+
+> Note that as an exception, the [`var`](elements#var) element does not provide access to its attributes as locals, as that would cause infinite recursion when redefining a variable in terms of itself.
 
 ### Variable definition
 
@@ -29,7 +39,6 @@ Example - increment `var1`
 ```xml
 <var var1="{{${var1} + 1}}" />
 ```
-
 
 ## Arithmetic
 

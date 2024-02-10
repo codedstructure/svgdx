@@ -1,0 +1,34 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50mm" height="46mm" viewBox="5 7 50 46">
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+  ]]>
+  </style>
+  <!-- Draw a 'pipeline' shape using a path element -->
+  <style>
+    .coin { fill: gold; stroke: silver; }
+  </style>
+
+  <path d="M 10 12.5
+      a 5 2.5 0 0 0 10 0
+      a 5 2.5 0 0 0 -10 0
+      v 35
+      a 5 2.5 0 0 0 10 0
+      v -35" style="fill:red" class="pipeline"/>
+
+  <path d="M 30 15
+      a 10 5 0 0 0 20 0
+      a 10 5 0 0 0 -20 0
+      v 3
+      a 10 5 0 0 0 20 0
+      v -3" class="coin pipeline"/>
+
+  <path d="M 30 30
+      a 10 5 0 0 0 20 0
+      a 10 5 0 0 0 -20 0
+      v 10
+      a 10 5 0 0 0 20 0
+      v -10" style="stroke-width: 0.1; fill: limegreen;" class="pipeline"/>
+</svg>

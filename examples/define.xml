@@ -1,11 +1,11 @@
 <svg>
- <var h="10" x="0"/>
+ <var h="10" xpos="0"/>
 
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
- <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
- <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
- <var h="{{$h * 2}}" x="{{$x + 1}}"/>
- <rect xy="{{10*$x}} -$h" wh="10 $h" text="{{$x}}\n:\n{{$h / 10}}"/>
+ <rect xy="{{10*$xpos}} -$h" wh="10 $h" text="{{$xpos}}\n:\n{{$h / 10}}"/>
+ <var h="{{$h * 2}}" xpos="{{$xpos + 1}}"/>
+ <rect xy="{{10*$xpos}} -$h" wh="10 $h" text="{{$xpos}}\n:\n{{$h / 10}}"/>
+ <var h="{{$h * 2}}" xpos="{{$xpos + 1}}"/>
+ <rect xy="{{10*$xpos}} -$h" wh="10 $h" text="{{$xpos}}\n:\n{{$h / 10}}"/>
+ <var h="{{$h * 2}}" xpos="{{$xpos + 1}}"/>
+ <rect xy="{{10*$xpos}} -$h" wh="10 $h" text="{{$xpos}}\n:\n{{$h / 10}}"/>
 </svg>

@@ -32,3 +32,44 @@ This element allows one or more variables to be set. These values can be referen
 Variables are set using a `varname="value"` attribute pair, and multiple variables can be set in a single `<var>` element.
 
 Note the `value` is considered to be an expressions, so variables can be set based on the value of other (or the same) variable.
+
+### `specs`
+
+This is a container element; the contents of it are not transferred to the rendered output, but may be referenced by other elements,
+in particular the `reuse` element.
+
+The element is analogous to SVG's `<defs>` element, in that "The ‘[specs]’ element is a container element for referenced elements ...
+Elements that are descendants of a ‘[specs]’ are not rendered directly" [ref](https://www.w3.org/TR/SVG11/struct.html#DefsElement).
+The difference is that `<defs>` remain in the document (and therefore DOM) at render time; `<specs>` do not.
+
+Elements within a `<specs>` section should generally have an `id` attribute so they can be referenced, otherwise they will have no effect on the rendered document.
+
+Note that `<specs>` elements may not be nested.
+
+### `reuse`
+
+The `<reuse>` element is analogous to SVG's `<use>` element, in that it takes an `href` attribute referring to another element.
+The difference is that where a `<use>` element will remain as-is in the rendered output, the `<reuse>` element is _replaced_ by the referenced element.
+
+Typically this is used to refer to elements defined in the `<specs>` section of the document, using a `href` attribute analogous to the `<use>` element.
+(Note there should _not_ be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
+
+The `style` attribute of the `<reuse>` element is applied to the rendered output, as are any classes defined for the element.
+Any `id` attribute of the `<reuse>` element is also applied to the rendered output element, and the target `id` becomes a new `class` entry.
+
+For example:
+
+```xml
+<specs>
+  <rect id="square" x="$x" y="$y" width="$size" height="$size"/>
+</specs>
+<reuse id="base" href="#square" x="0" y="0" size="10" class="thing"/>
+```
+
+will result in the following rendered output:
+
+```xml
+<rect id="base" x="0" y="0" width="10" height="10" class="thing square"/>
+```
+
+Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).

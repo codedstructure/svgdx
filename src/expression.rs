@@ -138,7 +138,7 @@ impl<'a> EvalState<'a> {
     fn lookup(&self, v: &str) -> Result<f32> {
         self.context
             .get_var(v)
-            .and_then(|t| evaluate(tokenize(t).ok()?, self.context).ok())
+            .and_then(|t| evaluate(tokenize(&t).ok()?, self.context).ok())
             .context("Could not evaluate variable")
     }
 
@@ -276,7 +276,7 @@ pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
             });
             context
                 .get_var(cap.as_str())
-                .unwrap_or(&inner.as_str().to_string())
+                .unwrap_or(inner.as_str().to_string())
                 .to_string()
         }
     });
@@ -318,6 +318,8 @@ pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
 
 #[cfg(test)]
 mod tests {
+    use crate::element::SvgElement;
+
     use super::*;
 
     #[test]
@@ -349,6 +351,21 @@ mod tests {
             eval_vars(r"Created in ${this_year} by ${me}", &ctx),
             "Created in 2023 by Ben"
         );
+
+        // Check attributes as locals
+        ctx.set_current_element(&SvgElement::new(
+            "rect",
+            &[
+                ("width".to_string(), "3".to_string()),
+                ("height".to_string(), "4".to_string()),
+                // Check this overrides the 'global' variables
+                ("this_year".to_string(), "2024".to_string()),
+            ],
+        ));
+        assert_eq!(
+            eval_vars("$this_year: $width.$one$height", &ctx),
+            "2024: 3.14"
+        )
     }
 
     #[test]
