@@ -1,5 +1,4 @@
 use crate::connector::{ConnectionType, Connector};
-use crate::custom::process_custom;
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
@@ -56,13 +55,22 @@ impl TransformerContext {
     }
 
     pub fn set_current_element(&mut self, el: &SvgElement) {
-        self.current_element = Some(el.clone())
+        self.current_element = Some(el.clone());
     }
 
     pub fn get_var(&self, name: &str) -> Option<String> {
         self.current_element
             .as_ref()
-            .and_then(|el| el.get_attr(name))
+            .and_then(|el| {
+                if el.name == "var" {
+                    // `var` is special - its attributes are targets, so can't
+                    // also be used for lookup or `x="$x * 2"` type expressions
+                    // would fail.
+                    None
+                } else {
+                    el.get_attr(name)
+                }
+            })
             .or_else(|| self.variables.get(name).cloned())
     }
 
@@ -278,12 +286,6 @@ impl TransformerContext {
                 }
             }
             omit = true;
-        }
-
-        if let Some((prev_elem, custom_events)) = process_custom(&e, empty)? {
-            omit = true;
-            prev_element = Some(prev_elem);
-            events.extend(custom_events);
         }
 
         if !omit {
@@ -572,7 +574,15 @@ impl Transformer {
                         // the referenced element will have an `id` attribute (which it was
                         // referenced by) but the new instance should not have this to avoid
                         // multiple elements with the same id.
-                        instance_element.pop_attr("id");
+                        // However we *do* want the instance element to inherit any `id` which
+                        // was on the `reuse` element.
+                        let ref_id = instance_element
+                            .pop_attr("id")
+                            .context("referenced element should have id")?;
+                        if let Some(inst_id) = event_element.pop_attr("id") {
+                            instance_element.add_attr("id", &inst_id);
+                            self.context.update_element(&event_element);
+                        }
                         // the instanced element should have the same indent as the original
                         // `reuse` element, as well as inherit `style` and `class` values.
                         instance_element.set_indent(target_indent);
@@ -580,6 +590,7 @@ impl Transformer {
                             instance_element.add_attr("style", &inst_style);
                         }
                         instance_element.add_classes(&event_element.classes);
+                        instance_element.add_class(&ref_id);
                         event_element = instance_element;
                     }
                     let mut repeat = if in_specs { 0 } else { 1 };
@@ -622,10 +633,7 @@ impl Transformer {
                     }
                 }
                 Event::End(e) => {
-                    let mut ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
-                    if ee_name.as_str() == "tbox" {
-                        ee_name = String::from("text");
-                    }
+                    let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     if ee_name.as_str() == "specs" {
                         in_specs = false;
                         discard_next_text = true;

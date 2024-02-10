@@ -42,7 +42,6 @@ use std::{
 use tempfile::NamedTempFile;
 
 mod connector;
-mod custom;
 mod element;
 mod expression;
 mod path;

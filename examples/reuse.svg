@@ -16,19 +16,19 @@
       a 5 2.5 0 0 0 -10 0
       v 35
       a 5 2.5 0 0 0 10 0
-      v -35" style="fill:red"/>
+      v -35" style="fill:red" class="pipeline"/>
 
   <path d="M 30 15
       a 10 5 0 0 0 20 0
       a 10 5 0 0 0 -20 0
       v 3
       a 10 5 0 0 0 20 0
-      v -3" class="coin"/>
+      v -3" class="coin pipeline"/>
 
   <path d="M 30 30
       a 10 5 0 0 0 20 0
       a 10 5 0 0 0 -20 0
       v 10
       a 10 5 0 0 0 20 0
-      v -10" style="stroke-width: 0.1; fill: limegreen;"/>
+      v -10" style="stroke-width: 0.1; fill: limegreen;" class="pipeline"/>
 </svg>

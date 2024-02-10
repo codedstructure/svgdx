@@ -162,7 +162,7 @@ impl SvgElement {
         // these to be set to have a bounding box.
         let zstr = "0".to_owned();
         match self.name.as_str() {
-            "rect" | "tbox" | "pipeline" => {
+            "rect" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
                     let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
                     let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
@@ -243,20 +243,6 @@ impl SvgElement {
                     let rx = strp(rx)?;
                     let ry = strp(ry)?;
                     Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))
-                } else {
-                    Ok(None)
-                }
-            }
-            "person" => {
-                if let (Some(x), Some(y), Some(h)) = (
-                    self.attrs.get("x"),
-                    self.attrs.get("y"),
-                    self.attrs.get("height"),
-                ) {
-                    let x = strp(x)?;
-                    let y = strp(y)?;
-                    let h = strp(h)?;
-                    Ok(Some(BoundingBox::new(x, y, x + h / 3., y + h)))
                 } else {
                     Ok(None)
                 }
@@ -658,7 +644,7 @@ impl SvgElement {
             // attribute totally determines the resulting value(s).
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
-                ("xy", "text" | "rect" | "pipeline") => {
+                ("xy", "text" | "rect") => {
                     new_attrs.insert("x", parts.next().expect("cycle"));
                     new_attrs.insert("y", parts.next().expect("cycle"));
                 }
@@ -694,7 +680,7 @@ impl SvgElement {
             for (key, value) in new_attrs.clone() {
                 let mut parts = attr_split_cycle(&value);
                 match (key.as_str(), self.name.as_str()) {
-                    ("cxy", "rect" | "tbox" | "pipeline") => {
+                    ("cxy", "rect") => {
                         // Requires width / height to be specified in order to evaluate
                         // the centre point.
                         // TODO: also support specifying other attributes; xy+cxy should be sufficient

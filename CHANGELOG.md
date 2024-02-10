@@ -7,8 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Support for `<specs>` and `<reuse>` custom elements to allow templating of
+- Changed: Removed the custom elements `<tbox>`, `<person>` and `<pipeline>`,
+  since these are now better implemented with `<specs>` and `<reuse>`.
+  The `person` and `pipeline` examples have been updated to use the new `<reuse>`
+  templating approach.
+
+- Added: Support for `<specs>` and `<reuse>` custom elements to allow templating of
   elements in the rendered document.
+
+- Changed: Variable lookups now first reference attributes of the input element
+  (provided this is not a `<vars>` element) before checking the global namespace.
+  This is particularly useful in conjunction with the `<reuse>` element to provide
+  'custom element'-like behaviour.
 
 ## [0.4.2 - 2024-02-04]
 

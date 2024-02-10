@@ -55,5 +55,21 @@ Typically this is used to refer to elements defined in the `<specs>` section of 
 (Note there should _not_ be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
 
 The `style` attribute of the `<reuse>` element is applied to the rendered output, as are any classes defined for the element.
+Any `id` attribute of the `<reuse>` element is also applied to the rendered output element, and the target `id` becomes a new `class` entry.
+
+For example:
+
+```xml
+<specs>
+  <rect id="square" x="$x" y="$y" width="$size" height="$size"/>
+</specs>
+<reuse id="base" href="#square" x="0" y="0" size="10" class="thing"/>
+```
+
+will result in the following rendered output:
+
+```xml
+<rect id="base" x="0" y="0" width="10" height="10" class="thing square"/>
+```
 
 Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).
