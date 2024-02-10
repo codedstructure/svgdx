@@ -497,7 +497,7 @@ impl Transformer {
 
         let mut defer_next_text = false;
         let mut discard_next_text = false;
-        let mut in_spec = false;
+        let mut in_specs = false;
 
         'ev: for (idx, ev, pos, indent) in seq {
             match ev {
@@ -512,11 +512,11 @@ impl Transformer {
                         continue;
                     }
 
-                    if event_element.name == "spec" && !is_empty {
-                        if in_spec {
-                            bail!("Cannot nest <spec> elements");
+                    if event_element.name == "specs" && !is_empty {
+                        if in_specs {
+                            bail!("Cannot nest <specs> elements");
                         }
-                        in_spec = true;
+                        in_specs = true;
                     }
 
                     event_element.set_indent(indent);
@@ -569,7 +569,7 @@ impl Transformer {
                         instance_element.add_classes(&event_element.classes);
                         event_element = instance_element;
                     }
-                    let mut repeat = if in_spec { 0 } else { 1 };
+                    let mut repeat = if in_specs { 0 } else { 1 };
                     if let Some(rep_count) = event_element.pop_attr("repeat") {
                         if is_empty {
                             repeat = rep_count.parse().unwrap_or(1);
@@ -612,8 +612,8 @@ impl Transformer {
                     if ee_name.as_str() == "tbox" {
                         ee_name = String::from("text");
                     }
-                    if ee_name.as_str() == "spec" {
-                        in_spec = false;
+                    if ee_name.as_str() == "specs" {
+                        in_specs = false;
                         discard_next_text = true;
                         continue;
                     } else {
@@ -626,7 +626,7 @@ impl Transformer {
                         discard_next_text = false;
                         continue;
                     }
-                    if !in_spec {
+                    if !in_specs {
                         if defer_next_text {
                             remain.push((idx, ev, pos, indent));
                         } else {

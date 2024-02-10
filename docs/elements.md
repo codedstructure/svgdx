@@ -33,21 +33,25 @@ Variables are set using a `varname="value"` attribute pair, and multiple variabl
 
 Note the `value` is considered to be an expressions, so variables can be set based on the value of other (or the same) variable.
 
-### `spec`
+### `specs`
 
 This is a container element; the contents of it are not transferred to the rendered output, but may be referenced by other elements,
 in particular the `reuse` element.
 
-Elements within a `<spec>` section should generally have an `id` attribute so they can be referenced, otherwise they will have no effect on the rendered document.
+The element is analogous to SVG's `<defs>` element, in that "The ‘[specs]’ element is a container element for referenced elements ...
+Elements that are descendants of a ‘[specs]’ are not rendered directly" [ref](https://www.w3.org/TR/SVG11/struct.html#DefsElement).
+The difference is that `<defs>` remain in the document (and therefore DOM) at render time; `<specs>` do not.
 
-Note that `<spec>` elements may not be nested.
+Elements within a `<specs>` section should generally have an `id` attribute so they can be referenced, otherwise they will have no effect on the rendered document.
+
+Note that `<specs>` elements may not be nested.
 
 ### `reuse`
 
 The `<reuse>` element is analogous to SVG's `<use>` element, in that it takes an `href` attribute referring to another element.
-The difference is that where a `<use>` element will remain as-is in the rendered output, the `<reuse>` element is replaced by the referenced element.
+The difference is that where a `<use>` element will remain as-is in the rendered output, the `<reuse>` element is _replaced_ by the referenced element.
 
-Typically this is used to refer to elements defined in the `<spec>` section of the document, using a `href` attribute analogous to the `<use>` element.
-(Note there should not be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
+Typically this is used to refer to elements defined in the `<specs>` section of the document, using a `href` attribute analogous to the `<use>` element.
+(Note there should _not_ be an `xlink:` namespace prefix on the `href` attribute of `<reuse>` elements).
 
 The `style` attribute of the `<reuse>` element is applied to the rendered output, as are any classes defined for the element.

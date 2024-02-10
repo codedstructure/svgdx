@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-- Support for `<spec>` and `<reuse>` custom elements to allow templating of
+- Support for `<specs>` and `<reuse>` custom elements to allow templating of
   elements in the rendered document.
 
 ## [0.4.2 - 2024-02-04]
