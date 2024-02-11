@@ -69,6 +69,8 @@ pub struct TransformConfig {
     pub add_auto_defs: bool,
     /// Background colour (default "none")
     pub background: String,
+    /// Random seed
+    pub seed: u64,
 }
 
 impl Default for TransformConfig {
@@ -79,6 +81,7 @@ impl Default for TransformConfig {
             border: 5,
             add_auto_defs: true,
             background: "none".to_owned(),
+            seed: 0,
         }
     }
 }
@@ -192,6 +195,10 @@ struct Arguments {
     /// Default background colour if auto-styles are active
     #[arg(long, default_value = "none")]
     background: String,
+
+    /// Seed for RNG functions, default 0
+    #[arg(long, default_value = "0")]
+    seed: u64,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -246,6 +253,7 @@ impl Config {
                 border: args.border,
                 add_auto_defs: !args.no_auto_style,
                 background: args.background,
+                seed: args.seed,
             },
         })
     }

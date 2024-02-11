@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   This is particularly useful in conjunction with the `<reuse>` element to provide
   'custom element'-like behaviour.
 
+- Added: a bunch of builtin functions for expressions, including basics such as min,
+  max, and abs, trignometric functions, and random number generation. See the
+  [function documentation](docs/expressions.md#built-in-functions) for a full list.
+
+- Added: a `--seed` command-line argument (and `<config seed="...">` setting) to
+  initialise the random number generation for the `random()` and `randint()` functions.
+
 ## [0.4.2 - 2024-02-04]
 
 - Added: initial support for `<path>` bounding boxes. Note this currently ignores

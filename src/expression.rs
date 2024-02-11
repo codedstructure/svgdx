@@ -1,11 +1,89 @@
 /// Recursive descent expression parser
 use lazy_regex::regex;
+use rand::Rng;
 use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
 use crate::transform::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
+
+#[derive(Clone, PartialEq)]
+enum Function {
+    /// abs(x) - absolute value of x
+    Abs,
+    /// ceil(x) - ceiling of x
+    Ceil,
+    /// floor(x) - floor of x
+    Floor,
+    /// fract(x) - fractional part of x
+    Fract,
+    /// sign(x) - -1 for x < 0, 0 for x == 0, 1 for x > 0
+    Sign,
+    /// sqrt(x) - square root of x
+    Sqrt,
+    /// log(x) - (natural) log of x
+    Log,
+    /// exp(x) - raise e to the power of x
+    Exp,
+    /// pow(x, y) - raise x to the power of y
+    Pow,
+    /// sin(x) - sine of x (x in degrees)
+    Sin,
+    /// cos(x) - cosine of x (x in degrees)
+    Cos,
+    /// tan(x) - tangent of x (x in degrees)
+    Tan,
+    /// asin(x) - arcsine of x degrees
+    Asin,
+    /// acos(x) - arccosine of x in degrees
+    Acos,
+    /// atan(x) - arctangent of x in degrees
+    Atan,
+    /// random() - generate uniform random number in range 0..1
+    Random,
+    /// randint(min, max) - generate uniform random integer in range min..max
+    RandInt,
+    /// min(a, b) - minimum of two values
+    Min,
+    /// max(a, b) - maximum of two values
+    Max,
+    /// clamp(x, min, max) - return x, clamped between min and max
+    Clamp,
+    /// mix(start, end, amount) - linear interpolation between start and end
+    Mix,
+}
+
+impl TryFrom<&str> for Function {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> std::prelude::v1::Result<Self, Self::Error> {
+        Ok(match value {
+            "abs" => Self::Abs,
+            "ceil" => Self::Ceil,
+            "floor" => Self::Floor,
+            "fract" => Self::Fract,
+            "sign" => Self::Sign,
+            "sqrt" => Self::Sqrt,
+            "log" => Self::Log,
+            "exp" => Self::Exp,
+            "pow" => Self::Pow,
+            "sin" => Self::Sin,
+            "cos" => Self::Cos,
+            "tan" => Self::Tan,
+            "asin" => Self::Asin,
+            "acos" => Self::Acos,
+            "atan" => Self::Atan,
+            "random" => Self::Random,
+            "randint" => Self::RandInt,
+            "min" => Self::Min,
+            "max" => Self::Max,
+            "clamp" => Self::Clamp,
+            "mix" => Self::Mix,
+            _ => bail!("Unknown function"),
+        })
+    }
+}
 
 #[derive(Clone, PartialEq)]
 enum Token {
@@ -15,10 +93,14 @@ enum Token {
     Var(String),
     /// Reference to an element-derived value, beginning with '#'
     ElementRef(String),
+    /// A function reference
+    FnRef(Function),
     /// A literal '('
     OpenParen,
     /// A literal ')'
     CloseParen,
+    /// A literal ',' - used for separating function arguments
+    Comma,
     /// A literal '+' for addition
     Add,
     /// A literal '-' for subtraction or unary minus
@@ -58,12 +140,14 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         }
     } else if input.starts_with('#') {
         Ok(Token::ElementRef(input.to_owned()))
+    } else if let Ok(func) = Function::try_from(input) {
+        Ok(Token::FnRef(func))
     } else {
         input
             .parse::<f32>()
             .ok()
             .map(Token::Number)
-            .context("Invalid number")
+            .with_context(|| format!("Invalid number or function '{input}"))
     }
 }
 
@@ -80,6 +164,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             '*' => Token::Mul,
             '/' => Token::Div,
             '%' => Token::Mod,
+            ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
             _ => Token::Other,
         };
@@ -133,6 +218,15 @@ impl<'a> EvalState<'a> {
 
     fn advance(&mut self) {
         self.index += 1;
+    }
+
+    fn require(&mut self, token: Token) -> Result<()> {
+        if self.peek() == Some(token) {
+            self.advance();
+            Ok(())
+        } else {
+            bail!("Expected token not matched")
+        }
     }
 
     fn lookup(&self, v: &str) -> Result<f32> {
@@ -238,9 +332,7 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
         Some(Token::ElementRef(v)) => eval_state.element_ref(&v),
         Some(Token::OpenParen) => {
             let e = expr(eval_state)?;
-            if eval_state.next() != Some(Token::CloseParen) {
-                bail!("Expected closing parenthesis");
-            }
+            eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
         Some(Token::Sub) => match eval_state.peek() {
@@ -249,6 +341,87 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
             }
             _ => bail!("Invalid unary minus"),
         },
+        Some(Token::FnRef(fun)) => {
+            eval_state.require(Token::OpenParen)?;
+            let e = match fun {
+                Function::Abs => expr(eval_state)?.abs(),
+                Function::Ceil => expr(eval_state)?.ceil(),
+                Function::Floor => expr(eval_state)?.floor(),
+                Function::Fract => expr(eval_state)?.fract(),
+                Function::Sign => {
+                    // Can't just use signum since it returns +1 for
+                    // input of (positive) zero.
+                    let e = expr(eval_state)?;
+                    if e == 0. {
+                        0.
+                    } else {
+                        e.signum()
+                    }
+                }
+                Function::Sqrt => expr(eval_state)?.sqrt(),
+                Function::Log => expr(eval_state)?.ln(),
+                Function::Exp => expr(eval_state)?.exp(),
+                Function::Pow => {
+                    let x = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let y = expr(eval_state)?;
+                    x.powf(y)
+                }
+                Function::Sin => expr(eval_state)?.to_radians().sin(),
+                Function::Cos => expr(eval_state)?.to_radians().cos(),
+                Function::Tan => expr(eval_state)?.to_radians().tan(),
+                Function::Asin => expr(eval_state)?.asin().to_degrees(),
+                Function::Acos => expr(eval_state)?.acos().to_degrees(),
+                Function::Atan => expr(eval_state)?.atan().to_degrees(),
+                Function::Random => eval_state.context.get_rng().borrow_mut().gen::<f32>(),
+                Function::RandInt => {
+                    let min = expr(eval_state)? as i32;
+                    eval_state.require(Token::Comma)?;
+                    let max = expr(eval_state)? as i32;
+                    if min > max {
+                        bail!("randint(min, max) - `min` must be <= `max`");
+                    }
+                    eval_state
+                        .context
+                        .get_rng()
+                        .borrow_mut()
+                        .gen_range(min..=max) as f32
+                }
+                Function::Max => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    a.max(b)
+                }
+                Function::Min => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    a.min(b)
+                }
+                Function::Clamp => {
+                    let x = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let min = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let max = expr(eval_state)?;
+                    if min > max {
+                        bail!("clamp(x, min, max) - `min` must be <= `max`");
+                    }
+                    x.clamp(min, max)
+                }
+                Function::Mix => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let c = expr(eval_state)?;
+                    a * (1. - c) + b * c
+                }
+            };
+            eval_state.require(Token::CloseParen)?;
+            Ok(e)
+        }
         _ => bail!("Invalid token in factor()"),
     }
 }
@@ -319,12 +492,13 @@ pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
 #[cfg(test)]
 mod tests {
     use crate::element::SvgElement;
+    use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
 
     use super::*;
 
     #[test]
     fn test_eval_var() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
@@ -370,7 +544,7 @@ mod tests {
 
     #[test]
     fn test_valid_expressions() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("pi", "3.1415927"),
             ("tau", "(2. * $pi)"),
@@ -393,9 +567,150 @@ mod tests {
             ("-${pi}*-100.", Some(314.15927_f32)),
             ("${tau} - 6", Some(0.28318548)),
             ("0.125 * $mega", Some(125000.)),
+            ("abs(1)", Some(1.)),
+            ("abs(-1)", Some(1.)),
+            ("30 * abs((3 - 4) * 2) + 3", Some(63.)),
+            ("min($kilo, $mega)", Some(1000.)),
+            ("max($kilo, $mega)", Some(1000000.)),
+            ("min($mega, abs($kilo * 1.5))", Some(1500.)),
+            ("max($mega * 3, $kilo)", Some(3000000.)),
+            ("mix(10, 100, 0.5)", Some(55.)),
+            ("mix(-10, 30, 0.25)", Some(0.)),
+            ("mix(-10, 30, 0.75)", Some(20.)),
+            ("mix(-10, 30, 0)", Some(-10.)),
+            ("mix(-10, 30, 1)", Some(30.)),
+            ("mix(-10, 30, 10)", Some(390.)),
         ] {
             assert_eq!(evaluate(tokenize(expr).expect("test"), &ctx).ok(), expected);
         }
+    }
+
+    #[test]
+    fn test_func_simple() {
+        let mut ctx = TransformerContext::new();
+        for (name, value) in [("kilo", "1000"), ("mega", "($kilo * $kilo)")] {
+            ctx.set_var(name, value);
+        }
+        for (expr, expected) in [
+            ("abs(1)", 1.),
+            ("abs(-1)", 1.),
+            ("30 * abs((3 - 4) * 2) + 3", 63.),
+            ("min($kilo, $mega)", 1000.),
+            ("max($kilo, $mega)", 1000000.),
+            ("min($mega, abs($kilo * 1.5))", 1500.),
+            ("max($mega * 3, $kilo)", 3000000.),
+            ("mix(10, 100, 0.5)", 55.),
+            ("mix(-10, 30, 0.25)", 0.),
+            ("mix(-10, 30, 0.75)", 20.),
+            ("mix(-10, 30, 0)", -10.),
+            ("mix(-10, 30, 1)", 30.),
+            ("mix(-10, 30, 10)", 390.),
+            ("clamp(30, -10, 20)", 20.),
+            ("clamp(-30, -10, 20)", -10.),
+            ("ceil(-2.5)", -2.),
+            ("ceil(2.5)", 3.),
+            ("floor(-2.5)", -3.),
+            ("floor(2.5)", 2.),
+            ("fract(2.75)", 0.75),
+            ("fract(-2.75)", -0.75),
+            ("sign(-2.75)", -1.),
+            ("sign(0.75)", 1.),
+            ("sign(0)", 0.),
+            ("sqrt(81)", 9.),
+            ("sqrt(2)", std::f32::consts::SQRT_2),
+            ("log(1000) / log(10)", 3.),
+            ("log(4096) / log(2)", 12.),
+            ("log(exp(1))", 1.),
+            ("exp(1)", std::f32::consts::E),
+            ("pow(2, 10)", 1024.),
+            ("pow(2, -1)", 0.5),
+            ("pow(9, 0.5)", 3.),
+        ] {
+            assert_in_delta!(
+                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                expected,
+                0.00001
+            );
+        }
+    }
+
+    #[test]
+    fn test_func_trig() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("sin(0)", 0.),
+            ("sin(45)", 2_f32.sqrt() / 2.),
+            ("sin(90)", 1.),
+            ("cos(0)", 1.),
+            ("cos(30)", 3_f32.sqrt() / 2.),
+            ("cos(60)", 0.5),
+            ("cos(90)", 0.),
+            ("tan(0)", 0.),
+            ("tan(45)", 1.),
+            ("tan(60)", 3_f32.sqrt()),
+            ("asin(sin(30))", 30.),
+            ("acos(cos(30))", 30.),
+            ("atan(tan(30))", 30.),
+            ("asin(sin(60))", 60.),
+            ("acos(cos(60))", 60.),
+            ("atan(tan(60))", 60.),
+        ] {
+            assert_in_delta!(
+                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                expected,
+                0.00001
+            );
+        }
+    }
+
+    #[test]
+    fn test_func_random() {
+        // Check random() provides reasonable samples
+        let ctx = TransformerContext::new();
+        let expr = "random()";
+        let tokens = tokenize(expr).unwrap();
+        let mut count_a = 0;
+        let mut count_b = 0;
+        for counter in 0..1000 {
+            let sample = evaluate(tokens.clone(), &ctx).ok().unwrap();
+            assert!((0. ..=1.).contains(&sample));
+            if count_a == 0 && sample > 0.3 && sample < 0.35 {
+                count_a = counter;
+            }
+            if count_b == 0 && sample > 0.85 && sample < 0.9 {
+                count_b = counter;
+            }
+            if count_a != 0 && count_b != 0 {
+                break;
+            }
+        }
+        assert_ne!(count_a, 0);
+        assert_lt!(count_a, 100);
+        assert_ne!(count_b, 0);
+        assert_lt!(count_b, 100);
+
+        // Check randint hits different values
+        let expr = "randint(1, 6)";
+        let tokens = tokenize(expr).unwrap();
+        let mut count_a = 0;
+        let mut count_b = 0;
+        for counter in 0..1000 {
+            let sample = evaluate(tokens.clone(), &ctx).ok().unwrap();
+            assert!((1. ..=6.).contains(&sample));
+            if count_a == 0 && sample == 1. {
+                count_a = counter;
+            }
+            if count_b == 0 && sample == 6. {
+                count_b = counter;
+            }
+            if count_a != 0 && count_b != 0 {
+                break;
+            }
+        }
+        assert_ne!(count_a, 0);
+        assert_lt!(count_a, 100);
+        assert_ne!(count_b, 0);
+        assert_lt!(count_b, 100);
     }
 
     #[test]
@@ -429,7 +744,7 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         ctx.set_var("numbers", "20 40");
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
             assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
@@ -453,11 +768,7 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate(
-                    tokenize(expr).expect("test"),
-                    &TransformerContext::default(),
-                )
-                .ok(),
+                evaluate(tokenize(expr).expect("test"), &TransformerContext::new(),).ok(),
                 expected
             );
         }
@@ -465,7 +776,7 @@ mod tests {
 
     #[test]
     fn test_eval_attr() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),

@@ -48,10 +48,42 @@ Expressions may include the following. Note these are listed in order of precede
 * Numbers, including floating point and negative numbers. Internally numbers are stored with at least IEEE 754 single-precision floats, but exact precision and range are not part of this spec.
 * Variable references of the form `$var` or `${var}`
 * Element references, of the form `#id:v` where `id` indicates the target element and `v` is the value of that element to retrieve.
+* [function](#built-in-functions) calls, of the form `function(args)`
 * `(`, `)` - parenthesis, for increasing precedence.
 * `*`, `/`, `%` - multiply, divide, remainder. Precedence is left-to-right among these.
 * `+`, `-` - addition and subtraction. Precedence is left-to-right among these.
 
+## Built-in functions
+
+A selection of built-in functions are provided, as follows:
+
+| function | description |
+| --- | --- |
+| `abs(x)` | absolute value of x |
+| `ceil(x)` | ceiling of x |
+| `floor(x)` | floor of x |
+| `fract(x)` | fractional part of x |
+| `sign(x)` | -1 for x < 0, 0 for x == 0, 1 for x > 0 |
+| `sqrt(x)` | square root of x |
+| `log(x)` | (natural) log of x |
+| `exp(x)` | raise e to the power of x |
+| `pow(x, y)` | raise x to the power of y |
+| `sin(x)` | sine of x (x in degrees) |
+| `cos(x)` | cosine of x (x in degrees) |
+| `tan(x)` | tangent of x (x in degrees) |
+| `asin(x)` | arcsine of x degrees |
+| `acos(x)` | arccosine of x in degrees |
+| `atan(x)` | arctangent of x in degrees |
+| `random()` | generate uniform random number in range 0..1 |
+| `randint(min, max)` | generate uniform random integer in range [min, max] inclusive |
+| `min(a, b)` | minimum of two values |
+| `max(a, b)` | maximum of two values |
+| `clamp(x, min, max)` | return x, clamped between min and max |
+| `mix(start, end, amount)` | linear interpolation between start and end |
+
+Note these functions (e.g. the order of arguments in `mix` and `clamp`) are influenced by GLSL.
+
+> Unlike most programming languages, **degrees** are the unit used for trigonometric functions.
 
 ## Element references
 
