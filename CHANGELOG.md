@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0 - 2024-02-11]
+
 - Changed: Removed the custom elements `<tbox>`, `<person>` and `<pipeline>`,
   since these are now better implemented with `<specs>` and `<reuse>`.
   The `person` and `pipeline` examples have been updated to use the new `<reuse>`
