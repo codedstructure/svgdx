@@ -5,6 +5,7 @@ use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
 use crate::{element::SvgElement, TransformConfig};
 
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 
@@ -17,13 +18,16 @@ use quick_xml::writer::Writer;
 use anyhow::{bail, Context, Result};
 use lazy_regex::regex;
 
-#[derive(Default)]
+use rand::prelude::*;
+
 pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     original_map: HashMap<String, SvgElement>,
     current_element: Option<SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
+    // SmallRng is used as it is seedable.
+    rng: RefCell<SmallRng>,
 }
 
 impl TransformerContext {
@@ -34,6 +38,7 @@ impl TransformerContext {
             current_element: None,
             prev_element: None,
             variables: HashMap::new(),
+            rng: RefCell::new(SmallRng::seed_from_u64(0)),
         }
     }
 
@@ -47,6 +52,14 @@ impl TransformerContext {
 
     pub fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
         self.elem_map.get_mut(id)
+    }
+
+    pub fn get_rng(&self) -> &RefCell<SmallRng> {
+        &self.rng
+    }
+
+    pub fn seed_rng(&mut self, seed: u64) {
+        self.rng = RefCell::new(SmallRng::seed_from_u64(seed));
     }
 
     #[cfg(test)]
@@ -471,8 +484,10 @@ pub struct Transformer {
 
 impl Transformer {
     pub fn from_config(config: &TransformConfig) -> Self {
+        let mut context = TransformerContext::new();
+        context.seed_rng(config.seed);
         Self {
-            context: TransformerContext::new(),
+            context,
             config: config.to_owned(),
         }
     }
@@ -485,6 +500,10 @@ impl Transformer {
                 "add-auto-styles" => self.config.add_auto_defs = value.parse()?,
                 "border" => self.config.border = value.parse()?,
                 "background" => self.config.background = value.clone(),
+                "seed" => {
+                    self.config.seed = value.parse()?;
+                    self.context.seed_rng(self.config.seed);
+                }
                 _ => bail!("Unknown config setting {key}"),
             }
         }

@@ -1,5 +1,6 @@
 /// Recursive descent expression parser
 use lazy_regex::regex;
+use rand::Rng;
 use regex::Captures;
 
 use anyhow::{bail, Context, Result};
@@ -27,6 +28,10 @@ enum Function {
     Exp,
     /// pow(x, y) - raise x to the power of y
     Pow,
+    // random() - generate uniform random number in range 0..1
+    Random,
+    // randint(min, max) - generate uniform random integer in range min..max
+    RandInt,
     /// clamp(x, min, max) - return x, clamped between min and max
     Clamp,
     /// min(a, b) - minimum of two values
@@ -51,6 +56,8 @@ impl TryFrom<&str> for Function {
             "log" => Self::Log,
             "exp" => Self::Exp,
             "pow" => Self::Pow,
+            "random" => Self::Random,
+            "randint" => Self::RandInt,
             "clamp" => Self::Clamp,
             "min" => Self::Min,
             "max" => Self::Max,
@@ -342,6 +349,20 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
                     let y = expr(eval_state)?;
                     x.powf(y)
                 }
+                Function::Random => eval_state.context.get_rng().borrow_mut().gen::<f32>(),
+                Function::RandInt => {
+                    let min = expr(eval_state)? as i32;
+                    eval_state.require(Token::Comma)?;
+                    let max = expr(eval_state)? as i32;
+                    if min > max {
+                        bail!("randint(min, max) - `min` must be <= `max`");
+                    }
+                    eval_state
+                        .context
+                        .get_rng()
+                        .borrow_mut()
+                        .gen_range(min..max) as f32
+                }
                 Function::Clamp => {
                     let x = expr(eval_state)?;
                     eval_state.require(Token::Comma)?;
@@ -452,7 +473,7 @@ mod tests {
 
     #[test]
     fn test_eval_var() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
@@ -498,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_valid_expressions() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("pi", "3.1415927"),
             ("tau", "(2. * $pi)"),
@@ -570,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         ctx.set_var("numbers", "20 40");
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
             assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
@@ -596,7 +617,7 @@ mod tests {
             assert_eq!(
                 evaluate(
                     tokenize(expr).expect("test"),
-                    &TransformerContext::default(),
+                    &TransformerContext::new(),
                 )
                 .ok(),
                 expected
@@ -606,7 +627,7 @@ mod tests {
 
     #[test]
     fn test_eval_attr() {
-        let mut ctx = TransformerContext::default();
+        let mut ctx = TransformerContext::new();
         for (name, value) in [
             ("one", "1"),
             ("this_year", "2023"),
