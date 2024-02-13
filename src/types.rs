@@ -66,6 +66,15 @@ impl Length {
         }
     }
 
+    /// Convert a `Length` to a value, taking a base value as input
+    /// in case a ratio length is used.
+    pub fn evaluate(&self, base: f32) -> f32 {
+        match self {
+            Self::Absolute(abs) => *abs,
+            Self::Ratio(ratio) => base * ratio,
+        }
+    }
+
     /// Given a single value, update it (scale or addition) from
     /// the current Length value
     pub fn adjust(&self, value: f32) -> f32 {
@@ -327,6 +336,35 @@ impl BoundingBox {
         self
     }
 
+    /// dilate the bounding box by the given absolute amount in each direction
+    #[allow(dead_code)]
+    pub fn expand_trbl(&mut self, trbl: Trbl) -> &Self {
+        *self = Self {
+            x1: self.x1 - trbl.left,
+            y1: self.y1 - trbl.top,
+            x2: self.x2 + trbl.right,
+            y2: self.y2 + trbl.bottom,
+        };
+        self
+    }
+
+    pub fn expand_trbl_length(&mut self, trbl: TrblLength) -> &Self {
+        // NOTE: not clear if x values should use width and y values use
+        // height, or if having consistent values (as here) is better.
+        // Current approach ensures a single-valued `TrblLength`` input
+        // has a consistent border on all sides, which is probably the
+        // expectation, and matches CSS (where all %ages are in terms
+        // of inline-size - typically width - of parent element).
+        let base = self.width().max(self.height());
+        *self = Self {
+            x1: self.x1 - trbl.left.evaluate(base),
+            y1: self.y1 - trbl.top.evaluate(base),
+            x2: self.x2 + trbl.right.evaluate(base),
+            y2: self.y2 + trbl.bottom.evaluate(base),
+        };
+        self
+    }
+
     pub fn width(&self) -> f32 {
         self.x2 - self.x1
     }
@@ -367,6 +405,85 @@ impl BoundingBox {
             y2: self.y2.ceil(),
         };
         self
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TrblLength {
+    pub top: Length,
+    pub right: Length,
+    pub bottom: Length,
+    pub left: Length,
+}
+
+impl TrblLength {
+    pub fn new(top: Length, right: Length, bottom: Length, left: Length) -> Self {
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
+    }
+}
+
+impl TryFrom<&str> for TrblLength {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // convert parts to Length, fail if any conversion fails.
+        let parts: Result<Vec<_>, _> = attr_split(value).map(|v| strp_length(&v)).collect();
+        let parts = parts?;
+
+        Ok(match parts.len() {
+            1 => TrblLength::new(parts[0], parts[0], parts[0], parts[0]),
+            2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
+            3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
+            4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
+            _ => bail!("Invalid number of values"),
+        })
+    }
+}
+
+impl TryFrom<String> for TrblLength {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_ref())
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Trbl {
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+    pub left: f32,
+}
+
+impl Trbl {
+    pub fn new(top: f32, right: f32, bottom: f32, left: f32) -> Self {
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
+    }
+}
+
+impl TryFrom<&str> for Trbl {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // convert parts to f32, fail if any conversion fails.
+        let parts: Result<Vec<_>, _> = attr_split(value).map(|v| strp(&v)).collect();
+        let parts = parts?;
+
+        Ok(match parts.len() {
+            1 => Trbl::new(parts[0], parts[0], parts[0], parts[0]),
+            2 => Trbl::new(parts[0], parts[1], parts[0], parts[1]),
+            3 => Trbl::new(parts[0], parts[1], parts[2], parts[1]),
+            4 => Trbl::new(parts[0], parts[1], parts[2], parts[3]),
+            _ => bail!("Invalid number of values"),
+        })
     }
 }
 

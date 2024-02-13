@@ -2,7 +2,7 @@ use crate::connector::{ConnectionType, Connector};
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
+use crate::types::{attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, TrblLength};
 use crate::{element::SvgElement, TransformConfig};
 
 use std::cell::RefCell;
@@ -159,16 +159,10 @@ impl TransformerContext {
             let mut bbox = BoundingBox::combine(bbox_list);
 
             if let Some(margin) = e.pop_attr("margin") {
-                let mut parts = attr_split_cycle(&margin).map_while(|v| strp_length(&v).ok());
-                let mx = parts.next().context("mx from margin should be numeric")?;
-                let my = parts.next().context("my from margin should be numeric")?;
+                let margin: TrblLength = margin.try_into()?;
 
                 if let Some(bb) = &mut bbox {
-                    let bw = bb.width();
-                    let h_margin = mx.adjust(bw) - bw;
-                    let bh = bb.height();
-                    let v_margin = my.adjust(bh) - bh;
-                    bb.expand(h_margin, v_margin);
+                    bb.expand_trbl_length(margin);
                 }
             }
             if let Some(bb) = bbox {
