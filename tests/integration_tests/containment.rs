@@ -152,3 +152,62 @@ fn test_surround_connectors_permute() {
         assert_contains!(output, expected3);
     }
 }
+
+#[test]
+fn test_inside_margin() {
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="15%" />
+"##;
+    let expected = r#"<rect id="r" x="11.5" y="11.5" width="7" height="7" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="3" />
+"##;
+    let expected = r#"<rect id="r" x="13" y="13" width="4" height="4" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="3 10%" />
+"##;
+    let expected = r#"<rect id="r" x="11" y="13" width="8" height="4" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_inside_surround_invalid() {
+    // Cannot have an element with both surround and inside attributes
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" surround="#a #b" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+
+    // Cannot have an element with either surround or inside referring to a non-present id
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b #c" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" surround="#a #b #c" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+}

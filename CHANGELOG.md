@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: `margin` now takes up to 4 entries, analogous with CSS margin and padding
+  values. Previously it took either one or two entries, and with two entries the
+  first was an 'x' margin and the second a 'y' margin. Now the [CSS approach](https://developer.mozilla.org/en-US/docs/Web/CSS/Shorthand_properties#margin_and_padding_properties)
+  is used with support for separate TRBL margins.
+
+- Added: `inside` attribute, analogous to `surround` but as the intersection of
+  bounding boxes rather than their union.
+
 ## [0.5.0 - 2024-02-11]
 
 - Changed: Removed the custom elements `<tbox>`, `<person>` and `<pipeline>`,
