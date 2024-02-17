@@ -3,7 +3,7 @@ use crate::path::path_bbox;
 use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
-    EdgeSpec, Length, LocSpec,
+    EdgeSpec, Length, LocSpec, TrblLength,
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
@@ -480,36 +480,18 @@ impl SvgElement {
                 );
             }
             if let Some(ref_el) = ref_el {
-                let mut margin_x = 0.;
-                let mut margin_y = 0.;
-                if let Some(margin) = ref_el.get_attr("margin") {
-                    let mut margin_parts = attr_split_cycle(&margin);
-                    margin_x = strp(&margin_parts.next().expect("cycle"))?;
-                    margin_y = strp(&margin_parts.next().expect("cycle"))?;
-                }
-                let loc = loc.unwrap_or(default_rel);
-                margin_y = match loc {
-                    LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => -margin_y,
-                    LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight => margin_y,
-                    _ => 0.,
-                };
-                margin_x = match loc {
-                    LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => -margin_x,
-                    LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => margin_x,
-                    _ => 0.,
-                };
-
-                if let Some(bb) = ref_el.bbox()? {
+                if let Some(mut bb) = ref_el.bbox()? {
+                    if let Some(margin) = ref_el.get_attr("margin") {
+                        let margin: TrblLength = margin.try_into()?;
+                        bb.expand_trbl_length(margin);
+                    }
+                    let loc = loc.unwrap_or(default_rel);
                     let pos = if let (Ok(es), Some(len)) = (EdgeSpec::try_from(loc), len) {
                         bb.edgespec(es, len)
                     } else {
                         bb.locspec(loc)
                     };
-                    return Ok(format!(
-                        "{} {}",
-                        fstr(pos.0 + margin_x + dx),
-                        fstr(pos.1 + margin_y + dy)
-                    ));
+                    return Ok(format!("{} {}", fstr(pos.0 + dx), fstr(pos.1 + dy)));
                 }
             }
         }

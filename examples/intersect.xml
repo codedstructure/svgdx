@@ -1,0 +1,8 @@
+<svg>
+  <style>#a, #b { fill: none; stroke-width: 2; }</style>
+  <rect surround="#a #b" margin="3" class="d-fill-lime" opacity="0.2" />
+  <rect wh="50" id="a" />
+  <rect xy="15" wh="50" id="b" />
+  <rect inside="#a #b" margin="-3 2" class="d-fill-blue" opacity="0.2" />
+  <rect inside="#a #b" margin="15%" class="d-fill-red" />
+</svg>

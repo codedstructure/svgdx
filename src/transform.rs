@@ -2,7 +2,7 @@ use crate::connector::{ConnectionType, Connector};
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, strp_length, BoundingBox, LocSpec};
+use crate::types::{attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, TrblLength};
 use crate::{element::SvgElement, TransformConfig};
 
 use std::cell::RefCell;
@@ -135,48 +135,60 @@ impl TransformerContext {
         events
     }
 
-    fn handle_surround(&mut self, e: &mut SvgElement) -> Result<()> {
-        if let Some(surround_list) = e.pop_attr("surround") {
-            let mut bbox_list = vec![];
+    fn handle_containment(&mut self, e: &mut SvgElement) -> Result<()> {
+        let (surround, inside) = (e.pop_attr("surround"), e.pop_attr("inside"));
 
-            for elref in attr_split(&surround_list) {
-                let el = self
-                    .elem_map
-                    .get(
-                        elref
-                            .strip_prefix('#')
-                            .context(format!("Invalid surround value {elref}"))?,
-                    )
-                    .context("Ref lookup failed at this time")?;
-                {
-                    if let Ok(Some(el_bb)) = el.bbox() {
-                        bbox_list.push(el_bb);
-                    } else {
-                        bail!("Element #{elref} has no bounding box at this time");
-                    }
-                }
-            }
-            let mut bbox = BoundingBox::combine(bbox_list);
-
-            if let Some(margin) = e.pop_attr("margin") {
-                let mut parts = attr_split_cycle(&margin).map_while(|v| strp_length(&v).ok());
-                let mx = parts.next().context("mx from margin should be numeric")?;
-                let my = parts.next().context("my from margin should be numeric")?;
-
-                if let Some(bb) = &mut bbox {
-                    let bw = bb.width();
-                    let h_margin = mx.adjust(bw) - bw;
-                    let bh = bb.height();
-                    let v_margin = my.adjust(bh) - bh;
-                    bb.expand(h_margin, v_margin);
-                }
-            }
-            if let Some(bb) = bbox {
-                e.position_from_bbox(&bb);
-            }
-            e.add_class("d-surround");
+        if surround.is_some() && inside.is_some() {
+            bail!("Cannot have 'surround' and 'inside' on an element");
+        }
+        if surround.is_none() && inside.is_none() {
+            return Ok(());
         }
 
+        let is_surround = surround.is_some();
+        let contain_str = if is_surround { "surround" } else { "inside" };
+        let ref_list = surround.unwrap_or_else(|| inside.unwrap());
+
+        let mut bbox_list = vec![];
+
+        for elref in attr_split(&ref_list) {
+            let el = self
+                .elem_map
+                .get(
+                    elref
+                        .strip_prefix('#')
+                        .context(format!("Invalid {} value {elref}", contain_str))?,
+                )
+                .context("Ref lookup failed at this time")?;
+            {
+                if let Ok(Some(el_bb)) = el.bbox() {
+                    bbox_list.push(el_bb);
+                } else {
+                    bail!("Element #{elref} has no bounding box at this time");
+                }
+            }
+        }
+        let mut bbox = if is_surround {
+            BoundingBox::union(bbox_list)
+        } else {
+            BoundingBox::intersection(bbox_list)
+        };
+
+        if let Some(margin) = e.pop_attr("margin") {
+            let margin: TrblLength = margin.try_into()?;
+
+            if let Some(bb) = &mut bbox {
+                if is_surround {
+                    bb.expand_trbl_length(margin);
+                } else {
+                    bb.shrink_trbl_length(margin);
+                }
+            }
+        }
+        if let Some(bb) = bbox {
+            e.position_from_bbox(&bb);
+        }
+        e.add_class(&format!("d-{contain_str}"));
         Ok(())
     }
 
@@ -197,7 +209,7 @@ impl TransformerContext {
             return Ok(vec![]);
         }
         events.extend(self.handle_comments(&mut e));
-        self.handle_surround(&mut e)?;
+        self.handle_containment(&mut e)?;
 
         e.expand_attributes(self)?;
 
@@ -764,7 +776,7 @@ impl Transformer {
             }
         }
         // Expand by given border width
-        let mut extent = BoundingBox::combine(bbox_list);
+        let mut extent = BoundingBox::union(bbox_list);
         if let Some(extent) = &mut extent {
             extent.expand(self.config.border as f32, self.config.border as f32);
             extent.round();

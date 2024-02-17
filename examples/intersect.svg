@@ -1,0 +1,22 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="81mm" height="81mm" viewBox="-8 -8 81 81">
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    .d-surround { fill: none; }
+    .d-fill-blue { fill: blue; }
+    text.d-fill-blue, text.d-fill-blue * { fill: white; }
+    .d-fill-lime { fill: lime; }
+    text.d-fill-lime, text.d-fill-lime * { fill: black; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; }
+  ]]>
+  </style>
+  <style>#a, #b { fill: none; stroke-width: 2; }</style>
+  <rect opacity="0.2" x="-3" y="-3" width="71" height="71" class="d-fill-lime d-surround"/>
+  <rect width="50" height="50" id="a"/>
+  <rect x="15" y="15" width="50" height="50" id="b"/>
+  <rect opacity="0.2" x="17" y="12" width="31" height="41" class="d-fill-blue d-inside"/>
+  <rect x="20.25" y="20.25" width="24.5" height="24.5" class="d-fill-red d-inside"/>
+</svg>

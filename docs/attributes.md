@@ -76,11 +76,12 @@ Applies to: `<rect>`, `<circle>`, `<ellipse>`
 
 TODO
 
-### `surround`
+### `surround`, `inside`
 As an alternative to specifying position and size (e.g. `xy` and `wh`),
-the `surround` attribute can be given a list of element references,
-causing it to be positioned as the bounding box to those elements.
-May be used together with the [margin](#margin) attribute to visually
+the `surround` or `inside` attributes can be given a list of element
+references, causing it to be positioned at either the union (`surround`)
+or intersection (`inside`) of the bounding boxes to those elements.
+May be used together with the [`margin`](#margin) attribute to visually
 group a set of related elements.
 
 Type: [List](#lists) of [Element ref](#element-ref) items.
@@ -100,12 +101,23 @@ Example:
 meaning in isolation.
 
 Typically it represents added space / size (see also [dw / dh / dwh](#dw-dh-dwh))
-between elements.
+between or around elements.
 
-If only a single value is given it is used for both _x_ and _y_ axes; if two
-values are provided, they give the _x_ and _y_ values respectively.
+When used with `inside`, the margin is a *decrease* in the target element size
+relative to the intersection box; when used with `surround`, margin is an
+*increase* in the target element size.
 
-Type: [Expression pair](#expression-pair)
+Separate margins may be defined for each of the 'TRBL' (top, right, bottom, left)
+edges analogous to [CSS `padding` and `margin` values](https://developer.mozilla.org/en-US/docs/Web/CSS/Shorthand_properties#margin_and_padding_properties).
+
+* If a **single value** is given it is used for all 4 edges.
+* If **2 values** are given they correspond to top/bottom and left/right edges respectively.
+* If **3 values** are given, they correspond to top, left/right, bottom edges respectively.
+* If **4 values** are given, they correspond to top, right, bottom, left edges
+  (i.e. clockwise from top) respectively.
+
+Each entry in a `margin` attribute may be either a number (in user coordinates)
+or a percentage length.
 
 ## Lines and connectors
 

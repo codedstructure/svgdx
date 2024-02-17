@@ -66,6 +66,15 @@ impl Length {
         }
     }
 
+    /// Convert a `Length` to a value, taking a base value as input
+    /// in case a ratio length is used.
+    pub fn evaluate(&self, base: f32) -> f32 {
+        match self {
+            Self::Absolute(abs) => *abs,
+            Self::Ratio(ratio) => base * ratio,
+        }
+    }
+
     /// Given a single value, update it (scale or addition) from
     /// the current Length value
     pub fn adjust(&self, value: f32) -> f32 {
@@ -302,7 +311,12 @@ impl BoundingBox {
         }
     }
 
-    pub fn union(&self, other: &Self) -> Self {
+    pub fn union(bb_iter: impl IntoIterator<Item = Self>) -> Option<Self> {
+        let bb_iter = bb_iter.into_iter();
+        bb_iter.reduce(|bb1, bb2| bb1.combine(&bb2))
+    }
+
+    pub fn combine(&self, other: &Self) -> Self {
         Self::new(
             self.x1.min(other.x1),
             self.y1.min(other.y1),
@@ -311,9 +325,33 @@ impl BoundingBox {
         )
     }
 
-    pub fn combine(bb_iter: impl IntoIterator<Item = Self>) -> Option<Self> {
-        let bb_iter = bb_iter.into_iter();
-        bb_iter.reduce(|bb1, bb2| bb1.union(&bb2))
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        let result = Self::new(
+            self.x1.max(other.x1),
+            self.y1.max(other.y1),
+            self.x2.min(other.x2),
+            self.y2.min(other.y2),
+        );
+        if result.width() >= 0. && result.height() >= 0. {
+            Some(result)
+        } else {
+            None
+        }
+    }
+
+    pub fn intersection(bb_iter: impl IntoIterator<Item = Self>) -> Option<Self> {
+        // Ideally want to use `reduce()` here, but want to exit early on None,
+        // so do it long-hand.
+        let mut bb_iter = bb_iter.into_iter();
+        let mut bb = bb_iter.next();
+        while bb.is_some() {
+            if let Some(other) = bb_iter.next() {
+                bb = bb?.intersect(&other);
+            } else {
+                break;
+            }
+        }
+        bb
     }
 
     /// dilate the bounding box by the given absolute amount in each direction
@@ -323,6 +361,44 @@ impl BoundingBox {
             y1: self.y1 - exp_y,
             x2: self.x2 + exp_x,
             y2: self.y2 + exp_y,
+        };
+        self
+    }
+
+    pub fn expand_trbl_length(&mut self, trbl: TrblLength) -> &Self {
+        // NOTE: not clear if x values should use width and y values use
+        // height, or if having consistent values (as here) is better.
+        // Current approach ensures a single-valued `TrblLength`` input
+        // has a consistent border on all sides, which is probably the
+        // expectation, and matches CSS (where all %ages are in terms
+        // of inline-size - typically width - of parent element).
+        let base = self.width().max(self.height());
+        *self = Self {
+            x1: self.x1 - trbl.left.evaluate(base),
+            y1: self.y1 - trbl.top.evaluate(base),
+            x2: self.x2 + trbl.right.evaluate(base),
+            y2: self.y2 + trbl.bottom.evaluate(base),
+        };
+        self
+    }
+
+    pub fn shrink_trbl_length(&mut self, trbl: TrblLength) -> &Self {
+        // NOTE: not clear if x values should use width and y values use
+        // height, or if having consistent values (as here) is better.
+        // Current approach ensures a single-valued `TrblLength`` input
+        // has a consistent border on all sides, which is probably the
+        // expectation, and matches CSS (where all %ages are in terms
+        // of inline-size - typically width - of parent element).
+
+        // Where 'expand_trbl_length' takes the max of width / height,
+        // this takes the minimum, so shrink up to 100% still leave some
+        // box present.
+        let base = self.width().min(self.height());
+        *self = Self {
+            x1: self.x1 + trbl.left.evaluate(base),
+            y1: self.y1 + trbl.top.evaluate(base),
+            x2: self.x2 - trbl.right.evaluate(base),
+            y2: self.y2 - trbl.bottom.evaluate(base),
         };
         self
     }
@@ -367,6 +443,49 @@ impl BoundingBox {
             y2: self.y2.ceil(),
         };
         self
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct TrblLength {
+    pub top: Length,
+    pub right: Length,
+    pub bottom: Length,
+    pub left: Length,
+}
+
+impl TrblLength {
+    pub fn new(top: Length, right: Length, bottom: Length, left: Length) -> Self {
+        Self {
+            top,
+            right,
+            bottom,
+            left,
+        }
+    }
+}
+
+impl TryFrom<&str> for TrblLength {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // convert parts to Length, fail if any conversion fails.
+        let parts: Result<Vec<_>, _> = attr_split(value).map(|v| strp_length(&v)).collect();
+        let parts = parts?;
+
+        Ok(match parts.len() {
+            1 => TrblLength::new(parts[0], parts[0], parts[0], parts[0]),
+            2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
+            3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
+            4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
+            _ => bail!("Invalid number of values"),
+        })
+    }
+}
+
+impl TryFrom<String> for TrblLength {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        Self::try_from(value.as_ref())
     }
 }
 
@@ -619,8 +738,8 @@ mod test {
     #[test]
     fn test_bbox() {
         let mut bb = BoundingBox::new(10., 0., 10., 10.);
-        bb = bb.union(&BoundingBox::new(20., 10., 30., 15.));
-        bb = bb.union(&BoundingBox::new(25., 20., 25., 30.));
+        bb = bb.combine(&BoundingBox::new(20., 10., 30., 15.));
+        bb = bb.combine(&BoundingBox::new(25., 20., 25., 30.));
         assert_eq!(bb, BoundingBox::new(10., 0., 30., 30.));
 
         bb.expand(10., 10.);

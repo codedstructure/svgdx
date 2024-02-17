@@ -86,6 +86,22 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 
 [input file](surround.xml)
 
+## Intersection of shapes
+
+![](intersect.svg)
+
+[source](intersect.svg)
+
+[input file](intersect.xml)
+
+## Hierarchies and containment
+
+![](containment.svg)
+
+[source](containment.svg)
+
+[input file](containment.xml)
+
 ## Text within shapes
 
 ![](text-attr.svg)

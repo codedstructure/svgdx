@@ -45,7 +45,7 @@ fn test_surround_multi_margin() {
 <rect id="c" xy="8" wh="1" />
 <rect id="s" surround="#a #b #c" margin="1.25 3"/>
 "##;
-    let expected = r#"<rect id="s" x="-1.25" y="-3" width="11.5" height="18" class="d-surround"/>"#;
+    let expected = r#"<rect id="s" x="-3" y="-1.25" width="15" height="14.5" class="d-surround"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -55,7 +55,7 @@ fn test_surround_non_rect() {
     let input = r##"
 <rect id="a" xy="0" wh="5" />
 <rect id="b" xy="2 0" wh="5" />
-<circle id="s" surround="#a #b" margin="1 2"/>
+<circle id="s" surround="#a #b" margin="2 1"/>
 "##;
     let expected = r#"<circle id="s" cx="3.5" cy="2.5" r="6.363" class="d-surround"/>"#;
     let output = transform_str_default(input).unwrap();
@@ -64,7 +64,7 @@ fn test_surround_non_rect() {
     let input = r##"
 <rect id="a" xy="0" wh="5" />
 <rect id="b" xy="2 0" wh="5" />
-<ellipse id="s" surround="#a #b" margin="2 1"/>
+<ellipse id="s" surround="#a #b" margin="1 2"/>
 "##;
     let expected =
         r#"<ellipse id="s" cx="3.5" cy="2.5" rx="7.777" ry="4.949" class="d-surround"/>"#;
@@ -151,4 +151,63 @@ fn test_surround_connectors_permute() {
         assert_contains!(output, expected2);
         assert_contains!(output, expected3);
     }
+}
+
+#[test]
+fn test_inside_margin() {
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="15%" />
+"##;
+    let expected = r#"<rect id="r" x="11.5" y="11.5" width="7" height="7" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="3" />
+"##;
+    let expected = r#"<rect id="r" x="13" y="13" width="4" height="4" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" margin="3 10%" />
+"##;
+    let expected = r#"<rect id="r" x="11" y="13" width="8" height="4" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_inside_surround_invalid() {
+    // Cannot have an element with both surround and inside attributes
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b" surround="#a #b" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+
+    // Cannot have an element with either surround or inside referring to a non-present id
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" inside="#a #b #c" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+
+    let input = r##"
+<rect wh="20" id="a" />
+<rect xy="10" wh="20" id="b" />
+<rect id="r" surround="#a #b #c" margin="2" />
+"##;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
 }
