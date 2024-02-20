@@ -23,7 +23,7 @@ use rand::prelude::*;
 pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     original_map: HashMap<String, SvgElement>,
-    current_element: Option<SvgElement>,
+    pub current_element: Option<SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
     // SmallRng is used as it is seedable.
@@ -69,6 +69,10 @@ impl TransformerContext {
 
     pub fn set_current_element(&mut self, el: &SvgElement) {
         self.current_element = Some(el.clone());
+    }
+
+    pub fn clear_current_element(&mut self) {
+        self.current_element = None;
     }
 
     pub fn get_var(&self, name: &str) -> Option<String> {
@@ -274,6 +278,12 @@ impl TransformerContext {
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
                 self.update_element(&e);
+            }
+        }
+
+        if !e.has_attr("text") {
+            if let Some(c_text) = e.content.clone() {
+                e.set_attr("text", &c_text);
             }
         }
 
@@ -561,6 +571,43 @@ impl Transformer {
         Ok(())
     }
 
+    fn handle_reuse_element(&mut self, event_element: &mut SvgElement) -> Result<SvgElement> {
+        let elref = event_element
+            .pop_attr("href")
+            .context("reuse element should have an href attribute")?;
+        let target_indent = event_element.indent;
+        let referenced_element = self
+            .context
+            .get_original_element(
+                elref
+                    .strip_prefix('#')
+                    .context("href value should begin with '#'")?,
+            )
+            .context("unknown reference")?;
+        let mut instance_element = referenced_element.clone();
+        // the referenced element will have an `id` attribute (which it was
+        // referenced by) but the new instance should not have this to avoid
+        // multiple elements with the same id.
+        // However we *do* want the instance element to inherit any `id` which
+        // was on the `reuse` element.
+        let ref_id = instance_element
+            .pop_attr("id")
+            .context("referenced element should have id")?;
+        if let Some(inst_id) = event_element.pop_attr("id") {
+            instance_element.set_attr("id", &inst_id);
+            self.context.update_element(event_element);
+        }
+        // the instanced element should have the same indent as the original
+        // `reuse` element, as well as inherit `style` and `class` values.
+        instance_element.set_indent(target_indent);
+        if let Some(inst_style) = event_element.pop_attr("style") {
+            instance_element.set_attr("style", &inst_style);
+        }
+        instance_element.add_classes(&event_element.classes);
+        instance_element.add_class(&ref_id);
+        Ok(instance_element)
+    }
+
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         let output = self.process_events(input)?;
@@ -611,97 +658,71 @@ impl Transformer {
                     }
                     last_idx = idx;
 
-                    self.context.update_element(&event_element);
-                    if self.config.debug {
-                        // Prefix replaced element(s) with a representation of the original element
-                        //
-                        // Replace double quote with backtick to avoid messy XML entity conversion
-                        // (i.e. &quot; or &apos; if single quotes were used)
-                        gen_events.push(&Event::Comment(BytesText::new(
-                            &format!(" {event_element}",).replace('"', "`"),
-                        )));
-                        gen_events.push(&Event::Text(BytesText::new(&format!(
-                            "\n{}",
-                            " ".repeat(input_ev.indent)
-                        ))));
+                    if !is_empty && event_element.name != "style" {
+                        // Note this must be done before `<reuse>` processing, which 'switches out' the
+                        // element being processed to its target. The 'current_element' is used for
+                        // local variable lookup from attributes.
+                        self.context.set_current_element(&event_element);
+                    } else {
+                        self.context.clear_current_element();
                     }
-                    // Note this must be done before `<reuse>` processing, which 'switches out' the
-                    // element being processed to its target. The 'current_element' is used for
-                    // local variable lookup from attributes.
-                    self.context.set_current_element(&event_element);
-                    // support reuse element
-                    if event_element.name == "reuse" {
-                        let elref = event_element
-                            .pop_attr("href")
-                            .context("reuse element should have an href attribute")?;
-                        let target_indent = event_element.indent;
-                        let referenced_element = self
-                            .context
-                            .get_original_element(
-                                elref
-                                    .strip_prefix('#')
-                                    .context("href value should begin with '#'")?,
-                            )
-                            .context("unknown reference")?;
-                        let mut instance_element = referenced_element.clone();
-                        // the referenced element will have an `id` attribute (which it was
-                        // referenced by) but the new instance should not have this to avoid
-                        // multiple elements with the same id.
-                        // However we *do* want the instance element to inherit any `id` which
-                        // was on the `reuse` element.
-                        let ref_id = instance_element
-                            .pop_attr("id")
-                            .context("referenced element should have id")?;
-                        if let Some(inst_id) = event_element.pop_attr("id") {
-                            instance_element.add_attr("id", &inst_id);
-                            self.context.update_element(&event_element);
-                        }
-                        // the instanced element should have the same indent as the original
-                        // `reuse` element, as well as inherit `style` and `class` values.
-                        instance_element.set_indent(target_indent);
-                        if let Some(inst_style) = event_element.pop_attr("style") {
-                            instance_element.add_attr("style", &inst_style);
-                        }
-                        instance_element.add_classes(&event_element.classes);
-                        instance_element.add_class(&ref_id);
-                        event_element = instance_element;
-                    }
-                    let mut repeat = if in_specs { 0 } else { 1 };
-                    if let Some(rep_count) = event_element.pop_attr("repeat") {
-                        if is_empty {
-                            repeat = rep_count.parse().unwrap_or(1);
-                        } else {
-                            todo!("Repeat is not implemented for non-empty elements");
-                        }
-                    }
-                    for rep_idx in 0..repeat {
-                        let events = transform_element(&event_element, &mut self.context, is_empty)
-                            .context(format!("processing element on line {}", input_ev.line));
-                        if events.is_err() {
-                            // TODO: save the error context with the element to show to user if it is unrecoverable.
-                            remain.push((idx, input_ev.clone()));
-                            defer_next_text = true;
-                            // discard any events generated by this element.
-                            gen_events = EventList::new();
-                            continue 'ev;
-                        }
-                        let events = events?;
-                        if events.is_empty() {
-                            // if an input event doesn't generate any output events,
-                            // ignore text following that event to avoid blank lines in output.
-                            discard_next_text = true;
-                            continue 'ev;
-                        }
 
-                        for ev in events.iter() {
-                            gen_events.push(&ev.event);
-                        }
-
-                        if rep_idx < (repeat - 1) {
+                    if is_empty || event_element.name == "svg" || event_element.name == "style" {
+                        self.context.update_element(&event_element);
+                        if self.config.debug {
+                            // Prefix replaced element(s) with a representation of the original element
+                            //
+                            // Replace double quote with backtick to avoid messy XML entity conversion
+                            // (i.e. &quot; or &apos; if single quotes were used)
+                            gen_events.push(&Event::Comment(BytesText::new(
+                                &format!(" {event_element}",).replace('"', "`"),
+                            )));
                             gen_events.push(&Event::Text(BytesText::new(&format!(
                                 "\n{}",
                                 " ".repeat(input_ev.indent)
                             ))));
+                        }
+                        // support reuse element
+                        if event_element.name == "reuse" {
+                            event_element = self.handle_reuse_element(&mut event_element)?;
+                        }
+                        let mut repeat = if in_specs { 0 } else { 1 };
+                        if let Some(rep_count) = event_element.pop_attr("repeat") {
+                            repeat = rep_count.parse().unwrap_or(1);
+                        }
+                        for rep_idx in 0..repeat {
+                            let events =
+                                transform_element(&event_element, &mut self.context, is_empty)
+                                    .context(format!(
+                                        "processing element on line {}",
+                                        input_ev.line
+                                    ));
+                            if events.is_err() {
+                                // TODO: save the error context with the element to show to user if it is unrecoverable.
+                                remain.push((idx, input_ev.clone()));
+                                defer_next_text = true;
+                                // discard any events generated by this element.
+                                gen_events = EventList::new();
+                                continue 'ev;
+                            }
+                            let events = events?;
+                            if events.is_empty() {
+                                // if an input event doesn't generate any output events,
+                                // ignore text following that event to avoid blank lines in output.
+                                discard_next_text = true;
+                                continue 'ev;
+                            }
+
+                            for ev in events.iter() {
+                                gen_events.push(&ev.event);
+                            }
+
+                            if rep_idx < (repeat - 1) {
+                                gen_events.push(&Event::Text(BytesText::new(&format!(
+                                    "\n{}",
+                                    " ".repeat(input_ev.indent)
+                                ))));
+                            }
                         }
                     }
                 }
@@ -712,8 +733,74 @@ impl Transformer {
                         discard_next_text = true;
                         continue;
                     }
-                    gen_events.push(&Event::End(BytesEnd::new(ee_name)));
-                    last_idx = idx;
+
+                    if let Some(mut event_element) = self.context.current_element.clone() {
+                        self.context.update_element(&event_element);
+                        if self.config.debug {
+                            // Prefix replaced element(s) with a representation of the original element
+                            //
+                            // Replace double quote with backtick to avoid messy XML entity conversion
+                            // (i.e. &quot; or &apos; if single quotes were used)
+                            gen_events.push(&Event::Comment(BytesText::new(
+                                &format!(" {event_element}",).replace('"', "`"),
+                            )));
+                            gen_events.push(&Event::Text(BytesText::new(&format!(
+                                "\n{}",
+                                " ".repeat(input_ev.indent)
+                            ))));
+                        }
+                        // Note this must be done before `<reuse>` processing, which 'switches out' the
+                        // element being processed to its target. The 'current_element' is used for
+                        // local variable lookup from attributes.
+                        self.context.set_current_element(&event_element);
+                        // support reuse element
+                        if event_element.name == "reuse" {
+                            event_element = self.handle_reuse_element(&mut event_element)?;
+                        }
+                        let mut repeat = if in_specs { 0 } else { 1 };
+                        if let Some(rep_count) = event_element.pop_attr("repeat") {
+                            repeat = rep_count.parse().unwrap_or(1);
+                        }
+                        for rep_idx in 0..repeat {
+                            let events =
+                                transform_element(&event_element, &mut self.context, false)
+                                    .context(format!(
+                                        "processing element on line {}",
+                                        input_ev.line
+                                    ));
+                            if events.is_err() {
+                                // TODO: save the error context with the element to show to user if it is unrecoverable.
+                                remain.push((idx, input_ev.clone()));
+                                defer_next_text = true;
+                                // discard any events generated by this element.
+                                gen_events = EventList::new();
+                                continue 'ev;
+                            }
+                            let events = events?;
+                            if events.is_empty() {
+                                // if an input event doesn't generate any output events,
+                                // ignore text following that event to avoid blank lines in output.
+                                discard_next_text = true;
+                                continue 'ev;
+                            }
+
+                            for ev in events.iter() {
+                                gen_events.push(&ev.event);
+                            }
+
+                            if rep_idx < (repeat - 1) {
+                                gen_events.push(&Event::Text(BytesText::new(&format!(
+                                    "\n{}",
+                                    " ".repeat(input_ev.indent)
+                                ))));
+                            }
+                        }
+                    } else {
+                        gen_events.push(&Event::End(BytesEnd::new(ee_name)));
+                        last_idx = idx;
+                    }
+
+                    self.context.clear_current_element();
                 }
                 Event::Text(e) => {
                     if discard_next_text {
@@ -724,7 +811,33 @@ impl Transformer {
                         if defer_next_text {
                             remain.push((idx, input_ev));
                         } else {
-                            gen_events.push(&Event::Text(e.borrow()));
+                            let s = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
+                            if let Some(el) = self.context.current_element.as_mut() {
+                                if el.content.is_none() {
+                                    el.content = Some(s);
+                                }
+                            } else {
+                                gen_events.push(&Event::Text(e.borrow()));
+                            }
+                        }
+                    }
+                }
+                Event::CData(e) => {
+                    if discard_next_text {
+                        discard_next_text = false;
+                        continue;
+                    }
+                    if !in_specs {
+                        if defer_next_text {
+                            remain.push((idx, input_ev));
+                        } else {
+                            let s = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
+                            if let Some(el) = self.context.current_element.as_mut() {
+                                // This should override a Text content.
+                                el.content = Some(s);
+                            } else {
+                                gen_events.push(&Event::CData(e.borrow()));
+                            }
                         }
                     }
                 }
@@ -1029,7 +1142,7 @@ fn transform_element<'a>(
                 output.push(&Event::Comment(BytesText::new(&t)));
             }
             SvgEvent::Text(t) => {
-                output.push(&Event::Text(BytesText::new(&t)));
+                output.push(&Event::Text(BytesText::from_escaped(&t)));
             }
             SvgEvent::End(name) => {
                 output.push(&Event::End(BytesEnd::new(name)));
