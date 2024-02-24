@@ -30,13 +30,24 @@ fn expand_relspec(value: &str, context: &TransformerContext) -> String {
     result.to_string()
 }
 
+#[derive(Debug, Clone)]
+pub enum ContentType {
+    /// This element is empty, therefore *can't* have any content
+    Empty,
+    /// This element will have content but it isn't known yet
+    Pending,
+    /// This element has content and it's ready to be used
+    Ready(String),
+}
+
 #[derive(Clone, Debug)]
 pub struct SvgElement {
     pub name: String,
     pub attrs: AttrMap,
     pub classes: ClassList,
-    pub content: Option<String>,
+    pub content: ContentType,
     pub indent: usize,
+    pub src_line: usize,
 }
 
 impl Display for SvgElement {
@@ -67,13 +78,18 @@ impl SvgElement {
             name: name.to_string(),
             attrs: attr_map,
             classes,
-            content: None,
+            content: ContentType::Empty,
             indent: 0,
+            src_line: 0,
         }
     }
 
     pub fn set_indent(&mut self, indent: usize) {
         self.indent = indent;
+    }
+
+    pub fn set_src_line(&mut self, line: usize) {
+        self.src_line = line;
     }
 
     pub fn add_class(&mut self, class: &str) -> Self {
@@ -130,10 +146,11 @@ impl SvgElement {
         for (k, v) in &other.attrs {
             attrs.insert(k, v);
         }
-        let mut element = self.clone();
+        let mut element = other.clone();
         element.replace_attrs(attrs);
-        element.add_classes(&other.classes);
-        element.set_indent(other.indent);
+        // Everything but the name and any attrs unique to the original element
+        // is from the other element.
+        element.name = self.name.clone();
         element
     }
 
@@ -147,6 +164,50 @@ impl SvgElement {
 
     fn set_attr(&mut self, key: &str, value: &str) {
         self.attrs.insert(key, value);
+    }
+
+    /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
+    /// Note `reuse` is not a standard SVG element, but is used here in similar
+    /// contexts to the `use` element.
+    pub fn is_graphics_element(&self) -> bool {
+        matches!(
+            self.name.as_str(),
+            "circle"
+                | "ellipse"
+                | "image"
+                | "line"
+                | "path"
+                | "polygon"
+                | "polyline"
+                | "rect"
+                | "text"
+                | "use"
+                | "reuse"
+        )
+    }
+
+    /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
+    /// Note `specs` is not a standard SVG element, but is used here in similar
+    /// contexts to the `defs` element.
+    pub fn is_container_element(&self) -> bool {
+        matches!(
+            self.name.as_str(),
+            "a" | "defs"
+                | "glyph"
+                | "g"
+                | "marker"
+                | "mask"
+                | "missing-glyph"
+                | "pattern"
+                | "svg"
+                | "switch"
+                | "symbol"
+                | "specs"
+        )
+    }
+
+    pub fn is_empty_element(&self) -> bool {
+        matches!(self.content, ContentType::Empty)
     }
 
     pub fn is_connector(&self) -> bool {

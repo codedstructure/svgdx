@@ -1,4 +1,4 @@
-use crate::element::SvgElement;
+use crate::element::{ContentType, SvgElement};
 use crate::types::{attr_split_cycle, fstr, strp, LocSpec};
 
 use anyhow::{Context, Result};
@@ -159,7 +159,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         text_elem.add_class(class);
     }
     if !multiline {
-        text_elem.content = Some(text_value.clone());
+        text_elem.content = ContentType::Ready(text_value.clone());
     }
     text_elements.push(text_elem);
     if multiline {
@@ -184,7 +184,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 line_spacing
             };
             tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
-            tspan.content = Some(if text_fragment.is_empty() {
+            tspan.content = ContentType::Ready(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.
                 // Without this "a\n\nb" would render three tspans, but it would appear
                 // to have 'b' immediately below 'a' without a blank line between them.
