@@ -40,6 +40,16 @@ pub enum ContentType {
     Ready(String),
 }
 
+impl ContentType {
+    pub fn is_pending(&self) -> bool {
+        matches!(self, ContentType::Pending)
+    }
+
+    pub fn is_ready(&self) -> bool {
+        matches!(self, ContentType::Ready(_))
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SvgElement {
     pub name: String,

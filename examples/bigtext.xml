@@ -1,0 +1,26 @@
+<svg>
+  <style>
+  * { font-size: 6px; }
+  text.d-code, text.d-code * { font-family: monospace; font-size: 60% }
+  </style>
+  <rect id="outer" wh="89 60" class="d-fill-papayawhip"/>
+
+  <line xy1="#outer@t:-10" xy2="#outer@r:10" />
+  <circle cxy="#outer@tr" dxy="-5 5" r="2" class="d-fill-lightgreen"/>
+  <line xy1="#outer@b:-10" xy2="#outer@r:-10" />
+  <circle cxy="#outer@br" dxy="-5 -5" r="2" class="d-fill-red"/>
+
+  <rect cxy="20 30" wh="0" class="d-none"
+  text="This is a text
+thing across
+multiple lines" text-lsp="1.5"/>
+
+  <rect cxy="50 30" wh="0" text-loc="l" class="d-none d-code" text-lsp="0.9">
+  <![CDATA[
+def area(w, h):
+  """Return area of thing"""
+  return w * h
+  ]]>
+  </rect>
+
+</svg>
