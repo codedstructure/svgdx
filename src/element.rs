@@ -119,10 +119,6 @@ impl SvgElement {
         self.attrs.contains_key(key)
     }
 
-    pub fn add_attr(&mut self, key: &str, value: &str) {
-        self.attrs.insert(key, value);
-    }
-
     fn replace_attrs(&mut self, attrs: AttrMap) {
         self.attrs = attrs;
     }
@@ -131,7 +127,7 @@ impl SvgElement {
     #[must_use]
     fn with_attr(&self, key: &str, value: &str) -> Self {
         let mut element = self.clone();
-        element.add_attr(key, value);
+        element.set_attr(key, value);
         element
     }
 
@@ -172,7 +168,7 @@ impl SvgElement {
         self.attrs.get(key).map(|x| x.to_owned())
     }
 
-    fn set_attr(&mut self, key: &str, value: &str) {
+    pub fn set_attr(&mut self, key: &str, value: &str) {
         self.attrs.insert(key, value);
     }
 

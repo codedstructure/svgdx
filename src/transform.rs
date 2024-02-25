@@ -284,9 +284,9 @@ impl TransformerContext {
             }
         }
 
-        if e.is_graphics_element() {
+        if e.is_graphics_element() && !e.has_attr("text") {
             if let ContentType::Ready(ref value) = e.clone().content {
-                e.add_attr("text", value);
+                e.set_attr("text", value);
             }
         }
 
@@ -659,7 +659,7 @@ impl Transformer {
             .pop_attr("id")
             .context("referenced element should have id")?;
         if let Some(inst_id) = event_element.pop_attr("id") {
-            instance_element.add_attr("id", &inst_id);
+            instance_element.set_attr("id", &inst_id);
             self.context.update_element(&event_element);
         }
         // the instanced element should have the same indent as the original
@@ -667,7 +667,7 @@ impl Transformer {
         instance_element.set_indent(event_element.indent);
         instance_element.set_src_line(event_element.src_line);
         if let Some(inst_style) = event_element.pop_attr("style") {
-            instance_element.add_attr("style", &inst_style);
+            instance_element.set_attr("style", &inst_style);
         }
         instance_element.add_classes(&event_element.classes);
         instance_element.add_class(&ref_id);
@@ -799,19 +799,17 @@ impl Transformer {
                     if !self.context.in_specs {
                         if self.context.defer_next_text {
                             remain.push((idx, input_ev));
-                        } else {
-                            if let Some(ref mut event_element) = self.context.current_element {
-                                if event_element.content.is_pending() {
-                                    if event_element.is_graphics_element() {
-                                        event_element.content =
-                                            ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
-                                    } else {
-                                        gen_events.push(ev);
-                                    }
+                        } else if let Some(ref mut event_element) = self.context.current_element {
+                            if event_element.content.is_pending() {
+                                if event_element.is_graphics_element() {
+                                    event_element.content =
+                                        ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
+                                } else {
+                                    gen_events.push(ev);
                                 }
-                            } else {
-                                gen_events.push(ev);
                             }
+                        } else {
+                            gen_events.push(ev);
                         }
                     }
                 }
@@ -824,22 +822,20 @@ impl Transformer {
                     if !self.context.in_specs {
                         if self.context.defer_next_text {
                             remain.push((idx, input_ev));
-                        } else {
-                            if let Some(ref mut event_element) = self.context.current_element {
-                                // CData overrides normal text
-                                if event_element.content.is_pending()
-                                    || event_element.content.is_ready()
-                                {
-                                    if event_element.is_graphics_element() {
-                                        event_element.content =
-                                            ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
-                                    } else {
-                                        gen_events.push(ev);
-                                    }
+                        } else if let Some(ref mut event_element) = self.context.current_element {
+                            // CData overrides normal text
+                            if event_element.content.is_pending()
+                                || event_element.content.is_ready()
+                            {
+                                if event_element.is_graphics_element() {
+                                    event_element.content =
+                                        ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
+                                } else {
+                                    gen_events.push(ev);
                                 }
-                            } else {
-                                gen_events.push(ev);
                             }
+                        } else {
+                            gen_events.push(ev);
                         }
                     }
                 }

@@ -194,3 +194,71 @@ fn test_text_line() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_content() {
+    let input = r#"
+<rect xy="0" wh="10">some text</rect>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">some text</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect xy="0" wh="10">multi-line
+text</rect>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">
+<tspan x="5" dy="-0.525em">multi-line</tspan><tspan x="5" dy="1.05em">text</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_cdata() {
+    let input = r#"
+<rect xy="0" wh="10"><![CDATA[some text]]></rect>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">some text</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect xy="0" wh="10">
+<![CDATA[
+    def start():
+        print("Hello World!")
+]]>
+</rect>
+"#;
+
+    // In this test we replace 'N' and 'Z' for non-breaking and zero-width spaces
+    // repectively, for easier string authoring...
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">
+<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdef start():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;Hello World!&quot;)</tspan>
+</text>
+"#;
+    let expected = expected.replace('N', "\u{a0}").replace('Z', "\u{200b}");
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}

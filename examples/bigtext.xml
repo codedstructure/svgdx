@@ -12,7 +12,7 @@
 
   <rect cxy="20 30" wh="0" class="d-none"
   text="This is a text
-thing across
+block across
 multiple lines" text-lsp="1.5"/>
 
   <rect cxy="50 30" wh="0" text-loc="l" class="d-none d-code" text-lsp="0.9">
