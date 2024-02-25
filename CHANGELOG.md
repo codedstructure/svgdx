@@ -15,6 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: `inside` attribute, analogous to `surround` but as the intersection of
   bounding boxes rather than their union.
 
+- Added: support for providing text content for graphical elements using XML text or CData
+  in addition to the `text` attribute. This makes pre-formatted text much easier to include.
+
+- Changed: leading whitespace in text content of elements is now replaced with non-breaking
+  spaces, to allow arbitrary indenting.
+
 ## [0.5.0 - 2024-02-11]
 
 - Changed: Removed the custom elements `<tbox>`, `<person>` and `<pipeline>`,

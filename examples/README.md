@@ -70,6 +70,14 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 
 [input file](line-text.xml)
 
+## Pre-formatted text
+
+![](bigtext.svg)
+
+[source](bigtext.svg)
+
+[input file](bigtext.xml)
+
 ## Relative positioning
 
 ![](loc.svg)

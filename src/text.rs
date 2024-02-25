@@ -1,4 +1,4 @@
-use crate::element::SvgElement;
+use crate::element::{ContentType, SvgElement};
 use crate::types::{attr_split_cycle, fstr, strp, LocSpec};
 
 use anyhow::{Context, Result};
@@ -131,6 +131,9 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     const WRAP_UP: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) * spacing;
     const WRAP_MID: fn(usize, f32) -> f32 = |count, spacing| -(count as f32 - 1.) / 2. * spacing;
 
+    const ZWSP: &str = "\u{200B}"; // Zero-width space
+    const NBSP: &str = "\u{00A0}"; // Non-breaking space
+
     let mut orig_elem = element.clone();
 
     let text_value = get_text_value(&mut orig_elem);
@@ -152,14 +155,14 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     // Copy style and class(es) from original element
     if let Some(style) = orig_elem.get_attr("style") {
-        text_elem.add_attr("style", &style);
+        text_elem.set_attr("style", &style);
     }
     text_elem.classes = orig_elem.classes.clone();
     for class in text_classes {
         text_elem.add_class(class);
     }
     if !multiline {
-        text_elem.content = Some(text_value.clone());
+        text_elem.content = ContentType::Ready(text_value.clone());
     }
     text_elements.push(text_elem);
     if multiline {
@@ -183,12 +186,20 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             } else {
                 line_spacing
             };
+            // Replace leading spaces with non-breaking spaces so they aren't collapsed
+            // by XML processing. This allows pre-formatted multi-line text (e.g. for
+            // code listings)
+            let init_len = text_fragment.len();
+            let text_remainder = text_fragment.trim_start();
+            let mut text_fragment = NBSP.repeat(init_len - text_remainder.len());
+            text_fragment.push_str(text_remainder);
+
             tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
-            tspan.content = Some(if text_fragment.is_empty() {
+            tspan.content = ContentType::Ready(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.
                 // Without this "a\n\nb" would render three tspans, but it would appear
                 // to have 'b' immediately below 'a' without a blank line between them.
-                "\u{200B}".to_string()
+                ZWSP.to_string()
             } else {
                 text_fragment.to_string()
             });
