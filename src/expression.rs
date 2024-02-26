@@ -52,6 +52,28 @@ enum Function {
     Clamp,
     /// mix(start, end, amount) - linear interpolation between start and end
     Mix,
+    /// eq(a, b) - 1 if a == b, 0 otherwise
+    Equal,
+    /// ne(a, b) - 1 if a != b, 0 otherwise
+    NotEqual,
+    /// lt(a, b) - 1 if a < b, 0 otherwise
+    LessThan,
+    /// le(a, b) - 1 if a <= b, 0 otherwise
+    LessThanEqual,
+    /// gt(a, b) - 1 if a > b, 0 otherwise
+    GreaterThan,
+    /// ge(a, b) - 1 if a >= b, 0 otherwise
+    GreaterThanEqual,
+    /// if(cond, a, b) - if cond is non-zero, return a, else return b
+    If,
+    /// not(a) - 1 if a is zero, 0 otherwise
+    Not,
+    /// and(a, b) - 1 if both a and b are non-zero, 0 otherwise
+    And,
+    /// or(a, b) - 1 if either a or b are non-zero, 0 otherwise
+    Or,
+    /// xor(a, b) - 1 if either a or b are non-zero but not both, 0 otherwise
+    Xor,
 }
 
 impl TryFrom<&str> for Function {
@@ -80,6 +102,17 @@ impl TryFrom<&str> for Function {
             "max" => Self::Max,
             "clamp" => Self::Clamp,
             "mix" => Self::Mix,
+            "eq" => Self::Equal,
+            "ne" => Self::NotEqual,
+            "lt" => Self::LessThan,
+            "le" => Self::LessThanEqual,
+            "gt" => Self::GreaterThan,
+            "ge" => Self::GreaterThanEqual,
+            "if" => Self::If,
+            "not" => Self::Not,
+            "and" => Self::And,
+            "or" => Self::Or,
+            "xor" => Self::Xor,
             _ => bail!("Unknown function"),
         })
     }
@@ -418,6 +451,116 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
                     let c = expr(eval_state)?;
                     a * (1. - c) + b * c
                 }
+                Function::Equal => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a == b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::NotEqual => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a != b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::LessThan => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a < b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::LessThanEqual => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a <= b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::GreaterThan => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a > b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::GreaterThanEqual => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a >= b {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::If => {
+                    let cond = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if cond != 0. {
+                        a
+                    } else {
+                        b
+                    }
+                }
+                Function::Not => {
+                    let a = expr(eval_state)?;
+                    if a == 0. {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::And => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a != 0. && b != 0. {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::Or => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if a != 0. || b != 0. {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
+                Function::Xor => {
+                    let a = expr(eval_state)?;
+                    eval_state.require(Token::Comma)?;
+                    let b = expr(eval_state)?;
+                    if (a != 0.) ^ (b != 0.) {
+                        1.
+                    } else {
+                        0.
+                    }
+                }
             };
             eval_state.require(Token::CloseParen)?;
             Ok(e)
@@ -711,6 +854,64 @@ mod tests {
         assert_lt!(count_a, 100);
         assert_ne!(count_b, 0);
         assert_lt!(count_b, 100);
+    }
+
+    #[test]
+    fn test_func_comparison() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("eq(1, 1)", 1.),
+            ("eq(1, 2)", 0.),
+            ("ne(1, 1)", 0.),
+            ("ne(1, 2)", 1.),
+            ("lt(1, 2)", 1.),
+            ("lt(2, 1)", 0.),
+            ("lt(1, 1)", 0.),
+            ("le(1, 2)", 1.),
+            ("le(2, 1)", 0.),
+            ("le(1, 1)", 1.),
+            ("gt(2, 1)", 1.),
+            ("gt(1, 2)", 0.),
+            ("gt(1, 1)", 0.),
+            ("ge(2, 1)", 1.),
+            ("ge(1, 2)", 0.),
+            ("ge(1, 1)", 1.),
+        ] {
+            assert_eq!(
+                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                expected,
+            );
+        }
+    }
+
+    #[test]
+    fn test_func_logic() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("if(1, 2, 3)", 2.),
+            ("if(0, 2, 3)", 3.),
+            ("if(100, 2, 3)", 2.),
+            ("not(1)", 0.),
+            ("not(0)", 1.),
+            ("not(100)", 0.),
+            ("and(1, 1)", 1.),
+            ("and(1, 0)", 0.),
+            ("and(0, 1)", 0.),
+            ("and(0, 0)", 0.),
+            ("or(1, 1)", 1.),
+            ("or(1, 0)", 1.),
+            ("or(0, 1)", 1.),
+            ("or(0, 0)", 0.),
+            ("xor(1, 1)", 0.),
+            ("xor(1, 0)", 1.),
+            ("xor(0, 1)", 1.),
+            ("xor(0, 0)", 0.),
+        ] {
+            assert_eq!(
+                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                expected,
+            );
+        }
     }
 
     #[test]

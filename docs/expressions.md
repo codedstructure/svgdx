@@ -80,6 +80,17 @@ A selection of built-in functions are provided, as follows:
 | `max(a, b)` | maximum of two values |
 | `clamp(x, min, max)` | return x, clamped between min and max |
 | `mix(start, end, amount)` | linear interpolation between start and end |
+| `eq(a, b)` | 1 if a == b, 0 otherwise |
+| `ne(a, b)` | 1 if a != b, 0 otherwise |
+| `lt(a, b)` | 1 if a < b, 0 otherwise |
+| `le(a, b)` | 1 if a <= b, 0 otherwise |
+| `gt(a, b)` | 1 if a > b, 0 otherwise |
+| `ge(a, b)` | 1 if a >= b, 0 otherwise |
+| `if(cond, a, b)` | a if cond is non-zero, else b |
+| `not(a)` | 1 if a is zero, 0 otherwise |
+| `and(a, b)` | 1 if both a and b are non-zero, 0 otherwise |
+| `or(a, b)` | 1 if either a or b are non-zero, 0 otherwise |
+| `xor(a, b)` | 1 if either a or b are non-zero but not both, 0 otherwise |
 
 Note these functions (e.g. the order of arguments in `mix` and `clamp`) are influenced by GLSL.
 

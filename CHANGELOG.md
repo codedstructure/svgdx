@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed: leading whitespace in text content of elements is now replaced with non-breaking
   spaces, to allow arbitrary indenting.
 
+- Added: Relational and logical functions. Function notation (e.g. `lt(a,b)` rather than
+  `a < b`) is chosen to avoid the need to use XML entities ('`&lt;`' etc). It also avoids
+  the need for more levels of precedence, though that's not a good reason on its own.
+  Note logical values adhere to C-language values; non-zero evaluates to true, and true/false
+  will be indicated by the numeric values 1.0 & 0.0 respectively.
+
 ## [0.5.0 - 2024-02-11]
 
 - Changed: Removed the custom elements `<tbox>`, `<person>` and `<pipeline>`,

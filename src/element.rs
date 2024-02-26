@@ -195,6 +195,7 @@ impl SvgElement {
     /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
     /// Note `specs` is not a standard SVG element, but is used here in similar
     /// contexts to the `defs` element.
+    #[allow(dead_code)]
     pub fn is_container_element(&self) -> bool {
         matches!(
             self.name.as_str(),
