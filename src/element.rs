@@ -3,13 +3,18 @@ use crate::path::path_bbox;
 use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
-    EdgeSpec, Length, LocSpec, TrblLength,
+    EdgeSpec, Length, LocSpec, RelSpec,
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::regex;
 use regex::Captures;
 
+/// Replace all refspec entries in a string with lookup results
+/// Suitable for use with path `d` or polyline `points` attributes
+/// which may contain many such entries.
+///
+/// Infallible; any invalid refspec will be left unchanged.
 fn expand_relspec(value: &str, context: &TransformerContext) -> String {
     let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
 
@@ -418,152 +423,109 @@ impl SvgElement {
         }
     }
 
-    fn eval_pos(&mut self, input: &str, context: &TransformerContext) -> Result<String> {
-        // Relative positioning:
-        //   ID LOC DX DY
-        // [#id][@loc] [dx] [dy]
-        //   or
-        // (^|#id:)(h|v|H|V) [gap]
-
-        // #abc@tl - top-left point of #abc
-        // @tl - prev element
-        // #abc:h - to-the-right of #abc
-        // ^h - prev element
-
-        // Defaults:
-        //   #id = previous element
-        //   @loc = tr
-        //   dx, dy - offset from the @loc
-        // Examples:
-        //   xy="^h 10"      - position to right of previous element with gap of 10
-        //   xy="^H"         - position immediately to left of previous element
-        //   xy="^v"         - position immediately below previous element
-        //   xy="^V 5"       - position immediately previous element
-        //   xy="@tr 10 0"   - position to right of previous element with gap of 10
-        //   cxy="@b"        - position centre at bottom of previous element
-        // TODO - extend to allow referencing earlier elements beyond previous
-        let rel_re = regex!(
-            r"^((?<relhv>(\^|#[[:word:]]+:)[hvHV])|(?<id>#[[:word:]]+)?((?<loc>@[tbrlc]+)(:(?<len>[-0-9\.]+%?))?)?)"
-        );
-        let mut parts = attr_split(input);
-        let ref_loc = parts.next().context("Empty attribute in eval_pos()")?;
-        if let Some(caps) = rel_re.captures(&ref_loc) {
-            if caps.get(0).expect("Should always have group 0").is_empty() {
-                // We need either id or loc or both; since they are both optional in
-                // the regex we check that we did actually match some text here...
-                return Ok(input.to_owned());
-            }
-
-            // For ^h etc, we only consider the first number as a 'gap' value.
-            // For other relative specs these are dx/dy.
-            let d1 = strp(&parts.next().unwrap_or("0".to_owned()));
-            let d2 = strp(&parts.next().unwrap_or("0".to_owned()));
-            let mut dx = 0.;
-            let mut dy = 0.;
-
-            let mut ref_el = context.get_prev_element();
-            let default_rel;
-            let mut loc = None;
-            let mut len = None;
-
-            if let Some(relhv) = caps.name("relhv") {
-                let rel_dir;
-                if let Some(relhv_id) = relhv.as_str().strip_prefix('#') {
-                    let mut parts = relhv_id.split(':');
-                    let ref_el_id = parts.next().expect("Regex match");
-                    rel_dir = parts.next();
-                    ref_el = context.get_element(ref_el_id);
-                } else {
-                    rel_dir = relhv.as_str().strip_prefix('^');
-                }
-
-                default_rel = match rel_dir
-                    .context("Invalid relative direction (expected: hHvV)")?
-                {
-                    "h" => {
-                        dx = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        LocSpec::Right
-                    }
-                    "H" => {
-                        dx = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        LocSpec::Left
-                    }
-                    "v" => {
-                        dy = d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        LocSpec::Bottom
-                    }
-                    "V" => {
-                        dy = -d1.context(format!(r#"{ref_loc} gap error("{input}")"#))?;
-                        LocSpec::Top
-                    }
-                    _ => {
-                        dx = d1
-                            .context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
-                        dy = d2
-                            .context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
-                        LocSpec::TopRight
-                    }
-                };
-
-                // This is similar to the more generic `xy-loc` processing.
-                // assumes the bounding-box is well-defined by this point.
-                if let Some(bbox) = self.bbox()? {
-                    let width = bbox.width();
-                    let height = bbox.height();
-                    let (xy_dx, xy_dy) = match default_rel {
-                        LocSpec::Bottom => (width / 2., 0.),
-                        LocSpec::Left => (width, height / 2.),
-                        LocSpec::Top => (width / 2., height),
-                        LocSpec::Right => (0., height / 2.),
-                        _ => (0., 0.),
-                    };
-                    dx -= xy_dx;
-                    dy -= xy_dy;
-                }
+    fn split_ref_el<'a, 'b>(
+        &self,
+        input: &'b str,
+        context: &'a TransformerContext,
+    ) -> Result<(Option<&'a SvgElement>, &'b str)> {
+        if input.starts_with('^') {
+            let skip_prev = input.strip_prefix('^').unwrap_or(input);
+            Ok((context.get_prev_element(), skip_prev.trim_start()))
+        } else if input.starts_with('#') {
+            let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
+            let (id, remain) = extract_ref_id_re
+                .captures(input)
+                .map(|caps| {
+                    (
+                        caps.name("id").expect("Regex Match").as_str(),
+                        caps.name("remain").expect("Regex Match").as_str(),
+                    )
+                })
+                .unwrap_or(("INVALID ELEMENT ID", input));
+            if let Some(el) = context.get_element(id) {
+                Ok((Some(el), remain))
             } else {
-                dx = d1.context(format!(r#"Could not determine dx in eval_pos("{input}")"#))?;
-                dy = d2.context(format!(r#"Could not determine dy in eval_pos("{input}")"#))?;
-                default_rel = LocSpec::TopRight;
-                let loc_str = caps
-                    .name("loc")
-                    .map(|v| v.as_str().strip_prefix('@').expect("Regex match"));
-                if let Some(loc_str) = loc_str {
-                    loc = Some(LocSpec::try_from(loc_str)?);
-                }
-                if let Some(len_str) = caps.name("len") {
-                    len = Some(strp_length(len_str.as_str()).context("Invalid Length")?);
-                }
+                bail!("Reference to unknown element '{}'", id);
             }
-
-            let opt_id = caps.name("id").map(|v| {
-                v.as_str()
-                    .strip_prefix('#')
-                    .expect("Regex should require a # prefix on id")
-            });
-            if let Some(name) = opt_id {
-                ref_el = Some(
-                    context
-                        .get_element(name)
-                        .context(format!(r#"id '{name}' not found in eval_pos("{input}")"#))?,
-                );
-            }
-            if let Some(ref_el) = ref_el {
-                if let Some(mut bb) = ref_el.bbox()? {
-                    if let Some(margin) = ref_el.get_attr("margin") {
-                        let margin: TrblLength = margin.try_into()?;
-                        bb.expand_trbl_length(margin);
-                    }
-                    let loc = loc.unwrap_or(default_rel);
-                    let pos = if let (Ok(es), Some(len)) = (EdgeSpec::try_from(loc), len) {
-                        bb.edgespec(es, len)
-                    } else {
-                        bb.locspec(loc)
-                    };
-                    return Ok(format!("{} {}", fstr(pos.0 + dx), fstr(pos.1 + dy)));
-                }
-            }
+        } else {
+            Ok((None, input))
         }
-        Ok(input.to_owned())
+    }
+
+    /// Extract dx/dy from a string such as '10 20' or '10' (in which case dy is 0)
+    fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)> {
+        let mut parts = attr_split(input);
+        let dx = strp(&parts.next().unwrap_or("0".to_string()))?;
+        let dy = strp(&parts.next().unwrap_or("0".to_string()))?;
+        Ok((dx, dy))
+    }
+
+    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
+        // Simple relative positioning - horizontally below, above, left, or right of reference element
+        // (^|#id)(:(h|v|H|V) [gap])
+        // Location-based positioning - relative to a specific location on the reference element
+        // (^|#id)[@loc] [dx] [dy]
+        // Edge-based positioning - relative to a specific location on the reference element
+        // (^|#id)[@edge][:length] [dx] [dy]
+        let (ref_el, remain) = self.split_ref_el(input, context)?;
+        let ref_el = match ref_el {
+            Some(el) => el,
+            None => return Ok(input.to_owned()),
+        };
+
+        if let Some(bbox) = ref_el.bbox()? {
+            self.eval_pos_helper(remain, &bbox)
+        } else {
+            Ok(input.to_owned())
+        }
+    }
+
+    fn eval_pos_helper(&self, remain: &str, bbox: &BoundingBox) -> Result<String> {
+        let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
+        let loc_re = regex!(r"^@(?<loc>[trblc]+)(\s+(?<remain>.*))?$");
+        let edge_re = regex!(r"^@(?<edge>[trbl]):(?<len>[-0-9\.]+%?)(\s+(?<remain>.*))?$");
+        let result = if let Some(caps) = rel_re.captures(remain) {
+            let rel = RelSpec::try_from(caps.name("rel").expect("Regex Match").as_str())?;
+            let this_width = self.bbox()?.map(|bb| bb.width()).unwrap_or(0.);
+            let this_height = self.bbox()?.map(|bb| bb.height()).unwrap_or(0.);
+            let gap = if let Some(remain) = caps.name("remain") {
+                let mut parts = attr_split(remain.as_str());
+                strp(&parts.next().unwrap_or("0".to_string()))?
+            } else {
+                0.
+            };
+            let (x, y) = bbox.locspec(rel.to_locspec());
+            let (dx, dy) = match rel {
+                RelSpec::Above => (-this_width / 2., -(this_height + gap)),
+                RelSpec::Below => (-this_width / 2., gap),
+                RelSpec::InFront => (gap, -this_height / 2.),
+                RelSpec::Behind => (-(this_width + gap), -this_height / 2.),
+            };
+            format!("{} {}", fstr(x + dx), fstr(y + dy))
+        } else if let Some(caps) = edge_re.captures(remain) {
+            let edge = EdgeSpec::try_from(caps.name("edge").expect("Regex Match").as_str())?;
+            let length = strp_length(caps.name("len").expect("Regex Match").as_str())?;
+            let (dx, dy) = if let Some(remain) = caps.name("remain") {
+                self.extract_dx_dy(remain.as_str())?
+            } else {
+                (0., 0.)
+            };
+            let (x, y) = bbox.edgespec(edge, length);
+            format!("{} {}", fstr(x + dx), fstr(y + dy))
+        } else if let Some(caps) = loc_re.captures(remain) {
+            let loc = LocSpec::try_from(caps.name("loc").expect("Regex Match").as_str())?;
+            let (dx, dy) = if let Some(remain) = caps.name("remain") {
+                self.extract_dx_dy(remain.as_str())?
+            } else {
+                (0., 0.)
+            };
+            let (x, y) = bbox.locspec(loc);
+            format!("{} {}", fstr(x + dx), fstr(y + dy))
+        } else {
+            remain.to_owned()
+        };
+
+        Ok(result)
     }
 
     fn eval_size(&self, input: &str, context: &TransformerContext) -> Result<String> {
@@ -794,5 +756,92 @@ impl SvgElement {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_eval_pos_edge() {
+        let element = SvgElement::new("rect", &[]);
+        let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+
+        // Test with edge positioning
+        let result = element.eval_pos_helper("@t:20%", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "20 0");
+
+        let result = element.eval_pos_helper("@t:20% -4", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "16 0");
+
+        let result = element.eval_pos_helper("@r:200%", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "100 200");
+
+        let result = element.eval_pos_helper("@l:-1", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "0 99");
+
+        let result = element.eval_pos_helper("@l:37", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "0 37");
+
+        let result = element.eval_pos_helper("@l:37 3 5", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "3 42");
+    }
+
+    #[test]
+    fn test_eval_pos_loc() {
+        let element = SvgElement::new("rect", &[]);
+        let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+
+        // Test with location positioning
+        let result = element.eval_pos_helper("@tr", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "100 0");
+
+        let result = element.eval_pos_helper("@bl", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "0 100");
+
+        let result = element.eval_pos_helper("@c", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "50 50");
+    }
+
+    #[test]
+    fn test_eval_pos_rel() {
+        let element = SvgElement::new(
+            "rect",
+            &[
+                (String::from("width"), String::from("100")),
+                (String::from("height"), String::from("75")),
+            ],
+        );
+        let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+
+        // Test with relative positioning
+        let result = element.eval_pos_helper(":h 10", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "110 12.5");
+    }
+
+    #[test]
+    fn test_eval_pos_invalid() {
+        let element = SvgElement::new("rect", &[]);
+        let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+        // Test with invalid input
+
+        let result = element.eval_pos_helper("invalid", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "invalid");
+
+        let result = element.eval_pos_helper("30 20", &bbox);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "30 20");
     }
 }
