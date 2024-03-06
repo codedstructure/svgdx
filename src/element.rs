@@ -3,7 +3,7 @@ use crate::path::path_bbox;
 use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
-    EdgeSpec, Length, LocSpec, RelSpec,
+    DirSpec, EdgeSpec, Length, LocSpec,
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
@@ -445,7 +445,20 @@ impl SvgElement {
     /// ```text
     /// (^|#id)[@edge][:length] [dx] [dy]
     /// ```
-    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
+    ///
+    /// `input`: the relspec string
+    ///
+    /// `anchor`: the anchor point for the position. This is only relevant for dirspec
+    /// (e.g. `^:h`) and bare elref (e.g. `#id`), not for locspec or edgespec.
+    ///
+    /// `context`: the transformer context, used for lookup of the reference element.
+    fn eval_pos(
+        &self,
+        input: &str,
+        anchor: LocSpec,
+        context: &TransformerContext,
+    ) -> Result<String> {
+        let input = input.trim();
         let (ref_el, remain) = self.split_relspec(input, context)?;
         let ref_el = match ref_el {
             Some(el) => el,
@@ -453,12 +466,18 @@ impl SvgElement {
         };
 
         if let Some(bbox) = ref_el.bbox()? {
-            self.eval_pos_helper(remain, &bbox)
+            self.eval_pos_helper(remain, &bbox, anchor)
         } else {
             Ok(input.to_owned())
         }
     }
 
+    /// Split a possible relspec into the reference element (if it exists) and remainder
+    ///
+    /// `input`: the relspec string
+    ///
+    /// If the input is not a relspec, the reference element is `None` and the remainder
+    /// is the entire input string.
     fn split_relspec<'a, 'b>(
         &self,
         input: &'b str,
@@ -497,14 +516,15 @@ impl SvgElement {
     }
 
     // This is split out for testability
-    fn eval_pos_helper(&self, remain: &str, bbox: &BoundingBox) -> Result<String> {
+    fn eval_pos_helper(&self, remain: &str, bbox: &BoundingBox, anchor: LocSpec) -> Result<String> {
         let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
         let loc_re = regex!(r"^@(?<loc>[trblc]+)(\s+(?<remain>.*))?$");
         let edge_re = regex!(r"^@(?<edge>[trbl]):(?<len>[-0-9\.]+%?)(\s+(?<remain>.*))?$");
-        let result = if let Some(caps) = rel_re.captures(remain) {
-            let rel = RelSpec::try_from(caps.name("rel").expect("Regex Match").as_str())?;
-            let this_width = self.bbox()?.map(|bb| bb.width()).unwrap_or(0.);
-            let this_height = self.bbox()?.map(|bb| bb.height()).unwrap_or(0.);
+        if let Some((x, y)) = if let Some(caps) = rel_re.captures(remain) {
+            let rel = DirSpec::try_from(caps.name("rel").expect("Regex Match").as_str())?;
+            let this_bbox = self.bbox()?;
+            let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
+            let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
             let gap = if let Some(remain) = caps.name("remain") {
                 let mut parts = attr_split(remain.as_str());
                 strp(&parts.next().unwrap_or("0".to_string()))?
@@ -512,13 +532,17 @@ impl SvgElement {
                 0.
             };
             let (x, y) = bbox.locspec(rel.to_locspec());
-            let (dx, dy) = match rel {
-                RelSpec::Above => (-this_width / 2., -(this_height + gap)),
-                RelSpec::Below => (-this_width / 2., gap),
-                RelSpec::InFront => (gap, -this_height / 2.),
-                RelSpec::Behind => (-(this_width + gap), -this_height / 2.),
+            let (mut dx, mut dy) = match rel {
+                DirSpec::Above => (-this_width / 2., -(this_height + gap)),
+                DirSpec::Below => (-this_width / 2., gap),
+                DirSpec::InFront => (gap, -this_height / 2.),
+                DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
             };
-            format!("{} {}", fstr(x + dx), fstr(y + dy))
+            if let LocSpec::Center = anchor {
+                dx += this_width / 2.;
+                dy += this_height / 2.;
+            }
+            Some((x + dx, y + dy))
         } else if let Some(caps) = edge_re.captures(remain) {
             let edge = EdgeSpec::try_from(caps.name("edge").expect("Regex Match").as_str())?;
             let length = strp_length(caps.name("len").expect("Regex Match").as_str())?;
@@ -528,7 +552,7 @@ impl SvgElement {
                 (0., 0.)
             };
             let (x, y) = bbox.edgespec(edge, length);
-            format!("{} {}", fstr(x + dx), fstr(y + dy))
+            Some((x + dx, y + dy))
         } else if let Some(caps) = loc_re.captures(remain) {
             let loc = LocSpec::try_from(caps.name("loc").expect("Regex Match").as_str())?;
             let (dx, dy) = if let Some(remain) = caps.name("remain") {
@@ -537,15 +561,17 @@ impl SvgElement {
                 (0., 0.)
             };
             let (x, y) = bbox.locspec(loc);
-            format!("{} {}", fstr(x + dx), fstr(y + dy))
+            Some((x + dx, y + dy))
         } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
-            let (x, y) = bbox.locspec(LocSpec::TopLeft);
-            format!("{} {}", fstr(x + dx), fstr(y + dy))
+            let (x, y) = bbox.locspec(anchor);
+            Some((x + dx, y + dy))
         } else {
-            remain.to_owned()
-        };
+            None
+        } {
+            return Ok(format!("{} {}", fstr(x), fstr(y)));
+        }
 
-        Ok(result)
+        Ok(remain.to_owned())
     }
 
     fn eval_size(&self, input: &str, context: &TransformerContext) -> Result<String> {
@@ -556,12 +582,12 @@ impl SvgElement {
         //   ^ - reference to previous element
         //   dw / dh - delta width/height (user units; may be negative)
         //   dw% / dh% - scaled width/height
-        // Note: unlike in eval_pos, the id section is mandatory to distinguish from
-        //       a numeric `wh` pair.
+        //
         // Examples:
         //   wh="#thing 2 110%"  - size of #thing plus 2 units width, *1.1 height
         // TODO: extend to allow referencing earlier elements beyond previous
         // TODO: allow mixed relative and absolute values...
+        let input = input.trim();
         let mut parts = attr_split(input);
         let ref_loc = parts.next().expect("always at least one");
         let rel_re = regex!(r"^(?<ref>(#\S+|\^))");
@@ -665,9 +691,12 @@ impl SvgElement {
         for (key, value) in self.attrs.clone() {
             let mut value = value.clone();
             match key.as_str() {
-                "xy" | "cxy" | "xy1" | "xy2" => {
+                "xy" | "xy1" | "xy2" => {
                     // TODO: maybe split up? pos may depend on size, but size doesn't depend on pos
-                    value = self.eval_pos(value.as_str(), context)?;
+                    value = self.eval_pos(value.as_str(), LocSpec::TopLeft, context)?;
+                }
+                "cxy" => {
+                    value = self.eval_pos(value.as_str(), LocSpec::Center, context)?;
                 }
                 _ => (),
             }
@@ -789,27 +818,27 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with edge positioning
-        let result = element.eval_pos_helper("@t:20%", &bbox);
+        let result = element.eval_pos_helper("@t:20%", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "20 0");
 
-        let result = element.eval_pos_helper("@t:20% -4", &bbox);
+        let result = element.eval_pos_helper("@t:20% -4", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "16 0");
 
-        let result = element.eval_pos_helper("@r:200%", &bbox);
+        let result = element.eval_pos_helper("@r:200%", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "100 200");
 
-        let result = element.eval_pos_helper("@l:-1", &bbox);
+        let result = element.eval_pos_helper("@l:-1", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "0 99");
 
-        let result = element.eval_pos_helper("@l:37", &bbox);
+        let result = element.eval_pos_helper("@l:37", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "0 37");
 
-        let result = element.eval_pos_helper("@l:37 3 5", &bbox);
+        let result = element.eval_pos_helper("@l:37 3 5", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "3 42");
     }
@@ -820,15 +849,15 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with location positioning
-        let result = element.eval_pos_helper("@tr", &bbox);
+        let result = element.eval_pos_helper("@tr", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "100 0");
 
-        let result = element.eval_pos_helper("@bl", &bbox);
+        let result = element.eval_pos_helper("@bl", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "0 100");
 
-        let result = element.eval_pos_helper("@c", &bbox);
+        let result = element.eval_pos_helper("@c", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "50 50");
     }
@@ -845,7 +874,7 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with relative positioning
-        let result = element.eval_pos_helper(":h 10", &bbox);
+        let result = element.eval_pos_helper(":h 10", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "110 12.5");
     }
@@ -856,11 +885,11 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
         // Test with invalid input
 
-        let result = element.eval_pos_helper("invalid", &bbox);
+        let result = element.eval_pos_helper("invalid", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "invalid");
 
-        let result = element.eval_pos_helper("30 20", &bbox);
+        let result = element.eval_pos_helper("30 20", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "30 20");
     }

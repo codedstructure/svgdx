@@ -59,10 +59,10 @@ following abbreviations:
 
 Together an 'elref' and a 'locspec' denote a point in 2D user coordinates.
 
-**Edge Offset Spec** - as a special case of 'locspec', those locations which define the
-edge of an element (i.e. t,r,b,l) may be followed by an offset to vary the resulting
-point position along the edge. The offset is separated from the locspec by a colon
-(`:`), and may be either a number or a percentage.
+**Edge Offset Spec** - ('edgespec') as a special case of 'locspec', those locations
+which define the edge of an element (i.e. t,r,b,l) may be followed by an offset to
+vary the resulting point position along the edge. The offset is separated from the
+locspec by a colon (`:`), and may be either a number or a percentage.
 
 Each edge starts at the 'left' (`t` / `b` edges) or 'top' (`l` / `r` edges) and
 ends at the right/bottom of the edge respectively.

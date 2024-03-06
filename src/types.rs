@@ -115,16 +115,16 @@ pub fn strp_length(s: &str) -> anyhow::Result<Length> {
     }
 }
 
-/// `RelSpec` defines a location relative to an element's `BoundingBox`
+/// `DirSpec` defines a location relative to an element's `BoundingBox`
 #[derive(Clone, Copy)]
-pub enum RelSpec {
+pub enum DirSpec {
     InFront,
     Behind,
     Below,
     Above,
 }
 
-impl TryFrom<&str> for RelSpec {
+impl TryFrom<&str> for DirSpec {
     type Error = anyhow::Error;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
@@ -133,12 +133,12 @@ impl TryFrom<&str> for RelSpec {
             "H" => Ok(Self::Behind),
             "v" => Ok(Self::Below),
             "V" => Ok(Self::Above),
-            _ => bail!("Invalid RelSpec format {value}"),
+            _ => bail!("Invalid DirSpec format {value}"),
         }
     }
 }
 
-impl RelSpec {
+impl DirSpec {
     pub fn to_locspec(self) -> LocSpec {
         match self {
             Self::InFront => LocSpec::Right,
