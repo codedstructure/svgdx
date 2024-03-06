@@ -423,7 +423,43 @@ impl SvgElement {
         }
     }
 
-    fn split_ref_el<'a, 'b>(
+    /// Convert a (potentially) relspec position string to an absolute position string.
+    ///
+    /// If it doesn't look like a relspec, it is returned unchanged; if it looks like a
+    /// relspec but can't be parsed, an error is returned.
+    ///
+    /// Examples:
+    ///
+    /// Direction relative positioning - horizontally below, above, to the left, or to the
+    /// right of the referenced element.
+    /// ```text
+    /// (^|#id)(:(h|H|v|V) [gap])
+    /// ```
+    ///
+    /// Location-based positioning - relative to a specific location on the reference element
+    /// ```text
+    /// (^|#id)[@loc] [dx] [dy]
+    /// ```
+    ///
+    /// Edge-based positioning - relative to a specific location on the reference element
+    /// ```text
+    /// (^|#id)[@edge][:length] [dx] [dy]
+    /// ```
+    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
+        let (ref_el, remain) = self.split_relspec(input, context)?;
+        let ref_el = match ref_el {
+            Some(el) => el,
+            None => return Ok(input.to_owned()),
+        };
+
+        if let Some(bbox) = ref_el.bbox()? {
+            self.eval_pos_helper(remain, &bbox)
+        } else {
+            Ok(input.to_owned())
+        }
+    }
+
+    fn split_relspec<'a, 'b>(
         &self,
         input: &'b str,
         context: &'a TransformerContext,
@@ -460,26 +496,7 @@ impl SvgElement {
         Ok((dx, dy))
     }
 
-    fn eval_pos(&self, input: &str, context: &TransformerContext) -> Result<String> {
-        // Simple relative positioning - horizontally below, above, left, or right of reference element
-        // (^|#id)(:(h|v|H|V) [gap])
-        // Location-based positioning - relative to a specific location on the reference element
-        // (^|#id)[@loc] [dx] [dy]
-        // Edge-based positioning - relative to a specific location on the reference element
-        // (^|#id)[@edge][:length] [dx] [dy]
-        let (ref_el, remain) = self.split_ref_el(input, context)?;
-        let ref_el = match ref_el {
-            Some(el) => el,
-            None => return Ok(input.to_owned()),
-        };
-
-        if let Some(bbox) = ref_el.bbox()? {
-            self.eval_pos_helper(remain, &bbox)
-        } else {
-            Ok(input.to_owned())
-        }
-    }
-
+    // This is split out for testability
     fn eval_pos_helper(&self, remain: &str, bbox: &BoundingBox) -> Result<String> {
         let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
         let loc_re = regex!(r"^@(?<loc>[trblc]+)(\s+(?<remain>.*))?$");
@@ -520,6 +537,9 @@ impl SvgElement {
                 (0., 0.)
             };
             let (x, y) = bbox.locspec(loc);
+            format!("{} {}", fstr(x + dx), fstr(y + dy))
+        } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
+            let (x, y) = bbox.locspec(LocSpec::TopLeft);
             format!("{} {}", fstr(x + dx), fstr(y + dy))
         } else {
             remain.to_owned()

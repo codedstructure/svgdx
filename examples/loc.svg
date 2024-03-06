@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="42mm" height="33mm" viewBox="-6 -8 42 33">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="-5 -5 40 30">
   <style>
   <![CDATA[
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
@@ -7,7 +7,7 @@
   ]]>
   </style>
     <rect x="10" y="10" width="10" height="10" margin="3 1" id="base"/>
-    <rect x="-1" y="10" width="10" height="10" style="fill:blue"/>
-    <rect x="21" y="10" width="10" height="10" style="fill:green"/>
-    <rect x="21" y="-3" width="10" height="10" style="fill:red"/>
+    <rect x="0" y="10" width="10" height="10" style="fill:blue"/>
+    <rect x="20" y="10" width="10" height="10" style="fill:green"/>
+    <rect x="20" y="0" width="10" height="10" style="fill:red"/>
 </svg>

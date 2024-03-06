@@ -2,7 +2,7 @@
   <rect surround="#a #b #c" margin="2" class="d-dash d-fill-blue" opacity="0.5"/>
   <rect surround="#b #d" margin="5" rx="3" class="d-dot d-fill-red" opacity="0.5"/>
   <rect id="a" xy="0" wh="20" text="a" class="d-red" />
-  <rect id="b" xy="^h 10" wh="^" text="b" class="d-fill-green" />
-  <rect id="c" xy="^h 30" wh="^" text="c" class="d-fill-yellow" />
+  <rect id="b" xy="^:h 10" wh="^" text="b" class="d-fill-green" />
+  <rect id="c" xy="^:h 30" wh="^" text="c" class="d-fill-yellow" />
   <rect id="d" xy="#b:v 5" wh="^" text="d" class="d-fill-magenta"/>
 </svg>
