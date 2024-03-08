@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: relspec positioning modified to be more consistent: the referenced element
+  must now be given explicitly as `^` or `#id`, rather than the previous implicit
+  'previous element' default. Direction-based relative positioning ('dirspec') now
+  always requires a ':' separator. See [layout.md](docs/layout.md) for details of the
+  new relspec definition.
+
 - Changed: `margin` now takes up to 4 entries, analogous with CSS margin and padding
   values. Previously it took either one or two entries, and with two entries the
   first was an 'x' margin and the second a 'y' margin. Now the [CSS approach](https://developer.mozilla.org/en-US/docs/Web/CSS/Shorthand_properties#margin_and_padding_properties)

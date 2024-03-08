@@ -235,6 +235,11 @@ impl SvgElement {
         // these to be set to have a bounding box.
         let zstr = "0".to_owned();
         match self.name.as_str() {
+            "text" => {
+                let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
+                let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
+                Ok(Some(BoundingBox::new(x, y, x, y)))
+            }
             "rect" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
                     let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
@@ -574,53 +579,44 @@ impl SvgElement {
         Ok(remain.to_owned())
     }
 
+    /// Convert a (potentially) relspec size string to an absolute (width, height) string.
+    ///
+    /// If it doesn't look like a relspec, it is returned unchanged; if it looks like a
+    /// relspec but can't be parsed, an error is returned.
+    ///
+    /// Examples:
+    ///
+    ///   (#id|^) [DW[%] DH[%]]
+    /// Meaning:
+    ///   #id - reference to size of another element
+    ///   ^ - reference to previous element
+    ///   dw / dh - delta width/height (user units; may be negative)
+    ///   dw% / dh% - scaled width/height
+    ///
+    /// `input`: the relspec string
+    ///
+    /// `context`: the transformer context, used for lookup of the reference element.
     fn eval_size(&self, input: &str, context: &TransformerContext) -> Result<String> {
-        // Relative size:
-        //   (#id|^) [DW[%] DH[%]]
-        // Meaning:
-        //   #id - reference to size of another element
-        //   ^ - reference to previous element
-        //   dw / dh - delta width/height (user units; may be negative)
-        //   dw% / dh% - scaled width/height
-        //
-        // Examples:
-        //   wh="#thing 2 110%"  - size of #thing plus 2 units width, *1.1 height
-        // TODO: extend to allow referencing earlier elements beyond previous
-        // TODO: allow mixed relative and absolute values...
         let input = input.trim();
-        let mut parts = attr_split(input);
-        let ref_loc = parts.next().expect("always at least one");
-        let rel_re = regex!(r"^(?<ref>(#\S+|\^))");
-        if let Some(caps) = rel_re.captures(&ref_loc) {
-            let dw = parts.next().unwrap_or("0".to_owned());
-            let dh = parts.next().unwrap_or("0".to_owned());
-            let mut ref_el = context.get_prev_element();
-            let ref_str = caps
-                .name("ref")
-                .context("ref is mandatory in regex")?
-                .as_str();
-            if let Some(ref_str) = ref_str.strip_prefix('#') {
-                ref_el = Some(context.get_element(ref_str).context(format!(
-                    "Could not find reference '{ref_str}' in eval_size({input})"
-                ))?);
-            }
+        let (ref_el, remain) = self.split_relspec(input, context)?;
+        let ref_el = match ref_el {
+            Some(el) => el,
+            None => return Ok(input.to_owned()),
+        };
 
-            if let Some(inner) = ref_el {
-                if let (Some(w), Some(h)) = (inner.get_attr("width"), inner.get_attr("height")) {
-                    let w =
-                        strp(&w).context(r#"Could not derive width in eval_size("{input}")"#)?;
-                    let h =
-                        strp(&h).context(r#"Could not derive height in eval_size("{input}")"#)?;
-                    let dw = strp_length(&dw)
-                        .context(r#"Could not derive dw in eval_size("{input"})"#)?;
-                    let dh = strp_length(&dh)
-                        .context(r#"Could not derive dh in eval_size("{input"})"#)?;
-                    let w = fstr(dw.adjust(w));
-                    let h = fstr(dh.adjust(h));
+        let mut parts = attr_split(remain);
+        let dw = parts.next().unwrap_or("0".to_owned());
+        let dh = parts.next().unwrap_or("0".to_owned());
 
-                    return Ok(format!("{w} {h}"));
-                }
-            }
+        if let (Some(w), Some(h)) = (ref_el.get_attr("width"), ref_el.get_attr("height")) {
+            let w = strp(&w).context(r#"Could not derive width in eval_size("{input}")"#)?;
+            let h = strp(&h).context(r#"Could not derive height in eval_size("{input}")"#)?;
+            let dw = strp_length(&dw).context(r#"Could not derive dw in eval_size("{input"})"#)?;
+            let dh = strp_length(&dh).context(r#"Could not derive dh in eval_size("{input"})"#)?;
+            let w = fstr(dw.adjust(w));
+            let h = fstr(dh.adjust(h));
+
+            return Ok(format!("{w} {h}"));
         }
         Ok(input.to_owned())
     }
