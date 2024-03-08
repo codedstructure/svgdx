@@ -4,7 +4,7 @@ use svgdx::transform_str_default;
 fn test_repeat_simple() {
     let rep_input = r#"
 <rect xy="0" wh="2"/>
-<rect xy="@tr" wh="2" repeat="3"/>
+<rect xy="^@tr" wh="2" repeat="3"/>
 "#;
     let expected = r#"
 <rect x="0" y="0" width="2" height="2"/>
@@ -22,7 +22,7 @@ fn test_repeat_simple() {
 fn test_repeat_zero() {
     let rep_input = r#"
 <rect xy="0" wh="2"/>
-<rect xy="@tr" wh="2" repeat="0"/>
+<rect xy="^@tr" wh="2" repeat="0"/>
 "#;
     let expected = r#"
 <rect x="0" y="0" width="2" height="2"/>

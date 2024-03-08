@@ -115,6 +115,40 @@ pub fn strp_length(s: &str) -> anyhow::Result<Length> {
     }
 }
 
+/// `DirSpec` defines a location relative to an element's `BoundingBox`
+#[derive(Clone, Copy)]
+pub enum DirSpec {
+    InFront,
+    Behind,
+    Below,
+    Above,
+}
+
+impl TryFrom<&str> for DirSpec {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "h" => Ok(Self::InFront),
+            "H" => Ok(Self::Behind),
+            "v" => Ok(Self::Below),
+            "V" => Ok(Self::Above),
+            _ => bail!("Invalid DirSpec format {value}"),
+        }
+    }
+}
+
+impl DirSpec {
+    pub fn to_locspec(self) -> LocSpec {
+        match self {
+            Self::InFront => LocSpec::Right,
+            Self::Behind => LocSpec::Left,
+            Self::Below => LocSpec::Bottom,
+            Self::Above => LocSpec::Top,
+        }
+    }
+}
+
 /// `EdgeSpec` defines one edge of a `BoundingBox`.
 ///
 /// May be combined with a `Length` to refer to a point along an edge.

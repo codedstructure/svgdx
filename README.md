@@ -34,8 +34,8 @@ Prepare an input file ([examples/simple.xml](examples/simple.xml)):
 ```xml
 <svg>
   <rect id="in" wh="20 10" text="input" />
-  <rect id="proc" xy="^h 10" wh="^" text="process" />
-  <rect id="out" xy="^h 10" wh="^" text="output" />
+  <rect id="proc" xy="^:h 10" wh="^" text="process" />
+  <rect id="out" xy="^:h 10" wh="^" text="output" />
 
   <line start="#in" end="#proc" class="d-arrow"/>
   <line start="#proc" end="#out" class="d-arrow"/>

@@ -37,28 +37,28 @@
     <rect id="b1" x="20" y="20" width="80" height="20" text="Box 1"/>
     <line start="#b1@b" end="#b3@t"/>
     <rect id="b2" x="20" y="50" width="20" height="30" text="Box 2" text-loc="t"/>
-    <rect xy="@tl 2 11" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
+    <rect xy="^@tl 2 11" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
     <line start="#b2@r" end="#b3@l"/>
     <rect id="b3" x="50" y="50" width="20" height="30" text="Box 3" text-loc="t"/>
-    <rect xy="@tl 2 11" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
+    <rect xy="^@tl 2 11" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
     <line start="#b3@r" end="#b4@l"/>
     <rect id="b4" x="80" y="50" width="20" height="30" text="Box 4" text-loc="t"/>
-    <rect xy="@tl 2 11" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
-    <rect xy="@bl 0 1" width="16" height="5"/>
+    <rect xy="^@tl 2 11" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
+    <rect xy="^@bl 0 1" width="16" height="5"/>
 
     <rect x="20" y="82" width="5" height="5"/>
-    <rect xy="@tr 2 0" width="11" height="5"/>
-    <rect xy="@tr 2 0" width="6" height="5"/>
-    <rect xy="@tr 2 0" width="6" height="5"/>
-    <rect xy="@tr 8 0" width="2" height="5"/>
-    <rect xy="@tr 2 0" width="6" height="5"/>
-    <rect xy="@tr 2 0" width="8" height="5"/>
-    <rect xy="@tr 2 0" width="6" height="5"/>
-    <rect xy="@tr 2 0" width="8" height="5"/>
+    <rect xy="^@tr 2 0" width="11" height="5"/>
+    <rect xy="^@tr 2 0" width="6" height="5"/>
+    <rect xy="^@tr 2 0" width="6" height="5"/>
+    <rect xy="^@tr 8 0" width="2" height="5"/>
+    <rect xy="^@tr 2 0" width="6" height="5"/>
+    <rect xy="^@tr 2 0" width="8" height="5"/>
+    <rect xy="^@tr 2 0" width="6" height="5"/>
+    <rect xy="^@tr 2 0" width="8" height="5"/>
 
 </svg>

@@ -12,8 +12,9 @@ manage by hand for anything but the most simple diagrams.
 > NOTE: Changes to the coordinate system (e.g. using the `transform` attribute)
 > are currently ignored when `svgdx` calculates layout.
 
-> NOTE: Bounding boxes are not currently computed for `<path>` elements, so
-> these will not position effectively.
+> NOTE: Bounding boxes calculations for `<path>` elements are incomplete,
+> (in particular arcs and curves are not handled) so these may not position
+> effectively.
 
 ## Uniform Attributes
 
@@ -34,7 +35,7 @@ position and size of an `<ellipse>` element, for example.
 
 Rather than requiring absolute positions for elements, `svgdx` allows elements
 to be placed relative to other elements. Since `xy` defaults to "0" if not
-specified, many diagrams will not need any absolute positions to be specified.
+specified, many diagrams will not need _any_ absolute positions to be specified.
 
 The following concepts are defined, and can be combined to make a 'relative
 specifier', or 'relspec'.
@@ -58,10 +59,10 @@ following abbreviations:
 
 Together an 'elref' and a 'locspec' denote a point in 2D user coordinates.
 
-**Edge Offset Spec** - as a special case of 'locspec', those locations which define the
-edge of an element (i.e. t,r,b,l) may be followed by an offset to vary the resulting
-point position along the edge. The offset is separated from the locspec by a colon
-(`:`), and may be either a number or a percentage.
+**Edge Offset Spec** - ('edgespec') as a special case of 'locspec', those locations
+which define the edge of an element (i.e. t,r,b,l) may be followed by an offset to
+vary the resulting point position along the edge. The offset is separated from the
+locspec by a colon (`:`), and may be either a number or a percentage.
 
 Each edge starts at the 'left' (`t` / `b` edges) or 'top' (`l` / `r` edges) and
 ends at the right/bottom of the edge respectively.
@@ -92,27 +93,19 @@ two objects. The following dirspec values are supported:
 ### Relspec
 
 The above pieces fit together according to the following grammar.
-Note this provides shortcuts rather than being fully consistent,
-allowing some separators to be omitted when
-context allows it.
 
 ```
-length     := number | number %
-edgespec   := @ [t|r|b|l]
-offsetspec := edgespec : length
+dirspec    := : [h|H|v|V]
 locspec    := @ [tl|t|tr|r|br|b|bl|l|c]
-dirspec    := [h|H|v|V]
-prevspec   := ^
-ident      := alphanumeric
-ref        := # ident
-elref      := prevspec | ref
+edgespec   := @ [t|r|b|l] : length
+length     := number | number %
 
-relspec  := prevspec dirspec |
-            ref : dirspec |
-            locspec |
-            ref locspec |
-            edgespec offsetspec |
-            ref locspec offsetspec
+elref      := prevspec | ref
+prevspec   := ^
+ref        := # ident
+ident      := alphanumeric
+
+relspec  := elref [dirspec | locspec | edgespec]
 ```
 
 Following the `relspec` as defined above, additional values may be given to define
@@ -130,8 +123,8 @@ Some simple examples:
   with `id="abc"`.
 * `cxy="^"` - position this element to have its center on the center of the
   previous element.
-* `xy="^V"` - position this element directly above the previous element.
-* `xy="@br"` - position this element at the bottom-right of the
+* `xy="^:V"` - position this element directly above the previous element.
+* `xy="^@br"` - position this element at the bottom-right of the
   previous element.
 * `xy="#thing@tr 5 10"` - position this element at the top-right of
   element with `id="thing"`, offset by (5, 10).
