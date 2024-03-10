@@ -61,16 +61,22 @@ pub struct SvgElement {
     pub attrs: AttrMap,
     pub classes: ClassList,
     pub content: ContentType,
+    pub tail: Option<String>,
+    pub order_index: usize,
     pub indent: usize,
     pub src_line: usize,
 }
 
 impl Display for SvgElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.name, self.attrs)?;
+        write!(f, "<{}", self.name)?;
+        if !self.attrs.is_empty() {
+            write!(f, " {}", self.attrs)?;
+        }
         if !self.classes.is_empty() {
             write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
         }
+        write!(f, ">")?;
         Ok(())
     }
 }
@@ -94,6 +100,8 @@ impl SvgElement {
             attrs: attr_map,
             classes,
             content: ContentType::Empty,
+            tail: None,
+            order_index: 0,
             indent: 0,
             src_line: 0,
         }
@@ -105,6 +113,14 @@ impl SvgElement {
 
     pub fn set_src_line(&mut self, line: usize) {
         self.src_line = line;
+    }
+
+    pub fn set_order_index(&mut self, order_index: usize) {
+        self.order_index = order_index;
+    }
+
+    pub fn set_tail(&mut self, tail: &str) {
+        self.tail = Some(tail.to_string());
     }
 
     pub fn add_class(&mut self, class: &str) -> Self {
@@ -177,6 +193,10 @@ impl SvgElement {
         self.attrs.insert(key, value);
     }
 
+    pub fn is_phantom_element(&self) -> bool {
+        matches!(self.name.as_str(), "config" | "specs" | "var")
+    }
+
     /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
     /// Note `reuse` is not a standard SVG element, but is used here in similar
     /// contexts to the `use` element.
@@ -193,6 +213,7 @@ impl SvgElement {
                 | "rect"
                 | "text"
                 | "use"
+                // Following are non-standard.
                 | "reuse"
         )
     }
@@ -214,8 +235,16 @@ impl SvgElement {
                 | "svg"
                 | "switch"
                 | "symbol"
+                // Following are non-standard.
                 | "specs"
         )
+    }
+
+    /// Should text content of this element be treated as element text?
+    pub fn is_content_text(&self) -> bool {
+        // This is present for graphics elements except for text,
+        // where we need to be transparent.
+        self.is_graphics_element() && self.name != "text"
     }
 
     pub fn is_empty_element(&self) -> bool {

@@ -18,7 +18,7 @@ pub fn fstr(x: f32) -> String {
 
 /// Parse a string to an f32
 pub fn strp(s: &str) -> anyhow::Result<f32> {
-    s.parse().map_err(|e: ParseFloatError| e.into())
+    s.trim().parse().map_err(|e: ParseFloatError| e.into())
 }
 
 /// Returns iterator over whitespace-or-comma separated values
@@ -544,7 +544,7 @@ impl Display for AttrMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.attrs.iter().enumerate() {
             write!(f, r#"{}="{}""#, k.1, v)?;
-            if idx < self.attrs.len() {
+            if idx < self.attrs.len() - 1 {
                 write!(f, " ")?;
             }
         }
@@ -559,6 +559,10 @@ impl AttrMap {
             index_map: HashMap::new(),
             next_index: 0,
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.attrs.is_empty()
     }
 
     /// Insert-or-update the given key/value into the `AttrMap`.

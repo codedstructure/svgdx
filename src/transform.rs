@@ -24,14 +24,13 @@ use rand::prelude::*;
 pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     original_map: HashMap<String, SvgElement>,
-    current_element: Option<SvgElement>,
+    current_element: Vec<SvgElement>,
     prev_element: Option<SvgElement>,
     variables: HashMap<String, String>,
     // SmallRng is used as it is seedable.
     rng: RefCell<SmallRng>,
+    real_svg: bool,
     in_specs: bool,
-    defer_next_text: bool,
-    discard_next_text: bool,
 }
 
 impl TransformerContext {
@@ -39,13 +38,12 @@ impl TransformerContext {
         Self {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
-            current_element: None,
+            current_element: Vec::new(),
             prev_element: None,
             variables: HashMap::new(),
             rng: RefCell::new(SmallRng::seed_from_u64(0)),
+            real_svg: false,
             in_specs: false,
-            defer_next_text: false,
-            discard_next_text: false,
         }
     }
 
@@ -74,13 +72,24 @@ impl TransformerContext {
         self.variables.insert(name.into(), value.into());
     }
 
-    pub fn set_current_element(&mut self, el: &SvgElement) {
-        self.current_element = Some(el.clone());
+    pub fn push_current_element(&mut self, el: &SvgElement) {
+        self.current_element.push(el.clone());
+    }
+
+    pub fn pop_current_element(&mut self) -> Option<SvgElement> {
+        self.current_element.pop()
+    }
+
+    pub fn get_current_element(&self) -> Option<&SvgElement> {
+        self.current_element.last()
+    }
+
+    pub fn get_current_element_mut(&mut self) -> Option<&mut SvgElement> {
+        self.current_element.last_mut()
     }
 
     pub fn get_var(&self, name: &str) -> Option<String> {
-        self.current_element
-            .as_ref()
+        self.get_current_element()
             .and_then(|el| {
                 if el.name == "var" {
                     // `var` is special - its attributes are targets, so can't
@@ -215,6 +224,9 @@ impl TransformerContext {
             self.handle_vars(&mut e);
             return Ok(vec![]);
         }
+        if &e.name == "specs" {
+            return Ok(vec![]);
+        }
         events.extend(self.handle_comments(&mut e));
         self.handle_containment(&mut e)?;
 
@@ -284,7 +296,7 @@ impl TransformerContext {
             }
         }
 
-        if e.is_graphics_element() && !e.has_attr("text") {
+        if e.is_content_text() && !e.has_attr("text") {
             if let ContentType::Ready(ref value) = e.clone().content {
                 e.set_attr("text", value);
             }
@@ -357,16 +369,22 @@ pub enum SvgEvent {
     End(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputEvent<'a> {
+    event: Event<'a>,
+    line: usize,
+    indent: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct EventList<'a> {
     events: Vec<InputEvent<'a>>,
 }
 
-#[derive(Debug, Clone)]
-struct InputEvent<'a> {
-    event: Event<'a>,
-    line: usize,
-    indent: usize,
+impl From<&str> for EventList<'_> {
+    fn from(value: &str) -> Self {
+        Self::from_str(value).expect("failed to parse string")
+    }
 }
 
 impl From<Event<'_>> for EventList<'_> {
@@ -377,6 +395,21 @@ impl From<Event<'_>> for EventList<'_> {
                 line: 0,
                 indent: 0,
             }],
+        }
+    }
+}
+
+impl From<Vec<InputEvent<'_>>> for EventList<'_> {
+    fn from(value: Vec<InputEvent>) -> Self {
+        Self {
+            events: value
+                .into_iter()
+                .map(|v| InputEvent {
+                    event: v.event.into_owned(),
+                    line: v.line,
+                    indent: v.indent,
+                })
+                .collect(),
         }
     }
 }
@@ -393,6 +426,15 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
                 })
                 .collect(),
         }
+    }
+}
+
+impl<'a> IntoIterator for EventList<'a> {
+    type Item = (usize, InputEvent<'a>);
+    type IntoIter = std::iter::Enumerate<std::vec::IntoIter<InputEvent<'a>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.events.into_iter().enumerate()
     }
 }
 
@@ -572,6 +614,15 @@ impl Transformer {
         self.postprocess(output, writer)
     }
 
+    fn handle_svg_root(&mut self, element: &SvgElement) -> Result<()> {
+        // "Real" SVG documents will have an `xmlns` attribute.
+        if element.get_attr("xmlns") == Some("http://www.w3.org/2000/svg".to_owned()) {
+            self.context.real_svg = true;
+        }
+
+        Ok(())
+    }
+
     fn handle_config_element(&mut self, element: &SvgElement) -> Result<()> {
         for (key, value) in &element.attrs {
             match key.as_str() {
@@ -607,8 +658,6 @@ impl Transformer {
             ));
             if let Err(err) = events {
                 // TODO: save the error context with the element to show to user if it is unrecoverable.
-                self.context.defer_next_text = true;
-                // discard any events generated by this element.
                 bail!(
                     "Error '{}' processing element on line {}",
                     err,
@@ -619,7 +668,6 @@ impl Transformer {
             if events.is_empty() {
                 // if an input event doesn't generate any output events,
                 // ignore text following that event to avoid blank lines in output.
-                self.context.discard_next_text = true;
                 break;
             }
 
@@ -627,11 +675,14 @@ impl Transformer {
                 gen_events.push(&ev.event);
             }
 
-            if rep_idx < (repeat - 1) || event_element.content.is_ready() {
+            if rep_idx < (repeat - 1) {
                 gen_events.push(&Event::Text(BytesText::new(&format!(
                     "\n{}",
                     " ".repeat(event_element.indent)
                 ))));
+            }
+            if let Some(tail) = &event_element.tail {
+                gen_events.push(&Event::Text(BytesText::new(tail)));
             }
         }
         Ok(gen_events)
@@ -675,35 +726,46 @@ impl Transformer {
         Ok(instance_element)
     }
 
-    fn process_seq<'a, 'b>(
+    fn process_seq<'a>(
         &mut self,
-        seq: impl IntoIterator<Item = (usize, InputEvent<'b>)>,
+        seq: impl IntoIterator<Item = (usize, InputEvent<'a>)>,
         idx_output: &mut BTreeMap<usize, EventList>,
-    ) -> Result<Vec<(usize, InputEvent<'b>)>> {
+    ) -> Result<Vec<(usize, InputEvent<'a>)>> {
         let mut remain = Vec::<(usize, InputEvent)>::new();
-        let mut gen_events = EventList::new();
-        let mut last_idx = 0;
+        let mut last_event = None;
+        let mut last_element = None;
+        let mut gen_events: Vec<(usize, EventList<'_>)>;
 
         for (idx, input_ev) in seq {
             let ev = &input_ev.event;
+            gen_events = Vec::new();
+
             match ev {
                 Event::Start(ref e) | Event::Empty(ref e) => {
                     let is_empty = matches!(ev, Event::Empty(_));
+
                     let mut event_element = SvgElement::try_from(e).context(format!(
                         "could not extract element at line {}",
                         input_ev.line
                     ))?;
                     event_element.set_indent(input_ev.indent);
                     event_element.set_src_line(input_ev.line);
+                    event_element.set_order_index(idx);
                     event_element.content = if is_empty {
                         ContentType::Empty
                     } else {
                         ContentType::Pending
                     };
+                    last_element = Some(event_element.clone());
+                    last_event = Some(ev.clone());
+
+                    if event_element.name == "svg" && self.context.get_current_element().is_none() {
+                        // The outer <svg> element is a special case.
+                        self.handle_svg_root(&event_element)?;
+                    }
 
                     if event_element.name == "config" {
                         self.handle_config_element(&event_element)?;
-                        self.context.discard_next_text = true;
                         continue;
                     }
 
@@ -714,22 +776,19 @@ impl Transformer {
                         self.context.in_specs = true;
                     }
 
-                    if !gen_events.is_empty() {
-                        idx_output.insert(last_idx, gen_events);
-                        gen_events = EventList::new();
-                    }
-                    last_idx = idx;
-
+                    let mut ev_events = EventList::new();
                     self.context.update_element(&event_element);
                     if self.config.debug {
                         // Prefix replaced element(s) with a representation of the original element
                         //
                         // Replace double quote with backtick to avoid messy XML entity conversion
                         // (i.e. &quot; or &apos; if single quotes were used)
-                        gen_events.push(&Event::Comment(BytesText::new(
-                            &format!(" {event_element}",).replace('"', "`"),
+                        ev_events.push(&Event::Comment(BytesText::new(
+                            &format!(" {event_element} ",)
+                                .replace('"', "`")
+                                .replace(['<', '>'], ""),
                         )));
-                        gen_events.push(&Event::Text(BytesText::new(&format!(
+                        ev_events.push(&Event::Text(BytesText::new(&format!(
                             "\n{}",
                             " ".repeat(event_element.indent)
                         ))));
@@ -737,122 +796,137 @@ impl Transformer {
                     // Note this must be done before `<reuse>` processing, which 'switches out' the
                     // element being processed to its target. The 'current_element' is used for
                     // local variable lookup from attributes.
-                    self.context.set_current_element(&event_element);
+                    self.context.push_current_element(&event_element);
                     // support reuse element
                     if event_element.name == "reuse" {
-                        event_element = self.handle_reuse_element(event_element)?;
-                    }
-
-                    if is_empty || !event_element.is_graphics_element() {
-                        let events = self.generate_element_events(&mut event_element);
-                        if let Ok(ref events) = events {
-                            if events.is_empty() {
-                                continue;
+                        match self.handle_reuse_element(event_element) {
+                            Ok(ev_el) => {
+                                event_element = ev_el;
                             }
-                            gen_events.extend(events);
-                        } else {
-                            remain.push((idx, input_ev));
-                            continue;
+                            Err(err) => {
+                                self.context.pop_current_element();
+                                bail!(err);
+                            }
                         }
                     }
                     if is_empty {
-                        self.context.current_element = None;
+                        let events = self.generate_element_events(&mut event_element);
+                        if let Ok(ref events) = events {
+                            if !events.is_empty() {
+                                ev_events.extend(events);
+                                gen_events.push((idx, ev_events.clone()));
+                            }
+                        } else {
+                            remain.push((idx, input_ev.clone()));
+                        }
+
+                        self.context.pop_current_element();
                     }
                 }
                 Event::End(e) => {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
-                    if ee_name.as_str() == "specs" {
-                        self.context.in_specs = false;
-                        self.context.discard_next_text = true;
-                        continue;
+
+                    if let Some(mut event_element) = self.context.pop_current_element() {
+                        if event_element.name != ee_name {
+                            bail!(
+                                "Mismatched end tag: expected {}, got {ee_name}",
+                                event_element.name
+                            );
+                        }
+
+                        if ee_name.as_str() == "specs" {
+                            self.context.in_specs = false;
+                        }
+
+                        let mut events = self.generate_element_events(&mut event_element);
+                        if let Ok(ref mut events) = events {
+                            if !events.is_empty() {
+                                // `is_content_text` elements have responsibility for handling their own text content,
+                                // otherwise include the text element immediately after the opening element.
+                                if !event_element.is_content_text() {
+                                    if let ContentType::Ready(content) =
+                                        event_element.content.clone()
+                                    {
+                                        events.push(&Event::Text(BytesText::new(&content)));
+                                    }
+                                }
+                                gen_events.push((event_element.order_index, events.clone()));
+                                if !event_element.is_content_text() {
+                                    // Similarly, `is_content_text` elements should close themselves in the returned
+                                    // event list if needed.
+                                    gen_events.push((idx, EventList::from(ev.clone())));
+                                }
+                            }
+                        } else {
+                            remain.push((idx, input_ev.clone()));
+                        }
+                        last_element = Some(event_element);
+                    }
+                }
+                Event::Text(_) | Event::CData(_) => {
+                    // Inner value for Text and CData are different, so need to break these out again
+                    // into common String type.
+                    let t_str = match ev {
+                        Event::Text(e) => String::from_utf8(e.to_vec())?,
+                        Event::CData(e) => String::from_utf8(e.to_vec())?,
+                        _ => panic!("unreachable"),
+                    };
+
+                    let mut set_element_content_text = false;
+                    if let Some(ref last_element) = last_element {
+                        if last_element.is_phantom_element() {
+                            // Ignore text following a phantom element to avoid blank lines in output.
+                            continue;
+                        }
+                        let mut want_text = last_element.content.is_pending();
+                        if matches!(ev, Event::CData(_)) {
+                            // CData may happen after Text (e.g. newline+indent), in which case
+                            // override any previously stored text content. (CData is used to
+                            // preserve whitespace in the content text).
+                            want_text |= last_element.content.is_ready();
+                        }
+                        set_element_content_text = last_element.is_content_text() && want_text;
                     }
 
                     let mut processed = false;
-                    if let Some(ref event_element) = self.context.current_element {
-                        if event_element.is_graphics_element() {
-                            let events = self.generate_element_events(&mut event_element.clone());
-                            if let Ok(ref events) = events {
-                                if events.is_empty() {
-                                    continue;
-                                }
-                                gen_events.extend(events);
-                                processed = true;
-                            } else {
-                                remain.push((idx, input_ev));
-                                continue;
-                            }
-                        }
-                        self.context.current_element = None;
-                    }
-
-                    if !processed {
-                        gen_events.push(&Event::End(BytesEnd::new(ee_name)));
-                    }
-
-                    last_idx = idx;
-                }
-                Event::Text(e) => {
-                    // TODO: factor out Text and CData handling. Note slight differences.
-                    if self.context.discard_next_text {
-                        self.context.discard_next_text = false;
-                        continue;
-                    }
-                    if !self.context.in_specs {
-                        if self.context.defer_next_text {
-                            remain.push((idx, input_ev));
-                        } else if let Some(ref mut event_element) = self.context.current_element {
-                            if event_element.content.is_pending() {
-                                if event_element.is_graphics_element() {
-                                    event_element.content =
-                                        ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
-                                } else {
-                                    gen_events.push(ev);
-                                }
-                            }
-                        } else {
-                            gen_events.push(ev);
-                        }
-                    }
-                }
-                Event::CData(e) => {
-                    // TODO: factor out Text and CData handling. Note slight differences.
-                    if self.context.discard_next_text {
-                        self.context.discard_next_text = false;
-                        continue;
-                    }
-                    if !self.context.in_specs {
-                        if self.context.defer_next_text {
-                            remain.push((idx, input_ev));
-                        } else if let Some(ref mut event_element) = self.context.current_element {
-                            // CData overrides normal text
-                            if event_element.content.is_pending()
-                                || event_element.content.is_ready()
+                    match last_event {
+                        Some(Event::Start(_)) | Some(Event::Text(_)) => {
+                            // if the last *event* was a Start event, the text should be
+                            // set as the content of the current *element*.
+                            if let Some(ref mut last_element) =
+                                self.context.get_current_element_mut()
                             {
-                                if event_element.is_graphics_element() {
-                                    event_element.content =
-                                        ContentType::Ready(String::from_utf8(e.clone().to_vec())?);
-                                } else {
-                                    gen_events.push(ev);
+                                if set_element_content_text {
+                                    last_element.content = ContentType::Ready(t_str.clone());
+                                    processed = true;
                                 }
                             }
-                        } else {
-                            gen_events.push(ev);
                         }
+                        Some(Event::End(_)) => {
+                            // if the last *event* was an End event, the text should be
+                            // set as the tail of the last *element*.
+                            if let Some(ref mut last_element) = last_element {
+                                last_element.set_tail(&t_str.clone());
+                            }
+                        }
+                        _ => {}
+                    }
+                    if !processed && !self.context.in_specs {
+                        gen_events.push((idx, EventList::from(ev.clone())));
                     }
                 }
                 _ => {
-                    gen_events.push(ev);
+                    gen_events.push((idx, EventList::from(ev.clone())));
                 }
             }
 
-            // These are deliberately skipped by `continue` statements in the above match()
-            self.context.defer_next_text = false;
-            self.context.discard_next_text = false;
+            for (gen_idx, gen_events) in gen_events {
+                idx_output.insert(gen_idx, EventList::from(gen_events.events));
+            }
+
+            last_event = Some(ev.clone());
         }
 
-        if !gen_events.is_empty() {
-            idx_output.insert(last_idx, gen_events);
-        }
         Ok(remain)
     }
 
@@ -860,10 +934,8 @@ impl Transformer {
         let mut output = EventList { events: vec![] };
         let mut idx_output = BTreeMap::<usize, EventList>::new();
 
-        let seq = input.iter().cloned().enumerate().map(|x| (x.0, x.1));
-
         // First pass with original input data
-        let mut remain = self.process_seq(seq, &mut idx_output)?;
+        let mut remain = self.process_seq(input, &mut idx_output)?;
         // Repeatedly process remaining elements while useful
         while !remain.is_empty() {
             let last_len = remain.len();
@@ -1002,7 +1074,7 @@ impl Transformer {
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && self.config.add_auto_defs {
+        if has_svg_element && !self.context.real_svg && self.config.add_auto_defs {
             let indent = 2;
             let auto_defs = build_defs(&element_set, &class_set, &self.config);
             let auto_styles = build_styles(&element_set, &class_set, &self.config);
@@ -1148,4 +1220,74 @@ fn transform_element<'a>(
         }
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_eventlist_minimal() {
+        let input = r#"<svg></svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 2);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_eventlist_indent() {
+        let input = r#"<svg>
+        </svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 3);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].indent, 0);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 2);
+        assert_eq!(
+            el.events[1].event,
+            Event::Text(BytesText::new("\n        "))
+        );
+        assert_eq!(el.events[2].line, 2);
+        assert_eq!(el.events[2].indent, 8);
+        assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_process_seq() {
+        let mut transformer = Transformer::from_config(&TransformConfig::default());
+        let mut idx_output = BTreeMap::new();
+        let seq = EventList::new();
+
+        let remain = transformer.process_seq(seq, &mut idx_output);
+
+        assert_eq!(remain.unwrap(), Vec::new());
+    }
+
+    #[test]
+    fn test_process_seq_multiple_elements() {
+        let mut transformer = Transformer::from_config(&TransformConfig::default());
+        let mut idx_output = BTreeMap::new();
+
+        let seq = EventList::from(
+            r##"<svg>
+          <rect xy="#a:h" wh="10"/>
+          <circle id="a" cx="50" cy="50" r="40"/>
+        </svg>"##,
+        );
+
+        let remain = transformer.process_seq(seq, &mut idx_output);
+
+        let ok_ev_count = idx_output
+            .iter()
+            .map(|entry| entry.1.events.len())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        assert_eq!(ok_ev_count, 6);
+        let remain_ev_count = remain.unwrap().len();
+        assert_eq!(remain_ev_count, 1);
+    }
 }

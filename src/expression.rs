@@ -670,7 +670,7 @@ mod tests {
         );
 
         // Check attributes as locals
-        ctx.set_current_element(&SvgElement::new(
+        ctx.push_current_element(&SvgElement::new(
             "rect",
             &[
                 ("width".to_string(), "3".to_string()),
