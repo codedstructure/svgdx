@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0 - 2024-03-10]
+
 - Changed: relspec positioning modified to be more consistent: the referenced element
   must now be given explicitly as `^` or `#id`, rather than the previous implicit
   'previous element' default. Direction-based relative positioning ('dirspec') now
