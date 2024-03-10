@@ -661,7 +661,6 @@ impl Transformer {
             }
 
             if rep_idx < (repeat - 1) {
-                // || event_element.content.is_ready() {
                 gen_events.push(&Event::Text(BytesText::new(&format!(
                     "\n{}",
                     " ".repeat(event_element.indent)
@@ -849,77 +848,56 @@ impl Transformer {
                         last_element = Some(event_element);
                     }
                 }
-                Event::Text(e) => {
-                    let t_str = String::from_utf8(e.to_vec())?;
+                Event::Text(_) | Event::CData(_) => {
+                    // Inner value for Text and CData are different, so need to break these out again
+                    // into common String type.
+                    let t_str = match ev {
+                        Event::Text(e) => String::from_utf8(e.to_vec())?,
+                        Event::CData(e) => String::from_utf8(e.to_vec())?,
+                        _ => panic!("unreachable"),
+                    };
 
+                    let mut set_element_content_text = false;
                     if let Some(ref last_element) = last_element {
                         if last_element.is_phantom_element() {
+                            // Ignore text following a phantom element to avoid blank lines in output.
                             continue;
                         }
+                        let mut want_text = last_element.content.is_pending();
+                        if matches!(ev, Event::CData(_)) {
+                            // CData may happen after Text (e.g. newline+indent), in which case
+                            // override any previously stored text content. (CData is used to
+                            // preserve whitespace in the content text).
+                            want_text |= last_element.content.is_ready();
+                        }
+                        set_element_content_text = last_element.is_content_text() && want_text;
                     }
 
-                    match last_event {
-                        Some(Event::Start(_)) => {
-                            // if the last *event* was a Start event, the text should be
-                            // set as the content of the last *element*.
-                            if let Some(ref mut last_element) =
-                                self.context.get_current_element_mut()
-                            {
-                                if last_element.is_content_text()
-                                    && last_element.content.is_pending()
-                                {
-                                    last_element.content = ContentType::Ready(t_str.clone());
-                                } else {
-                                    gen_events.push((idx, EventList::from(ev.clone())));
-                                }
-                            }
-                        }
-                        _ => {
-                            if !self.context.in_specs {
-                                gen_events.push((idx, EventList::from(ev.clone())));
-                            }
-                        }
-                    }
-                    if let Some(Event::End(_)) = last_event {
-                        // if the last *event* was an End event, the text should be
-                        // set as the tail of the last *element*.
-                        if let Some(ref mut last_element) = last_element {
-                            last_element.set_tail(&t_str.clone());
-                        }
-                    }
-                }
-                Event::CData(e) => {
-                    let t_str = String::from_utf8(e.to_vec())?;
-
+                    let mut processed = false;
                     match last_event {
                         Some(Event::Start(_)) | Some(Event::Text(_)) => {
                             // if the last *event* was a Start event, the text should be
-                            // set as the content of the last *element*.
+                            // set as the content of the current *element*.
                             if let Some(ref mut last_element) =
                                 self.context.get_current_element_mut()
                             {
-                                if last_element.is_content_text()
-                                    && (last_element.content.is_pending()
-                                        || last_element.content.is_ready())
-                                {
+                                if set_element_content_text {
                                     last_element.content = ContentType::Ready(t_str.clone());
-                                } else {
-                                    gen_events.push((idx, EventList::from(ev.clone())));
+                                    processed = true;
                                 }
                             }
                         }
-                        _ => {
-                            if !self.context.in_specs {
-                                gen_events.push((idx, EventList::from(ev.clone())));
+                        Some(Event::End(_)) => {
+                            // if the last *event* was an End event, the text should be
+                            // set as the tail of the last *element*.
+                            if let Some(ref mut last_element) = last_element {
+                                last_element.set_tail(&t_str.clone());
                             }
                         }
+                        _ => {}
                     }
-                    if let Some(Event::End(_)) = last_event {
-                        // if the last *event* was an End event, the text should be
-                        // set as the tail of the last *element*.
-                        if let Some(ref mut last_element) = last_element {
-                            last_element.set_tail(&t_str.clone());
-                        }
+                    if !processed && !self.context.in_specs {
+                        gen_events.push((idx, EventList::from(ev.clone())));
                     }
                 }
                 _ => {

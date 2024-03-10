@@ -93,3 +93,18 @@ fn test_roundtrip_text() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, input);
 }
+
+#[test]
+fn test_roundtrip_cdata() {
+    // Tests Start + Empty + Text + CData + Text + End
+    let input = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
+    <rect width="2" height="4"/>
+    <![CDATA[
+        cdata stuff
+    ]]>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, input);
+}
