@@ -213,6 +213,7 @@ impl SvgElement {
                 | "rect"
                 | "text"
                 | "use"
+                // Following are non-standard.
                 | "reuse"
         )
     }
@@ -234,8 +235,16 @@ impl SvgElement {
                 | "svg"
                 | "switch"
                 | "symbol"
+                // Following are non-standard.
                 | "specs"
         )
+    }
+
+    /// Should text content of this element be treated as element text?
+    pub fn is_content_text(&self) -> bool {
+        // This is present for graphics elements except for text,
+        // where we need to be transparent.
+        self.is_graphics_element() && self.name != "text"
     }
 
     pub fn is_empty_element(&self) -> bool {

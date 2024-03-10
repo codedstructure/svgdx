@@ -80,3 +80,16 @@ fn test_roundtrip_nested() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, input);
 }
+
+#[test]
+fn test_roundtrip_text() {
+    // Tests Start + Text + End
+    let input = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
+    <text x="1" y="2"><tspan>some</tspan><tspan dx="1em" dy="1em">thing</tspan></text>
+    <text x="3" y="4">other thing</text>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, input);
+}

@@ -296,7 +296,7 @@ impl TransformerContext {
             }
         }
 
-        if e.is_graphics_element() && !e.has_attr("text") {
+        if e.is_content_text() && !e.has_attr("text") {
             if let ContentType::Ready(ref value) = e.clone().content {
                 e.set_attr("text", value);
             }
@@ -827,9 +827,9 @@ impl Transformer {
                         let mut events = self.generate_element_events(&mut event_element);
                         if let Ok(ref mut events) = events {
                             if !events.is_empty() {
-                                // Graphics elements have responsibility for handling their own text content, otherwise
-                                // include the text element immediately after the opening element.
-                                if !event_element.is_graphics_element() {
+                                // `is_content_text` elements have responsibility for handling their own text content,
+                                // otherwise include the text element immediately after the opening element.
+                                if !event_element.is_content_text() {
                                     if let ContentType::Ready(content) =
                                         event_element.content.clone()
                                     {
@@ -837,9 +837,9 @@ impl Transformer {
                                     }
                                 }
                                 gen_events.push((event_element.order_index, events.clone()));
-                                if !event_element.is_graphics_element() {
-                                    // Similarly, graphics elements should close themselves in the returned event list
-                                    // if needed.
+                                if !event_element.is_content_text() {
+                                    // Similarly, `is_content_text` elements should close themselves in the returned
+                                    // event list if needed.
                                     gen_events.push((idx, EventList::from(ev.clone())));
                                 }
                             }
@@ -865,7 +865,7 @@ impl Transformer {
                             if let Some(ref mut last_element) =
                                 self.context.get_current_element_mut()
                             {
-                                if last_element.is_graphics_element()
+                                if last_element.is_content_text()
                                     && last_element.content.is_pending()
                                 {
                                     last_element.content = ContentType::Ready(t_str.clone());
@@ -898,7 +898,7 @@ impl Transformer {
                             if let Some(ref mut last_element) =
                                 self.context.get_current_element_mut()
                             {
-                                if last_element.is_graphics_element()
+                                if last_element.is_content_text()
                                     && (last_element.content.is_pending()
                                         || last_element.content.is_ready())
                                 {
