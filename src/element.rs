@@ -269,7 +269,7 @@ impl SvgElement {
                 let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
                 Ok(Some(BoundingBox::new(x, y, x, y)))
             }
-            "rect" => {
+            "rect" | "use" | "image" | "svg" | "foreignObject" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
                     let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
                     let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
@@ -665,7 +665,7 @@ impl SvgElement {
             let w = parts.next().expect("cycle");
             let h = parts.next().expect("cycle");
             match self.name.as_str() {
-                "rect" => {
+                "rect" | "use" | "image" | "svg" | "foreignObject" => {
                     self.attrs.insert_idx("width", w, idx);
                     self.attrs.insert_idx("height", h, idx + 1);
                 }
@@ -730,7 +730,7 @@ impl SvgElement {
             // attribute totally determines the resulting value(s).
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
-                ("xy", "text" | "rect") => {
+                ("xy", "text" | "rect" | "use" | "image" | "svg" | "foreignObject") => {
                     new_attrs.insert("x", parts.next().expect("cycle"));
                     new_attrs.insert("y", parts.next().expect("cycle"));
                 }

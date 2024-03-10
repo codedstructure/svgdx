@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Support `wh` and `xy` attributes for `<use>`, `<image>`, `<svg>` and
+  `<foreignObject>` elements.
+
 ## [0.6.0 - 2024-03-10]
 
 - Changed: relspec positioning modified to be more consistent: the referenced element
