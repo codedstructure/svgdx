@@ -369,16 +369,22 @@ pub enum SvgEvent {
     End(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InputEvent<'a> {
+    event: Event<'a>,
+    line: usize,
+    indent: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct EventList<'a> {
     events: Vec<InputEvent<'a>>,
 }
 
-#[derive(Debug, Clone)]
-struct InputEvent<'a> {
-    event: Event<'a>,
-    line: usize,
-    indent: usize,
+impl From<&str> for EventList<'_> {
+    fn from(value: &str) -> Self {
+        Self::from_str(value).expect("failed to parse string")
+    }
 }
 
 impl From<Event<'_>> for EventList<'_> {
@@ -420,6 +426,15 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
                 })
                 .collect(),
         }
+    }
+}
+
+impl<'a> IntoIterator for EventList<'a> {
+    type Item = (usize, InputEvent<'a>);
+    type IntoIter = std::iter::Enumerate<std::vec::IntoIter<InputEvent<'a>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.events.into_iter().enumerate()
     }
 }
 
@@ -711,11 +726,11 @@ impl Transformer {
         Ok(instance_element)
     }
 
-    fn process_seq<'a, 'b>(
+    fn process_seq<'a>(
         &mut self,
-        seq: impl IntoIterator<Item = (usize, InputEvent<'b>)>,
+        seq: impl IntoIterator<Item = (usize, InputEvent<'a>)>,
         idx_output: &mut BTreeMap<usize, EventList>,
-    ) -> Result<Vec<(usize, InputEvent<'b>)>> {
+    ) -> Result<Vec<(usize, InputEvent<'a>)>> {
         let mut remain = Vec::<(usize, InputEvent)>::new();
         let mut last_event = None;
         let mut last_element = None;
@@ -919,10 +934,8 @@ impl Transformer {
         let mut output = EventList { events: vec![] };
         let mut idx_output = BTreeMap::<usize, EventList>::new();
 
-        let seq = input.iter().cloned().enumerate().map(|x| (x.0, x.1));
-
         // First pass with original input data
-        let mut remain = self.process_seq(seq, &mut idx_output)?;
+        let mut remain = self.process_seq(input, &mut idx_output)?;
         // Repeatedly process remaining elements while useful
         while !remain.is_empty() {
             let last_len = remain.len();
@@ -1207,4 +1220,74 @@ fn transform_element<'a>(
         }
     }
     Ok(output)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_eventlist_minimal() {
+        let input = r#"<svg></svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 2);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_eventlist_indent() {
+        let input = r#"<svg>
+        </svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 3);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].indent, 0);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 2);
+        assert_eq!(
+            el.events[1].event,
+            Event::Text(BytesText::new("\n        "))
+        );
+        assert_eq!(el.events[2].line, 2);
+        assert_eq!(el.events[2].indent, 8);
+        assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_process_seq() {
+        let mut transformer = Transformer::from_config(&TransformConfig::default());
+        let mut idx_output = BTreeMap::new();
+        let seq = EventList::new();
+
+        let remain = transformer.process_seq(seq, &mut idx_output);
+
+        assert_eq!(remain.unwrap(), Vec::new());
+    }
+
+    #[test]
+    fn test_process_seq_multiple_elements() {
+        let mut transformer = Transformer::from_config(&TransformConfig::default());
+        let mut idx_output = BTreeMap::new();
+
+        let seq = EventList::from(
+            r##"<svg>
+          <rect xy="#a:h" wh="10"/>
+          <circle id="a" cx="50" cy="50" r="40"/>
+        </svg>"##,
+        );
+
+        let remain = transformer.process_seq(seq, &mut idx_output);
+
+        let ok_ev_count = idx_output
+            .iter()
+            .map(|entry| entry.1.events.len())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        assert_eq!(ok_ev_count, 6);
+        let remain_ev_count = remain.unwrap().len();
+        assert_eq!(remain_ev_count, 1);
+    }
 }
