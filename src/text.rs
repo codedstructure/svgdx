@@ -152,6 +152,8 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let mut text_elem = SvgElement::new("text", &text_attrs);
     // line spacing (in 'em').
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
+    // Whether text is pre-formatted (i.e. spaces are not collapsed)
+    let text_pre = orig_elem.pop_attr("text-pre").is_some();
 
     // Copy style and class(es) from original element
     if let Some(style) = orig_elem.get_attr("style") {
@@ -179,20 +181,21 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
         let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
         tspan_elem.attrs.pop("y");
-        for (idx, text_fragment) in lines.iter().enumerate() {
+        for (idx, text_fragment) in lines.into_iter().enumerate() {
+            let mut text_fragment = text_fragment.to_string();
             let mut tspan = tspan_elem.clone();
             let line_offset = if idx == 0 {
                 first_line_offset(line_count, line_spacing)
             } else {
                 line_spacing
             };
-            // Replace leading spaces with non-breaking spaces so they aren't collapsed
-            // by XML processing. This allows pre-formatted multi-line text (e.g. for
-            // code listings)
-            let init_len = text_fragment.len();
-            let text_remainder = text_fragment.trim_start();
-            let mut text_fragment = NBSP.repeat(init_len - text_remainder.len());
-            text_fragment.push_str(text_remainder);
+
+            if text_pre {
+                // Replace spaces with non-breaking spaces so they aren't collapsed
+                // by XML processing. This allows pre-formatted multi-line text (e.g. for
+                // code listings)
+                text_fragment = text_fragment.replace(' ', NBSP);
+            }
 
             tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
             tspan.content = ContentType::Ready(if text_fragment.is_empty() {

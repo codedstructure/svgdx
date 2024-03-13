@@ -248,12 +248,40 @@ fn test_text_cdata() {
 </rect>
 "#;
 
+    // In this test we replace 'Z' with a zero-width space for easier string authoring...
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">
+<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print(&quot;Hello World!&quot;)</tspan>
+</text>
+"#;
+    let expected = expected.replace('Z', "\u{200b}");
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_cdata_pre() {
+    // While conversion preserves whitespace, the rendering of SVG does not, due
+    // to XML whitespace rules. The `text-pre` attribute converts whitespace to
+    // non-breaking spaces to preserve formatting.
+    let input = r#"
+<rect xy="0" wh="10" text-pre="true">
+<![CDATA[
+    def start():
+        print("Hello World!")
+]]>
+</rect>
+"#;
+
     // In this test we replace 'N' and 'Z' for non-breaking and zero-width spaces
     // repectively, for easier string authoring...
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-tbox">
-<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdef start():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;Hello World!&quot;)</tspan>
+<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;HelloNWorld!&quot;)</tspan>
 </text>
 "#;
     let expected = expected.replace('N', "\u{a0}").replace('Z', "\u{200b}");

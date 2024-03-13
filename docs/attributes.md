@@ -195,6 +195,16 @@ Type: [Location](#location)
 
 Applies to: Basic shapes
 
+### `text-pre`
+If this attribute is present - regardless of value - for an element, that element has spaces
+replaced with non-breaking spaces. This prevents the usual XML whitespace collapse which
+replaces multiple contiguous spaces with a single space.
+
+This is useful for including code listings, ASCII art, and other whitespace-sensitive text
+in an SVG document.
+
+Applies to: Basic shapes
+
 # Types
 
 ## Lists

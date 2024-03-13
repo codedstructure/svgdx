@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: Support `wh` and `xy` attributes for `<use>`, `<image>`, `<svg>` and
   `<foreignObject>` elements.
 
+- Changed / Added: `text-pre` attribute which if present (with any value) converts
+  spaces in text to non-breaking spaces, to defeat the XML whitespace processing
+  and allow space-preserving text to be displayed. Previously leading spaces were
+  converted in this way, but not internal space.
+
 ## [0.6.0 - 2024-03-10]
 
 - Changed: relspec positioning modified to be more consistent: the referenced element

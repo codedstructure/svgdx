@@ -15,7 +15,7 @@
 block across
 multiple lines" text-lsp="1.5"/>
 
-  <rect cxy="50 30" wh="0" text-loc="l" class="d-none d-code" text-lsp="0.9">
+  <rect cxy="50 30" wh="0" text-loc="l" class="d-none d-code" text-pre="true" text-lsp="0.9">
   <![CDATA[
 def area(w, h):
   """Return area of thing"""
