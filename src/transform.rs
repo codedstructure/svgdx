@@ -369,11 +369,34 @@ pub enum SvgEvent {
     End(String),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct InputEvent<'a> {
     event: Event<'a>,
+    index: usize,
     line: usize,
     indent: usize,
+}
+
+impl Clone for InputEvent<'_> {
+    fn clone(&self) -> Self {
+        Self {
+            event: self.event.clone().into_owned(),
+            index: self.index,
+            line: self.line,
+            indent: self.indent,
+        }
+    }
+}
+
+impl<'a> InputEvent<'a> {
+    fn into_owned(self) -> InputEvent<'static> {
+        InputEvent {
+            event: self.event.into_owned(),
+            index: self.index,
+            line: self.line,
+            indent: self.indent,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -392,6 +415,7 @@ impl From<Event<'_>> for EventList<'_> {
         Self {
             events: vec![InputEvent {
                 event: value.into_owned(),
+                index: 0,
                 line: 0,
                 indent: 0,
             }],
@@ -406,6 +430,7 @@ impl From<Vec<InputEvent<'_>>> for EventList<'_> {
                 .into_iter()
                 .map(|v| InputEvent {
                     event: v.event.into_owned(),
+                    index: v.index,
                     line: v.line,
                     indent: v.indent,
                 })
@@ -421,6 +446,7 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
                 .into_iter()
                 .map(|v| InputEvent {
                     event: v.into_owned(),
+                    index: 0,
                     line: 0,
                     indent: 0,
                 })
@@ -430,11 +456,22 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
 }
 
 impl<'a> IntoIterator for EventList<'a> {
-    type Item = (usize, InputEvent<'a>);
-    type IntoIter = std::iter::Enumerate<std::vec::IntoIter<InputEvent<'a>>>;
+    type Item = InputEvent<'a>;
+    type IntoIter = std::vec::IntoIter<InputEvent<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.events.into_iter().enumerate()
+        self.events.into_iter()
+    }
+}
+
+impl From<Event<'_>> for InputEvent<'_> {
+    fn from(value: Event) -> Self {
+        Self {
+            event: value.into_owned(),
+            index: 0,
+            line: 0,
+            indent: 0,
+        }
     }
 }
 
@@ -451,17 +488,18 @@ impl EventList<'_> {
         self.events.iter()
     }
 
-    fn push(&mut self, ev: &Event) {
-        self.events.push(InputEvent {
-            event: ev.clone().into_owned(),
-            line: 0,
-            indent: 0,
-        });
+    fn len(&self) -> usize {
+        self.events.len()
+    }
+
+    fn push<'a>(&mut self, ev: impl Into<InputEvent<'a>>) {
+        let ev = ev.into();
+        self.events.push(ev.clone().into_owned());
     }
 
     pub fn extend(&mut self, other: &EventList) {
         for ev in other.iter() {
-            self.push(&ev.event);
+            self.push(ev.event.clone());
         }
     }
 
@@ -473,6 +511,7 @@ impl EventList<'_> {
 
         let mut line_count = 1;
         let mut indent = 0;
+        let mut index = 0;
         loop {
             let ev = reader.read_event_into(&mut buf);
             if let Ok(ok_ev) = ev.clone() {
@@ -488,19 +527,22 @@ impl EventList<'_> {
                     indent = t_str.len() - t_str.trim_end_matches(' ').len();
 
                     events.push(InputEvent {
-                        event: ev.expect("match").clone().into_owned(),
+                        event: ev.expect("match").into_owned(),
+                        index,
                         line: line_count,
                         indent,
                     });
                 }
                 Ok(e) => events.push(InputEvent {
                     event: e.clone().into_owned(),
+                    index,
                     line: line_count,
                     indent,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
 
+            index += 1;
             buf.clear();
         }
 
@@ -515,6 +557,7 @@ impl EventList<'_> {
         // TODO: remove duplication between this and `from_reader`
         let mut line_count = 1;
         let mut indent = 0;
+        let mut index = 0;
         loop {
             let ev = reader.read_event();
             if let Ok(ok_ev) = ev.clone() {
@@ -530,17 +573,21 @@ impl EventList<'_> {
 
                     events.push(InputEvent {
                         event: ev.expect("match").clone().into_owned(),
+                        index,
                         line: line_count,
                         indent,
                     });
                 }
                 Ok(e) => events.push(InputEvent {
                     event: e.clone().into_owned(),
+                    index,
                     line: line_count,
                     indent,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
+
+            index += 1;
         }
         Ok(Self { events })
     }
@@ -672,17 +719,17 @@ impl Transformer {
             }
 
             for ev in events.iter() {
-                gen_events.push(&ev.event);
+                gen_events.push(ev.event.clone());
             }
 
             if rep_idx < (repeat - 1) {
-                gen_events.push(&Event::Text(BytesText::new(&format!(
+                gen_events.push(Event::Text(BytesText::new(&format!(
                     "\n{}",
                     " ".repeat(event_element.indent)
                 ))));
             }
             if let Some(tail) = &event_element.tail {
-                gen_events.push(&Event::Text(BytesText::new(tail)));
+                gen_events.push(Event::Text(BytesText::new(tail)));
             }
         }
         Ok(gen_events)
@@ -728,15 +775,15 @@ impl Transformer {
 
     fn process_seq<'a>(
         &mut self,
-        seq: impl IntoIterator<Item = (usize, InputEvent<'a>)>,
+        seq: EventList<'a>,
         idx_output: &mut BTreeMap<usize, EventList>,
-    ) -> Result<Vec<(usize, InputEvent<'a>)>> {
-        let mut remain = Vec::<(usize, InputEvent)>::new();
+    ) -> Result<EventList<'a>> {
+        let mut remain = EventList::new();
         let mut last_event = None;
         let mut last_element = None;
         let mut gen_events: Vec<(usize, EventList<'_>)>;
 
-        for (idx, input_ev) in seq {
+        for input_ev in seq {
             let ev = &input_ev.event;
             gen_events = Vec::new();
 
@@ -750,7 +797,7 @@ impl Transformer {
                     ))?;
                     event_element.set_indent(input_ev.indent);
                     event_element.set_src_line(input_ev.line);
-                    event_element.set_order_index(idx);
+                    event_element.set_order_index(input_ev.index);
                     event_element.content = if is_empty {
                         ContentType::Empty
                     } else {
@@ -783,12 +830,12 @@ impl Transformer {
                         //
                         // Replace double quote with backtick to avoid messy XML entity conversion
                         // (i.e. &quot; or &apos; if single quotes were used)
-                        ev_events.push(&Event::Comment(BytesText::new(
+                        ev_events.push(Event::Comment(BytesText::new(
                             &format!(" {event_element} ",)
                                 .replace('"', "`")
                                 .replace(['<', '>'], ""),
                         )));
-                        ev_events.push(&Event::Text(BytesText::new(&format!(
+                        ev_events.push(Event::Text(BytesText::new(&format!(
                             "\n{}",
                             " ".repeat(event_element.indent)
                         ))));
@@ -814,10 +861,10 @@ impl Transformer {
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
-                                gen_events.push((idx, ev_events.clone()));
+                                gen_events.push((input_ev.index, ev_events.clone()));
                             }
                         } else {
-                            remain.push((idx, input_ev.clone()));
+                            remain.push(input_ev.clone());
                         }
 
                         self.context.pop_current_element();
@@ -847,18 +894,18 @@ impl Transformer {
                                     if let ContentType::Ready(content) =
                                         event_element.content.clone()
                                     {
-                                        events.push(&Event::Text(BytesText::new(&content)));
+                                        events.push(Event::Text(BytesText::new(&content)));
                                     }
                                 }
                                 gen_events.push((event_element.order_index, events.clone()));
                                 if !event_element.is_content_text() {
                                     // Similarly, `is_content_text` elements should close themselves in the returned
                                     // event list if needed.
-                                    gen_events.push((idx, EventList::from(ev.clone())));
+                                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
                                 }
                             }
                         } else {
-                            remain.push((idx, input_ev.clone()));
+                            remain.push(input_ev.clone());
                         }
                         last_element = Some(event_element);
                     }
@@ -912,11 +959,11 @@ impl Transformer {
                         _ => {}
                     }
                     if !processed && !self.context.in_specs {
-                        gen_events.push((idx, EventList::from(ev.clone())));
+                        gen_events.push((input_ev.index, EventList::from(ev.clone())));
                     }
                 }
                 _ => {
-                    gen_events.push((idx, EventList::from(ev.clone())));
+                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
                 }
             }
 
@@ -945,7 +992,7 @@ impl Transformer {
                     "Could not resolve the following elements:\n{}",
                     remain
                         .iter()
-                        .map(|r| format!("{:4}: {:?}", r.1.line, r.1.event))
+                        .map(|r| format!("{:4}: {:?}", r.line, r.event))
                         .join("\n")
                 );
             }
@@ -1203,19 +1250,19 @@ fn transform_element<'a>(
                     )));
                 }
                 if is_empty {
-                    output.push(&Event::Empty(bs));
+                    output.push(Event::Empty(bs));
                 } else {
-                    output.push(&Event::Start(bs));
+                    output.push(Event::Start(bs));
                 }
             }
             SvgEvent::Comment(t) => {
-                output.push(&Event::Comment(BytesText::new(&t)));
+                output.push(Event::Comment(BytesText::new(&t)));
             }
             SvgEvent::Text(t) => {
-                output.push(&Event::Text(BytesText::from_escaped(&t)));
+                output.push(Event::Text(BytesText::from_escaped(&t)));
             }
             SvgEvent::End(name) => {
-                output.push(&Event::End(BytesEnd::new(name)));
+                output.push(Event::End(BytesEnd::new(name)));
             }
         }
     }
@@ -1264,7 +1311,7 @@ mod tests {
 
         let remain = transformer.process_seq(seq, &mut idx_output);
 
-        assert_eq!(remain.unwrap(), Vec::new());
+        assert_eq!(remain.unwrap(), EventList::new());
     }
 
     #[test]
