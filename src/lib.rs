@@ -26,23 +26,10 @@
 //! println!("{output}");
 //! ```
 
-use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
-
-use anyhow::{bail, Context, Result};
-use clap::Parser;
-use notify::RecursiveMode;
-use notify_debouncer_mini::new_debouncer;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-    path::Path,
-    sync::mpsc::channel,
-    time::Duration,
-};
-use tempfile::NamedTempFile;
-
 mod connector;
+mod context;
 mod element;
+mod events;
 mod expression;
 mod path;
 mod svg_defs;
@@ -50,6 +37,18 @@ mod text;
 mod transform;
 mod types;
 
+use anyhow::{bail, Context, Result};
+use clap::Parser;
+use notify::RecursiveMode;
+use notify_debouncer_mini::new_debouncer;
+use std::{
+    fs::{self, File},
+    io::{BufRead, BufReader, Cursor, IsTerminal, Read, Write},
+    path::Path,
+    sync::mpsc::channel,
+    time::Duration,
+};
+use tempfile::NamedTempFile;
 use transform::Transformer;
 
 /// Settings to configure a single transformation.

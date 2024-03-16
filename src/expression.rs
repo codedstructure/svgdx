@@ -5,7 +5,7 @@ use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
-use crate::transform::TransformerContext;
+use crate::context::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
 #[derive(Clone, PartialEq)]

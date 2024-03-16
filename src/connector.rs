@@ -1,5 +1,5 @@
+use crate::context::TransformerContext;
 use crate::element::SvgElement;
-use crate::transform::TransformerContext;
 use crate::types::{attr_split, fstr, strp, strp_length, Length};
 use lazy_regex::regex;
 
