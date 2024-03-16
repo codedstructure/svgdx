@@ -26,19 +26,12 @@
 //! println!("{output}");
 //! ```
 
-use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
-
-use anyhow::Result;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-};
-use tempfile::NamedTempFile;
-
 #[cfg(feature = "cli")]
 pub mod cli;
 mod connector;
+mod context;
 mod element;
+mod events;
 mod expression;
 mod path;
 #[cfg(feature = "server")]
@@ -48,6 +41,18 @@ mod text;
 mod transform;
 mod types;
 
+use anyhow::{bail, Context, Result};
+use clap::Parser;
+use notify::RecursiveMode;
+use notify_debouncer_mini::new_debouncer;
+use std::{
+    fs::{self, File},
+    io::{BufRead, BufReader, Cursor, IsTerminal, Read, Write},
+    path::Path,
+    sync::mpsc::channel,
+    time::Duration,
+};
+use tempfile::NamedTempFile;
 use transform::Transformer;
 
 /// Settings to configure a single transformation.
