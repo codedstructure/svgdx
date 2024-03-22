@@ -1,6 +1,8 @@
 use crate::element::SvgElement;
 
+use std::cell::Cell;
 use std::io::{BufRead, Write};
+use std::rc::Rc;
 
 use quick_xml::events::{BytesText, Event};
 use quick_xml::reader::Reader;
@@ -23,6 +25,7 @@ pub struct InputEvent<'a> {
     pub index: usize,
     pub line: usize,
     pub indent: usize,
+    pub processed: Cell<bool>,
 }
 
 impl Clone for InputEvent<'_> {
@@ -32,6 +35,7 @@ impl Clone for InputEvent<'_> {
             index: self.index,
             line: self.line,
             indent: self.indent,
+            processed: Cell::new(self.processed.get()),
         }
     }
 }
@@ -43,13 +47,14 @@ impl<'a> InputEvent<'a> {
             index: self.index,
             line: self.line,
             indent: self.indent,
+            processed: Cell::new(self.processed.get()),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EventList<'a> {
-    pub events: Vec<InputEvent<'a>>,
+    pub events: Rc<Vec<InputEvent<'a>>>,
 }
 
 impl From<&str> for EventList<'_> {
@@ -61,12 +66,13 @@ impl From<&str> for EventList<'_> {
 impl From<Event<'_>> for EventList<'_> {
     fn from(value: Event) -> Self {
         Self {
-            events: vec![InputEvent {
+            events: Rc::new(vec![InputEvent {
                 event: value.into_owned(),
                 index: 0,
                 line: 0,
                 indent: 0,
-            }],
+                processed: Cell::new(false),
+            }]),
         }
     }
 }
@@ -74,15 +80,18 @@ impl From<Event<'_>> for EventList<'_> {
 impl From<Vec<InputEvent<'_>>> for EventList<'_> {
     fn from(value: Vec<InputEvent>) -> Self {
         Self {
-            events: value
-                .into_iter()
-                .map(|v| InputEvent {
-                    event: v.event.into_owned(),
-                    index: v.index,
-                    line: v.line,
-                    indent: v.indent,
-                })
-                .collect(),
+            events: Rc::new(
+                value
+                    .into_iter()
+                    .map(|v| InputEvent {
+                        event: v.event.into_owned(),
+                        index: v.index,
+                        line: v.line,
+                        indent: v.indent,
+                        processed: Cell::new(v.processed.get()),
+                    })
+                    .collect(),
+            ),
         }
     }
 }
@@ -90,15 +99,18 @@ impl From<Vec<InputEvent<'_>>> for EventList<'_> {
 impl From<Vec<Event<'_>>> for EventList<'_> {
     fn from(value: Vec<Event>) -> Self {
         Self {
-            events: value
-                .into_iter()
-                .map(|v| InputEvent {
-                    event: v.into_owned(),
-                    index: 0,
-                    line: 0,
-                    indent: 0,
-                })
-                .collect(),
+            events: Rc::new(
+                value
+                    .into_iter()
+                    .map(|v| InputEvent {
+                        event: v.into_owned(),
+                        index: 0,
+                        line: 0,
+                        indent: 0,
+                        processed: Cell::new(false),
+                    })
+                    .collect(),
+            ),
         }
     }
 }
@@ -108,7 +120,7 @@ impl<'a> IntoIterator for EventList<'a> {
     type IntoIter = std::vec::IntoIter<InputEvent<'a>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.events.into_iter()
+        <Vec<InputEvent<'_>> as Clone>::clone(&self.events).into_iter()
     }
 }
 
@@ -119,13 +131,16 @@ impl From<Event<'_>> for InputEvent<'_> {
             index: 0,
             line: 0,
             indent: 0,
+            processed: Cell::new(false),
         }
     }
 }
 
 impl EventList<'_> {
     pub fn new() -> Self {
-        Self { events: vec![] }
+        Self {
+            events: Rc::new(vec![]),
+        }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -142,12 +157,23 @@ impl EventList<'_> {
 
     pub fn push<'a>(&mut self, ev: impl Into<InputEvent<'a>>) {
         let ev = ev.into();
-        self.events.push(ev.clone().into_owned());
+        Rc::<Vec<InputEvent<'_>>>::make_mut(&mut self.events).push(ev.clone().into_owned());
     }
 
     pub fn extend(&mut self, other: &EventList) {
         for ev in other.iter() {
             self.push(ev.event.clone());
+        }
+    }
+
+    pub fn into_owned(self) -> EventList<'static> {
+        EventList {
+            events: Rc::new(
+                <Vec<InputEvent<'_>> as Clone>::clone(&self.events.clone())
+                    .into_iter()
+                    .map(|v| v.into_owned())
+                    .collect(),
+            ),
         }
     }
 
@@ -179,6 +205,7 @@ impl EventList<'_> {
                         index,
                         line: line_count,
                         indent,
+                        processed: Cell::new(false),
                     });
                 }
                 Ok(e) => events.push(InputEvent {
@@ -186,6 +213,7 @@ impl EventList<'_> {
                     index,
                     line: line_count,
                     indent,
+                    processed: Cell::new(false),
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
@@ -194,7 +222,9 @@ impl EventList<'_> {
             buf.clear();
         }
 
-        Ok(Self { events })
+        Ok(Self {
+            events: Rc::new(events),
+        })
     }
 
     pub fn from_str(s: impl Into<String>) -> Result<Self> {
@@ -224,6 +254,7 @@ impl EventList<'_> {
                         index,
                         line: line_count,
                         indent,
+                        processed: Cell::new(false),
                     });
                 }
                 Ok(e) => events.push(InputEvent {
@@ -231,20 +262,23 @@ impl EventList<'_> {
                     index,
                     line: line_count,
                     indent,
+                    processed: Cell::new(false),
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
 
             index += 1;
         }
-        Ok(Self { events })
+        Ok(Self {
+            events: Rc::new(events),
+        })
     }
 
     pub fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
         let blank_line_remover = regex!("\n[ \t]+\n");
-        for event_pos in &self.events {
+        for event_pos in &*self.events {
             // trim trailing whitespace.
             // just using `trim_end()` on Text events won't work
             // as Text event may be followed by a Start/Empty event.
@@ -265,7 +299,7 @@ impl EventList<'_> {
         let mut before = vec![];
         let mut pivot = None;
         let mut after = vec![];
-        for input_ev in self.events.clone() {
+        for input_ev in (*self.events).iter().cloned() {
             if pivot.is_some() {
                 after.push(input_ev);
             } else {
@@ -284,6 +318,50 @@ impl EventList<'_> {
             }
         }
 
-        (Self { events: before }, pivot, Self { events: after })
+        (
+            Self {
+                events: Rc::new(before),
+            },
+            pivot,
+            Self {
+                events: Rc::new(after),
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+
+    #[test]
+    fn test_eventlist_minimal() {
+        let input = r#"<svg></svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 2);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_eventlist_indent() {
+        let input = r#"<svg>
+        </svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 3);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].indent, 0);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 2);
+        assert_eq!(
+            el.events[1].event,
+            Event::Text(BytesText::new("\n        "))
+        );
+        assert_eq!(el.events[2].line, 2);
+        assert_eq!(el.events[2].indent, 8);
+        assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
     }
 }
