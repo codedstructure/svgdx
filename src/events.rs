@@ -11,6 +11,20 @@ use quick_xml::writer::Writer;
 use anyhow::{bail, Result};
 use lazy_regex::regex;
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Index(Vec<usize>);
+
+impl Index {
+    pub fn new() -> Self {
+        Self(vec![0])
+    }
+    pub fn increment(&mut self) {
+        if let Some(last) = self.0.last_mut() {
+            *last += 1;
+        }
+    }
+}
+
 pub enum SvgEvent {
     Comment(String),
     Text(String),
@@ -22,7 +36,7 @@ pub enum SvgEvent {
 #[derive(Debug, PartialEq, Eq)]
 pub struct InputEvent<'a> {
     pub event: Event<'a>,
-    pub index: usize,
+    pub index: Index,
     pub line: usize,
     pub indent: usize,
     pub processed: Cell<bool>,
@@ -32,7 +46,7 @@ impl Clone for InputEvent<'_> {
     fn clone(&self) -> Self {
         Self {
             event: self.event.clone().into_owned(),
-            index: self.index,
+            index: self.index.clone(),
             line: self.line,
             indent: self.indent,
             processed: Cell::new(self.processed.get()),
@@ -68,7 +82,7 @@ impl From<Event<'_>> for EventList<'_> {
         Self {
             events: Rc::new(vec![InputEvent {
                 event: value.into_owned(),
-                index: 0,
+                index: Index::new(),
                 line: 0,
                 indent: 0,
                 processed: Cell::new(false),
@@ -104,7 +118,7 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
                     .into_iter()
                     .map(|v| InputEvent {
                         event: v.into_owned(),
-                        index: 0,
+                        index: Index::new(),
                         line: 0,
                         indent: 0,
                         processed: Cell::new(false),
@@ -128,7 +142,7 @@ impl From<Event<'_>> for InputEvent<'_> {
     fn from(value: Event) -> Self {
         Self {
             event: value.into_owned(),
-            index: 0,
+            index: Index::new(),
             line: 0,
             indent: 0,
             processed: Cell::new(false),
@@ -185,7 +199,7 @@ impl EventList<'_> {
 
         let mut line_count = 1;
         let mut indent = 0;
-        let mut index = 0;
+        let mut index = Index::new();
         loop {
             let ev = reader.read_event_into(&mut buf);
             if let Ok(ok_ev) = ev.clone() {
@@ -202,7 +216,7 @@ impl EventList<'_> {
 
                     events.push(InputEvent {
                         event: ev.expect("match").into_owned(),
-                        index,
+                        index: index.clone(),
                         line: line_count,
                         indent,
                         processed: Cell::new(false),
@@ -210,7 +224,7 @@ impl EventList<'_> {
                 }
                 Ok(e) => events.push(InputEvent {
                     event: e.clone().into_owned(),
-                    index,
+                    index: index.clone(),
                     line: line_count,
                     indent,
                     processed: Cell::new(false),
@@ -218,7 +232,7 @@ impl EventList<'_> {
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
 
-            index += 1;
+            index.increment();
             buf.clear();
         }
 
@@ -235,7 +249,7 @@ impl EventList<'_> {
         // TODO: remove duplication between this and `from_reader`
         let mut line_count = 1;
         let mut indent = 0;
-        let mut index = 0;
+        let mut index = Index::new();
         loop {
             let ev = reader.read_event();
             if let Ok(ok_ev) = ev.clone() {
@@ -251,7 +265,7 @@ impl EventList<'_> {
 
                     events.push(InputEvent {
                         event: ev.expect("match").clone().into_owned(),
-                        index,
+                        index: index.clone(),
                         line: line_count,
                         indent,
                         processed: Cell::new(false),
@@ -259,7 +273,7 @@ impl EventList<'_> {
                 }
                 Ok(e) => events.push(InputEvent {
                     event: e.clone().into_owned(),
-                    index,
+                    index: index.clone(),
                     line: line_count,
                     indent,
                     processed: Cell::new(false),
@@ -267,7 +281,7 @@ impl EventList<'_> {
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
 
-            index += 1;
+            index.increment();
         }
         Ok(Self {
             events: Rc::new(events),

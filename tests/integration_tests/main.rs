@@ -7,6 +7,7 @@ mod connector;
 mod containment;
 mod error_handling;
 mod eval_locs;
+mod group;
 mod indent;
 mod rel_pos;
 mod rel_size;

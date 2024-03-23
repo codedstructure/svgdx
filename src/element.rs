@@ -1,4 +1,5 @@
 use crate::context::TransformerContext;
+use crate::events::Index;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::types::{
@@ -62,7 +63,7 @@ pub struct SvgElement {
     pub classes: ClassList,
     pub content: ContentType,
     pub tail: Option<String>,
-    pub order_index: usize,
+    pub order_index: Index,
     pub indent: usize,
     pub src_line: usize,
 }
@@ -101,7 +102,7 @@ impl SvgElement {
             classes,
             content: ContentType::Empty,
             tail: None,
-            order_index: 0,
+            order_index: Index::new(),
             indent: 0,
             src_line: 0,
         }
@@ -115,7 +116,7 @@ impl SvgElement {
         self.src_line = line;
     }
 
-    pub fn set_order_index(&mut self, order_index: usize) {
+    pub fn set_order_index(&mut self, order_index: Index) {
         self.order_index = order_index;
     }
 
