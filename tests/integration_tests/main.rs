@@ -1,5 +1,6 @@
 mod attr_expansion;
 mod auto_styles;
+#[cfg(feature = "cli")]
 mod cmdline;
 mod comments;
 mod config;

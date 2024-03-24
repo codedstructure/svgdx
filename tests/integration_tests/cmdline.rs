@@ -1,7 +1,7 @@
 use assert_cmd::{crate_name, Command};
 use assertables::{assert_contains, assert_contains_as_result};
 use std::io::Write;
-use svgdx::Config;
+use svgdx::cli::Config;
 use tempfile::NamedTempFile;
 
 #[test]
@@ -32,7 +32,7 @@ fn test_cmdline_config() {
         tmpfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::run(config).expect("run failed");
+    svgdx::cli::run(config).expect("run failed");
 
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
@@ -44,7 +44,7 @@ fn test_cmdline_config() {
         tmpfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::run(config).expect("run failed");
+    svgdx::cli::run(config).expect("run failed");
 }
 
 #[test]
