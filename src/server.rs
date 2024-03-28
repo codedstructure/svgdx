@@ -35,10 +35,19 @@ async fn index() -> Html<String> {
     Html(content)
 }
 
+async fn script() -> impl IntoResponse {
+    let content = fs::read_to_string("static/svgdx-editor.js").await.unwrap();
+    Response::builder()
+        .header("Content-Type", "application/javascript")
+        .body(Body::from(content))
+        .unwrap()
+}
+
 pub async fn start_server(listen_addr: Option<&str>) {
     let addr = listen_addr.unwrap_or("127.0.0.1:3003");
     let app = Router::new()
         .route("/", get(index))
+        .route("/svgdx-editor.js", get(script))
         .route("/transform", post(transform));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{}", addr);

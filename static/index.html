@@ -2,83 +2,62 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>SVG Editor</title>
+    <title>svgdx editor</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css" />
     <style>
         .container {
             display: flex;
         }
-        #editor, #svg-output {
+
+        #editor-container,
+        #svg-output {
             width: 50%;
-            height: 100vh;
+            height: calc(100vh - 100px);
             box-sizing: border-box;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 0 10px;
+            overflow: auto;
         }
+        #editor-container {
+            min-width: 20em;
+        }
+
         #editor {
+            width: 100%;
+            height: 100%;
             background-color: none;
+        }
+
+        .CodeMirror .error-line {
+            background-color: #ffdddd;
+        }
+
+        .CodeMirror {
+            height: 100%;
         }
     </style>
 </head>
+
 <body>
+    <h1>svgdx editor</h1>
     <div class="container">
-        <div id="editor"></div>
-        <div id="svg-output"></div>
+        <div id="editor-container">
+            <div id="editor"></div>
+        </div>
+        <div id="svg-output">
+            <svg></svg>
+        </div>
         <div id="error-output"></div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/xml-fold.min.js" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.js" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.js" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/autorefresh.min.js" referrerpolicy="no-referrer"></script>
-    <script>
-        async function update() {
-            try {
-                const response = await fetch('/transform', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'text/xml'
-                    },
-                    body: editor.getValue()
-                });
-
-                if (response.ok) {
-                    const svgData = await response.text();
-                    document.getElementById('svg-output').innerHTML = svgData;
-                    document.getElementById('editor').style.backgroundColor = "white";
-                    document.getElementById('error-output').innerText = "";
-                    // save to localStorage
-                    localStorage.setItem('editorValue', editor.getValue());
-                } else {
-                    let responseText = await response.text();
-                    document.getElementById('error-output').innerText = responseText;
-                    document.getElementById('editor').style.backgroundColor = 'red';
-                }
-            } catch (e) {
-                console.error('Error sending data to /transform', e);
-            }
-        }
-        const editor = CodeMirror(document.getElementById('editor'), {
-            mode: 'xml',
-            lineNumbers: true,
-            autoRefresh: true,
-            extraKeys: {"Ctrl-Q": function(cm){ cm.foldCode(cm.getCursor()); }},
-            foldGutter: true,
-            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
-        });
-        // focus editor window and start cursor at beginning
-        editor.focus();
-        editor.setCursor({line: 0, ch: 0});
-
-        // on load restore from localstorage
-        const savedValue = localStorage.getItem('editorValue');
-        if (savedValue) {
-            editor.setValue(savedValue);
-            update();
-        }
-
-        editor.on('change', update);
-    </script>
+    <script src="svgdx-editor.js"></script>
 </body>
 </html>
