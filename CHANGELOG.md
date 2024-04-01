@@ -71,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   'custom element'-like behaviour.
 
 - Added: a bunch of builtin functions for expressions, including basics such as min,
-  max, and abs, trignometric functions, and random number generation. See the
+  max, and abs, trigonometric functions, and random number generation. See the
   [function documentation](docs/expressions.md#built-in-functions) for a full list.
 
 - Added: a `--seed` command-line argument (and `<config seed="...">` setting) to

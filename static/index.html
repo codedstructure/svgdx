@@ -28,16 +28,17 @@
 
         #editor-container {
             /* initial width, splitter overrides this */
+            min-width: 40%;
             width: 40%;
         }
 
         #editor {
-            width: 100%;
+            min-width: 20%;
             height: calc(100% - 80px);
-            background-color: none;
             flex-grow: 1;
         }
         #svg-output {
+            min-width: 10%;
             display: flex;
             flex-grow: 1;
             justify-content: center;
@@ -96,7 +97,7 @@
         }
 
         #splitter {
-            width: 5px;
+            min-width: 5px;
             margin: 0 -5px;
             cursor: col-resize;
             background-color: #eee;

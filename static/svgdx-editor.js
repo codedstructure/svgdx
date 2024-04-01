@@ -318,6 +318,8 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
 
     function mousemove(e) {
         const dx = e.clientX - initialClientX;
+        // Set both width and min-width to improve cross-browser compatibility
+        editorContainer.style.minWidth = (initialWidth + dx) + 'px';
         editorContainer.style.width = (initialWidth + dx) + 'px';
     }
 
