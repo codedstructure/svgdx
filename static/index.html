@@ -6,36 +6,42 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css" />
     <style>
+        body {
+            font-family: sans-serif;
+        }
         .container {
             display: flex;
         }
 
         #editor-container,
-        #svg-output-container {
-            width: 50%;
+        #svg-output {
             height: calc(100vh - 100px);
             box-sizing: border-box;
             border: 1px solid #ccc;
             padding: 10px;
             margin: 0 10px;
-            overflow: auto;
+            overflow-y: auto;
+            overflow-x: hidden;
             display: flex;
             flex-direction: column;
         }
 
         #editor-container {
-            min-width: 20em;
+            /* initial width, splitter overrides this */
+            width: 40%;
         }
 
         #editor {
             width: 100%;
-            height: 100%;
+            height: calc(100% - 80px);
             background-color: none;
-        }
-
-        #editor,
-        #svg-output {
             flex-grow: 1;
+        }
+        #svg-output {
+            display: flex;
+            flex-grow: 1;
+            justify-content: center;
+            align-items: center;
         }
 
         .CodeMirror .error-line {
@@ -44,6 +50,62 @@
 
         .CodeMirror {
             height: 100%;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        #error-output {
+            color: red;
+            font-family: monospace;
+            margin-top: 10px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        #controls {
+            height: 50px;
+            margin-top: 10px;
+        }
+        button {
+            background-color: #eee;
+            border-radius: 5px;
+            box-shadow: 2px 2px 3px #000;
+            border: none;
+        }
+        button:hover, button:focus {
+            box-shadow: 1px 1px 2px #000;
+        }
+        button:active {
+            box-shadow: inset 1px 1px 2px #000;
+        }
+        button[data-checked="true"] {
+            background-color: #ccc;
+            box-shadow: inset 1px 1px 2px #000;
+        }
+        button[data-checked="true"]:hover, button[data-checked="true"]:focus {
+            box-shadow: inset 2px 2px 3px #000;
+        }
+        button[data-checked="true"]:active {
+            box-shadow: inset 3px 3px 4px #000;
+        }
+        #statusbar {
+            margin: 10px 0 0 0;
+            font-family: monospace;
+        }
+
+        #splitter {
+            width: 5px;
+            margin: 0 -5px;
+            cursor: col-resize;
+            background-color: #eee;
+        }
+        #splitter:hover {
+            background-color: #ddd;
+        }
+        #splitter:active {
+            background-color: #ccc;
         }
     </style>
 </head>
@@ -54,19 +116,21 @@
         <div id="editor-container">
             <div id="editor"></div>
             <div id="error-output"></div>
-            <div style="position: inline-block">
-                <input type="checkbox" id="auto-viewbox" name="auto-viewbox">
-                <label for="auto-viewbox">Auto scale & center</label>
+            <div id="controls">
+                <div style="position: inline-block">
+                    <button id="auto-viewbox">Auto Fit</button>
+                    <button id="reset-view">Reset View</button>
+                    <button id="save-input">Save Input</button>
+                    <button id="save-output">Save SVG</button>
+                </div>
+                <div style="position: inline-block;">
+                    <pre id="statusbar">svgdx</pre>
+                </div>
             </div>
         </div>
-        <div id="svg-output-container">
-            <div id="svg-output">
-                <svg></svg>
-            </div>
-            <div style="position: inline-block">
-                <button id="reset-view">Reset View</button>
-                <button id="save-svg">Save</button>
-            </div>
+        <div id="splitter"></div>
+        <div id="svg-output">
+            <svg></svg>
         </div>
     </div>
 
