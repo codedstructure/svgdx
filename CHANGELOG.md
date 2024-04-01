@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: Split out features for `cli` and `server` (support for the new
+  `svgdx-server`). Both these are default features, but if only the library
+  is needed a no-default-features build will be smaller / faster to compile.
+
+- Added: 'svgdx-server' - a simple web-based frontend for editing and viewing
+  svgdx documents. Run with `cargo run --bin svgdx-server`. I'm not sure what
+  direction this will go in - for me it's a workflow improvement over the
+  `--watch` + [Gapplin](https://gapplin.wolfrosch.com) (or similar) I'd been
+  using previously.
+
 - Added: Support `wh` and `xy` attributes for `<use>`, `<image>`, `<svg>` and
   `<foreignObject>` elements.
 

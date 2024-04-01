@@ -1,7 +1,9 @@
 use anyhow::Result;
 
+use svgdx::cli::{get_config, run};
+
 fn main() -> Result<()> {
-    svgdx::run(svgdx::get_config()?)?;
+    run(get_config()?)?;
 
     Ok(())
 }
