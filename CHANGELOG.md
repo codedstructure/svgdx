@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0 - 2024-04-01]
+
 - Changed: Split out features for `cli` and `server` (support for the new
   `svgdx-server`). Both these are default features, but if only the library
   is needed a no-default-features build will be smaller / faster to compile.
