@@ -8,6 +8,7 @@
 // - Zoom and pan SVG with mouse wheel / drag
 // - Split between edit and output panes
 // TODO:
+// - use a WASM build rather than needing external /transform endpoint
 // - Highlight lines with errors
 // - Default content for new editor, or examples to choose from
 // - Ability to select SVG elements and get info about them (in status bar?)
@@ -41,7 +42,7 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
     async function update() {
         try {
             // save editor content to localStorage
-            localStorage.setItem('editorValue', editor.getValue());
+            localStorage.setItem('svgdx-editor-value', editor.getValue());
 
             const response = await fetch('/transform', {
                 method: 'POST',
@@ -104,9 +105,20 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
     editor.setCursor({ line: 0, ch: 0 });
 
     // restore from localstorage on load
-    const savedValue = localStorage.getItem('editorValue');
+    const savedValue = localStorage.getItem('svgdx-editor-value');
     if (savedValue) {
         editor.setValue(savedValue);
+        update();
+    } else {
+        editor.setValue(`<svg>
+  <!-- Example svgdx document -->
+  <rect id="in" wh="20 10" text="input" />
+  <rect id="proc" xy="^:h 10" wh="^" text="process" />
+  <rect id="out" xy="^:h 10" wh="^" text="output" />
+
+  <line start="#in" end="#proc" class="d-arrow"/>
+  <line start="#proc" end="#out" class="d-arrow"/>
+</svg>`);
         update();
     }
 
@@ -119,13 +131,13 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
     });
 
     const autoViewbox = document.getElementById('auto-viewbox');
-    let autoViewboxChecked = localStorage.getItem('autoViewbox') || "true";
+    let autoViewboxChecked = localStorage.getItem('svgdx-auto-viewbox') || "true";
     autoViewbox.dataset.checked = autoViewboxChecked;
 
     autoViewbox.addEventListener('click', () => {
         autoViewboxChecked = autoViewboxChecked === "true" ? "false" : "true";
         autoViewbox.dataset.checked = autoViewboxChecked;
-        localStorage.setItem('autoViewbox', autoViewbox.dataset.checked);
+        localStorage.setItem('svgdx-auto-viewbox', autoViewbox.dataset.checked);
         update();
     });
 

@@ -5,6 +5,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+#[cfg(debug_assertions)]
 use tokio::fs;
 
 use crate::{transform_str, TransformConfig};
@@ -29,14 +30,36 @@ async fn transform(input: String) -> impl IntoResponse {
 }
 
 async fn index() -> Html<String> {
-    // Perhaps in production builds this should cache on first use.
+    // If configured as a release build, use include_str! to embed the file.
+    #[cfg(not(debug_assertions))]
+    let content =
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/index.html")).to_string();
     // During development it's useful to have it re-read each request.
-    let content = fs::read_to_string("static/index.html").await.unwrap();
+    #[cfg(debug_assertions)]
+    let content = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/index.html"))
+        .await
+        .unwrap();
+
     Html(content)
 }
 
 async fn script() -> impl IntoResponse {
-    let content = fs::read_to_string("static/svgdx-editor.js").await.unwrap();
+    // If configured as a release build, use include_str! to embed the file.
+    #[cfg(not(debug_assertions))]
+    let content = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/static/svgdx-editor.js"
+    ))
+    .to_string();
+    // During development it's useful to have it re-read each request.
+    #[cfg(debug_assertions)]
+    let content = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/static/svgdx-editor.js"
+    ))
+    .await
+    .unwrap();
+
     Response::builder()
         .header("Content-Type", "application/javascript")
         .body(Body::from(content))
