@@ -10,9 +10,10 @@
 // TODO:
 // - use a WASM build rather than needing external /transform endpoint
 // - Highlight lines with errors
-// - Default content for new editor, or examples to choose from
+// - Ability to load examples
 // - Ability to select SVG elements and get info about them (in status bar?)
 // - Editor shortcuts for folding etc
+// - Save multiple documents in localStorage
 
 /* global CodeMirror */
 
@@ -314,13 +315,24 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
     // double-click to reset split
     splitter.addEventListener('dblclick', function(e) {
         editorContainer.style.width = '';
+        editorContainer.style.minWidth = '';
     });
 
     function mousemove(e) {
         const dx = e.clientX - initialClientX;
+        let newWidth = initialWidth + dx;
+
+        // Convert min (25em) and max (80%) widths to pixels
+        const minPixels = parseFloat(getComputedStyle(editorContainer).fontSize) * 25;
+        const maxPixels = window.innerWidth * 0.8;
+
+        // Enforce min and max widths
+        newWidth = Math.max(newWidth, minPixels);
+        newWidth = Math.min(newWidth, maxPixels);
+
         // Set both width and min-width to improve cross-browser compatibility
-        editorContainer.style.minWidth = (initialWidth + dx) + 'px';
-        editorContainer.style.width = (initialWidth + dx) + 'px';
+        editorContainer.style.width = newWidth + 'px';
+        editorContainer.style.minWidth = newWidth + 'px';
     }
 
     function mouseup() {
