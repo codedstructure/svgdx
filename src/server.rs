@@ -11,22 +11,28 @@ use tokio::fs;
 use crate::{transform_str, TransformConfig};
 
 async fn transform(input: String) -> impl IntoResponse {
-    transform_str(input, &TransformConfig::default())
-        .map(|output| {
-            Response::builder()
-                .header("Content-Type", "image/svg+xml")
-                .body(Body::from(output))
-                .unwrap()
-        })
-        .map_err(|e| {
-            // TODO: make the error more informative, e.g. by returning a JSON object
-            // including line number(s) of failed elements.
-            Response::builder()
-                .status(400)
-                .header("Content-Type", "text/plain")
-                .body(Body::from(format!("Error: {}", e)))
-                .unwrap()
-        })
+    transform_str(
+        input,
+        &TransformConfig {
+            add_metadata: true,
+            ..Default::default()
+        },
+    )
+    .map(|output| {
+        Response::builder()
+            .header("Content-Type", "image/svg+xml")
+            .body(Body::from(output))
+            .unwrap()
+    })
+    .map_err(|e| {
+        // TODO: make the error more informative, e.g. by returning a JSON object
+        // including line number(s) of failed elements.
+        Response::builder()
+            .status(400)
+            .header("Content-Type", "text/plain")
+            .body(Body::from(format!("Error: {}", e)))
+            .unwrap()
+    })
 }
 
 async fn index() -> Html<String> {

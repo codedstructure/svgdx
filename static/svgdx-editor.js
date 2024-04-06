@@ -33,6 +33,16 @@ function clientToSvg(svg, x, y) {
 /** #svg-output element - used in many other functions */
 const container = document.querySelector('#svg-output'); // Assuming that your SVG is inside a container with id="container"
 
+const editor = CodeMirror(document.getElementById('editor'), {
+    mode: 'xml',
+    lineNumbers: true,
+    autoRefresh: true,
+    autofocus: true,
+    foldGutter: true,
+    lineWrapping: true,
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
+});
+
 /** Editor updates */
 (function () {
     let last_viewbox = null;
@@ -93,17 +103,6 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
             console.error('Error sending data to /transform', e);
         }
     }
-    const editor = CodeMirror(document.getElementById('editor'), {
-        mode: 'xml',
-        lineNumbers: true,
-        autoRefresh: true,
-        foldGutter: true,
-        lineWrapping: true,
-        gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
-    });
-    // focus editor window and start cursor at beginning
-    editor.focus();
-    editor.setCursor({ line: 0, ch: 0 });
 
     // restore from localstorage on load
     const savedValue = localStorage.getItem('svgdx-editor-value');
@@ -269,23 +268,35 @@ const container = document.querySelector('#svg-output'); // Assuming that your S
             // show tooltip in status bar
             statusbar.innerText = tooltips[e.target.id];
         } else if (e.target.closest('div > svg') === svg) {
+            // highlight source of this element in editor
+            for (let i= 0; i < editor.lineCount(); i++) {
+                editor.removeLineClass(i, "background", "hover-line");
+            }
+            let hover_element = e.target;
+            if (e.target.tagName === 'tspan') {
+                hover_element = e.target.closest('text');
+            }
+            if (hover_element.dataset.sourceLine) {
+                const lineNumber = parseInt(hover_element.dataset.sourceLine);
+                editor.addLineClass(lineNumber - 1, "background", "hover-line");
+            }
             // display mouse position in SVG user-space coordinates
             const svgPos = clientToSvg(svg, e.clientX, e.clientY);
             const pos_text = `${svgPos.x.toFixed(2)}, ${svgPos.y.toFixed(2)}`;
             let status_text = pos_text.padEnd(20, ' ');
-            const target_tag = e.target.tagName;
+            const target_tag = hover_element.tagName;
             if (target_tag !== null) {
                 status_text += ` ${target_tag}`;
             }
-            const target_id = e.target.getAttribute('id');
+            const target_id = hover_element.getAttribute('id');
             if (target_id !== null) {
                 status_text += ` id="${target_id}"`;
             }
-            const target_href = e.target.getAttribute('href');
+            const target_href = hover_element.getAttribute('href');
             if (target_href !== null) {
                 status_text += ` href="${target_href}"`;
             }
-            const target_class = e.target.getAttribute('class');
+            const target_class = hover_element.getAttribute('class');
             if (target_class !== null) {
                 status_text += ` class="${target_class}"`;
             }

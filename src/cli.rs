@@ -47,6 +47,10 @@ struct Arguments {
     /// Seed for RNG functions, default 0
     #[arg(long, default_value = "0")]
     seed: u64,
+
+    /// Include metadata in output
+    #[arg(long)]
+    add_metadata: bool,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -102,6 +106,7 @@ impl Config {
                 add_auto_defs: !args.no_auto_style,
                 background: args.background,
                 seed: args.seed,
+                add_metadata: args.add_metadata,
             },
         })
     }
