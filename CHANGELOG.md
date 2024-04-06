@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- svgdx-editor enhancements, including both horizontal and vertical editor layouts,
+  copy as data URI, highlight source lines on element hover, and various bug fixes.
+
 ## [0.7.0 - 2024-04-01]
 
 - Changed: Split out features for `cli` and `server` (support for the new

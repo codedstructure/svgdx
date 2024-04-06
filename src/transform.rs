@@ -823,8 +823,7 @@ impl Transformer {
                         self.context.in_specs = true;
                     }
 
-                    // TODO: push into event generation, since this will only
-                    // work if event_element is merely modified and not replaced.
+                    // This is copied from source element to any generated elements in transform_element()
                     if self.config.add_metadata && event_element.is_graphics_element() {
                         event_element
                             .attrs

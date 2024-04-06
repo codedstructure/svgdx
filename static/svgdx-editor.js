@@ -30,8 +30,24 @@ function clientToSvg(svg, x, y) {
     return {x: svgPos.x, y: svgPos.y};
 }
 
-/** #svg-output element - used in many other functions */
-const container = document.querySelector('#svg-output'); // Assuming that your SVG is inside a container with id="container"
+const container = document.querySelector('.container');
+const editorContainer = document.querySelector('#editor-container');
+const svg_container = document.querySelector('#svg-output');
+const error_output = document.querySelector('#error-output');
+
+function resetLayout() {
+    if (container.dataset.layout === "vertical") {
+        editorContainer.style.minWidth = "40%";
+        editorContainer.style.width = "40%";
+        editorContainer.style.minHeight = "";
+        editorContainer.style.height = "";
+    } else {
+        editorContainer.style.minWidth = "";
+        editorContainer.style.width = "";
+        editorContainer.style.minHeight = "40%";
+        editorContainer.style.height = "40%";
+    }
+}
 
 const editor = CodeMirror(document.getElementById('editor'), {
     mode: 'xml',
@@ -64,14 +80,14 @@ const editor = CodeMirror(document.getElementById('editor'), {
             });
 
             if (response.ok) {
-                const oldSvg = container.querySelector('svg');
+                const oldSvg = svg_container.querySelector('svg');
                 if (oldSvg) {
                     last_viewbox = oldSvg.getAttribute('viewBox');
                 }
 
                 const svgData = await response.text();
-                container.innerHTML = svgData;
-                const svg = container.querySelector('svg');
+                svg_container.innerHTML = svgData;
+                const svg = svg_container.querySelector('svg');
                 // tweak the SVG to make it fill the container
                 // save first so we can restore during save operations
                 original_width = svg.width.baseVal.value;
@@ -84,7 +100,8 @@ const editor = CodeMirror(document.getElementById('editor'), {
                 }
 
                 document.getElementById('editor').style.backgroundColor = "white";
-                document.getElementById('error-output').innerText = "";
+                error_output.innerText = "";
+                error_output.style.display = "none";
 
                 // TODO: return error line numbers info in response to highlight
                 // for (let i = 0; i < editor.lineCount(); i++) {
@@ -96,8 +113,9 @@ const editor = CodeMirror(document.getElementById('editor'), {
 
             } else {
                 const responseText = await response.text();
-                document.getElementById('error-output').innerText = responseText;
                 document.getElementById('editor').style.backgroundColor = 'red';
+                error_output.innerText = responseText;
+                error_output.style.display = "";
             }
         } catch (e) {
             console.error('Error sending data to /transform', e);
@@ -126,7 +144,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
 
     const resetButton = document.getElementById('reset-view');
     resetButton.addEventListener('click', () => {
-        const svg = container.querySelector('svg');
+        const svg = svg_container.querySelector('svg');
         svg.setAttribute('viewBox', original_viewbox);
     });
 
@@ -175,11 +193,51 @@ const editor = CodeMirror(document.getElementById('editor'), {
         svg.setAttribute('height', '100%');
         svg.setAttribute('viewBox', saved_viewbox);
     });
+
+    // copy as base64 button
+    document.getElementById('copy-base64').addEventListener('click', () => {
+        const svg = document.querySelector('#svg-output svg');
+        const saved_viewbox = svg.getAttribute('viewBox');
+        // temporarily set width, height, and viewBox to original values
+        svg.setAttribute('width', original_width);
+        svg.setAttribute('height', original_height);
+        svg.setAttribute('viewBox', original_viewbox);
+        // encode as base64
+        const base64 = btoa(Array.from(new TextEncoder().encode(svg.outerHTML), (byte) =>
+            String.fromCodePoint(byte),
+        ).join(""));
+        // create data-uri and copy to clipboard
+        const dataUri = `data:image/svg+xml;base64,${base64}`;
+        // copy to clipboard
+        navigator.clipboard.writeText(dataUri);
+        // restore original values
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.setAttribute('viewBox', saved_viewbox);
+    });
+
+    // toggle layout between horizontal and vertical
+    const layoutButton = document.getElementById('toggle-layout');
+    let layoutButtonChecked = localStorage.getItem('svgdx-layout') || "false";
+    layoutButton.dataset.checked = layoutButtonChecked;
+    container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
+    resetLayout();
+    layoutButton.addEventListener('click', () => {
+        layoutButtonChecked = layoutButtonChecked === "true" ? "false" : "true";
+        layoutButton.dataset.checked = layoutButtonChecked;
+        container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
+        localStorage.setItem('svgdx-layout', layoutButton.dataset.checked);
+
+        // Reset any manual resizing via the splitter
+        resetLayout();
+        // opportunity for auto-fit to take effect
+        update();
+    });
 })();
 
 /** Scroll wheel: zoom SVG */
 (function () {
-    container.addEventListener('wheel', (e) => {
+    svg_container.addEventListener('wheel', (e) => {
         // Prevent default scrolling behavior
         e.preventDefault();
 
@@ -188,7 +246,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
         const factor = Math.sign(e.deltaY) * ZOOM_SPEED;
 
         // initial viewBox
-        const svg = container.querySelector('svg');
+        const svg = svg_container.querySelector('svg');
         const x = svg.viewBox.baseVal.x;
         const y = svg.viewBox.baseVal.y;
         const width = svg.viewBox.baseVal.width;
@@ -211,13 +269,13 @@ const editor = CodeMirror(document.getElementById('editor'), {
     let isDragging = false;
     let startX, startY;
 
-    container.addEventListener('mousedown', (e) => {
+    svg_container.addEventListener('mousedown', (e) => {
         // we're only interested in the left mouse button
         if (e.button !== 0) return;
 
         // set cursor to xy move
         document.body.style.cursor = 'move';
-        const svg = container.querySelector('svg');
+        const svg = svg_container.querySelector('svg');
         if (e.target.closest('#svg-output > svg') === svg) {
             isDragging = true;
             startX = e.clientX;
@@ -228,7 +286,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
 
-        const svg = container.querySelector('svg');
+        const svg = svg_container.querySelector('svg');
         // Note stores mouse *client* position rather than SVG position
         // for accuracy, since mouse moves in integer pixel steps, and
         // converts only to calculate the delta for viewBox updates.
@@ -254,14 +312,16 @@ const editor = CodeMirror(document.getElementById('editor'), {
 /** status bar updates */
 (function () {
     document.addEventListener('mousemove', (e) => {
-        const svg = container.querySelector('svg');
+        const svg = svg_container.querySelector('svg');
         const statusbar = document.querySelector('#statusbar');
 
         const tooltips = {
+            "toggle-layout": "Toggle layout between horizontal and vertical",
             "auto-viewbox": "When active, auto-resize and center the SVG on update",
             "reset-view": "Resize and center the SVG",
             "save-input": "Download the input",
-            "save-output": "Download the SVG"
+            "save-output": "Download the SVG",
+            "copy-base64": "Copy the SVG as base64 to clipboard"
         };
 
         if (e.target.id in tooltips) {
@@ -311,39 +371,59 @@ const editor = CodeMirror(document.getElementById('editor'), {
 /** Splitter for resizing editor and output */
 (function () {
     let splitter = document.getElementById('splitter');
-    let editorContainer = document.getElementById('editor-container');
 
-    let initialClientX, initialWidth;
+    let initialClientPos, initialSize;
 
     splitter.addEventListener('mousedown', function(e) {
         e.preventDefault();
-        initialClientX = e.clientX;
-        initialWidth = editorContainer.getBoundingClientRect().width;
+        if (container.dataset.layout === "vertical") {
+            initialClientPos = e.clientX;
+            initialSize = editorContainer.getBoundingClientRect().width;
+        } else {
+            initialClientPos = e.clientY;
+            initialSize = editorContainer.getBoundingClientRect().height;
+        }
         document.addEventListener('mousemove', mousemove);
         document.addEventListener('mouseup', mouseup);
     });
 
     // double-click to reset split
     splitter.addEventListener('dblclick', function(e) {
-        editorContainer.style.width = '';
-        editorContainer.style.minWidth = '';
+        resetLayout();
     });
 
     function mousemove(e) {
-        const dx = e.clientX - initialClientX;
-        let newWidth = initialWidth + dx;
+        if (container.dataset.layout === "vertical") {
+            const dx = e.clientX - initialClientPos;
+            let newWidth = initialSize + dx;
 
-        // Convert min (25em) and max (80%) widths to pixels
-        const minPixels = parseFloat(getComputedStyle(editorContainer).fontSize) * 25;
-        const maxPixels = window.innerWidth * 0.8;
+            // Convert min (25em) and max (80%) widths to pixels
+            const minPixels = parseFloat(getComputedStyle(editorContainer).fontSize) * 25;
+            const maxPixels = window.innerWidth * 0.8;
 
-        // Enforce min and max widths
-        newWidth = Math.max(newWidth, minPixels);
-        newWidth = Math.min(newWidth, maxPixels);
+            // Enforce min and max widths
+            newWidth = Math.max(newWidth, minPixels);
+            newWidth = Math.min(newWidth, maxPixels);
 
-        // Set both width and min-width to improve cross-browser compatibility
-        editorContainer.style.width = newWidth + 'px';
-        editorContainer.style.minWidth = newWidth + 'px';
+            // Set both width and min-width to improve cross-browser compatibility
+            editorContainer.style.width = newWidth + 'px';
+            editorContainer.style.minWidth = newWidth + 'px';
+        } else {
+            const dy = e.clientY - initialClientPos;
+            let newHeight = initialSize + dy;
+
+            // Convert min (20%) and max (80%) height to pixels
+            const minPixels = window.innerHeight * 0.2;
+            const maxPixels = window.innerHeight * 0.8;
+
+            // Enforce min and max widths
+            newHeight = Math.max(newHeight, minPixels);
+            newHeight = Math.min(newHeight, maxPixels);
+
+            // Set both width and min-width to improve cross-browser compatibility
+            editorContainer.style.height = newHeight + 'px';
+            editorContainer.style.minHeight = newHeight + 'px';
+        }
     }
 
     function mouseup() {
