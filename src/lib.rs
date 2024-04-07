@@ -69,6 +69,8 @@ pub struct TransformConfig {
     pub background: String,
     /// Random seed
     pub seed: u64,
+    /// Add source metadata to output
+    pub add_metadata: bool,
 }
 
 impl Default for TransformConfig {
@@ -80,6 +82,7 @@ impl Default for TransformConfig {
             add_auto_defs: true,
             background: "none".to_owned(),
             seed: 0,
+            add_metadata: false,
         }
     }
 }

@@ -11,64 +11,88 @@
         }
         .container {
             display: flex;
+            flex: 1;
+            height: calc(100svh - 100px);
+        }
+        .container[data-layout="vertical"] {
+            flex-direction: row;
+        }
+        .container[data-layout="horizontal"] {
+            flex-direction: column;
         }
 
         #editor-container,
         #svg-output {
-            height: calc(100vh - 100px);
-            box-sizing: border-box;
             border: 1px solid #ccc;
-            padding: 10px;
-            margin: 0 10px;
-            overflow-y: auto;
-            overflow-x: hidden;
-            display: flex;
-            flex-direction: column;
+            margin: 10px;
+            min-width: 100px;
+            min-height: 100px;
+        }
+
+        #svg-output {
+            flex: 1 1 auto;
+            overflow: hidden;
         }
 
         #editor-container {
-            /* initial width, splitter overrides this */
-            min-width: 40%;
-            width: 40%;
+            display: flex;
+            flex-direction: column;
+            /* flex: 1 1 auto; */
+        }
+        #editor {
+            flex: 1 1 auto;
+            overflow-y: auto;
+        }
+        #controls div {
+            margin: 10px;
+        }
+        #error-output {
+            color: red;
+            font-family: monospace;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        #statusbar {
+            font-family: monospace;
         }
 
-        #editor {
-            min-width: 20%;
-            height: calc(100% - 80px);
-            flex-grow: 1;
+        #splitter {
+            min-width: 8px;
+            min-height: 8px;
+            background-color: #eee;
+            flex: none;
         }
-        #svg-output {
-            min-width: 10%;
-            display: flex;
-            flex-grow: 1;
-            justify-content: center;
-            align-items: center;
+        .container[data-layout="horizontal"] #splitter{
+            cursor: row-resize;
+            margin: -5px 10px;
+        }
+        .container[data-layout="vertical"] #splitter{
+            cursor: col-resize;
+            margin: 10px -5px;
+        }
+        #splitter:hover {
+            background-color: #ddd;
+        }
+        #splitter:active {
+            background-color: #ccc;
         }
 
         .CodeMirror .error-line {
             background-color: #ffdddd;
         }
 
+        .CodeMirror .hover-line {
+            background-color: #f0f0f0;
+        }
+
         .CodeMirror {
             height: 100%;
         }
-
         svg {
             width: 100%;
             height: 100%;
         }
 
-        #error-output {
-            color: red;
-            font-family: monospace;
-            margin-top: 10px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-        #controls {
-            height: 50px;
-            margin-top: 10px;
-        }
         button {
             background-color: #eee;
             border-radius: 5px;
@@ -91,38 +115,25 @@
         button[data-checked="true"]:active {
             box-shadow: inset 3px 3px 4px #000;
         }
-        #statusbar {
-            margin: 10px 0 0 0;
-            font-family: monospace;
-        }
-
-        #splitter {
-            min-width: 5px;
-            margin: 0 -5px;
-            cursor: col-resize;
-            background-color: #eee;
-        }
-        #splitter:hover {
-            background-color: #ddd;
-        }
-        #splitter:active {
-            background-color: #ccc;
-        }
     </style>
 </head>
 
 <body>
-    <h1>svgdx editor</h1>
-    <div class="container">
+    <div class="header">
+        <h1>svgdx editor</h1>
+    </div>
+    <div class="container" data-layout="vertical">
         <div id="editor-container">
             <div id="editor"></div>
-            <div id="error-output"></div>
             <div id="controls">
+                <div id="error-output"></div>
                 <div style="position: inline-block">
+                    <button id="toggle-layout">Layout</button>
                     <button id="auto-viewbox">Auto Fit</button>
                     <button id="reset-view">Reset View</button>
                     <button id="save-input">Save Input</button>
                     <button id="save-output">Save SVG</button>
+                    <button id="copy-base64">Copy SVG URI</button>
                 </div>
                 <div style="position: inline-block;">
                     <pre id="statusbar">svgdx</pre>
