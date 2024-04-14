@@ -9,13 +9,22 @@ beginning `d-`; all classes and id values provided by `svgdx` begin with this pr
 
 ## Colour - stroke and fill
 
+Three class types affect colour:
+
+- [`d-<colour>`](#d-colour) sets a 'default' colour for shape outlines and text
+- [`d-fill-<colour>`](#d-fill-colour) sets the colour for shape fills, and sets a default text colour to an appropriate contrast colour, if not overridden by `d-fill-<colour>` or `d-text-<colour>`
+- [`d-text-<colour>`](#d-text-colour) sets the colour for text elements, which overrides any implicit text colour set by `d-colour` or `d-fill-colour`.
+
+> Note that the approach to colour in auto-styles assumes that text will not have a stroke; if text stroke needs to be specified, use custom classes and styles.
+
 ### `d-<colour>`
 Sets the stroke of this element to the given colour, which must be a colour name as
 given in the [SVG 'Color' type](https://www.w3.org/TR/SVG11/types.html#DataTypeColor)
 or the value `none` to disable stroke.
 
-Note any `text` associated with this element does *not* have its colour changed;
-text rendered from `text` attributes has no stroke by default.
+By default any `text` associated with this element will also have its colour changed, though text colour is applied via the `fill` attribute rather than `stroke`. Text colour can be overridden by use of [`d-text-<colour>`](#d-text-colour).
+
+> An exception is that `d-none` (typically used to prevent an outline being rendered) does not apply an equivalent to text, since this would leave the text invisible.
 
 Applies to: Basic Shapes
 
@@ -30,7 +39,7 @@ by the [SVG 'Color' keywords](https://www.w3.org/TR/SVG11/types.html#ColorKeywor
 the value `none` to disable fill (note `fill: none;` is the default style).
 
 If the fill colour matches an internal list of (subjectively) darker colours,
-any `text` associated with this element is changed to render in white rather than black.
+any `text` associated with this element is changed to render in white rather than black, unless overridden by [`d-<colour>`](#d-colour) or [`d-text-colour`](#d-text-colour).
 
 Applies to: Basic shapes
 
@@ -39,11 +48,26 @@ Examples:
 <rect xy="0" wh="10" text="Hello!" class="d-fill-deeppink" />
 ```
 
+### `d-text-<colour>`
+Sets the colour of rendered text to the given colour, which must be a colour name as given
+by the [SVG 'Color' keywords](https://www.w3.org/TR/SVG11/types.html#ColorKeywords).
+Note this overrides any colour applied by the other colour specifiers above.
+
+Example:
+```xml
+<rect xy="0" wh="10" text="Hello!" class="d-fill-grey d-text-darkblue d-green" />
+```
+
+This will render a grey square with green outline and dark blue text.
+
 ## Line styles - dots, dashes, and arrows
 
 ### `d-dot` / `d-dash`
 Renders an element outline (stroke) with a 'dotted' or 'dashed' line style respectively.
 Implemented with `stroke-dasharray`.
+
+### `d-thin` / `d-thick`
+These respectively reduce or increase the stroke width from the default by a factor of 2.
 
 ### `d-arrow`
 Renders an arrowhead at the 'end' of a `line` or `polyline` element. When used on a

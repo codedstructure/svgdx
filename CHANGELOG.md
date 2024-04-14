@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: various auto-styles relating to text, including the ability to specify
+  text colour, and preventing `d-softshadow` / `d-hardshadow` being applied to
+  rendered text. A new `d-thick` style has been added as a complement to `d-thin`.
+  See [auto_styles.md](docs/auto_styles.md) for more information.
+
 ## [0.7.1 - 2024-04-07]
 
 - svgdx-editor enhancements, including both horizontal and vertical editor layouts,

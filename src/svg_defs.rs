@@ -260,7 +260,10 @@ pub fn build_styles(
         ));
     }
     if classes.contains("d-thin") {
-        result.push(String::from(".d-thin { stroke-width: 0.2; }"));
+        result.push(String::from(".d-thin { stroke-width: 0.25; }"));
+    }
+    if classes.contains("d-thick") {
+        result.push(String::from(".d-thick { stroke-width: 1; }"));
     }
     if classes.contains("d-tbox") {
         result.push(String::from(
@@ -290,12 +293,12 @@ pub fn build_styles(
 
     if classes.contains("d-softshadow") {
         result.push(String::from(
-            ".d-softshadow { filter: url(#d-softshadow); }",
+            ".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }",
         ));
     }
     if classes.contains("d-hardshadow") {
         result.push(String::from(
-            ".d-hardshadow { filter: url(#d-hardshadow); }",
+            ".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }",
         ));
     }
     if classes.contains("d-arrow") {
@@ -315,19 +318,19 @@ pub fn build_styles(
         result.push(String::from(".d-dot { stroke-dasharray: 0.5 0.5; }"));
     }
     if classes.contains("d-surround") {
-        result.push(String::from(".d-surround { fill: none; }"));
+        result.push(String::from(".d-surround:not(text,tspan) { fill: none; }"));
     }
-    for colour in COLOUR_LIST {
-        if classes.contains(&format!("d-{colour}")) {
-            result.push(format!(".d-{colour} {{ stroke: {colour}; }}"));
-            result.push(format!(
-                "text.d-{colour}, text.d-{colour} * {{ stroke: none; }}"
-            ));
-        }
-    }
+    // Colours
+    // - d-colour sets a 'default' colour for shape outlines and text
+    // - d-fill-colour sets the colour for shape fills, and sets a text colour
+    //   to an appropriate contrast colour.
+    // - d-text-colour sets the colour for text elements, which overrides any
+    //   colours set by d-colour or d-fill-colour.
     for colour in COLOUR_LIST {
         if classes.contains(&format!("d-fill-{colour}")) {
-            result.push(format!(".d-fill-{colour} {{ fill: {colour}; }}"));
+            result.push(format!(
+                ".d-fill-{colour}:not(text,tspan) {{ fill: {colour}; }}"
+            ));
             let text_colour = if DARK_COLOURS.contains(colour) {
                 "white"
             } else {
@@ -335,6 +338,30 @@ pub fn build_styles(
             };
             result.push(format!(
                 "text.d-fill-{colour}, text.d-fill-{colour} * {{ fill: {text_colour}; }}"
+            ));
+        }
+    }
+    for colour in COLOUR_LIST {
+        if classes.contains(&format!("d-{colour}")) {
+            result.push(format!(
+                ".d-{colour}:not(text,tspan) {{ stroke: {colour}; }}"
+            ));
+            // By default text is the same colour as shape stroke, but may be
+            // overridden by d-text-colour (e.g. for text attrs on shapes)
+            // Also special-case 'none'; there are many use-cases for not having
+            // a stroke colour (using `d-none`), but text should always have a colour.
+            if *colour != "none" {
+                result.push(format!(
+                    "text.d-{colour}, text.d-{colour} * {{ fill: {colour}; }}"
+                ));
+            }
+        }
+    }
+    for colour in COLOUR_LIST {
+        if classes.contains(&format!("d-text-{colour}")) {
+            // Must be at least as specific as d-fill-colour
+            result.push(format!(
+                "text.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; }}"
             ));
         }
     }
