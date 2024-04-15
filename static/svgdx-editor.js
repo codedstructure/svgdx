@@ -49,6 +49,16 @@ function resetLayout() {
     }
 }
 
+const DEFAULT_CONTENT = `<svg>
+  <!-- Example svgdx document -->
+  <rect id="in" wh="20 10" text="input" />
+  <rect id="proc" xy="^:h 10" wh="^" text="process" />
+  <rect id="out" xy="^:h 10" wh="^" text="output" />
+
+  <line start="#in" end="#proc" class="d-arrow"/>
+  <line start="#proc" end="#out" class="d-arrow"/>
+</svg>`;
+
 const editor = CodeMirror(document.getElementById('editor'), {
     mode: 'xml',
     lineNumbers: true,
@@ -69,7 +79,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
     async function update() {
         try {
             // save editor content to localStorage
-            localStorage.setItem('svgdx-editor-value', editor.getValue());
+            localStorage.setItem(`svgdx-editor-value-${activeTab()}`, editor.getValue());
 
             const response = await fetch('/transform', {
                 method: 'POST',
@@ -123,24 +133,52 @@ const editor = CodeMirror(document.getElementById('editor'), {
     }
 
     // restore from localstorage on load
-    const savedValue = localStorage.getItem('svgdx-editor-value');
+    const savedValue = localStorage.getItem(`svgdx-editor-value-${activeTab()}`);
+    // Pre-tab implementation just used `svgdx-editor-value`
+    //const savedValue = localStorage.getItem(`svgdx-editor-value`);
     if (savedValue) {
         editor.setValue(savedValue);
         update();
     } else {
-        editor.setValue(`<svg>
-  <!-- Example svgdx document -->
-  <rect id="in" wh="20 10" text="input" />
-  <rect id="proc" xy="^:h 10" wh="^" text="process" />
-  <rect id="out" xy="^:h 10" wh="^" text="output" />
-
-  <line start="#in" end="#proc" class="d-arrow"/>
-  <line start="#proc" end="#out" class="d-arrow"/>
-</svg>`);
+        editor.setValue(DEFAULT_CONTENT);
         update();
     }
 
     editor.on('change', update);
+
+    function activeTab() {
+        let stored = localStorage.getItem("svgdx-active-tab") || "1";
+        let active = document.querySelector('#tabs button[data-checked="true"]');
+        if (active) {
+            let tabNum = active.dataset.tabNum;
+            if (stored != tabNum) {
+                localStorage.setItem("svgdx-active-tab", tabNum);
+            }
+            return tabNum;
+        }
+        const selected = document.querySelector(`#tabs button[data-tab-num="${stored}"]`);
+        if (selected) {
+            selected.dataset.checked = "true";
+        } else {
+            console.log("Oops: svgdx-active-tab doesn't refer to a valid button");
+            localStorage.setItem("svgdx-active-tab", "1");
+            return activeTab();
+        }
+        return stored;
+    }
+
+    document.querySelectorAll('#tabs button').forEach((button) => {
+        button.addEventListener('click', () => {
+            document.querySelectorAll('#tabs button').forEach((clearTab) => {
+                clearTab.dataset.checked = "false";
+            });
+            button.dataset.checked = "true";
+            localStorage.setItem("svgdx-active-tab", button.dataset.tabNum);
+            const loadValue = localStorage.getItem(`svgdx-editor-value-${activeTab()}`) || DEFAULT_CONTENT;
+            editor.setValue(loadValue);
+            update();
+        });
+    });
 
     const resetButton = document.getElementById('reset-view');
     resetButton.addEventListener('click', () => {
@@ -363,7 +401,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
             statusbar.innerText = status_text;
         }
         else {
-            statusbar.innerText = 'svgdx';
+            statusbar.innerText = "svgdx editor";
         }
     });
 })();

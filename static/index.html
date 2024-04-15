@@ -12,7 +12,7 @@
         .container {
             display: flex;
             flex: 1;
-            height: calc(100svh - 100px);
+            height: calc(100svh - 20px);
         }
         .container[data-layout="vertical"] {
             flex-direction: row;
@@ -37,11 +37,11 @@
         #editor-container {
             display: flex;
             flex-direction: column;
-            /* flex: 1 1 auto; */
         }
         #editor {
             flex: 1 1 auto;
             overflow-y: auto;
+            margin: 10px 0;
         }
         #controls div {
             margin: 10px;
@@ -99,6 +99,10 @@
             box-shadow: 2px 2px 3px #000;
             border: none;
         }
+        #tabs button {
+            border-radius: 0px;
+            margin: 3px;
+        }
         button:hover, button:focus {
             box-shadow: 1px 1px 2px #000;
         }
@@ -119,11 +123,15 @@
 </head>
 
 <body>
-    <div class="header">
-        <h1>svgdx editor</h1>
-    </div>
     <div class="container" data-layout="vertical">
         <div id="editor-container">
+            <div id="tabs">
+                <button data-tab-num="1">1</button>
+                <button data-tab-num="2">2</button>
+                <button data-tab-num="3">3</button>
+                <button data-tab-num="4">4</button>
+                <button data-tab-num="5">5</button>
+            </div>
             <div id="editor"></div>
             <div id="controls">
                 <div id="error-output"></div>
@@ -136,7 +144,7 @@
                     <button id="copy-base64">Copy SVG URI</button>
                 </div>
                 <div style="position: inline-block;">
-                    <pre id="statusbar">svgdx</pre>
+                    <pre id="statusbar">svgdx editor</pre>
                 </div>
             </div>
         </div>
