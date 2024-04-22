@@ -3,7 +3,7 @@ use crate::path::path_bbox;
 use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
-    DirSpec, EdgeSpec, Length, LocSpec,
+    DirSpec, EdgeSpec, Length, LocSpec, OrderIndex,
 };
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
@@ -62,7 +62,7 @@ pub struct SvgElement {
     pub classes: ClassList,
     pub content: ContentType,
     pub tail: Option<String>,
-    pub order_index: usize,
+    pub order_index: OrderIndex,
     pub indent: usize,
     pub src_line: usize,
     pub event_range: Option<(usize, usize)>,
@@ -102,7 +102,7 @@ impl SvgElement {
             classes,
             content: ContentType::Empty,
             tail: None,
-            order_index: 0,
+            order_index: OrderIndex::default(),
             indent: 0,
             src_line: 0,
             event_range: None,
@@ -117,8 +117,8 @@ impl SvgElement {
         self.src_line = line;
     }
 
-    pub fn set_order_index(&mut self, order_index: usize) {
-        self.order_index = order_index;
+    pub fn set_order_index(&mut self, order_index: &OrderIndex) {
+        self.order_index = order_index.clone();
     }
 
     pub fn set_event_range(&mut self, range: (usize, usize)) {

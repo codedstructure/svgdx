@@ -1,10 +1,12 @@
 use crate::connector::{ConnectionType, Connector};
-use crate::element::ContentType;
+use crate::element::{ContentType, SvgElement};
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, TrblLength};
-use crate::{element::SvgElement, TransformConfig};
+use crate::types::{
+    attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, OrderIndex, TrblLength,
+};
+use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -747,7 +749,7 @@ impl Transformer {
     fn handle_reuse_element(
         &mut self,
         mut event_element: SvgElement,
-        idx_output: &mut BTreeMap<usize, EventList>,
+        idx_output: &mut BTreeMap<OrderIndex, EventList>,
     ) -> Result<SvgElement> {
         let elref = event_element
             .pop_attr("href")
@@ -771,13 +773,10 @@ impl Transformer {
                     &mut btree,
                 )?;
 
-                //let open_event = self.generate_element_events(&mut instance_element)?.to_owned();
-                //btree.insert(event_element.order_index << 4, open_event.clone());
-
+                // TODO: should wrap the generated events in a <g> element
+                // which can inherit any id from the original reuse element.
                 for (idx, ev) in btree {
-                    // terrible hack to allow multiple elements to be inserted for the same source
-                    let idx = (event_element.order_index << 4) + (idx >> 4); // + open_event.len();
-                    idx_output.insert(idx, ev);
+                    idx_output.insert(event_element.order_index.with_sub_index(&idx), ev);
                 }
                 return Ok(SvgElement::new("phantom", &[]));
             }
@@ -810,16 +809,16 @@ impl Transformer {
     fn process_seq<'a>(
         &mut self,
         seq: EventList<'a>,
-        idx_output: &mut BTreeMap<usize, EventList>,
+        idx_output: &mut BTreeMap<OrderIndex, EventList>,
     ) -> Result<EventList<'a>> {
         let mut remain = EventList::new();
         let mut last_event = None;
         let mut last_element = None;
-        let mut gen_events: Vec<(usize, EventList<'_>)>;
+        let mut gen_events: Vec<(OrderIndex, EventList<'_>)>;
         // Stack of event indices of open elements.
         let mut idx_stack = Vec::new();
 
-        for input_ev in seq.iter().cloned() {
+        for input_ev in seq {
             let ev = &input_ev.event;
             gen_events = Vec::new();
 
@@ -833,7 +832,7 @@ impl Transformer {
                     ))?;
                     event_element.set_indent(input_ev.indent);
                     event_element.set_src_line(input_ev.line);
-                    event_element.set_order_index(input_ev.index);
+                    event_element.set_order_index(&OrderIndex::new(input_ev.index));
                     event_element.content = if is_empty {
                         ContentType::Empty
                     } else {
@@ -907,7 +906,8 @@ impl Transformer {
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
-                                gen_events.push((input_ev.index, ev_events.clone()));
+                                gen_events
+                                    .push((OrderIndex::new(input_ev.index), ev_events.clone()));
                             }
                         } else {
                             remain.push(input_ev.clone());
@@ -949,11 +949,15 @@ impl Transformer {
                                         events.push(Event::Text(BytesText::new(&content)));
                                     }
                                 }
-                                gen_events.push((event_element.order_index, events.clone()));
+                                gen_events
+                                    .push((event_element.order_index.clone(), events.clone()));
                                 if !event_element.is_content_text() {
                                     // Similarly, `is_content_text` elements should close themselves in the returned
                                     // event list if needed.
-                                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                                    gen_events.push((
+                                        OrderIndex::new(input_ev.index),
+                                        EventList::from(ev.clone()),
+                                    ));
                                 }
                             }
                         } else {
@@ -1011,16 +1015,17 @@ impl Transformer {
                         _ => {}
                     }
                     if !processed && !self.context.in_specs {
-                        gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                        gen_events
+                            .push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                     }
                 }
                 _ => {
-                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                    gen_events.push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                 }
             }
 
             for (gen_idx, gen_events) in gen_events {
-                idx_output.insert(gen_idx << 4, EventList::from(gen_events.events));
+                idx_output.insert(gen_idx, EventList::from(gen_events.events));
             }
 
             last_event = Some(ev.clone());
@@ -1031,7 +1036,7 @@ impl Transformer {
 
     fn process_events<'a>(&mut self, input: EventList<'a>) -> Result<EventList<'a>> {
         let mut output = EventList { events: vec![] };
-        let mut idx_output = BTreeMap::<usize, EventList>::new();
+        let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
         // First pass with original input data
         let mut remain = self.process_seq(input, &mut idx_output)?;
