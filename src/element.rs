@@ -65,6 +65,7 @@ pub struct SvgElement {
     pub order_index: usize,
     pub indent: usize,
     pub src_line: usize,
+    pub event_range: Option<(usize, usize)>,
 }
 
 impl Display for SvgElement {
@@ -104,6 +105,7 @@ impl SvgElement {
             order_index: 0,
             indent: 0,
             src_line: 0,
+            event_range: None,
         }
     }
 
@@ -117,6 +119,10 @@ impl SvgElement {
 
     pub fn set_order_index(&mut self, order_index: usize) {
         self.order_index = order_index;
+    }
+
+    pub fn set_event_range(&mut self, range: (usize, usize)) {
+        self.event_range = Some(range);
     }
 
     pub fn set_tail(&mut self, tail: &str) {
@@ -821,13 +827,7 @@ impl SvgElement {
         }
 
         self.attrs = new_attrs;
-        if let Some(elem_id) = self.get_attr("id") {
-            let mut updated = Self::new(&self.name, &self.attrs.to_vec());
-            updated.add_classes(&self.classes);
-            if let Some(elem) = context.get_element_mut(&elem_id) {
-                *elem = updated;
-            }
-        }
+        context.update_element(self);
 
         Ok(())
     }
