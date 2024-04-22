@@ -39,3 +39,38 @@ fn test_reuse_attr_locals() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_group() {
+    let input = r##"
+<specs>
+<g id="a">
+ <rect xy="0" wh="{{10 + $h}} $h" text="$h" text-loc="bl"/>
+ <circle cx="0" cy="$h" r="0.5"/>
+</g>
+</specs>
+<reuse href="#a" h="40"/>
+<reuse href="#a" h="30"/>
+<reuse href="#a" h="20"/>
+"##;
+    let expected = r#"
+
+ <rect x="0" y="0" width="50" height="40"/>
+ <text x="1" y="39" class="d-tbox d-text-bottom d-text-left">40</text>
+ <circle cx="0" cy="40" r="0.5"/>
+
+
+ <rect x="0" y="0" width="40" height="30"/>
+ <text x="1" y="29" class="d-tbox d-text-bottom d-text-left">30</text>
+ <circle cx="0" cy="30" r="0.5"/>
+
+
+ <rect x="0" y="0" width="30" height="20"/>
+ <text x="1" y="19" class="d-tbox d-text-bottom d-text-left">20</text>
+ <circle cx="0" cy="20" r="0.5"/>
+
+"#;
+    let output = transform_str_default(input).unwrap();
+    // exact equality check: ensure that <specs> doesn't appear in the output.
+    assert_eq!(output, expected);
+}
