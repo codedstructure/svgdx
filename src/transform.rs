@@ -36,8 +36,8 @@ pub struct TransformerContext {
     events: Vec<InputEvent<'static>>,
 }
 
-impl TransformerContext {
-    pub fn new() -> Self {
+impl Default for TransformerContext {
+    fn default() -> Self {
         Self {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
@@ -49,6 +49,12 @@ impl TransformerContext {
             in_specs: false,
             events: Vec::new(),
         }
+    }
+}
+
+impl TransformerContext {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn set_events(&mut self, events: Vec<InputEvent<'static>>) {
@@ -427,6 +433,18 @@ impl From<Event<'_>> for EventList<'_> {
     }
 }
 
+impl From<SvgEvent> for InputEvent<'_> {
+    fn from(value: SvgEvent) -> Self {
+        InputEvent::from(Event::from(value))
+    }
+}
+
+impl From<SvgEvent> for EventList<'_> {
+    fn from(value: SvgEvent) -> Self {
+        Event::from(value).into()
+    }
+}
+
 impl From<Vec<InputEvent<'_>>> for EventList<'_> {
     fn from(value: Vec<InputEvent>) -> Self {
         Self {
@@ -773,11 +791,25 @@ impl Transformer {
                     &mut btree,
                 )?;
 
-                // TODO: should wrap the generated events in a <g> element
-                // which can inherit any id from the original reuse element.
+                // Use sub-index to have group open at 0, content at 1.x, close at 2
                 for (idx, ev) in btree {
-                    idx_output.insert(event_element.order_index.with_sub_index(&idx), ev);
+                    idx_output.insert(
+                        event_element.order_index.with_index(1).with_sub_index(&idx),
+                        ev,
+                    );
                 }
+                let mut group_element = SvgElement::new("g", &[]);
+                group_element.set_indent(event_element.indent);
+                group_element.set_src_line(event_element.src_line);
+                group_element.add_classes(&event_element.classes);
+                if let Some(inst_id) = event_element.pop_attr("id") {
+                    group_element.set_attr("id", &inst_id);
+                }
+                let group_open = EventList::from(SvgEvent::Start(group_element));
+                let group_close = EventList::from(SvgEvent::End("g".to_string()));
+                idx_output.insert(event_element.order_index.with_index(0), group_open);
+                idx_output.insert(event_element.order_index.with_index(2), group_close);
+
                 return Ok(SvgElement::new("phantom", &[]));
             }
         }
@@ -1285,13 +1317,20 @@ fn transform_element<'a>(
         return Ok(EventList::new());
     }
     let mut output = EventList::new();
-    let source_line = element.get_attr("data-source-line");
     let ee = context.handle_element(element)?;
     for svg_ev in ee {
+        output.push(svg_ev);
+    }
+    Ok(output)
+}
+
+impl<'a> From<SvgEvent> for Event<'a> {
+    fn from(svg_ev: SvgEvent) -> Event<'a> {
         // re-calculate is_empty for each generated event
         let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
         match svg_ev {
             SvgEvent::Empty(e) | SvgEvent::Start(e) => {
+                let source_line = e.get_attr("data-source-line");
                 let mut bs = BytesStart::new(e.name);
                 // Collect pass-through attributes
                 for (k, v) in e.attrs {
@@ -1319,23 +1358,16 @@ fn transform_element<'a>(
                     )));
                 }
                 if is_empty {
-                    output.push(Event::Empty(bs));
+                    Event::Empty(bs)
                 } else {
-                    output.push(Event::Start(bs));
+                    Event::Start(bs)
                 }
             }
-            SvgEvent::Comment(t) => {
-                output.push(Event::Comment(BytesText::new(&t)));
-            }
-            SvgEvent::Text(t) => {
-                output.push(Event::Text(BytesText::from_escaped(&t)));
-            }
-            SvgEvent::End(name) => {
-                output.push(Event::End(BytesEnd::new(name)));
-            }
+            SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
+            SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            SvgEvent::End(name) => Event::End(BytesEnd::new(name)),
         }
     }
-    Ok(output)
 }
 
 #[cfg(test)]

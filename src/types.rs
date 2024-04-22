@@ -50,6 +50,13 @@ impl OrderIndex {
 
         Self(new_idx)
     }
+
+    pub fn with_index(&self, idx: usize) -> Self {
+        let mut new_idx = self.0.clone();
+        new_idx.push(idx);
+
+        Self(new_idx)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
