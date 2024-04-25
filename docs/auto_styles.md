@@ -60,6 +60,18 @@ Example:
 
 This will render a grey square with green outline and dark blue text.
 
+## Text styles
+
+### `d-text-smallest` / `-smaller` / `-small` / `-medium` / `-large` / `-larger` / `-largest`
+
+These styles control the size of text. The default text size is `d-text-medium`, but providing
+this style as an option allows the various relative size styles to be used if global font-size
+is overriden.
+
+### `d-text-monospace` / `d-text-italic` / `d-text-bold`
+
+These styles provide basic styling of text elements, and may be combined as required.
+
 ## Line styles - dots, dashes, and arrows
 
 ### `d-dot` / `d-dash`

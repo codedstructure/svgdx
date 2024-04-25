@@ -59,6 +59,41 @@ fn test_style_text_colour() {
 }
 
 #[test]
+fn test_style_text_attributes() {
+    let input = r#"<svg><text xy="0" class="d-text-bold">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style = r#"text.d-text-bold, text.d-text-bold * { font-weight: bold; }"#;
+    assert_contains!(output, expected_style);
+
+    let input = r#"<svg><text xy="0" class="d-text-italic">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style = r#"text.d-text-italic, text.d-text-italic * { font-style: italic; }"#;
+    assert_contains!(output, expected_style);
+
+    let input = r#"<svg><text xy="0" class="d-text-monospace">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style =
+        r#"text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"#;
+    assert_contains!(output, expected_style);
+
+    let text_sizes = vec![
+        ("d-text-smallest", 1.),
+        ("d-text-smaller", 1.5),
+        ("d-text-small", 2.),
+        ("d-text-medium", 3.), // Default, but include explicitly for completeness
+        ("d-text-large", 4.5),
+        ("d-text-larger", 7.),
+        ("d-text-largest", 10.),
+    ];
+    for (class, size) in text_sizes {
+        let input = format!(r#"<svg><text xy="0" class="{}">Hello!</text></svg>"#, class);
+        let output = transform_str_default(&input).unwrap();
+        let expected_style = format!("text.{0}, text.{0} * {{ font-size: {1}px; }}", class, size);
+        assert_contains!(output, &expected_style);
+    }
+}
+
+#[test]
 fn test_style_arrow() {
     let input = r#"<svg><line xy1="0" xy2="10" class="d-arrow" /></svg>"#;
     let expected_style = r#".d-arrow { marker-end: url(#d-arrow); }"#;

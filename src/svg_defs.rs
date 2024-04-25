@@ -291,6 +291,36 @@ pub fn build_styles(
         ));
     }
 
+    // Text size is 3px by default.
+    let text_sizes = vec![
+        ("d-text-smallest", 1.),
+        ("d-text-smaller", 1.5),
+        ("d-text-small", 2.),
+        ("d-text-medium", 3.), // Default, but include explicitly for completeness
+        ("d-text-large", 4.5),
+        ("d-text-larger", 7.),
+        ("d-text-largest", 10.),
+    ];
+    for (class, size) in text_sizes {
+        if classes.contains(class) {
+            result.push(format!(
+                "text.{0}, text.{0} * {{ font-size: {1}px; }}",
+                class, size
+            ));
+        }
+    }
+    // Default is sans-serif 'normal' text.
+    let font_style = vec![
+        ("d-text-bold", "font-weight: bold"),
+        ("d-text-italic", "font-style: italic"),
+        ("d-text-monospace", "font-family: monospace"),
+    ];
+    for (class, style) in font_style {
+        if classes.contains(class) {
+            result.push(format!("text.{0}, text.{0} * {{ {1}; }}", class, style));
+        }
+    }
+
     if classes.contains("d-softshadow") {
         result.push(String::from(
             ".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }",
