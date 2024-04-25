@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A new `d-thick` style has been added as a complement to `d-thin`.
   See [auto_styles.md](docs/auto_styles.md) for more information.
 
+- minor svgdx-editor enhancements including timestamp in download filenames
+
 ## [0.7.1 - 2024-04-07]
 
 - svgdx-editor enhancements, including both horizontal and vertical editor layouts,

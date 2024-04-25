@@ -34,6 +34,7 @@ const container = document.querySelector('.container');
 const editorContainer = document.querySelector('#editor-container');
 const svg_container = document.querySelector('#svg-output');
 const error_output = document.querySelector('#error-output');
+const statusbar = document.querySelector('#statusbar');
 
 function resetLayout() {
     if (container.dataset.layout === "vertical") {
@@ -81,6 +82,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
             // save editor content to localStorage
             localStorage.setItem(`svgdx-editor-value-${activeTab()}`, editor.getValue());
 
+            statusbar.style.opacity = "0.3";
             const response = await fetch('/transform', {
                 method: 'POST',
                 headers: {
@@ -88,6 +90,8 @@ const editor = CodeMirror(document.getElementById('editor'), {
                 },
                 body: editor.getValue()
             });
+            statusbar.style.opacity = null;
+            statusbar.style.color = null;
 
             if (response.ok) {
                 const oldSvg = svg_container.querySelector('svg');
@@ -128,6 +132,8 @@ const editor = CodeMirror(document.getElementById('editor'), {
                 error_output.style.display = "";
             }
         } catch (e) {
+            statusbar.style.color = "darkred";
+            statusbar.innerText = "svgdx editor - error using transform API";
             console.error('Error sending data to /transform', e);
         }
     }
@@ -197,6 +203,16 @@ const editor = CodeMirror(document.getElementById('editor'), {
         update();
     });
 
+    function pad2(n) {
+        return String(n).padStart(2, '0');
+    }
+
+    function getTimestamp() {
+        const date = new Date();
+        // format date as YYYY-MM-DD-HHMMSS
+        return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}-${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
+    }
+
     // save input button
     document.getElementById('save-input').addEventListener('click', () => {
         // trigger download
@@ -204,7 +220,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'svgdx-editor.svgdx';
+        a.download = `svgdx-editor-${getTimestamp()}.svgdx`;
         a.click();
         URL.revokeObjectURL(url);
     });
@@ -223,7 +239,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'output.svg';
+        a.download = `svgdx-output-${getTimestamp()}.svg`;
         a.click();
         URL.revokeObjectURL(url);
         // and back to our 'normal'
@@ -351,7 +367,6 @@ const editor = CodeMirror(document.getElementById('editor'), {
 (function () {
     document.addEventListener('mousemove', (e) => {
         const svg = svg_container.querySelector('svg');
-        const statusbar = document.querySelector('#statusbar');
 
         const tooltips = {
             "toggle-layout": "Toggle layout between horizontal and vertical",
