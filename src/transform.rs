@@ -98,14 +98,14 @@ impl TransformerContext {
         self.current_element.last_mut()
     }
 
+    /// Lookup variable in either parent attribute values or global variables
+    /// set using the `<var>` element.
     pub fn get_var(&self, name: &str) -> Option<String> {
-        for element_scope in self.current_element.iter().rev() {
-            if element_scope.name == "var" {
-                // `var` is special - its attributes are targets, so can't
-                // also be used for lookup or `x="$x * 2"` type expressions
-                // would fail.
-                continue;
-            }
+        // Note we skip the element we're currently processing so we can access
+        // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
+        // requires that when evaluating `x="$x"` we don't look up `x` in the
+        // `rect` element itself.
+        for element_scope in self.current_element.iter().rev().skip(1) {
             if let Some(value) = element_scope.get_attr(name) {
                 return Some(value.to_string());
             }
@@ -125,7 +125,7 @@ impl TransformerContext {
         }
     }
 
-    fn handle_vars(&mut self, e: &mut SvgElement) {
+    fn handle_var_element(&mut self, e: &mut SvgElement) {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
@@ -231,7 +231,7 @@ impl TransformerContext {
         let mut e = e.clone();
 
         if &e.name == "var" {
-            self.handle_vars(&mut e);
+            self.handle_var_element(&mut e);
             return Ok(vec![]);
         }
         if &e.name == "specs" {
@@ -779,17 +779,26 @@ impl Transformer {
                     .strip_prefix('#')
                     .context("href value should begin with '#'")?,
             )
-            .context("unknown reference")?;
+            .context("unknown reference")?
+            .to_owned();
         let mut instance_element = referenced_element.clone();
 
         if referenced_element.name == "g" {
             if let Some((start, end)) = referenced_element.event_range {
                 let mut btree = BTreeMap::new();
-                let _subseq = self.process_seq(
-                    // opening g element is not included in the slice
-                    EventList::from(self.context.events.clone()).slice(start + 1, end),
-                    &mut btree,
-                )?;
+
+                // opening g element is not included in the processed inner events to avoid
+                // infinite recursion...
+                let inner_events =
+                    EventList::from(self.context.events.clone()).slice(start + 1, end);
+                // ...but we do want to include it for attribute-variable lookups, so push the
+                // referenced element onto the element stack (just while we run process_seq)
+                self.context.push_current_element(&referenced_element);
+                let remain = self.process_seq(inner_events, &mut btree);
+                self.context.pop_current_element();
+                if !remain?.is_empty() {
+                    bail!("No support for forward references in reuse groups");
+                }
 
                 // Use sub-index to have group open at 0, content at 1.x, close at 2
                 for (idx, ev) in btree {
@@ -917,15 +926,19 @@ impl Transformer {
                             " ".repeat(event_element.indent)
                         ))));
                     }
+
                     // Note this must be done before `<reuse>` processing, which 'switches out' the
                     // element being processed to its target. The 'current_element' is used for
                     // local variable lookup from attributes.
                     self.context.push_current_element(&event_element);
                     // support reuse element
+                    let mut pop_needed = false;
                     if event_element.name == "reuse" {
                         match self.handle_reuse_element(event_element, idx_output) {
                             Ok(ev_el) => {
                                 event_element = ev_el;
+                                self.context.push_current_element(&event_element);
+                                pop_needed = true;
                             }
                             Err(err) => {
                                 self.context.pop_current_element();
@@ -948,6 +961,12 @@ impl Transformer {
                         self.context.pop_current_element();
                     } else {
                         idx_stack.push(input_ev.index);
+                    }
+                    if pop_needed {
+                        // This is a bit messy, but if we pushed an extra element to support
+                        // reuse, we need to pop it here. (Note we can't check for name=="reuse"
+                        // here as the element has been replaced with the target element).
+                        self.context.pop_current_element();
                     }
                 }
                 Event::End(e) => {
@@ -1317,52 +1336,77 @@ fn transform_element<'a>(
         return Ok(EventList::new());
     }
     let mut output = EventList::new();
+    let source_line = element.get_attr("data-source-line");
     let ee = context.handle_element(element)?;
     for svg_ev in ee {
-        output.push(svg_ev);
+        let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
+        let adapted = if let SvgEvent::Empty(e) | SvgEvent::Start(e) = svg_ev {
+            let mut bs = BytesStart::new(e.name);
+            // Collect pass-through attributes
+            for (k, v) in e.attrs {
+                if k != "class" && k != "data-source-line" {
+                    bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+                }
+            }
+            // Any 'class' attribute values are stored separately as a HashSet;
+            // collect those into the BytesStart object
+            if !e.classes.is_empty() {
+                bs.push_attribute(Attribute::from((
+                    "class".as_bytes(),
+                    e.classes
+                        .into_iter()
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                        .as_bytes(),
+                )));
+            }
+            // Add 'data-source-line' for all elements generated by input `element`
+            if let Some(ref source_line) = source_line {
+                bs.push_attribute(Attribute::from((
+                    "data-source-line".as_bytes(),
+                    source_line.as_bytes(),
+                )));
+            }
+            let new_el = SvgElement::try_from(&bs)?;
+            if is_empty {
+                SvgEvent::Empty(new_el)
+            } else {
+                SvgEvent::Start(new_el)
+            }
+        } else {
+            svg_ev
+        };
+
+        output.push(adapted);
     }
     Ok(output)
 }
 
+impl From<SvgElement> for BytesStart<'static> {
+    fn from(e: SvgElement) -> BytesStart<'static> {
+        let mut bs = BytesStart::new(e.name);
+        for (k, v) in e.attrs {
+            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+        }
+        if !e.classes.is_empty() {
+            bs.push_attribute(Attribute::from((
+                "class".as_bytes(),
+                e.classes
+                    .into_iter()
+                    .collect::<Vec<String>>()
+                    .join(" ")
+                    .as_bytes(),
+            )));
+        }
+        bs
+    }
+}
+
 impl<'a> From<SvgEvent> for Event<'a> {
     fn from(svg_ev: SvgEvent) -> Event<'a> {
-        // re-calculate is_empty for each generated event
-        let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
         match svg_ev {
-            SvgEvent::Empty(e) | SvgEvent::Start(e) => {
-                let source_line = e.get_attr("data-source-line");
-                let mut bs = BytesStart::new(e.name);
-                // Collect pass-through attributes
-                for (k, v) in e.attrs {
-                    if k != "class" && k != "data-source-line" {
-                        bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
-                    }
-                }
-                // Any 'class' attribute values are stored separately as a HashSet;
-                // collect those into the BytesStart object
-                if !e.classes.is_empty() {
-                    bs.push_attribute(Attribute::from((
-                        "class".as_bytes(),
-                        e.classes
-                            .into_iter()
-                            .collect::<Vec<String>>()
-                            .join(" ")
-                            .as_bytes(),
-                    )));
-                }
-                // Add 'data-source-line' for all elements generated by input `element`
-                if let Some(ref source_line) = source_line {
-                    bs.push_attribute(Attribute::from((
-                        "data-source-line".as_bytes(),
-                        source_line.as_bytes(),
-                    )));
-                }
-                if is_empty {
-                    Event::Empty(bs)
-                } else {
-                    Event::Start(bs)
-                }
-            }
+            SvgEvent::Empty(e) => Event::Empty(e.into()),
+            SvgEvent::Start(e) => Event::Start(e.into()),
             SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
             SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
             SvgEvent::End(name) => Event::End(BytesEnd::new(name)),

@@ -668,10 +668,20 @@ mod tests {
             eval_vars(r"Created in ${this_year} by ${me}", &ctx),
             "Created in 2023 by Ben"
         );
+    }
 
-        // Check attributes as locals
+    #[test]
+    fn test_eval_local_vars() {
+        let mut ctx = TransformerContext::new();
+        // provide some global variables so we can check they are overridden
+        for (name, value) in [("one", "1"), ("this_year", "2023")] {
+            ctx.set_var(name, value);
+        }
+
+        // Check attributes as locals; this would be something like the attributes
+        // of a surrounding <g> element, which can be referenced by child elements.
         ctx.push_current_element(&SvgElement::new(
-            "rect",
+            "g",
             &[
                 ("width".to_string(), "3".to_string()),
                 ("height".to_string(), "4".to_string()),
@@ -679,10 +689,46 @@ mod tests {
                 ("this_year".to_string(), "2024".to_string()),
             ],
         ));
+        // push another element - the actual 'current' element containing this attribute.
+        // This is skipped in variable lookup, so needed so the previous ('<g>') element
+        // is used.
+        ctx.push_current_element(&SvgElement::new("rect", &[]));
         assert_eq!(
             eval_vars("$this_year: $width.$one$height", &ctx),
             "2024: 3.14"
-        )
+        );
+
+        ctx.pop_current_element();
+        ctx.pop_current_element();
+        // Now `this_year` isn't overridden by the local variable should revert to
+        // the global value.
+        assert_eq!(eval_vars("$this_year", &ctx), "2023");
+
+        // Check multiple levels of override
+        ctx.push_current_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "1".to_string())],
+        ));
+        ctx.push_current_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "2".to_string())],
+        ));
+        ctx.push_current_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "3".to_string())],
+        ));
+        // The 'inner' element, where attributes should be ignored in variable lookup
+        ctx.push_current_element(&SvgElement::new(
+            "rect",
+            &[("level".to_string(), "inside!!".to_string())],
+        ));
+        assert_eq!(eval_vars("$level", &ctx), "3");
+        ctx.pop_current_element();
+        assert_eq!(eval_vars("$level", &ctx), "2");
+        ctx.pop_current_element();
+        assert_eq!(eval_vars("$level", &ctx), "1");
+        ctx.pop_current_element();
+        assert_eq!(eval_vars("$level", &ctx), "$level");
     }
 
     #[test]
