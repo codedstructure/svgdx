@@ -8,19 +8,19 @@
     text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     .d-dash { stroke-dasharray: 1.5 0.75; }
     .d-dot { stroke-dasharray: 0.5 0.5; }
-    .d-surround { fill: none; }
-    .d-red { stroke: red; }
-    text.d-red, text.d-red * { stroke: none; }
-    .d-fill-blue { fill: blue; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-blue:not(text,tspan) { fill: blue; }
     text.d-fill-blue, text.d-fill-blue * { fill: white; }
-    .d-fill-green { fill: green; }
+    .d-fill-green:not(text,tspan) { fill: green; }
     text.d-fill-green, text.d-fill-green * { fill: white; }
-    .d-fill-magenta { fill: magenta; }
+    .d-fill-magenta:not(text,tspan) { fill: magenta; }
     text.d-fill-magenta, text.d-fill-magenta * { fill: white; }
-    .d-fill-red { fill: red; }
+    .d-fill-red:not(text,tspan) { fill: red; }
     text.d-fill-red, text.d-fill-red * { fill: white; }
-    .d-fill-yellow { fill: yellow; }
+    .d-fill-yellow:not(text,tspan) { fill: yellow; }
     text.d-fill-yellow, text.d-fill-yellow * { fill: black; }
+    .d-red:not(text,tspan) { stroke: red; }
+    text.d-red, text.d-red * { fill: red; }
   ]]>
   </style>
   <rect opacity="0.5" x="-2" y="-2" width="104" height="24" class="d-dash d-fill-blue d-surround"/>

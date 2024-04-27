@@ -4,12 +4,12 @@
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
     rect, circle, ellipse, polygon { fill: white; }
     line, polyline, path { fill: none; }
-    .d-surround { fill: none; }
-    .d-fill-blue { fill: blue; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-blue:not(text,tspan) { fill: blue; }
     text.d-fill-blue, text.d-fill-blue * { fill: white; }
-    .d-fill-lime { fill: lime; }
+    .d-fill-lime:not(text,tspan) { fill: lime; }
     text.d-fill-lime, text.d-fill-lime * { fill: black; }
-    .d-fill-red { fill: red; }
+    .d-fill-red:not(text,tspan) { fill: red; }
     text.d-fill-red, text.d-fill-red * { fill: white; }
   ]]>
   </style>

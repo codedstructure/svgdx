@@ -7,13 +7,12 @@
     text { font-family: sans-serif; font-size: 3px; }
     text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     .d-dash { stroke-dasharray: 1.5 0.75; }
-    .d-surround { fill: none; }
-    .d-none { stroke: none; }
-    text.d-none, text.d-none * { stroke: none; }
-    .d-fill-grey { fill: grey; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-grey:not(text,tspan) { fill: grey; }
     text.d-fill-grey, text.d-fill-grey * { fill: white; }
-    .d-fill-white { fill: white; }
+    .d-fill-white:not(text,tspan) { fill: white; }
     text.d-fill-white, text.d-fill-white * { fill: black; }
+    .d-none:not(text,tspan) { stroke: none; }
   ]]>
   </style>
   <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/>

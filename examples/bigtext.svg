@@ -7,14 +7,13 @@
     text { font-family: sans-serif; font-size: 3px; }
     text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
     text.d-text-left, text.d-text-left * { text-anchor: start; }
-    .d-none { stroke: none; }
-    text.d-none, text.d-none * { stroke: none; }
-    .d-fill-lightgreen { fill: lightgreen; }
+    .d-fill-lightgreen:not(text,tspan) { fill: lightgreen; }
     text.d-fill-lightgreen, text.d-fill-lightgreen * { fill: black; }
-    .d-fill-papayawhip { fill: papayawhip; }
+    .d-fill-papayawhip:not(text,tspan) { fill: papayawhip; }
     text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; }
-    .d-fill-red { fill: red; }
+    .d-fill-red:not(text,tspan) { fill: red; }
     text.d-fill-red, text.d-fill-red * { fill: white; }
+    .d-none:not(text,tspan) { stroke: none; }
   ]]>
   </style>
   <style>

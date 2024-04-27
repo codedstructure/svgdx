@@ -16,10 +16,9 @@
     text.d-text-left, text.d-text-left * { text-anchor: start; }
     text.d-text-right, text.d-text-right * { text-anchor: end; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
-    .d-none { stroke: none; }
-    text.d-none, text.d-none * { stroke: none; }
-    .d-fill-black { fill: black; }
+    .d-fill-black:not(text,tspan) { fill: black; }
     text.d-fill-black, text.d-fill-black * { fill: white; }
+    .d-none:not(text,tspan) { stroke: none; }
   ]]>
   </style>
   <rect id="ace" x="0" y="0" width="25" height="15"/>

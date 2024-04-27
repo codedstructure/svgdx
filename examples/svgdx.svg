@@ -14,14 +14,14 @@
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     .d-dash { stroke-dasharray: 1.5 0.75; }
     .d-dot { stroke-dasharray: 0.5 0.5; }
-    .d-surround { fill: none; }
-    .d-fill-green { fill: green; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-green:not(text,tspan) { fill: green; }
     text.d-fill-green, text.d-fill-green * { fill: white; }
-    .d-fill-orange { fill: orange; }
+    .d-fill-orange:not(text,tspan) { fill: orange; }
     text.d-fill-orange, text.d-fill-orange * { fill: white; }
-    .d-fill-papayawhip { fill: papayawhip; }
+    .d-fill-papayawhip:not(text,tspan) { fill: papayawhip; }
     text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; }
-    .d-fill-red { fill: red; }
+    .d-fill-red:not(text,tspan) { fill: red; }
     text.d-fill-red, text.d-fill-red * { fill: white; }
   ]]>
   </style>
