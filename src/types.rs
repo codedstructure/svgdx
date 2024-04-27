@@ -36,6 +36,29 @@ pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
     x.into_iter().cycle()
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct OrderIndex(Vec<usize>);
+
+impl OrderIndex {
+    pub fn new(idx: usize) -> Self {
+        Self(vec![idx])
+    }
+
+    pub fn with_sub_index(&self, other: &Self) -> Self {
+        let mut new_idx = self.0.clone();
+        new_idx.extend(other.0.iter());
+
+        Self(new_idx)
+    }
+
+    pub fn with_index(&self, idx: usize) -> Self {
+        let mut new_idx = self.0.clone();
+        new_idx.push(idx);
+
+        Self(new_idx)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
 pub enum Length {
     Absolute(f32),
@@ -772,6 +795,7 @@ impl<'s> IntoIterator for &'s ClassList {
 #[cfg(test)]
 mod test {
     use super::*;
+    use assertables::{assert_lt, assert_lt_as_result};
 
     #[test]
     fn test_bbox() {
@@ -983,5 +1007,23 @@ mod test {
         assert_eq!(strp_length("125%").expect("test").adjust(20.), 25.);
         assert_eq!(strp_length("1").expect("test").adjust(23.), 24.);
         assert_eq!(strp_length("-12").expect("test").adjust(123.), 111.);
+    }
+
+    #[test]
+    fn test_order_index() {
+        let idx_default = OrderIndex::default();
+        let idx0 = OrderIndex::new(0);
+        let idx1 = OrderIndex::new(1);
+        let idx2 = OrderIndex::new(2);
+        assert_lt!(idx_default, idx0);
+        assert_lt!(idx1, idx2);
+        assert_lt!(idx1, idx1.with_sub_index(&idx1));
+        assert_lt!(idx1, idx1.with_sub_index(&idx1).with_sub_index(&idx1));
+
+        let subidx1 = OrderIndex::new(101);
+        let subidx2 = OrderIndex::new(102);
+        assert_lt!(idx1.with_sub_index(&subidx1), idx1.with_sub_index(&subidx2));
+        assert_lt!(idx1.with_sub_index(&subidx2), idx2);
+        assert_lt!(idx1.with_sub_index(&subidx2), idx2.with_sub_index(&subidx1));
     }
 }

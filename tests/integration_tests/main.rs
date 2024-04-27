@@ -16,3 +16,4 @@ mod reuse;
 mod roundtrip;
 mod text_attr;
 mod transform_svg;
+mod variables;

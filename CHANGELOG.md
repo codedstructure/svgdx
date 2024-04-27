@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A new `d-thick` style has been added as a complement to `d-thin`.
   See [auto_styles.md](docs/auto_styles.md) for more information.
 
+- Changed: attribute-based variable lookup now starts at the parent (rather than
+  the current) element. Note that when `reuse` is in effect, the source `reuse`
+  element itself is considered the immediate parent of target element.
+
+- Added: `<reuse>` element now supports `<g>` targets allowing more complex shapes
+  to be reused. Note that (currently) there are still limitations around positioning;
+  `<g>` doesn't yet have it's own bounding box, and elements within a reused group
+  element do not support the multiple passes required for forward references.
+
 - minor svgdx-editor enhancements including timestamp in download filenames
 
 ## [0.7.1 - 2024-04-07]

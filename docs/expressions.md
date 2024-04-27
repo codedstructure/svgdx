@@ -18,8 +18,13 @@ An alternative format using braces may be used to avoid ambiguous variable refer
 e.g. if `var` is defined as `1`, `${var}0` will expand to `10` (in non-[arithmetic](#arithmetic) contexts),
 whereas `$var0` would be a reference to the (perhaps non-existent) `var0` variable.
 
-While there is only a single global namespaces for variables, lookups are first done on the current element's attributes (unless the current element is a `<var>` element, see note below).
-For example if an element defines has an `id="thing"` attribute, this may be referenced in the element's `text` attribute, as `text="Current element 'id' is: $id"`.
+While there is only a single global namespaces for variables, lookups are first done on the attributes of
+any parent element's attributes.
+For example if a `<g>` element defines a `radius="3"` attribute, this may be referenced in attributes of
+the element's children, e.g. `<rect rx="$radius" .../>`.
+Note there is no way to refer to attributes of the current element, as that would allow circular references -
+an element such as `<g width="4"><rect width="$width" ...></g>` would not work as expected, and starting
+attribute lookup at the parent element avoids the need to be 'creative' with variable names.
 
 These "attribute locals" shadow global variables, but do not modify them.
 

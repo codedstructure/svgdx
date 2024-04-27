@@ -1,10 +1,12 @@
 use crate::connector::{ConnectionType, Connector};
-use crate::element::ContentType;
+use crate::element::{ContentType, SvgElement};
 use crate::expression::eval_attr;
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, TrblLength};
-use crate::{element::SvgElement, TransformConfig};
+use crate::types::{
+    attr_split, attr_split_cycle, fstr, strp, BoundingBox, LocSpec, OrderIndex, TrblLength,
+};
+use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -31,10 +33,11 @@ pub struct TransformerContext {
     rng: RefCell<SmallRng>,
     real_svg: bool,
     in_specs: bool,
+    events: Vec<InputEvent<'static>>,
 }
 
-impl TransformerContext {
-    pub fn new() -> Self {
+impl Default for TransformerContext {
+    fn default() -> Self {
         Self {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
@@ -44,7 +47,18 @@ impl TransformerContext {
             rng: RefCell::new(SmallRng::seed_from_u64(0)),
             real_svg: false,
             in_specs: false,
+            events: Vec::new(),
         }
+    }
+}
+
+impl TransformerContext {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set_events(&mut self, events: Vec<InputEvent<'static>>) {
+        self.events = events;
     }
 
     pub fn get_element(&self, id: &str) -> Option<&SvgElement> {
@@ -53,10 +67,6 @@ impl TransformerContext {
 
     pub fn get_original_element(&self, id: &str) -> Option<&SvgElement> {
         self.original_map.get(id)
-    }
-
-    pub fn get_element_mut(&mut self, id: &str) -> Option<&mut SvgElement> {
-        self.elem_map.get_mut(id)
     }
 
     pub fn get_rng(&self) -> &RefCell<SmallRng> {
@@ -88,19 +98,19 @@ impl TransformerContext {
         self.current_element.last_mut()
     }
 
+    /// Lookup variable in either parent attribute values or global variables
+    /// set using the `<var>` element.
     pub fn get_var(&self, name: &str) -> Option<String> {
-        self.get_current_element()
-            .and_then(|el| {
-                if el.name == "var" {
-                    // `var` is special - its attributes are targets, so can't
-                    // also be used for lookup or `x="$x * 2"` type expressions
-                    // would fail.
-                    None
-                } else {
-                    el.get_attr(name)
-                }
-            })
-            .or_else(|| self.variables.get(name).cloned())
+        // Note we skip the element we're currently processing so we can access
+        // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
+        // requires that when evaluating `x="$x"` we don't look up `x` in the
+        // `rect` element itself.
+        for element_scope in self.current_element.iter().rev().skip(1) {
+            if let Some(value) = element_scope.get_attr(name) {
+                return Some(value.to_string());
+            }
+        }
+        return self.variables.get(name).cloned();
     }
 
     pub fn get_prev_element(&self) -> Option<&SvgElement> {
@@ -115,7 +125,7 @@ impl TransformerContext {
         }
     }
 
-    fn handle_vars(&mut self, e: &mut SvgElement) {
+    fn handle_var_element(&mut self, e: &mut SvgElement) {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
@@ -221,7 +231,7 @@ impl TransformerContext {
         let mut e = e.clone();
 
         if &e.name == "var" {
-            self.handle_vars(&mut e);
+            self.handle_var_element(&mut e);
             return Ok(vec![]);
         }
         if &e.name == "specs" {
@@ -423,6 +433,18 @@ impl From<Event<'_>> for EventList<'_> {
     }
 }
 
+impl From<SvgEvent> for InputEvent<'_> {
+    fn from(value: SvgEvent) -> Self {
+        InputEvent::from(Event::from(value))
+    }
+}
+
+impl From<SvgEvent> for EventList<'_> {
+    fn from(value: SvgEvent) -> Self {
+        Event::from(value).into()
+    }
+}
+
 impl From<Vec<InputEvent<'_>>> for EventList<'_> {
     fn from(value: Vec<InputEvent>) -> Self {
         Self {
@@ -592,6 +614,12 @@ impl EventList<'_> {
         Ok(Self { events })
     }
 
+    fn slice(&self, start: usize, end: usize) -> Self {
+        Self {
+            events: self.events[start..end].to_vec(),
+        }
+    }
+
     fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
@@ -657,6 +685,7 @@ impl Transformer {
 
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
+        self.context.set_events(input.events.clone());
         let output = self.process_events(input)?;
         self.postprocess(output, writer)
     }
@@ -735,7 +764,11 @@ impl Transformer {
         Ok(gen_events)
     }
 
-    fn handle_reuse_element(&mut self, mut event_element: SvgElement) -> Result<SvgElement> {
+    fn handle_reuse_element(
+        &mut self,
+        mut event_element: SvgElement,
+        idx_output: &mut BTreeMap<OrderIndex, EventList>,
+    ) -> Result<SvgElement> {
         let elref = event_element
             .pop_attr("href")
             .context("reuse element should have an href attribute")?;
@@ -746,8 +779,49 @@ impl Transformer {
                     .strip_prefix('#')
                     .context("href value should begin with '#'")?,
             )
-            .context("unknown reference")?;
+            .context("unknown reference")?
+            .to_owned();
         let mut instance_element = referenced_element.clone();
+
+        if referenced_element.name == "g" {
+            if let Some((start, end)) = referenced_element.event_range {
+                let mut btree = BTreeMap::new();
+
+                // opening g element is not included in the processed inner events to avoid
+                // infinite recursion...
+                let inner_events =
+                    EventList::from(self.context.events.clone()).slice(start + 1, end);
+                // ...but we do want to include it for attribute-variable lookups, so push the
+                // referenced element onto the element stack (just while we run process_seq)
+                self.context.push_current_element(&referenced_element);
+                let remain = self.process_seq(inner_events, &mut btree);
+                self.context.pop_current_element();
+                if !remain?.is_empty() {
+                    bail!("No support for forward references in reuse groups");
+                }
+
+                // Use sub-index to have group open at 0, content at 1.x, close at 2
+                for (idx, ev) in btree {
+                    idx_output.insert(
+                        event_element.order_index.with_index(1).with_sub_index(&idx),
+                        ev,
+                    );
+                }
+                let mut group_element = SvgElement::new("g", &[]);
+                group_element.set_indent(event_element.indent);
+                group_element.set_src_line(event_element.src_line);
+                group_element.add_classes(&event_element.classes);
+                if let Some(inst_id) = event_element.pop_attr("id") {
+                    group_element.set_attr("id", &inst_id);
+                }
+                let group_open = EventList::from(SvgEvent::Start(group_element));
+                let group_close = EventList::from(SvgEvent::End("g".to_string()));
+                idx_output.insert(event_element.order_index.with_index(0), group_open);
+                idx_output.insert(event_element.order_index.with_index(2), group_close);
+
+                return Ok(SvgElement::new("phantom", &[]));
+            }
+        }
 
         // the referenced element will have an `id` attribute (which it was
         // referenced by) but the new instance should not have this to avoid
@@ -776,12 +850,14 @@ impl Transformer {
     fn process_seq<'a>(
         &mut self,
         seq: EventList<'a>,
-        idx_output: &mut BTreeMap<usize, EventList>,
+        idx_output: &mut BTreeMap<OrderIndex, EventList>,
     ) -> Result<EventList<'a>> {
         let mut remain = EventList::new();
         let mut last_event = None;
         let mut last_element = None;
-        let mut gen_events: Vec<(usize, EventList<'_>)>;
+        let mut gen_events: Vec<(OrderIndex, EventList<'_>)>;
+        // Stack of event indices of open elements.
+        let mut idx_stack = Vec::new();
 
         for input_ev in seq {
             let ev = &input_ev.event;
@@ -797,7 +873,7 @@ impl Transformer {
                     ))?;
                     event_element.set_indent(input_ev.indent);
                     event_element.set_src_line(input_ev.line);
-                    event_element.set_order_index(input_ev.index);
+                    event_element.set_order_index(&OrderIndex::new(input_ev.index));
                     event_element.content = if is_empty {
                         ContentType::Empty
                     } else {
@@ -831,7 +907,10 @@ impl Transformer {
                     }
 
                     let mut ev_events = EventList::new();
-                    self.context.update_element(&event_element);
+                    if is_empty {
+                        event_element.set_event_range((input_ev.index, input_ev.index));
+                        self.context.update_element(&event_element);
+                    }
                     if self.config.debug {
                         // Prefix replaced element(s) with a representation of the original element
                         //
@@ -847,15 +926,19 @@ impl Transformer {
                             " ".repeat(event_element.indent)
                         ))));
                     }
+
                     // Note this must be done before `<reuse>` processing, which 'switches out' the
                     // element being processed to its target. The 'current_element' is used for
                     // local variable lookup from attributes.
                     self.context.push_current_element(&event_element);
                     // support reuse element
+                    let mut pop_needed = false;
                     if event_element.name == "reuse" {
-                        match self.handle_reuse_element(event_element) {
+                        match self.handle_reuse_element(event_element, idx_output) {
                             Ok(ev_el) => {
                                 event_element = ev_el;
+                                self.context.push_current_element(&event_element);
+                                pop_needed = true;
                             }
                             Err(err) => {
                                 self.context.pop_current_element();
@@ -868,12 +951,21 @@ impl Transformer {
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
-                                gen_events.push((input_ev.index, ev_events.clone()));
+                                gen_events
+                                    .push((OrderIndex::new(input_ev.index), ev_events.clone()));
                             }
                         } else {
                             remain.push(input_ev.clone());
                         }
 
+                        self.context.pop_current_element();
+                    } else {
+                        idx_stack.push(input_ev.index);
+                    }
+                    if pop_needed {
+                        // This is a bit messy, but if we pushed an extra element to support
+                        // reuse, we need to pop it here. (Note we can't check for name=="reuse"
+                        // here as the element has been replaced with the target element).
                         self.context.pop_current_element();
                     }
                 }
@@ -881,6 +973,10 @@ impl Transformer {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
 
                     if let Some(mut event_element) = self.context.pop_current_element() {
+                        let start_idx = idx_stack.pop().expect("unreachable");
+                        event_element.set_event_range((start_idx, input_ev.index));
+                        self.context.update_element(&event_element);
+
                         if event_element.name != ee_name {
                             bail!(
                                 "Mismatched end tag: expected {}, got {ee_name}",
@@ -904,11 +1000,15 @@ impl Transformer {
                                         events.push(Event::Text(BytesText::new(&content)));
                                     }
                                 }
-                                gen_events.push((event_element.order_index, events.clone()));
+                                gen_events
+                                    .push((event_element.order_index.clone(), events.clone()));
                                 if !event_element.is_content_text() {
                                     // Similarly, `is_content_text` elements should close themselves in the returned
                                     // event list if needed.
-                                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                                    gen_events.push((
+                                        OrderIndex::new(input_ev.index),
+                                        EventList::from(ev.clone()),
+                                    ));
                                 }
                             }
                         } else {
@@ -966,11 +1066,12 @@ impl Transformer {
                         _ => {}
                     }
                     if !processed && !self.context.in_specs {
-                        gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                        gen_events
+                            .push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                     }
                 }
                 _ => {
-                    gen_events.push((input_ev.index, EventList::from(ev.clone())));
+                    gen_events.push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                 }
             }
 
@@ -986,7 +1087,7 @@ impl Transformer {
 
     fn process_events<'a>(&mut self, input: EventList<'a>) -> Result<EventList<'a>> {
         let mut output = EventList { events: vec![] };
-        let mut idx_output = BTreeMap::<usize, EventList>::new();
+        let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
         // First pass with original input data
         let mut remain = self.process_seq(input, &mut idx_output)?;
@@ -1139,7 +1240,7 @@ impl Transformer {
                     Event::Start(BytesStart::new("defs")),
                     Event::Text(BytesText::new("\n")),
                 ];
-                let eee = EventList::from_str(Self::indent_all(auto_defs, indent + 2).join("\n"))?;
+                let eee = EventList::from_str(indent_all(auto_defs, indent + 2).join("\n"))?;
                 event_vec.extend(eee.events.iter().map(|e| e.event.clone()));
                 event_vec.extend(vec![
                     Event::Text(BytesText::new(&indent_line)),
@@ -1163,7 +1264,7 @@ impl Transformer {
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
                     Event::CData(BytesCData::new(&format!(
                         "\n{}\n{}",
-                        Self::indent_all(auto_styles, indent + 2).join("\n"),
+                        indent_all(auto_styles, indent + 2).join("\n"),
                         " ".repeat(indent)
                     ))),
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
@@ -1182,22 +1283,6 @@ impl Transformer {
         }
 
         output.write_to(writer)
-    }
-
-    fn indent_all(s: Vec<String>, indent: usize) -> Vec<String> {
-        let mut result = vec![];
-        for entry in s {
-            let mut rs = String::new();
-            for (idx, line) in entry.lines().enumerate() {
-                if idx > 0 {
-                    rs.push('\n');
-                }
-                rs.push_str(&" ".repeat(indent).to_owned());
-                rs.push_str(line);
-            }
-            result.push(rs);
-        }
-        result
     }
 }
 
@@ -1224,64 +1309,109 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
     }
 }
 
+// Helper function to indent all lines in a vector of strings
+fn indent_all(s: Vec<String>, indent: usize) -> Vec<String> {
+    let mut result = vec![];
+    for entry in s {
+        let mut rs = String::new();
+        for (idx, line) in entry.lines().enumerate() {
+            if idx > 0 {
+                rs.push('\n');
+            }
+            rs.push_str(&" ".repeat(indent).to_owned());
+            rs.push_str(line);
+        }
+        result.push(rs);
+    }
+    result
+}
+
 /// Determine the sequence of (XML-level) events to emit in response
 /// to a given `SvgElement`
 fn transform_element<'a>(
     element: &'a SvgElement,
     context: &'a mut TransformerContext,
 ) -> Result<EventList<'a>> {
+    if element.name == "phantom" {
+        return Ok(EventList::new());
+    }
     let mut output = EventList::new();
     let source_line = element.get_attr("data-source-line");
     let ee = context.handle_element(element)?;
     for svg_ev in ee {
-        // re-calculate is_empty for each generated event
         let is_empty = matches!(svg_ev, SvgEvent::Empty(_));
-        match svg_ev {
-            SvgEvent::Empty(e) | SvgEvent::Start(e) => {
-                let mut bs = BytesStart::new(e.name);
-                // Collect pass-through attributes
-                for (k, v) in e.attrs {
-                    if k != "class" && k != "data-source-line" {
-                        bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
-                    }
-                }
-                // Any 'class' attribute values are stored separately as a HashSet;
-                // collect those into the BytesStart object
-                if !e.classes.is_empty() {
-                    bs.push_attribute(Attribute::from((
-                        "class".as_bytes(),
-                        e.classes
-                            .into_iter()
-                            .collect::<Vec<String>>()
-                            .join(" ")
-                            .as_bytes(),
-                    )));
-                }
-                // Add 'data-source-line' for all elements generated by input `element`
-                if let Some(ref source_line) = source_line {
-                    bs.push_attribute(Attribute::from((
-                        "data-source-line".as_bytes(),
-                        source_line.as_bytes(),
-                    )));
-                }
-                if is_empty {
-                    output.push(Event::Empty(bs));
-                } else {
-                    output.push(Event::Start(bs));
+        let adapted = if let SvgEvent::Empty(e) | SvgEvent::Start(e) = svg_ev {
+            let mut bs = BytesStart::new(e.name);
+            // Collect pass-through attributes
+            for (k, v) in e.attrs {
+                if k != "class" && k != "data-source-line" {
+                    bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
                 }
             }
-            SvgEvent::Comment(t) => {
-                output.push(Event::Comment(BytesText::new(&t)));
+            // Any 'class' attribute values are stored separately as a HashSet;
+            // collect those into the BytesStart object
+            if !e.classes.is_empty() {
+                bs.push_attribute(Attribute::from((
+                    "class".as_bytes(),
+                    e.classes
+                        .into_iter()
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                        .as_bytes(),
+                )));
             }
-            SvgEvent::Text(t) => {
-                output.push(Event::Text(BytesText::from_escaped(&t)));
+            // Add 'data-source-line' for all elements generated by input `element`
+            if let Some(ref source_line) = source_line {
+                bs.push_attribute(Attribute::from((
+                    "data-source-line".as_bytes(),
+                    source_line.as_bytes(),
+                )));
             }
-            SvgEvent::End(name) => {
-                output.push(Event::End(BytesEnd::new(name)));
+            let new_el = SvgElement::try_from(&bs)?;
+            if is_empty {
+                SvgEvent::Empty(new_el)
+            } else {
+                SvgEvent::Start(new_el)
             }
-        }
+        } else {
+            svg_ev
+        };
+
+        output.push(adapted);
     }
     Ok(output)
+}
+
+impl From<SvgElement> for BytesStart<'static> {
+    fn from(e: SvgElement) -> BytesStart<'static> {
+        let mut bs = BytesStart::new(e.name);
+        for (k, v) in e.attrs {
+            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+        }
+        if !e.classes.is_empty() {
+            bs.push_attribute(Attribute::from((
+                "class".as_bytes(),
+                e.classes
+                    .into_iter()
+                    .collect::<Vec<String>>()
+                    .join(" ")
+                    .as_bytes(),
+            )));
+        }
+        bs
+    }
+}
+
+impl<'a> From<SvgEvent> for Event<'a> {
+    fn from(svg_ev: SvgEvent) -> Event<'a> {
+        match svg_ev {
+            SvgEvent::Empty(e) => Event::Empty(e.into()),
+            SvgEvent::Start(e) => Event::Start(e.into()),
+            SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
+            SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            SvgEvent::End(name) => Event::End(BytesEnd::new(name)),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1351,5 +1481,36 @@ mod tests {
         assert_eq!(ok_ev_count, 6);
         let remain_ev_count = remain.unwrap().len();
         assert_eq!(remain_ev_count, 1);
+    }
+
+    #[test]
+    fn test_process_seq_slice() {
+        let mut transformer = Transformer::from_config(&TransformConfig::default());
+        let mut idx_output = BTreeMap::new();
+
+        let seq = EventList::from(
+            r##"<svg>
+          <rect id="a" wh="10"/>
+          <rect xy="#a:h" wh="10"/>
+        </svg>"##,
+        );
+
+        let remain = transformer.process_seq(seq.slice(2, 5), &mut idx_output);
+
+        let ok_ev_count = idx_output
+            .iter()
+            .map(|entry| entry.1.events.len())
+            .reduce(|a, b| a + b)
+            .unwrap();
+        assert_eq!(ok_ev_count, 3);
+        let remain_ev_count = remain.unwrap().len();
+        assert_eq!(remain_ev_count, 0);
+    }
+
+    #[test]
+    fn test_indent_all() {
+        let input = vec!["a".to_string(), "  b".to_string(), "c".to_string()];
+        let output = indent_all(input, 2);
+        assert_eq!(output, vec!["  a", "    b", "  c"]);
     }
 }
