@@ -277,6 +277,7 @@ impl TransformerContext {
             ) {
                 // replace with rendered connection element
                 e = conn.render()?.without_attr("edge-type");
+                self.update_element(&e);
             } else {
                 bail!("Cannot create connector {e}");
             }

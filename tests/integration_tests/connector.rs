@@ -168,3 +168,21 @@ fn test_connector_offset() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
 }
+
+/// Check shapes can be positioned relative to a connector
+#[test]
+fn test_connector_relpos() {
+    let input = format!(
+        r##"{RECT_SVG}<line id="conn1" start="#a@b" end="#c@t"/><rect id="x" xy="#conn1" wh="1"/>"##
+    );
+    let expected_rect = r#"<rect id="x" x="2.5" y="5" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    let input = format!(
+        r##"{RECT_SVG}<line id="conn1" start="#a@b" end="#c@t"/><rect id="x" xy="#conn1@b" xy-loc="t" wh="1"/>"##
+    );
+    let expected_rect = r#"<rect id="x" x="2" y="20" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_rect);
+}
