@@ -1,6 +1,6 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::element::{ContentType, SvgElement};
-use crate::expression::eval_attr;
+use crate::expression::{eval_attr, eval_condition};
 use crate::svg_defs::{build_defs, build_styles};
 use crate::text::process_text_attr;
 use crate::types::{
@@ -33,6 +33,7 @@ pub struct TransformerContext {
     rng: RefCell<SmallRng>,
     real_svg: bool,
     in_specs: bool,
+    in_loop: bool,
     events: Vec<InputEvent<'static>>,
 }
 
@@ -47,8 +48,38 @@ impl Default for TransformerContext {
             rng: RefCell::new(SmallRng::seed_from_u64(0)),
             real_svg: false,
             in_specs: false,
+            in_loop: false,
             events: Vec::new(),
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum LoopType {
+    Repeat(u32),
+    While(String),
+    Until(String),
+}
+
+impl TryFrom<&SvgElement> for LoopType {
+    type Error = anyhow::Error;
+
+    fn try_from(element: &SvgElement) -> Result<Self> {
+        if element.name != "loop" {
+            bail!("LoopType can only be created from a loop element");
+        }
+        if let Some(count) = element.get_attr("count") {
+            return Ok(LoopType::Repeat(
+                count.parse().context("count should be a number")?,
+            ));
+        }
+        if let Some(while_expr) = element.get_attr("while") {
+            return Ok(LoopType::While(while_expr));
+        }
+        if let Some(until_expr) = element.get_attr("until") {
+            return Ok(LoopType::Until(until_expr));
+        }
+        bail!("Loop element should have a count, while or until attribute");
     }
 }
 
@@ -234,7 +265,7 @@ impl TransformerContext {
             self.handle_var_element(&mut e);
             return Ok(vec![]);
         }
-        if &e.name == "specs" {
+        if &e.name == "specs" || &e.name == "loop" {
             return Ok(vec![]);
         }
         events.extend(self.handle_comments(&mut e));
@@ -316,8 +347,12 @@ impl TransformerContext {
         if e.has_attr("text") {
             let (orig_elem, text_elements) = process_text_attr(&e)?;
             prev_element = Some(e.clone());
-            events.push(SvgEvent::Empty(orig_elem));
-            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
+            if orig_elem.name != "text" {
+                // We only care about the original element if it wasn't a text element
+                // (otherwise we generate a useless empty text element for the original)
+                events.push(SvgEvent::Empty(orig_elem));
+                events.push(SvgEvent::Text(format!("\n{}", " ".repeat(e.indent))));
+            }
             match text_elements.as_slice() {
                 [] => {}
                 [elem] => {
@@ -765,6 +800,52 @@ impl Transformer {
         Ok(gen_events)
     }
 
+    fn handle_loop_element(&mut self, event_element: &SvgElement) -> Result<EventList> {
+        let mut gen_events = EventList::new();
+        if let (Ok(loop_type), Some((start, end))) =
+            (LoopType::try_from(event_element), event_element.event_range)
+        {
+            // opening loop element is not included in the processed inner events to avoid
+            // infinite recursion...
+            let inner_events = EventList::from(self.context.events.clone()).slice(start + 1, end);
+
+            let mut inf_loop_check = self.config.loop_limit;
+            let mut count = 0;
+            loop {
+                if let LoopType::Repeat(repeat_count) = &loop_type {
+                    count += 1;
+                    if count > *repeat_count {
+                        break;
+                    }
+                } else if let LoopType::While(expr) = &loop_type {
+                    if !eval_condition(expr, &self.context)? {
+                        break;
+                    }
+                }
+
+                let mut btree = BTreeMap::new();
+                let remain = self.process_seq(inner_events.clone(), &mut btree);
+                if !remain?.is_empty() {
+                    bail!("No support for forward references in reuse groups");
+                }
+                for (_, ev) in btree {
+                    gen_events.extend(&ev);
+                }
+
+                if let LoopType::Until(expr) = &loop_type {
+                    if eval_condition(expr, &self.context)? {
+                        break;
+                    }
+                }
+                inf_loop_check -= 1;
+                if inf_loop_check == 0 {
+                    bail!("Excessive looping detected");
+                }
+            }
+        }
+        Ok(gen_events)
+    }
+
     fn handle_reuse_element(
         &mut self,
         mut event_element: SvgElement,
@@ -859,10 +940,21 @@ impl Transformer {
         let mut gen_events: Vec<(OrderIndex, EventList<'_>)>;
         // Stack of event indices of open elements.
         let mut idx_stack = Vec::new();
+        let mut skip_until = Vec::new();
 
         for input_ev in seq {
             let ev = &input_ev.event;
             gen_events = Vec::new();
+            if let Event::End(ref e) = &ev {
+                if let Some(look_for) = skip_until.last() {
+                    if *look_for == String::from_utf8(e.name().into_inner().to_vec()).expect("utf8")
+                    {
+                        skip_until.pop();
+                    }
+                }
+            } else if !skip_until.is_empty() {
+                continue;
+            }
 
             match ev {
                 Event::Start(ref e) | Event::Empty(ref e) => {
@@ -898,6 +990,13 @@ impl Transformer {
                             bail!("Cannot nest <specs> elements");
                         }
                         self.context.in_specs = true;
+                    }
+                    if event_element.name == "loop" && !is_empty {
+                        if self.context.in_loop {
+                            bail!("Cannot nest <loop> elements");
+                        }
+                        self.context.in_loop = true;
+                        skip_until.push("loop");
                     }
 
                     // This is copied from source element to any generated elements in transform_element()
@@ -988,8 +1087,12 @@ impl Transformer {
                         if ee_name.as_str() == "specs" {
                             self.context.in_specs = false;
                         }
-
-                        let mut events = self.generate_element_events(&mut event_element);
+                        let mut events = if ee_name.as_str() == "loop" {
+                            self.context.in_loop = false;
+                            self.handle_loop_element(&event_element)
+                        } else {
+                            self.generate_element_events(&mut event_element)
+                        };
                         if let Ok(ref mut events) = events {
                             if !events.is_empty() {
                                 // `is_content_text` elements have responsibility for handling their own text content,
@@ -1003,7 +1106,10 @@ impl Transformer {
                                 }
                                 gen_events
                                     .push((event_element.order_index.clone(), events.clone()));
-                                if !event_element.is_content_text() {
+                                // TODO: this is about 'self_closing' elements include loop, g.
+                                if !(event_element.is_content_text()
+                                    || event_element.name == "loop")
+                                {
                                     // Similarly, `is_content_text` elements should close themselves in the returned
                                     // event list if needed.
                                     gen_events.push((
@@ -1066,7 +1172,7 @@ impl Transformer {
                         }
                         _ => {}
                     }
-                    if !processed && !self.context.in_specs {
+                    if !(processed || self.context.in_specs || self.context.in_loop) {
                         gen_events
                             .push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                     }

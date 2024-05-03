@@ -632,6 +632,13 @@ pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
     eval_vars(&value, context)
 }
 
+pub fn eval_condition(value: &str, context: &TransformerContext) -> Result<bool> {
+    eval_attr(value, context)
+        .parse::<f32>()
+        .map(|v| v != 0.)
+        .context("Invalid condition")
+}
+
 #[cfg(test)]
 mod tests {
     use crate::element::SvgElement;

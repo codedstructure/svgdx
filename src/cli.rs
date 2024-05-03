@@ -107,6 +107,7 @@ impl Config {
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,
+                ..Default::default()
             },
         })
     }

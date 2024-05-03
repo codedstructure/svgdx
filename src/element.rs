@@ -250,6 +250,7 @@ impl SvgElement {
     pub fn is_content_text(&self) -> bool {
         // This is present for graphics elements except for text,
         // where we need to be transparent.
+        // TODO: except where we don't....
         self.is_graphics_element() && self.name != "text"
     }
 
