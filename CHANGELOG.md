@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: positioning relative to a connector (`<line>` with `start`/`end` attributes).
 
+- svgdx-editor enhancements: Increased number of tabs from 5 to 10; added 'text output'
+  view with toggle button; minor styling improvements.
+
 ## [0.8.0 - 2024-04-27]
 
 - Changed: various auto-styles relating to text, including the ability to specify

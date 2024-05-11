@@ -21,17 +21,25 @@
             flex-direction: column;
         }
 
-        #editor-container,
-        #svg-output {
+        #editor-container, #output {
             border: 1px solid #ccc;
             margin: 10px;
             min-width: 100px;
             min-height: 100px;
         }
 
-        #svg-output {
+        #output {
             flex: 1 1 auto;
+        }
+        #svg-output, #text-output {
+            height: 100%;
+            width: 100%;
+        }
+        #svg-output {
             overflow: hidden;
+        }
+        #text-output {
+            overflow-y: auto;
         }
 
         #editor-container {
@@ -41,7 +49,8 @@
         #editor {
             flex: 1 1 auto;
             overflow-y: auto;
-            margin: 10px 0;
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
         }
         #controls div {
             margin: 10px;
@@ -95,9 +104,12 @@
 
         button {
             background-color: #eee;
-            border-radius: 5px;
+            border-radius: 2px;
             box-shadow: 2px 2px 3px #000;
             border: none;
+        }
+        #tabs {
+            padding: 10px;
         }
         #tabs button {
             border-radius: 0px;
@@ -131,12 +143,18 @@
                 <button data-tab-num="3">3</button>
                 <button data-tab-num="4">4</button>
                 <button data-tab-num="5">5</button>
+                <button data-tab-num="6">6</button>
+                <button data-tab-num="7">7</button>
+                <button data-tab-num="8">8</button>
+                <button data-tab-num="9">9</button>
+                <button data-tab-num="0">0</button>
             </div>
             <div id="editor"></div>
             <div id="controls">
                 <div id="error-output"></div>
                 <div style="position: inline-block">
                     <button id="toggle-layout">Layout</button>
+                    <button id="toggle-output">Text Output</button>
                     <button id="auto-viewbox">Auto Fit</button>
                     <button id="reset-view">Reset View</button>
                     <button id="save-input">Save Input</button>
@@ -149,8 +167,11 @@
             </div>
         </div>
         <div id="splitter"></div>
-        <div id="svg-output">
-            <svg></svg>
+        <div id="output">
+            <div style="display:none" id="text-output"></div>
+            <div style="display:none" id="svg-output">
+                <svg></svg>
+            </div>
         </div>
     </div>
 

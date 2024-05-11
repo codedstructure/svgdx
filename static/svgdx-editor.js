@@ -70,6 +70,17 @@ const editor = CodeMirror(document.getElementById('editor'), {
     gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
 });
 
+const textViewer = CodeMirror(document.getElementById('text-output'), {
+    mode: 'xml',
+    readOnly: true,
+    lineNumbers: true,
+    autoRefresh: true,
+    autofocus: true,
+    foldGutter: true,
+    lineWrapping: true,
+    gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
+});
+
 /** Editor updates */
 (function () {
     let last_viewbox = null;
@@ -100,6 +111,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
                 }
 
                 const svgData = await response.text();
+                textViewer.setValue(svgData);
                 svg_container.innerHTML = svgData;
                 const svg = svg_container.querySelector('svg');
                 // tweak the SVG to make it fill the container
@@ -287,6 +299,30 @@ const editor = CodeMirror(document.getElementById('editor'), {
         // opportunity for auto-fit to take effect
         update();
     });
+
+    // Toggle Output button: checked => text, unchecked => image
+    const toggleOutput = document.getElementById('toggle-output');
+    let toggleOutputChecked = localStorage.getItem('svgdx-toggle-output') || "false";
+    toggleOutput.dataset.checked = toggleOutputChecked;
+
+    function updateOutputMode() {
+        if (toggleOutputChecked === "true") {
+            document.getElementById('svg-output').style.display = "none";
+            document.getElementById('text-output').style.display = "";
+        } else {
+            document.getElementById('svg-output').style.display = "";
+            document.getElementById('text-output').style.display = "none";
+        }
+    }
+
+    updateOutputMode();
+
+    toggleOutput.addEventListener('click', () => {
+        toggleOutputChecked = toggleOutputChecked === "true" ? "false" : "true";
+        toggleOutput.dataset.checked = toggleOutputChecked;
+        localStorage.setItem('svgdx-toggle-output', toggleOutput.dataset.checked);
+        updateOutputMode();
+    });
 })();
 
 /** Scroll wheel: zoom SVG */
@@ -371,6 +407,7 @@ const editor = CodeMirror(document.getElementById('editor'), {
         const tooltips = {
             "toggle-layout": "Toggle layout between horizontal and vertical",
             "auto-viewbox": "When active, auto-resize and center the SVG on update",
+            "text-output": "View output as text rather than image",
             "reset-view": "Resize and center the SVG",
             "save-input": "Download the input",
             "save-output": "Download the SVG",
