@@ -263,7 +263,7 @@ impl TransformerContext {
             self.handle_var_element(&mut e);
             return Ok(vec![]);
         }
-        if &e.name == "specs" || &e.name == "loop" {
+        if &e.name == "specs" {
             return Ok(vec![]);
         }
         events.extend(self.handle_comments(&mut e));
@@ -820,7 +820,7 @@ impl Transformer {
                 }
 
                 let mut btree = BTreeMap::new();
-                let remain = self.process_seq(inner_events.clone(), &mut btree, OrderIndex::new(0));
+                let remain = self.process_seq(inner_events.clone(), &mut btree);
                 if !remain?.is_empty() {
                     bail!("No support for forward references in loops");
                 }
@@ -872,7 +872,7 @@ impl Transformer {
                 // ...but we do want to include it for attribute-variable lookups, so push the
                 // referenced element onto the element stack (just while we run process_seq)
                 self.context.push_current_element(&referenced_element);
-                let remain = self.process_seq(inner_events, &mut btree, OrderIndex::new(0));
+                let remain = self.process_seq(inner_events, &mut btree);
                 self.context.pop_current_element();
                 if !remain?.is_empty() {
                     bail!("No support for forward references in reuse groups");
@@ -929,7 +929,6 @@ impl Transformer {
         &mut self,
         seq: EventList<'a>,
         idx_output: &mut BTreeMap<OrderIndex, EventList>,
-        base_idx: OrderIndex,
     ) -> Result<EventList<'a>> {
         let mut remain = EventList::new();
         let mut last_event = None;
@@ -938,11 +937,10 @@ impl Transformer {
         // Stack of event indices of open elements.
         let mut idx_stack = Vec::new();
         let mut loop_depth = 0;
-        // let mut base_idx = base_idx.clone();
 
         for input_ev in seq {
             let ev = &input_ev.event;
-            let idx = base_idx.with_index(input_ev.index);
+            let idx = OrderIndex::new(input_ev.index);
             gen_events = Vec::new();
 
             match ev {
@@ -1040,7 +1038,6 @@ impl Transformer {
                             if let Ok(ref events) = events {
                                 if !events.is_empty() {
                                     ev_events.extend(events);
-                                    //println!(">>> Empty Generated events: {}", &events.len());
                                     gen_events.push((idx, ev_events.clone()));
                                 }
                             } else {
@@ -1186,11 +1183,11 @@ impl Transformer {
         let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
         // First pass with original input data
-        let mut remain = self.process_seq(input, &mut idx_output, OrderIndex::default())?;
+        let mut remain = self.process_seq(input, &mut idx_output)?;
         // Repeatedly process remaining elements while useful
         while !remain.is_empty() {
             let last_len = remain.len();
-            remain = self.process_seq(remain, &mut idx_output, OrderIndex::default())?;
+            remain = self.process_seq(remain, &mut idx_output)?;
             if last_len == remain.len() {
                 bail!(
                     "Could not resolve the following elements:\n{}",
@@ -1550,7 +1547,7 @@ mod tests {
         let mut idx_output = BTreeMap::new();
         let seq = EventList::new();
 
-        let remain = transformer.process_seq(seq, &mut idx_output, OrderIndex::default());
+        let remain = transformer.process_seq(seq, &mut idx_output);
 
         assert_eq!(remain.unwrap(), EventList::new());
     }
@@ -1567,7 +1564,7 @@ mod tests {
         </svg>"##,
         );
 
-        let remain = transformer.process_seq(seq, &mut idx_output, OrderIndex::default());
+        let remain = transformer.process_seq(seq, &mut idx_output);
 
         let ok_ev_count = idx_output
             .iter()
@@ -1591,8 +1588,7 @@ mod tests {
         </svg>"##,
         );
 
-        let remain =
-            transformer.process_seq(seq.slice(2, 5), &mut idx_output, OrderIndex::default());
+        let remain = transformer.process_seq(seq.slice(2, 5), &mut idx_output);
 
         let ok_ev_count = idx_output
             .iter()
