@@ -200,7 +200,7 @@ impl SvgElement {
     }
 
     pub fn is_phantom_element(&self) -> bool {
-        matches!(self.name.as_str(), "config" | "specs" | "var")
+        matches!(self.name.as_str(), "config" | "specs" | "var" | "loop")
     }
 
     /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
@@ -250,6 +250,7 @@ impl SvgElement {
     pub fn is_content_text(&self) -> bool {
         // This is present for graphics elements except for text,
         // where we need to be transparent.
+        // TODO: except where we don't....
         self.is_graphics_element() && self.name != "text"
     }
 

@@ -1,4 +1,5 @@
 /// Recursive descent expression parser
+use itertools::Itertools;
 use lazy_regex::regex;
 use rand::Rng;
 use regex::Captures;
@@ -227,14 +228,22 @@ struct EvalState<'a> {
     tokens: Vec<Token>,
     index: usize,
     context: &'a TransformerContext,
+    // Used to check for circular variable references
+    // Vec - likely to be few vars, and need stack behaviour
+    checked_vars: Vec<String>,
 }
 
 impl<'a> EvalState<'a> {
-    fn new(tokens: impl IntoIterator<Item = Token>, context: &'a TransformerContext) -> Self {
+    fn new(
+        tokens: impl IntoIterator<Item = Token>,
+        context: &'a TransformerContext,
+        checked_vars: &[String],
+    ) -> Self {
         Self {
             tokens: tokens.into_iter().collect(),
             index: 0,
             context,
+            checked_vars: Vec::from(checked_vars),
         }
     }
 
@@ -262,11 +271,19 @@ impl<'a> EvalState<'a> {
         }
     }
 
-    fn lookup(&self, v: &str) -> Result<f32> {
-        self.context
+    fn lookup(&mut self, v: &str) -> Result<f32> {
+        if self.checked_vars.iter().contains(&String::from(v)) {
+            bail!("Circular reference in variable lookup")
+        }
+        self.checked_vars.push(v.to_string());
+        let result = self
+            .context
             .get_var(v)
-            .and_then(|t| evaluate(tokenize(&t).ok()?, self.context).ok())
-            .context("Could not evaluate variable")
+            .and_then(|t| evaluate_inner(tokenize(&t).ok()?, self.context, &self.checked_vars).ok())
+            .context("Could not evaluate variable");
+        // Need this to allow e.g. "$var + $var"
+        self.checked_vars.pop();
+        result
     }
 
     /// Extract a single numeric value according to the given spec.
@@ -305,7 +322,16 @@ impl<'a> EvalState<'a> {
 }
 
 fn evaluate(tokens: impl IntoIterator<Item = Token>, context: &TransformerContext) -> Result<f32> {
-    let mut eval_state = EvalState::new(tokens, context);
+    // This just forwards with initial empty checked_vars
+    evaluate_inner(tokens, context, &[])
+}
+
+fn evaluate_inner(
+    tokens: impl IntoIterator<Item = Token>,
+    context: &TransformerContext,
+    checked_vars: &[String],
+) -> Result<f32> {
+    let mut eval_state = EvalState::new(tokens, context, checked_vars);
     let e = expr(&mut eval_state);
     if eval_state.peek().is_none() {
         e
@@ -606,30 +632,48 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = regex!(r"\{\{(?<inner>.+?)\}\}");
     re.replace_all(value, |caps: &Captures| {
-        let inner = caps
-            .name("inner")
-            .expect("Matched regex must have this group")
-            .as_str();
-        if let Ok(tokens) = tokenize(inner) {
-            if let Ok(parsed) = evaluate(tokens, context) {
-                fstr(parsed)
-            } else {
-                inner.to_owned()
-            }
-        } else {
-            inner.to_owned()
-        }
+        eval_str(
+            caps.name("inner")
+                .expect("Matched regex must have this group")
+                .as_str(),
+            context,
+        )
     })
     .to_string()
 }
 
+fn eval_str(value: &str, context: &TransformerContext) -> String {
+    if let Ok(tokens) = tokenize(value) {
+        if let Ok(parsed) = evaluate(tokens, context) {
+            fstr(parsed)
+        } else {
+            value.to_owned()
+        }
+    } else {
+        value.to_owned()
+    }
+}
+
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
 pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
-    // Step 1: Evaluate arithmetic expressions. All variables referenced here
-    // are assumed to resolve to a numeric expression.
+    // Step 1: Evaluate arithmetic expressions. All variables referenced within
+    // {{...}} blocks are assumed to resolve to a numeric expression.
     let value = eval_expr(value, context);
     // Step 2: Replace other variables (e.g. for string values)
     eval_vars(&value, context)
+}
+
+/// Evaluate a condition expression, returning true iff the result is non-zero
+pub fn eval_condition(value: &str, context: &TransformerContext) -> Result<bool> {
+    // Conditions don't need surrounding by {{...}} since they always evaluate to
+    // a single numeric expression, but allow for consistency with other attr values.
+    let re = regex!(r"\{\{(?<inner>.+?)\}\}");
+    // "If no match is found, then the haystack is returned unchanged."
+    let value = re.replace(value, r"$inner");
+    eval_str(&value, context)
+        .parse::<f32>()
+        .map(|v| v != 0.)
+        .with_context(|| format!("Invalid condition: '{value}'"))
 }
 
 #[cfg(test)]
@@ -999,6 +1043,18 @@ mod tests {
     }
 
     #[test]
+    fn test_circular_reference() {
+        let mut ctx = TransformerContext::new();
+        ctx.set_var("k", "$k - 1");
+        ctx.set_var("a", "$b");
+        ctx.set_var("b", "$a");
+        // These should successfully return error rather than cause stack overflow.
+        for expr in ["$k - 1", "$a"] {
+            assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
+        }
+    }
+
+    #[test]
     fn test_eval_precedence() {
         for (expr, expected) in [
             // Subtraction is left-to-right
@@ -1015,7 +1071,7 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &TransformerContext::new(),).ok(),
+                evaluate(tokenize(expr).expect("test"), &TransformerContext::new()).ok(),
                 expected
             );
         }
@@ -1044,5 +1100,49 @@ mod tests {
         );
         // This should 'fail' evaluation and be preserved as the variable value
         assert_eq!(eval_vars(r"$numbers", &ctx), "20  40");
+    }
+
+    #[test]
+    fn test_eval_condition() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("0.", false),
+            ("0", false),
+            ("0.0", false),
+            ("0.001", true),
+            ("eq(1, 1)", true),
+            ("eq(1, 2)", false),
+            ("ne(1, 1)", false),
+            ("ne(1, 2)", true),
+            ("lt(1, 2)", true),
+            ("lt(2, 1)", false),
+            ("lt(1, 1)", false),
+            ("le(1, 2)", true),
+            ("le(2, 1)", false),
+            ("le(1, 1)", true),
+            ("gt(2, 1)", true),
+            ("gt(1, 2)", false),
+            ("gt(1, 1)", false),
+            ("ge(2, 1)", true),
+            ("ge(1, 2)", false),
+            ("ge(1, 1)", true),
+            ("not(1)", false),
+            ("not(0)", true),
+            ("not(100)", false),
+            ("and(1, 1)", true),
+            ("and(1, 0)", false),
+            ("and(0, 1)", false),
+            ("and(0, 0)", false),
+            ("or(1, 1)", true),
+            ("or(1, 0)", true),
+            ("or(0, 1)", true),
+            ("or(0, 0)", false),
+            ("xor(1, 1)", false),
+            ("xor(1, 0)", true),
+            ("xor(0, 1)", true),
+            ("xor(0, 0)", false),
+        ] {
+            assert_eq!(eval_condition(expr, &ctx).expect("test"), expected);
+        }
     }
 }

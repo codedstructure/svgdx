@@ -24,6 +24,7 @@ The following configuration settings can be applied using this element. These co
 | background | [colour name](https://www.w3.org/TR/SVG11/types.html#ColorKeywords) | `background="lightgrey"` |
 | scale | float | `scale="2.5"` |
 | border | integer | `border="20"` |
+| loop-limit | integer | `loop-limit="9999"` |
 
 ### `var`
 
@@ -73,3 +74,60 @@ will result in the following rendered output:
 ```
 
 Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).
+
+
+### `loop`
+
+The `<loop>` element allows blocks of elements to be repeated. The repetition happens at the 'input' stage to processing,
+so side-effects such as variable updates take effect in each repetition.
+
+There are three forms of the loop element depending on given attribute:
+
+* **`count`** - a fixed number of repeat counts. Note the number of repeats is evaluated before any repeats are created,
+  so while an expression (possibly including variables) can be provided to this attribute, it will only be evaluated once rather than each iteration.
+
+  For each iteration, all elements within the `<loop>` block are processed and appended to the output document.
+
+  Example:
+
+  ```xml
+  <var i="0"/>
+  <loop count="4">
+    <circle cxy="{{$i * 10}} 0" r="5"/>
+    <var i="{{$i + 1}}"/>
+  </loop>
+  ```
+
+* **`while`** - this is given an expression as a condition, and iterations repeat **while** the condition is "true", which is defined as non-zero (as with the C language).
+
+  Example:
+
+  ```xml
+  <var x="0" y="0"/>
+  <loop while="{{le($x, 90)}}">
+    <var oldx="$x" oldy="$y" x="{{$x + 1}}" y="{{80 * sin($x * 4)}}"/>
+    <line xy1="$oldx $oldy" xy2="$x $y"/>
+  </loop>
+  ```
+
+* **`until`** - similar to `while`, but the expression is evaluated at the *end* of each loop rather the start as with `while`, so will always be present at least once in the output.
+
+  Example:
+
+  ```xml
+  <var x="0" ya="10" yb="-10"/>
+  <loop until="{{gt($x * $x, 25)}}">
+    <var oldx="$x" oldya="$ya" oldyb="$yb" x="{{$x + 1}}" ya="{{-$x * $x - 10}}" yb="{{$x * $x - 10}}"/>
+    <line xy1="$oldx $oldya" xy2="$x $ya"/>
+    <line xy1="$oldx $oldyb" xy2="$x $yb"/>
+  </loop>
+  ```
+
+Note that for `while` and `until`, the expression is evalutated each iteration, whereas it is only evaluated once for the `count` form.
+
+Only one of these attributes may be provided in a `loop` element.
+
+It is easy to generate very large documents using loops, and potentially take a long time to evaluate.
+To mitigate this, a separate `loop-limit` config value is defined to detect excessive loop counts. If the number of loops exceeds this at any point, document processing is abandoned with an error.
+Note that `loop-limit` does not 'clamp' the number of loops, but is a limit which if exceeded rejects the input entirely. It's primary use is to detect and escape infinite loops, which are easy to generate accidentally with malformed `while` and `until` conditions.
+By default this is set to `1000`, though as with other config elements it can be changed using the `<config>` element.
