@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for `<loop>` element, with `count`, `while` and `until` attributes
+  defining multiple iterations of the contained elements. See the [loop element](docs/elements.md#loop)
+  docs for more information.
+
+- Added: Check for circular references in expressions to avoid stack overflow.
+
 - Fixed: positioning relative to a connector (`<line>` with `start`/`end` attributes).
 
 - svgdx-editor enhancements: Increased number of tabs from 5 to 10; added 'text output'

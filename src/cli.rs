@@ -51,6 +51,10 @@ struct Arguments {
     /// Include metadata in output
     #[arg(long)]
     add_metadata: bool,
+
+    /// Limit on number of iterations for loop elements
+    #[arg(long, default_value = "1000")]
+    loop_limit: u32,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -107,7 +111,7 @@ impl Config {
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,
-                ..Default::default()
+                loop_limit: args.loop_limit,
             },
         })
     }

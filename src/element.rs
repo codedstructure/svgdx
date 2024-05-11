@@ -200,7 +200,7 @@ impl SvgElement {
     }
 
     pub fn is_phantom_element(&self) -> bool {
-        matches!(self.name.as_str(), "config" | "specs" | "var")
+        matches!(self.name.as_str(), "config" | "specs" | "var" | "loop")
     }
 
     /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
