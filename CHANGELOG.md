@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0 - 2024-05-13]
+
 - Added: support for `<loop>` element, with `count`, `while` and `until` attributes
   defining multiple iterations of the contained elements. See the [loop element](docs/elements.md#loop)
   docs for more information.
