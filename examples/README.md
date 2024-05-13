@@ -141,3 +141,11 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 [source](reuse.svg)
 
 [input file](reuse.xml)
+
+## Loops and conditions
+
+![](loops.svg)
+
+[source](loops.svg)
+
+[input file](loops.svg)

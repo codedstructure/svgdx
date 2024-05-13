@@ -1,0 +1,26 @@
+<svg>
+  <defs>
+    <g id="cube">
+      <polygon points="0 0 0 10 10 5 10 -5" class="d-fill-lightyellow"/>
+      <polygon points="10 -5 20 0 20 10 10 5" class="d-fill-silver"/>
+      <polygon points="0 10 10 15 20 10 10 5" class="d-fill-lightgrey"/>
+    </g>
+  </defs>
+
+  <var i="0" cube_wh="20 20"/>
+  <loop while="lt($i, 10)">
+    <var j="0" i="$i + 1"/>
+    <loop while="lt($j, 5)">
+      <var j="$j + 1"/>
+      <use href="#cube" wh="$cube_wh" xy="{{$i * 20}} {{$j * 30 + 10}}" />
+      <use href="#cube" wh="$cube_wh" xy="{{$i * 20 + 10}} {{$j * 30 + 25}}" />
+    </loop>
+  </loop>
+
+  <var x="0" oldx="0" oldy="0"/>
+  <loop count="100">
+    <var y="{{30 * sin($x * 7)}}" x="{{$x + 2}}"/>
+    <line xy1="$oldx $oldy" xy2="$x $y" dxy="20 110" class="d-thick d-red"/>
+    <var oldx="$x" oldy="$y"/>
+  </loop>
+</svg>
