@@ -12,12 +12,12 @@
     <defs>
         <filter id="softshadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
-            <feOffset/>
+            <feOffset dx="1" dy="1"/>
             <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
         </filter>
         <filter id="hardshadow" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
-            <feOffset/>
+            <feOffset dx="1" dy="1"/>
             <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
         </filter>
     </defs>

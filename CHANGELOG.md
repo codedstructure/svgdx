@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: positioning relative to a connector (`<line>` with `start`/`end` attributes).
 
+- Fixed: `dx` / `dy` attributes were being incorrectly stripped from `feOffset` elements.
+
 - svgdx-editor enhancements: Increased number of tabs from 5 to 10; added 'text output'
   view with toggle button; minor styling improvements.
 

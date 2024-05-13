@@ -313,8 +313,9 @@ impl TransformerContext {
             }
         }
 
-        // Process dx / dy / dxy if not a text element (where these could be useful)
-        if e.name != "text" && e.name != "tspan" {
+        // Process dx / dy / dxy as translation offsets if not an element
+        // where they already have intrinsic meaning.
+        if !matches!(e.name.as_str(), "text" | "tspan" | "feOffset") {
             let dx = e.pop_attr("dx");
             let dy = e.pop_attr("dy");
             let dxy = e.pop_attr("dxy");
