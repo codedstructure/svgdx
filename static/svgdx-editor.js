@@ -114,6 +114,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 textViewer.setValue(svgData);
                 svg_container.innerHTML = svgData;
                 const svg = svg_container.querySelector('svg');
+                if (svg === null) {
+                    throw new Error("No SVG returned");
+                }
                 // tweak the SVG to make it fill the container
                 // save first so we can restore during save operations
                 original_width = svg.width.baseVal.value;
@@ -142,10 +145,11 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 document.getElementById('editor').style.backgroundColor = 'red';
                 error_output.innerText = responseText;
                 error_output.style.display = "";
+                statusbar.innerText = "svgdx editor";
             }
         } catch (e) {
             statusbar.style.color = "darkred";
-            statusbar.innerText = "svgdx editor - error using transform API";
+            statusbar.innerText = `svgdx editor - error: ${e.message}`;
             console.error('Error sending data to /transform', e);
         }
     }
@@ -417,7 +421,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         if (e.target.id in tooltips) {
             // show tooltip in status bar
             statusbar.innerText = tooltips[e.target.id];
-        } else if (e.target.closest('div > svg') === svg) {
+        } else if (svg !== null && e.target.closest('div > svg') === svg) {
             // highlight source of this element in editor
             for (let i= 0; i < editor.lineCount(); i++) {
                 editor.removeLineClass(i, "background", "hover-line");
@@ -451,8 +455,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 status_text += ` class="${target_class}"`;
             }
             statusbar.innerText = status_text;
-        }
-        else {
+        } else {
             statusbar.innerText = "svgdx editor";
         }
     });

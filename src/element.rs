@@ -183,7 +183,7 @@ impl SvgElement {
         element.replace_attrs(attrs);
         // Everything but the name and any attrs unique to the original element
         // is from the other element.
-        element.name = self.name.clone();
+        element.name.clone_from(&self.name);
         element
     }
 
@@ -669,8 +669,8 @@ impl SvgElement {
         if let Some((wh, idx)) = self.attrs.pop_idx("wh") {
             let value = self.eval_size(&wh, context)?;
             let mut parts = attr_split_cycle(&value);
-            let w = parts.next().expect("cycle");
-            let h = parts.next().expect("cycle");
+            let w = parts.next().context("wh must not be empty")?;
+            let h = parts.next().context("wh must not be empty")?;
             match self.name.as_str() {
                 "rect" | "use" | "image" | "svg" | "foreignObject" => {
                     self.attrs.insert_idx("width", w, idx);
@@ -738,24 +738,24 @@ impl SvgElement {
             let mut parts = attr_split_cycle(&value);
             match (key.as_str(), self.name.as_str()) {
                 ("xy", "text" | "rect" | "use" | "image" | "svg" | "foreignObject") => {
-                    new_attrs.insert("x", parts.next().expect("cycle"));
-                    new_attrs.insert("y", parts.next().expect("cycle"));
+                    new_attrs.insert("x", parts.next().context("xy must not be empty")?);
+                    new_attrs.insert("y", parts.next().context("xy must not be empty")?);
                 }
                 ("cxy", "circle" | "ellipse") => {
-                    new_attrs.insert("cx", parts.next().expect("cycle"));
-                    new_attrs.insert("cy", parts.next().expect("cycle"));
+                    new_attrs.insert("cx", parts.next().context("cxy must not be empty")?);
+                    new_attrs.insert("cy", parts.next().context("cxy must not be empty")?);
                 }
                 ("rxy", "ellipse") => {
-                    new_attrs.insert("rx", parts.next().expect("cycle"));
-                    new_attrs.insert("ry", parts.next().expect("cycle"));
+                    new_attrs.insert("rx", parts.next().context("rxy must not be empty")?);
+                    new_attrs.insert("ry", parts.next().context("rxy must not be empty")?);
                 }
                 ("xy1", "line") => {
-                    new_attrs.insert("x1", parts.next().expect("cycle"));
-                    new_attrs.insert("y1", parts.next().expect("cycle"));
+                    new_attrs.insert("x1", parts.next().context("xy1 must not be empty")?);
+                    new_attrs.insert("y1", parts.next().context("xy1 must not be empty")?);
                 }
                 ("xy2", "line") => {
-                    new_attrs.insert("x2", parts.next().expect("cycle"));
-                    new_attrs.insert("y2", parts.next().expect("cycle"));
+                    new_attrs.insert("x2", parts.next().context("xy2 must not be empty")?);
+                    new_attrs.insert("y2", parts.next().context("xy2 must not be empty")?);
                 }
                 _ => new_attrs.insert(key.clone(), value.clone()),
             }
@@ -779,9 +779,9 @@ impl SvgElement {
                         // TODO: also support specifying other attributes; xy+cxy should be sufficient
                         let width = new_attrs.get("width").map(|z| strp(z));
                         let height = new_attrs.get("height").map(|z| strp(z));
-                        let cx = strp(&parts.next().expect("cycle"))
+                        let cx = strp(&parts.next().context("cxy must not be empty")?)
                             .context("Could not derive cx from cxy")?;
-                        let cy = strp(&parts.next().expect("cycle"))
+                        let cy = strp(&parts.next().context("cxy must not be empty")?)
                             .context("Could not derive cy from cxy")?;
                         if let (Some(width), Some(height)) = (width, height) {
                             pass_two_attrs.insert("x", fstr(cx - width? / 2.));
@@ -791,9 +791,9 @@ impl SvgElement {
                     ("xy", "circle") => {
                         // Requires xy / r
                         let r = new_attrs.get("r").map(|z| strp(z));
-                        let x = strp(&parts.next().expect("cycle"))
+                        let x = strp(&parts.next().context("xy must not be empty")?)
                             .context("Could not derive x from xy")?;
-                        let y = strp(&parts.next().expect("cycle"))
+                        let y = strp(&parts.next().context("xy must not be empty")?)
                             .context("Could not derive y from xy")?;
                         if let Some(r) = r {
                             let r = r?;
@@ -805,9 +805,9 @@ impl SvgElement {
                         // Requires xy / rx / ry
                         let rx = new_attrs.get("rx").map(|z| strp(z));
                         let ry = new_attrs.get("ry").map(|z| strp(z));
-                        let x = strp(&parts.next().expect("cycle"))
+                        let x = strp(&parts.next().context("xy must not be empty")?)
                             .context("Could not derive x from xy")?;
-                        let y = strp(&parts.next().expect("cycle"))
+                        let y = strp(&parts.next().context("xy must not be empty")?)
                             .context("Could not derive y from xy")?;
                         if let (Some(rx), Some(ry)) = (rx, ry) {
                             pass_two_attrs.insert("cx", fstr(x + rx?));

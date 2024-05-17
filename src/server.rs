@@ -18,6 +18,14 @@ async fn transform(input: String) -> impl IntoResponse {
             ..Default::default()
         },
     )
+    .and_then(|output| {
+        if output.is_empty() {
+            // Can't build a valid image/svg+xml response from empty string.
+            Err(anyhow::Error::msg("Empty response"))
+        } else {
+            Ok(output)
+        }
+    })
     .map(|output| {
         Response::builder()
             .header("Content-Type", "image/svg+xml")

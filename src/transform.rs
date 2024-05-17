@@ -742,7 +742,7 @@ impl Transformer {
                 "debug" => self.config.debug = value.parse()?,
                 "add-auto-styles" => self.config.add_auto_defs = value.parse()?,
                 "border" => self.config.border = value.parse()?,
-                "background" => self.config.background = value.clone(),
+                "background" => self.config.background.clone_from(value),
                 "seed" => {
                     self.config.seed = value.parse()?;
                     self.context.seed_rng(self.config.seed);
@@ -823,9 +823,22 @@ impl Transformer {
 
                 let mut btree = BTreeMap::new();
                 let remain = self.process_seq(inner_events.clone(), &mut btree);
-                if !remain?.is_empty() {
-                    bail!("No support for forward references in loops");
+                if let Ok(remain) = remain {
+                    // The resulting error string output is a bit convoluted in the case
+                    // of nested loops with errors, but better to have too much info.
+                    if !remain.is_empty() {
+                        bail!(
+                            "Could not resolve the following elements:\n{}",
+                            remain
+                                .iter()
+                                .map(|r| format!("{:4}: {:?}", r.line, r.event))
+                                .join("\n")
+                        );
+                    }
+                } else {
+                    bail!("Loop error:\n{remain:?}");
                 }
+
                 for (_, ev) in btree {
                     gen_events.extend(&ev);
                 }
@@ -1077,7 +1090,9 @@ impl Transformer {
                         let mut events = if ee_name.as_str() == "loop" {
                             loop_depth -= 1;
                             if loop_depth == 0 {
-                                self.handle_loop_element(&event_element)
+                                // Note we don't support remain from loop events, so exit if error
+                                // and re-wrap ok state.
+                                Ok(self.handle_loop_element(&event_element)?)
                             } else {
                                 Ok(EventList::new())
                             }
