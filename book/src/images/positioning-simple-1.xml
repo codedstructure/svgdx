@@ -1,0 +1,6 @@
+<svg>
+ <rect xy="0" wh="20" text="a"/>
+ <rect xy="^:h" wh="20" text="b"/>
+ <rect xy="^:v" wh="20" text="c"/>
+ <rect xy="^:h" wh="20" text="d"/>
+</svg>

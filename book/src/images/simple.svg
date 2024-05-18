@@ -1,0 +1,26 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="90mm" height="20mm" viewBox="-5 -5 90 20">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+  ]]>
+  </style>
+  <rect id="in" width="20" height="10"/>
+  <text x="10" y="5" class="d-tbox">input</text>
+  <rect id="proc" x="30" y="0" width="20" height="10"/>
+  <text x="40" y="5" class="d-tbox">process</text>
+  <rect id="out" x="60" y="0" width="20" height="10"/>
+  <text x="70" y="5" class="d-tbox">output</text>
+
+  <line x1="20" y1="5" x2="30" y2="5" class="d-arrow"/>
+  <line x1="50" y1="5" x2="60" y2="5" class="d-arrow"/>
+</svg>

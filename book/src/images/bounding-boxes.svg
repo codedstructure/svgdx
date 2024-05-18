@@ -1,0 +1,27 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="70mm" height="80mm" viewBox="-5 -5 70 80">
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    .d-dash { stroke-dasharray: 1.5 0.75; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-red:not(text,tspan) { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; }
+    .d-blue:not(text,tspan) { stroke: blue; }
+    text.d-blue, text.d-blue * { fill: blue; }
+    .d-red:not(text,tspan) { stroke: red; }
+    text.d-red, text.d-red * { fill: red; }
+    .d-none:not(text,tspan) { stroke: none; }
+  ]]>
+  </style>
+ <rect id="r1" x="0" y="0" width="30" height="20" class="d-none d-fill-red"/>
+ <circle id="c1" cx="50" cy="10" r="10" class="d-none d-fill-red"/>
+ <polyline id="pl1" points="60,30 40,50 60,70" class="d-red"/>
+ <polygon id="pg1" points="10,30 30,50 30,60 10,70 0,60 0,40" class="d-none d-fill-red"/>
+
+ <rect x="0" y="0" width="30" height="20" class="d-blue d-dash d-surround"/>
+ <rect x="40" y="0" width="20" height="20" class="d-blue d-dash d-surround"/>
+ <rect x="40" y="30" width="20" height="40" class="d-blue d-dash d-surround"/>
+ <rect x="0" y="30" width="30" height="40" class="d-blue d-dash d-surround"/>
+</svg>

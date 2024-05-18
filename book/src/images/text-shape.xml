@@ -1,0 +1,5 @@
+<svg>
+  <rect xy="0" wh="40 10" text="I am a rectangle!"/>
+  <circle cxy="20 30" r="15" text="I am a circle!"/>
+  <rect xy="50 0" wh="50" text="I am a square!"/>
+</svg>
