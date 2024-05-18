@@ -26,6 +26,9 @@
 //! println!("{output}");
 //! ```
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
 
 use anyhow::Result;
@@ -146,6 +149,12 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
 /// Transform `input` provided as a string, returning the result as a string.
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn transform_string(input: String) -> core::result::Result<String, String> {
+    let cfg = TransformConfig::default();
+    transform_str(input, &cfg).map_err(|e| { e.to_string() })
+}
+
 pub fn transform_str<T: Into<String>>(input: T, cfg: &TransformConfig) -> Result<String> {
     let input = input.into();
 
