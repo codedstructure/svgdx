@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: support for vertical text; add the `d-text-vertical` class to an element
   to cause text to be rendered vertically.
 
+- Fixed: Attributes derived from compound attribute expansion are lower priority
+  than equivalent target attributes, i.e. an `xy` attribute should not overwrite
+  an existing `y` attribute.
+
 - Fixed: various error handling improvements
 
 ## [0.9.0 - 2024-05-13]

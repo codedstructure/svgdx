@@ -67,3 +67,16 @@ fn test_expand_ellipse() {
     let expected = r#"<ellipse cx="6.5" cy="6" rx="1.5" ry="1"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+// Check that attributes derived from compound attrs are overridden
+// by explicit attributes
+fn test_attr_priority() {
+    let input = r#"<rect y="2" xy="3 4"/>"#;
+    let expected = r#"<rect y="2" x="3"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect xy="3 4" x="1"/>"#;
+    let expected = r#"<rect x="1" y="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

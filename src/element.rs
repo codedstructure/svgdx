@@ -663,10 +663,25 @@ impl SvgElement {
 
     /// Process and expand attributes as needed
     pub fn expand_attributes(&mut self, context: &mut TransformerContext) -> Result<()> {
+        // Certain attributes are kept and may override derived attributes,
+        // e.g. can have `wh="#other" height="10"` to take size from #other
+        // but override height.
+        let mut priority_attrs = AttrMap::new();
+
         // Step 0: Resolve any attributes
         for (key, value) in self.attrs.clone() {
             let replace = eval_attr(&value, context);
             self.attrs.insert(&key, &replace);
+
+            // These single-dimension attrs override values derived from
+            // compound attributes (xy, wh, cxy, etc.)
+            match key.as_str() {
+                "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" | // position attrs
+                "r" | "rx" | "ry" | "width" | "height" => {  // size attrs
+                    priority_attrs.insert(key.clone(), replace.clone());
+                }
+                _ => (),
+            }
         }
 
         // Step 1: Evaluate size from wh attributes
@@ -766,7 +781,7 @@ impl SvgElement {
         }
 
         {
-            // A second pass is used where the processed values of other attributes
+            // Step 3: A second pass is used where the processed values of other attributes
             // (which may be given in any order and so not available on first pass)
             // are required, e.g. updating cxy for rect-like objects, which requires
             // width & height to already be determined.
@@ -829,6 +844,12 @@ impl SvgElement {
             }
 
             new_attrs = pass_two_attrs;
+        }
+
+        // Step 4: Override compound-derived attributes with any original
+        // single-dimension attrs
+        for (key, value) in priority_attrs {
+            new_attrs.insert(key, value);
         }
 
         self.attrs = new_attrs;
