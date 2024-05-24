@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for vertical text; add the `d-text-vertical` class to an element
+  to cause text to be rendered vertically.
+
 - Fixed: various error handling improvements
 
 ## [0.9.0 - 2024-05-13]

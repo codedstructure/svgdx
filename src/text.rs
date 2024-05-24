@@ -58,26 +58,29 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     // Any specified dx/dy override this behaviour.
     let text_inset = 1.;
 
+    let vertical = element.has_class("d-text-vertical");
     let is_line = element.name == "line";
     // text associated with a line is pushed 'outside' the line,
     // where with other shapes it's pulled 'inside'. The classes
     // and dx/dy values are opposite.
     match text_loc {
         LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => {
-            text_classes.push(if is_line {
-                "d-text-bottom"
-            } else {
-                "d-text-top"
+            text_classes.push(match (is_line, vertical) {
+                (false, false) => "d-text-top",
+                (true, false) => "d-text-bottom",
+                (false, true) => "d-text-top-vertical",
+                (true, true) => "d-text-bottom-vertical",
             });
             if t_dy.is_none() {
                 t_dy = Some(if is_line { -text_inset } else { text_inset });
             }
         }
         LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
-            text_classes.push(if is_line {
-                "d-text-top"
-            } else {
-                "d-text-bottom"
+            text_classes.push(match (is_line, vertical) {
+                (false, false) => "d-text-bottom",
+                (true, false) => "d-text-top",
+                (false, true) => "d-text-bottom-vertical",
+                (true, true) => "d-text-top-vertical",
             });
             if t_dy.is_none() {
                 t_dy = Some(if is_line { text_inset } else { -text_inset });
@@ -88,20 +91,22 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
 
     match text_loc {
         LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => {
-            text_classes.push(if is_line {
-                "d-text-right"
-            } else {
-                "d-text-left"
+            text_classes.push(match (is_line, vertical) {
+                (false, false) => "d-text-left",
+                (true, false) => "d-text-right",
+                (false, true) => "d-text-left-vertical",
+                (true, true) => "d-text-right-vertical",
             });
             if t_dx.is_none() {
                 t_dx = Some(if is_line { -text_inset } else { text_inset });
             }
         }
         LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
-            text_classes.push(if is_line {
-                "d-text-left"
-            } else {
-                "d-text-right"
+            text_classes.push(match (is_line, vertical) {
+                (false, false) => "d-text-right",
+                (true, false) => "d-text-left",
+                (false, true) => "d-text-right-vertical",
+                (true, true) => "d-text-left-vertical",
             });
             if t_dx.is_none() {
                 t_dx = Some(if is_line { text_inset } else { -text_inset });
@@ -143,10 +148,11 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let text_attrs = vec![("x".into(), fstr(tdx)), ("y".into(), fstr(tdy))];
     let mut text_elements = Vec::new();
-    let lines: Vec<_> = text_value.lines().collect();
+    let mut lines: Vec<_> = text_value.lines().collect();
     let line_count = lines.len();
 
     let multiline = line_count > 1;
+    let vertical = orig_elem.has_class("d-text-vertical");
 
     // There will always be a text element; if not multiline this is the only element.
     let mut text_elem = SvgElement::new("text", &text_attrs);
@@ -163,24 +169,63 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     for class in text_classes {
         text_elem.add_class(class);
     }
+    // Add this prior to copying over presentation attrs which take precedence
+    if vertical {
+        text_elem.set_attr("writing-mode", "tb");
+    }
+    // Move text-related presentation attributes from original element to text element
+    let text_presentation_attrs = [
+        "alignment-baseline",
+        "font-family",
+        "font-size",
+        "font-size-adjust",
+        "font-stretch",
+        "font-style",
+        "font-variant",
+        "font-weight",
+        "text-decoration",
+        "text-rendering",
+        "text-anchor",
+        "textLength",
+        "lengthAdjust",
+        "word-spacing",
+        "letter-spacing",
+        "writing-mode",
+        "unicode-bidi",
+    ];
+    for text_attr in text_presentation_attrs.iter() {
+        if let Some(attr) = orig_elem.pop_attr(text_attr) {
+            text_elem.set_attr(text_attr, &attr);
+        }
+    }
     if !multiline {
         text_elem.content = ContentType::Ready(text_value.clone());
     }
     text_elements.push(text_elem);
     if multiline {
         let is_line = element.name == "line";
-        let first_line_offset = match (is_line, text_loc) {
+        // Determine position of first text line; others follow this based on line spacing
+        let first_line_offset = match (is_line, vertical, text_loc) {
             // shapes - text 'inside'
-            (false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
-            (false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
+            (false, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
+            (false, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
+            (false, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_DOWN,
+            (false, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_UP,
             // lines - text 'beyond'
-            (true, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
-            (true, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_DOWN,
-            (_, _) => WRAP_MID,
+            (true, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
+            (true, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => {
+                WRAP_DOWN
+            }
+            (true, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_UP,
+            (true, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_DOWN,
+            (_, _, _) => WRAP_MID,
         };
 
         let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
-        tspan_elem.attrs.pop("y");
+        tspan_elem.attrs.pop(if vertical { "x" } else { "y" });
+        if vertical {
+            lines = lines.into_iter().rev().collect();
+        }
         for (idx, text_fragment) in lines.into_iter().enumerate() {
             let mut text_fragment = text_fragment.to_string();
             let mut tspan = tspan_elem.clone();
@@ -197,7 +242,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 text_fragment = text_fragment.replace(' ', NBSP);
             }
 
-            tspan.attrs.insert("dy", format!("{}em", fstr(line_offset)));
+            tspan.attrs.insert(
+                if vertical { "dx" } else { "dy" },
+                format!("{}em", fstr(line_offset)),
+            );
             tspan.content = ContentType::Ready(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.
                 // Without this "a\n\nb" would render three tspans, but it would appear

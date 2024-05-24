@@ -128,6 +128,23 @@ fn test_text_multiline() {
 }
 
 #[test]
+fn test_text_vertical() {
+    let input = r#"
+<rect xy="0" wh="10 50" text="The Rust\nProgramming Language" class="d-text-vertical"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="50" class="d-text-vertical"/>
+<text x="5" y="25" writing-mode="tb" class="d-text-vertical d-tbox">
+<tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
 fn test_text_dxy() {
     let input = r#"
 <rect xy="0" wh="10" text-dx="2" text="blob"/>

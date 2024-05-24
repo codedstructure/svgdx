@@ -1,0 +1,59 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="95mm" height="95mm" viewBox="-5 -5 95 95">
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }
+    text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }
+    text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }
+    text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }
+    text.d-text-small, text.d-text-small * { font-size: 2px; }
+    text.d-text-medium, text.d-text-medium * { font-size: 3px; }
+    text.d-text-large, text.d-text-large * { font-size: 4.5px; }
+  ]]>
+  </style>
+  <!-- top row -->
+  <rect id="top" x="0" y="0" width="25" height="25" class="d-text-vertical d-text-small"/>
+  <text x="1" y="1" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-top-vertical d-text-left-vertical">
+  <tspan y="1" dx="0em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="30" y="0" width="25" height="25" class="d-text-vertical d-text-medium"/>
+  <text x="42.5" y="1" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox d-text-top-vertical">
+  <tspan y="1" dx="-1.05em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="60" y="0" width="25" height="25" class="d-text-vertical d-text-large"/>
+  <text x="84" y="1" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-top-vertical d-text-right-vertical">
+  <tspan y="1" dx="-2.1em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+  </text>
+
+  <!-- middle row -->
+  <rect id="middle" x="0" y="30" width="25" height="25" class="d-text-vertical d-text-small"/>
+  <text x="1" y="42.5" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-left-vertical">
+  <tspan y="42.5" dx="0em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="30" y="30" width="25" height="25" class="d-text-vertical d-text-medium"/>
+  <text x="42.5" y="42.5" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox">
+  <tspan y="42.5" dx="-1.05em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="60" y="30" width="25" height="25" class="d-text-vertical d-text-large"/>
+  <text x="84" y="42.5" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-right-vertical">
+  <tspan y="42.5" dx="-2.1em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+  </text>
+
+  <!-- bottom row -->
+  <rect x="0" y="60" width="25" height="25" class="d-text-vertical d-text-small"/>
+  <text x="1" y="84" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-bottom-vertical d-text-left-vertical">
+  <tspan y="84" dx="0em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="30" y="60" width="25" height="25" class="d-text-vertical d-text-medium"/>
+  <text x="42.5" y="84" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox d-text-bottom-vertical">
+  <tspan y="84" dx="-1.05em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+  </text>
+  <rect x="60" y="60" width="25" height="25" class="d-text-vertical d-text-large"/>
+  <text x="84" y="84" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-bottom-vertical d-text-right-vertical">
+  <tspan y="84" dx="-2.1em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+  </text>
+</svg>

@@ -290,6 +290,26 @@ pub fn build_styles(
             r#"text.d-text-right, text.d-text-right * { text-anchor: end; }"#,
         ));
     }
+    if classes.contains("d-text-top-vertical") {
+        result.push(String::from(
+            r#"text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }"#,
+        ));
+    }
+    if classes.contains("d-text-bottom-vertical") {
+        result.push(String::from(
+            r#"text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }"#,
+        ));
+    }
+    if classes.contains("d-text-left-vertical") {
+        result.push(String::from(
+            r#"text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }"#,
+        ));
+    }
+    if classes.contains("d-text-right-vertical") {
+        result.push(String::from(
+            r#"text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }"#,
+        ));
+    }
 
     // Text size is 3px by default.
     let text_sizes = vec![

@@ -62,6 +62,14 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 
 [input file](multiline-text.xml)
 
+## Multi-line vertical text
+
+![](vertical-text.svg)
+
+[source](vertical-text.svg)
+
+[input file](vertical-text.xml)
+
 ## Text associated with lines
 
 ![](line-text.svg)
@@ -148,4 +156,4 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 
 [source](loops.svg)
 
-[input file](loops.svg)
+[input file](loops.xml)

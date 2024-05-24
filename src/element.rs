@@ -142,6 +142,10 @@ impl SvgElement {
         }
     }
 
+    pub fn has_class(&self, class: &str) -> bool {
+        self.classes.contains(class)
+    }
+
     pub fn has_attr(&self, key: &str) -> bool {
         self.attrs.contains_key(key)
     }

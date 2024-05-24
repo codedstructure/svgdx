@@ -1,0 +1,16 @@
+<svg>
+  <!-- top row -->
+  <rect id="top" xy="0" wh="25" text="Multi\nline\nvertical" text-loc="tl" class="d-text-vertical d-text-small"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="t" class="d-text-vertical d-text-medium"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="tr" class="d-text-vertical d-text-large"/>
+
+  <!-- middle row -->
+  <rect id="middle" xy="#top:v 5" wh="25" text="Multi\nline\nvertical" text-loc="l" class="d-text-vertical d-text-small"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="c" class="d-text-vertical d-text-medium"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="r" class="d-text-vertical d-text-large"/>
+
+  <!-- bottom row -->
+  <rect xy="#middle:v 5" wh="25" text="Multi\nline\nvertical" text-loc="bl" class="d-text-vertical d-text-small"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="b" class="d-text-vertical d-text-medium"/>
+  <rect xy="^:h 5" wh="25" text="Multi\nline\nvertical" text-loc="br" class="d-text-vertical d-text-large"/>
+</svg>

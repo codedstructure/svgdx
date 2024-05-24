@@ -15,12 +15,6 @@
             font-family: "Ubuntu Mono", monospace;
             font-size: 3px;
         }
-        /* prior to top/bottom/left/right so they can override this */
-        text, text * { dominant-baseline: central; text-anchor: middle; }
-        text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
-        text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
-        text.d-text-left, text.d-text-left * { text-anchor: start; }
-        text.d-text-right, text.d-text-right * { text-anchor: end; }
         text.small, text.small * { font-size: 1.5px; }
         text.medium, text.medium * { font-size: 2.25px; }
         text.large, text.large * { font-size: 3px; }
