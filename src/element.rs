@@ -389,9 +389,9 @@ impl SvgElement {
                 .map_or(len, |v| strp_length(v.as_str()).expect("Invalid length"));
         }
         if let Some(bb) = self.bbox()? {
-            if let Ok(edge) = EdgeSpec::try_from(loc) {
+            if let Ok(edge) = loc.parse() {
                 Ok(Some(bb.edgespec(edge, len)))
-            } else if let Ok(loc) = LocSpec::try_from(loc) {
+            } else if let Ok(loc) = loc.parse() {
                 Ok(Some(bb.locspec(loc)))
             } else {
                 bail!("Invalid locspec in coord")
@@ -566,7 +566,7 @@ impl SvgElement {
         let loc_re = regex!(r"^@(?<loc>[trblc]+)(\s+(?<remain>.*))?$");
         let edge_re = regex!(r"^@(?<edge>[trbl]):(?<len>[-0-9\.]+%?)(\s+(?<remain>.*))?$");
         if let Some((x, y)) = if let Some(caps) = rel_re.captures(remain) {
-            let rel = DirSpec::try_from(caps.name("rel").expect("Regex Match").as_str())?;
+            let rel: DirSpec = caps.name("rel").expect("Regex Match").as_str().parse()?;
             let this_bbox = self.bbox()?;
             let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
             let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
@@ -589,7 +589,7 @@ impl SvgElement {
             }
             Some((x + dx, y + dy))
         } else if let Some(caps) = edge_re.captures(remain) {
-            let edge = EdgeSpec::try_from(caps.name("edge").expect("Regex Match").as_str())?;
+            let edge: EdgeSpec = caps.name("edge").expect("Regex Match").as_str().parse()?;
             let length = strp_length(caps.name("len").expect("Regex Match").as_str())?;
             let (dx, dy) = if let Some(remain) = caps.name("remain") {
                 self.extract_dx_dy(remain.as_str())?
@@ -599,7 +599,7 @@ impl SvgElement {
             let (x, y) = bbox.edgespec(edge, length);
             Some((x + dx, y + dy))
         } else if let Some(caps) = loc_re.captures(remain) {
-            let loc = LocSpec::try_from(caps.name("loc").expect("Regex Match").as_str())?;
+            let loc: LocSpec = caps.name("loc").expect("Regex Match").as_str().parse()?;
             let (dx, dy) = if let Some(remain) = caps.name("remain") {
                 self.extract_dx_dy(remain.as_str())?
             } else {

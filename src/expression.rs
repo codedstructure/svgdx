@@ -3,6 +3,7 @@ use itertools::Itertools;
 use lazy_regex::regex;
 use rand::Rng;
 use regex::Captures;
+use std::str::FromStr;
 
 use anyhow::{bail, Context, Result};
 
@@ -77,10 +78,10 @@ enum Function {
     Xor,
 }
 
-impl TryFrom<&str> for Function {
-    type Error = anyhow::Error;
+impl FromStr for Function {
+    type Err = anyhow::Error;
 
-    fn try_from(value: &str) -> std::prelude::v1::Result<Self, Self::Error> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         Ok(match value {
             "abs" => Self::Abs,
             "ceil" => Self::Ceil,
@@ -174,7 +175,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         }
     } else if input.starts_with('#') {
         Ok(Token::ElementRef(input.to_owned()))
-    } else if let Ok(func) = Function::try_from(input) {
+    } else if let Ok(func) = input.parse() {
         Ok(Token::FnRef(func))
     } else {
         input
@@ -305,7 +306,7 @@ impl<'a> EvalState<'a> {
         if let Some(caps) = re.captures(v) {
             let id = caps.name("id").expect("must match if here").as_str();
             let val = caps.name("val").expect("must match if here").as_str();
-            let val = ScalarSpec::try_from(val)?;
+            let val: ScalarSpec = val.parse()?;
             if let Some(elem) = self.context.get_element(id) {
                 if let Some(bb) = elem.bbox()? {
                     Ok(bb.scalarspec(val))

@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
 use std::num::ParseFloatError;
+use std::str::FromStr;
 
 use anyhow::bail;
 
@@ -147,10 +148,10 @@ pub enum DirSpec {
     Above,
 }
 
-impl TryFrom<&str> for DirSpec {
-    type Error = anyhow::Error;
+impl FromStr for DirSpec {
+    type Err = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "h" => Ok(Self::InFront),
             "H" => Ok(Self::Behind),
@@ -183,10 +184,10 @@ pub enum EdgeSpec {
     Left,
 }
 
-impl TryFrom<&str> for EdgeSpec {
-    type Error = anyhow::Error;
+impl FromStr for EdgeSpec {
+    type Err = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "t" => Ok(Self::Top),
             "r" => Ok(Self::Right),
@@ -194,13 +195,6 @@ impl TryFrom<&str> for EdgeSpec {
             "l" => Ok(Self::Left),
             _ => bail!("Invalid EdgeSpec format {value}"),
         }
-    }
-}
-
-impl TryFrom<String> for EdgeSpec {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
     }
 }
 
@@ -232,10 +226,10 @@ pub enum LocSpec {
     Center,
 }
 
-impl TryFrom<&str> for LocSpec {
-    type Error = anyhow::Error;
+impl FromStr for LocSpec {
+    type Err = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "tl" => Ok(Self::TopLeft),
             "t" => Ok(Self::Top),
@@ -248,13 +242,6 @@ impl TryFrom<&str> for LocSpec {
             "c" => Ok(Self::Center),
             _ => bail!("Invalid LocSpec format {value}"),
         }
-    }
-}
-
-impl TryFrom<String> for LocSpec {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
     }
 }
 
@@ -275,10 +262,10 @@ pub enum ScalarSpec {
     Ry,
 }
 
-impl TryFrom<&str> for ScalarSpec {
-    type Error = anyhow::Error;
+impl FromStr for ScalarSpec {
+    type Err = anyhow::Error;
 
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // TODO: 'r' here is ambiguous vs circle's radius attribute.
         // Perhaps require uppercase 'T/R/B/L' for edge values.
         // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
@@ -297,13 +284,6 @@ impl TryFrom<&str> for ScalarSpec {
             "ry" => Ok(Self::Ry),
             _ => bail!("Invalid ScalarSpec format {value}"),
         }
-    }
-}
-
-impl TryFrom<String> for ScalarSpec {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_str())
     }
 }
 
@@ -522,9 +502,9 @@ impl TrblLength {
     }
 }
 
-impl TryFrom<&str> for TrblLength {
-    type Error = anyhow::Error;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
+impl FromStr for TrblLength {
+    type Err = anyhow::Error;
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         // convert parts to Length, fail if any conversion fails.
         let parts: Result<Vec<_>, _> = attr_split(value).map(|v| strp_length(&v)).collect();
         let parts = parts?;
@@ -536,13 +516,6 @@ impl TryFrom<&str> for TrblLength {
             4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
             _ => bail!("Invalid number of values"),
         })
-    }
-}
-
-impl TryFrom<String> for TrblLength {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::try_from(value.as_ref())
     }
 }
 

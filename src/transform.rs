@@ -231,7 +231,7 @@ impl TransformerContext {
         };
 
         if let Some(margin) = e.pop_attr("margin") {
-            let margin: TrblLength = margin.try_into()?;
+            let margin: TrblLength = margin.parse()?;
 
             if let Some(bb) = &mut bbox {
                 if is_surround {
@@ -275,7 +275,7 @@ impl TransformerContext {
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.
         if let (Some(bbox), Some(xy_loc)) = (e.bbox()?, e.pop_attr("xy-loc")) {
-            let xy_loc = LocSpec::try_from(xy_loc.as_str()).context("Invalid xy-loc value")?;
+            let xy_loc: LocSpec = xy_loc.as_str().parse().context("Invalid xy-loc value")?;
             let width = bbox.width();
             let height = bbox.height();
             let (dx, dy) = match xy_loc {

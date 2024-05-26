@@ -51,7 +51,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     }
 
     let mut text_classes = vec!["d-tbox"];
-    let text_loc = LocSpec::try_from(element.pop_attr("text-loc").unwrap_or("c".into()))?;
+    let text_loc: LocSpec = element.pop_attr("text-loc").unwrap_or("c".into()).parse()?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without inset text squishes to the edge and can be unreadable
