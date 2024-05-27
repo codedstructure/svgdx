@@ -8,9 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 - Added: support for vertical text; add the `d-text-vertical` class to an element
-  to cause text to be rendered vertically.
+  to cause text to be rendered vertically. The same integration with basic shapes
+  and use of the `text-loc` attribute if available for vertical text.
 
-- Fixed: Attributes derived from compound attribute expansion are lower priority
+- Added: improve loop ergonomics with support for `loop-var`, `start` and `step`
+  attributes on `count` loops. By default the variable assigned by `loop-var` will
+  take the values `0`..`count-1`, incrementing each iteration. `start` and `step`
+  allow overriding the initial value and increment. Previously using a loop counter
+  as a variable value required a combination of two `<var>` elements (for initialisation
+  and increment) and a `while` loop.
+
+- Fixed: attributes derived from compound attribute expansion are lower priority
   than equivalent target attributes, i.e. an `xy` attribute should not overwrite
   an existing `y` attribute.
 

@@ -9,11 +9,10 @@
 
   <var i="0" cube_wh="20 20"/>
   <loop while="lt($i, 10)">
-    <var j="0" i="$i + 1"/>
-    <loop while="lt($j, 5)">
-      <var j="$j + 1"/>
-      <use href="#cube" wh="$cube_wh" xy="{{$i * 20}} {{$j * 30 + 10}}" />
-      <use href="#cube" wh="$cube_wh" xy="{{$i * 20 + 10}} {{$j * 30 + 25}}" />
+    <var i="$i + 1"/>
+    <loop count="5" loop-var="j">
+      <use href="#cube" wh="$cube_wh" xy="{{$i * 20}} {{$j * 30 + 40}}" />
+      <use href="#cube" wh="$cube_wh" xy="{{$i * 20 + 10}} {{$j * 30 + 55}}" />
     </loop>
   </loop>
 

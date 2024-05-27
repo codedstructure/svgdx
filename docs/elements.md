@@ -98,6 +98,33 @@ There are three forms of the loop element depending on given attribute:
   </loop>
   ```
 
+  The `count` variant of `<loop>` has three optional attributes: `loop-var`, `start`, and `step`.
+  These provide shortcuts replacing a combination of `var` and `while`-based `<loop>`s.
+
+  When present, the name given to `loop-var` (which should follow standard identifier naming) is assigned a value on each iteration,
+  (as though a `<var loop-var-value="$iter-value">` element was present) which may be used in expressions within the loop.
+
+  By default the loop value starts at 0 and increments by one each iteration, but this may be overridden by `start` and `step`.
+  Note these are only meaningful if `loop-var` is defined, and the number of iterations is always exactly the `count` value.
+  While `count` must always be a positive integer, `start` and `step` (and therefore the loop variable value) can be (possibly negative) floating point values.
+
+  Note that if expressions are given to `loop-var`, `start` and `step`, these are evaluated once prior to the loop beginning.
+
+  Example:
+
+  ```xml
+  <svg>
+    <rect xy="0" wh="120 150"/>
+    <loop count="5" loop-var="i" step="30">
+      <loop count="4" loop-var="j" step = "30">
+        <loop count="3" loop-var="k" start="5" step="-1.5">
+          <rect wh="20" xy="{{$j + $k}} {{$i + $k}}" class="d-softshadow"/>
+        </loop>
+      </loop>
+    </loop>
+  </svg>
+  ```
+
 * **`while`** - this is given an expression as a condition, and iterations repeat **while** the condition is "true", which is defined as non-zero (as with the C language).
 
   Example:

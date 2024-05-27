@@ -155,3 +155,48 @@ fn test_loop_nested_deep() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_loop_count_loop_var() {
+    let input = r#"
+<loop count="2" loop-var="i">
+<loop count="3" loop-var="j">
+<rect wh="1" xy="{{3 * $j}} {{3 * $i}}"/>
+</loop>
+</loop>
+"#;
+    let expected = r#"
+<rect width="1" height="1" x="0" y="0"/>
+
+<rect width="1" height="1" x="3" y="0"/>
+
+<rect width="1" height="1" x="6" y="0"/>
+
+
+<rect width="1" height="1" x="0" y="3"/>
+
+<rect width="1" height="1" x="3" y="3"/>
+
+<rect width="1" height="1" x="6" y="3"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_loop_count_loop_start_step() {
+    let input = r#"
+<loop count="3" loop-var="i" start="-4.5" step="1.5">
+<rect wh="1" xy="{{$i}} 10"/>
+</loop>
+"#;
+    let expected = r#"
+<rect width="1" height="1" x="-4.5" y="10"/>
+
+<rect width="1" height="1" x="-3" y="10"/>
+
+<rect width="1" height="1" x="-1.5" y="10"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

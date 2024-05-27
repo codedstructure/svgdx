@@ -54,7 +54,7 @@ impl Default for TransformerContext {
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
-    Repeat(u32),
+    Repeat(String, Option<(String, String, String)>),
     While(String),
     Until(String),
 }
@@ -67,9 +67,16 @@ impl TryFrom<&SvgElement> for LoopType {
             bail!("LoopType can only be created from a loop element");
         }
         if let Some(count) = element.get_attr("count") {
-            return Ok(LoopType::Repeat(
-                count.parse().context("count should be a number")?,
-            ));
+            // Note we don't parse attributes here as they might be expressions,
+            // and we don't have access to a context to evaluate them.
+            let count_spec = if let Some(loop_var) = element.get_attr("loop-var") {
+                let start = element.get_attr("start").unwrap_or("0".to_string());
+                let step = element.get_attr("step").unwrap_or("1".to_string());
+                Some((loop_var, start, step))
+            } else {
+                None
+            };
+            return Ok(LoopType::Repeat(count, count_spec));
         }
         if let Some(while_expr) = element.get_attr("while") {
             return Ok(LoopType::While(while_expr));
@@ -809,11 +816,28 @@ impl Transformer {
             // infinite recursion...
             let inner_events = EventList::from(self.context.events.clone()).slice(start + 1, end);
 
-            let mut count = 0;
+            let mut iteration = 0;
+            let mut loop_var_name = String::new();
+            let mut loop_count = 0;
+            let mut loop_var_value = 0.;
+            let mut loop_step = 1.;
+            if let LoopType::Repeat(count, loop_spec) = &loop_type {
+                loop_count = eval_attr(count, &self.context).parse()?;
+                if let Some((loop_var, start, step)) = loop_spec {
+                    loop_var_name = eval_attr(loop_var, &self.context);
+                    loop_var_value = eval_attr(start, &self.context).parse()?;
+                    loop_step = eval_attr(step, &self.context).parse()?;
+                }
+            }
             loop {
-                if let LoopType::Repeat(repeat_count) = &loop_type {
-                    if count >= *repeat_count {
+                if let LoopType::Repeat(_, _) = &loop_type {
+                    if iteration >= loop_count {
                         break;
+                    }
+                    if !loop_var_name.is_empty() {
+                        self.context
+                            .variables
+                            .insert(loop_var_name.clone(), loop_var_value.to_string());
                     }
                 } else if let LoopType::While(expr) = &loop_type {
                     if !eval_condition(expr, &self.context)? {
@@ -848,8 +872,9 @@ impl Transformer {
                         break;
                     }
                 }
-                count += 1;
-                if count == self.config.loop_limit {
+                iteration += 1;
+                loop_var_value += loop_step;
+                if iteration == self.config.loop_limit {
                     bail!("Excessive looping detected");
                 }
             }
