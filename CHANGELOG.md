@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed (regression in 0.9.0): overriding compound attribute derived positions
   caused position deltas (dx/dy/dw/dh) to stop working correctly in some cases.
 
+- Change (minor): `text-dx`/`text-dy`/`text-dxy` are now applied *after* any text
+  insetting, rather than *instead* of insetting. This means `text-dxy="0"` is now
+  a no-op.
+
+- Added: Support a `text-inset` attribute for varying the inset value (i.e. how
+  much non-centered text is 'pulled in' from a corner or edge). Previously this
+  was hard-coded to 1.
+
 ## [0.9.1 - 2024-05-27]
 
 - Added: support for vertical text; add the `d-text-vertical` class to an element

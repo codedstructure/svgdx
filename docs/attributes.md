@@ -195,6 +195,12 @@ Type: [Location](#location)
 
 Applies to: Basic shapes
 
+### `text-inset`
+When `text-loc` is used to place text at the corner or edge of a shape, it can become unreadable if pushed all the way to the edge.
+The `text-inset` attribute - which defaults to '1' if omitted - controls how much the text string is 'pulled in' from the edge or corner.
+
+For centered text this has no effect.
+
 ### `text-pre`
 If this attribute is present - regardless of value - for an element, that element has spaces
 replaced with non-breaking spaces. This prevents the usual XML whitespace collapse which

@@ -307,3 +307,75 @@ fn test_text_cdata_pre() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_inset() {
+    let input = r#"
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3"/>
+"#;
+    let expected = r#"
+<rect x="10" y="10" width="20" height="20"/>
+<text x="20" y="13" class="d-tbox d-text-top">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect cxy="20" wh="20" text="thing" text-loc="bl" text-inset="3"/>
+"#;
+    let expected = r#"
+<rect x="10" y="10" width="20" height="20"/>
+<text x="13" y="27" class="d-tbox d-text-bottom d-text-left">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_inset_dxy() {
+    // text-dxy should be applied after text-inset (which defaults to 1)
+    let input = r#"
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-dx="1" text-dy="2"/>
+"#;
+    let expected = r#"
+<rect x="10" y="10" width="20" height="20"/>
+<text x="21" y="13" class="d-tbox d-text-top">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3" text-dxy="0.5"/>
+"#;
+    let expected = r#"
+<rect x="10" y="10" width="20" height="20"/>
+<text x="20.5" y="13.5" class="d-tbox d-text-top">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect cxy="20" wh="20" text="thing" text-loc="tr" text-inset="3" text-dxy="-0.5"/>
+"#;
+    let expected = r#"
+<rect x="10" y="10" width="20" height="20"/>
+<text x="26.5" y="12.5" class="d-tbox d-text-top d-text-right">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}

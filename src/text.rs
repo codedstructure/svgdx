@@ -31,22 +31,22 @@ fn get_text_value(element: &mut SvgElement) -> String {
 }
 
 fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec, Vec<&'a str>)> {
-    let mut t_dx = None;
-    let mut t_dy = None;
+    let mut t_dx = 0.;
+    let mut t_dy = 0.;
     {
         let dx = element.pop_attr("text-dx");
         let dy = element.pop_attr("text-dy");
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = Some(parts.next().context("dx from text-dxy should be numeric")?);
-            t_dy = Some(parts.next().context("dy from text-dxy should be numeric")?);
+            t_dx = parts.next().context("dx from text-dxy should be numeric")?;
+            t_dy = parts.next().context("dy from text-dxy should be numeric")?;
         }
         if let Some(dx) = dx {
-            t_dx = Some(strp(&dx)?);
+            t_dx = strp(&dx)?;
         }
         if let Some(dy) = dy {
-            t_dy = Some(strp(&dy)?);
+            t_dy = strp(&dy)?;
         }
     }
 
@@ -56,7 +56,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without inset text squishes to the edge and can be unreadable
     // Any specified dx/dy override this behaviour.
-    let text_inset = 1.;
+    let text_inset = strp(&element.pop_attr("text-inset").unwrap_or("1".to_string()))?;
 
     let vertical = element.has_class("d-text-vertical");
     let is_line = element.name == "line";
@@ -71,9 +71,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
                 (false, true) => "d-text-top-vertical",
                 (true, true) => "d-text-bottom-vertical",
             });
-            if t_dy.is_none() {
-                t_dy = Some(if is_line { -text_inset } else { text_inset });
-            }
+            t_dy += if is_line { -text_inset } else { text_inset };
         }
         LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
             text_classes.push(match (is_line, vertical) {
@@ -82,9 +80,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
                 (false, true) => "d-text-bottom-vertical",
                 (true, true) => "d-text-top-vertical",
             });
-            if t_dy.is_none() {
-                t_dy = Some(if is_line { text_inset } else { -text_inset });
-            }
+            t_dy += if is_line { text_inset } else { -text_inset };
         }
         _ => (),
     }
@@ -97,9 +93,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
                 (false, true) => "d-text-left-vertical",
                 (true, true) => "d-text-right-vertical",
             });
-            if t_dx.is_none() {
-                t_dx = Some(if is_line { -text_inset } else { text_inset });
-            }
+            t_dx += if is_line { -text_inset } else { text_inset };
         }
         LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
             text_classes.push(match (is_line, vertical) {
@@ -108,9 +102,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
                 (false, true) => "d-text-right-vertical",
                 (true, true) => "d-text-left-vertical",
             });
-            if t_dx.is_none() {
-                t_dx = Some(if is_line { text_inset } else { -text_inset });
-            }
+            t_dx += if is_line { text_inset } else { -text_inset };
         }
         _ => (),
     }
@@ -119,12 +111,8 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element.bbox()?.context("No BoundingBox")?.locspec(text_loc);
-    if let Some(dx) = t_dx {
-        tdx += dx;
-    }
-    if let Some(dy) = t_dy {
-        tdy += dy;
-    }
+    tdx += t_dx;
+    tdy += t_dy;
 
     Ok((tdx, tdy, text_loc, text_classes))
 }
