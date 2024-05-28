@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed (regression in 0.9.0): overriding compound attribute derived positions
+  caused position deltas (dx/dy/dw/dh) to stop working correctly in some cases.
+
 ## [0.9.1 - 2024-05-27]
 
 - Added: support for vertical text; add the `d-text-vertical` class to an element

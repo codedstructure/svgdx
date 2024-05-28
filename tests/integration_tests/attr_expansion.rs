@@ -80,3 +80,19 @@ fn test_attr_priority() {
     let expected = r#"<rect x="1" y="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+fn test_attr_priority_delta() {
+    let input = r#"<rect xy="3 4" x="10" dx="2"/>"#;
+    let expected = r#"<rect x="12" y="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect wh="7 8" width="12" dw="-1"/>"#;
+    let expected = r#"<rect height="8" width="11"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    // Note only size attributes can have ratio deltas
+    let input = r#"<rect wh="7 8" width="12" dw="25%"/>"#;
+    let expected = r#"<rect height="8" width="3"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

@@ -59,6 +59,9 @@ impl ContentType {
 pub struct SvgElement {
     pub name: String,
     pub attrs: AttrMap,
+    // We keep a copy of the original attrs to allow overriding
+    // selected computed attributes.
+    pub orig_attrs: AttrMap,
     pub classes: ClassList,
     pub content: ContentType,
     pub tail: Option<String>,
@@ -98,7 +101,8 @@ impl SvgElement {
         }
         Self {
             name: name.to_string(),
-            attrs: attr_map,
+            attrs: attr_map.clone(),
+            orig_attrs: attr_map,
             classes,
             content: ContentType::Empty,
             tail: None,
@@ -663,25 +667,10 @@ impl SvgElement {
 
     /// Process and expand attributes as needed
     pub fn expand_attributes(&mut self, context: &mut TransformerContext) -> Result<()> {
-        // Certain attributes are kept and may override derived attributes,
-        // e.g. can have `wh="#other" height="10"` to take size from #other
-        // but override height.
-        let mut priority_attrs = AttrMap::new();
-
         // Step 0: Resolve any attributes
         for (key, value) in self.attrs.clone() {
             let replace = eval_attr(&value, context);
             self.attrs.insert(&key, &replace);
-
-            // These single-dimension attrs override values derived from
-            // compound attributes (xy, wh, cxy, etc.)
-            match key.as_str() {
-                "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" | // position attrs
-                "r" | "rx" | "ry" | "width" | "height" => {  // size attrs
-                    priority_attrs.insert(key.clone(), replace.clone());
-                }
-                _ => (),
-            }
         }
 
         // Step 1: Evaluate size from wh attributes
@@ -703,6 +692,16 @@ impl SvgElement {
                     self.attrs.insert_idx("ry", fstr(strp(&h)? / 2.), idx + 1);
                 }
                 _ => {}
+            }
+        }
+
+        // Step 1b: Override compound-derived attributes with any original
+        // single-dimension size attributes e.g. can have `wh="#other" height="10"`
+        // to take size from #other but override height.
+        for (key, value) in &self.orig_attrs {
+            // Single dimension size attributes
+            if let "r" | "rx" | "ry" | "width" | "height" = key.as_str() {
+                self.attrs.insert(key.clone(), eval_attr(value, context));
             }
         }
 
@@ -843,13 +842,17 @@ impl SvgElement {
                 }
             }
 
-            new_attrs = pass_two_attrs;
-        }
+            // Step 3b: Override compound-derived attributes with any original
+            // single-dimension position attributes e.g. can have `xy="#other" x="10"`
+            // to take position from #other but override x.
+            for (key, value) in &self.orig_attrs {
+                // Single dimension position attributes
+                if let "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" = key.as_str() {
+                    pass_two_attrs.insert(key.clone(), eval_attr(value, context));
+                }
+            }
 
-        // Step 4: Override compound-derived attributes with any original
-        // single-dimension attrs
-        for (key, value) in priority_attrs {
-            new_attrs.insert(key, value);
+            new_attrs = pass_two_attrs;
         }
 
         self.attrs = new_attrs;
