@@ -264,6 +264,57 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         svg.setAttribute('viewBox', saved_viewbox);
     });
 
+    // copy PNG button
+    document.getElementById('copy-png').addEventListener('click', async () => {
+        await copyPng();
+    }, false);
+
+    async function copyPng() {
+        const svg = document.querySelector('#svg-output svg');
+        const saved_viewbox = svg.getAttribute('viewBox');
+        // temporarily set width, height, and viewBox to original values
+        svg.setAttribute('width', original_width);
+        svg.setAttribute('height', original_height);
+        svg.setAttribute('viewBox', original_viewbox);
+
+        const img = new Image();
+        img.width = original_width;
+        img.height = original_height;
+        img.src = URL.createObjectURL(new Blob([svg.outerHTML], { type: "image/svg+xml" }));
+
+        await new Promise((resolve) => {
+            img.onload = resolve;
+        });
+
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0);
+
+        // Release the object URL now it's in the canvas
+        URL.revokeObjectURL(img.src);
+
+        const pngBlob = await new Promise((resolve) => {
+            canvas.toBlob((blob) => resolve(blob), "image/png");
+        });
+        try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                [pngBlob.type]: pngBlob,
+              }),
+            ]);
+            console.log("PNG image copied to clipboard!");
+        } catch (error) {
+            console.error("Error copying PNG image to clipboard:", error);
+        }
+
+        // restore original values
+        svg.setAttribute('width', '100%');
+        svg.setAttribute('height', '100%');
+        svg.setAttribute('viewBox', saved_viewbox);
+    }
+
     // copy as base64 button
     document.getElementById('copy-base64').addEventListener('click', () => {
         const svg = document.querySelector('#svg-output svg');
