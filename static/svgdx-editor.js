@@ -277,10 +277,26 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         svg.setAttribute('height', original_height);
         svg.setAttribute('viewBox', original_viewbox);
 
+        // scale to a consistent (high) resolution
+        // TODO: additionally support a lower (e.g. 512px) resolution for smaller PNGs
+        // probably from a hover menu on the button
+        const maxDim = 2048;
+        let pxWidth = svg.width.baseVal.value;
+        let pxHeight = svg.height.baseVal.value;
+        if (pxWidth > pxHeight) {
+            pxHeight = (maxDim / pxWidth) * pxHeight;
+            pxWidth = maxDim;
+        } else {
+            pxWidth = (maxDim / pxHeight) * pxWidth;
+            pxHeight = maxDim;
+        }
+        svg.setAttribute('width', pxWidth);
+        svg.setAttribute('height', pxHeight);
+
         const img = new Image();
-        img.width = original_width;
-        img.height = original_height;
         img.src = URL.createObjectURL(new Blob([svg.outerHTML], { type: "image/svg+xml" }));
+        img.width = pxWidth;
+        img.height = pxHeight;
 
         await new Promise((resolve) => {
             img.onload = resolve;
@@ -309,7 +325,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             console.error("Error copying PNG image to clipboard:", error);
         }
 
-        // restore original values
+        // restore previous values
         svg.setAttribute('width', '100%');
         svg.setAttribute('height', '100%');
         svg.setAttribute('viewBox', saved_viewbox);
