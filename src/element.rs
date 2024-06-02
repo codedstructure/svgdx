@@ -278,16 +278,36 @@ impl SvgElement {
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
         // these to be set to have a bounding box.
         let zstr = "0".to_owned();
+        // if not a number and not a refspec, pass it through without computing a bbox
+        // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
+        // attempting to compute a bounding box.
+        fn passthrough(value: &str) -> bool {
+            // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^' (which
+            // might be resolved later) then return Ok(None).
+            // This will return `true` for things such as "10%" or "40mm".
+            strp(value).is_err()
+                && !(value.contains('$') || value.contains('#') || value.contains('^'))
+        }
         match self.name.as_str() {
             "text" => {
-                let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
-                let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
+                let x = self.attrs.get("x").unwrap_or(&zstr);
+                let y = self.attrs.get("y").unwrap_or(&zstr);
+                if passthrough(x) || passthrough(y) {
+                    return Ok(None);
+                }
+                let x = strp(x)?;
+                let y = strp(y)?;
                 Ok(Some(BoundingBox::new(x, y, x, y)))
             }
             "rect" | "use" | "image" | "svg" | "foreignObject" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
-                    let x = strp(self.attrs.get("x").unwrap_or(&zstr))?;
-                    let y = strp(self.attrs.get("y").unwrap_or(&zstr))?;
+                    let x = self.attrs.get("x").unwrap_or(&zstr);
+                    let y = self.attrs.get("y").unwrap_or(&zstr);
+                    if passthrough(x) || passthrough(y) || passthrough(w) || passthrough(h) {
+                        return Ok(None);
+                    }
+                    let x = strp(x)?;
+                    let y = strp(y)?;
                     let w = strp(w)?;
                     let h = strp(h)?;
                     Ok(Some(BoundingBox::new(x, y, x + w, y + h)))
@@ -296,10 +316,17 @@ impl SvgElement {
                 }
             }
             "line" => {
-                let x1 = strp(self.attrs.get("x1").unwrap_or(&zstr))?;
-                let y1 = strp(self.attrs.get("y1").unwrap_or(&zstr))?;
-                let x2 = strp(self.attrs.get("x2").unwrap_or(&zstr))?;
-                let y2 = strp(self.attrs.get("y2").unwrap_or(&zstr))?;
+                let x1 = self.attrs.get("x1").unwrap_or(&zstr);
+                let y1 = self.attrs.get("y1").unwrap_or(&zstr);
+                let x2 = self.attrs.get("x2").unwrap_or(&zstr);
+                let y2 = self.attrs.get("y2").unwrap_or(&zstr);
+                if passthrough(x1) || passthrough(y1) || passthrough(x2) || passthrough(y2) {
+                    return Ok(None);
+                }
+                let x1 = strp(x1)?;
+                let y1 = strp(y1)?;
+                let x2 = strp(x2)?;
+                let y2 = strp(y2)?;
                 Ok(Some(BoundingBox::new(
                     x1.min(x2),
                     y1.min(y2),
@@ -350,8 +377,13 @@ impl SvgElement {
             "path" => Ok(Some(path_bbox(self)?)),
             "circle" => {
                 if let Some(r) = self.attrs.get("r") {
-                    let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;
-                    let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
+                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
+                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                    if passthrough(cx) || passthrough(cy) || passthrough(r) {
+                        return Ok(None);
+                    }
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
                     let r = strp(r)?;
                     Ok(Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r)))
                 } else {
@@ -360,8 +392,13 @@ impl SvgElement {
             }
             "ellipse" => {
                 if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
-                    let cx = strp(self.attrs.get("cx").unwrap_or(&zstr))?;
-                    let cy = strp(self.attrs.get("cy").unwrap_or(&zstr))?;
+                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
+                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                    if passthrough(cx) || passthrough(cy) || passthrough(rx) || passthrough(ry) {
+                        return Ok(None);
+                    }
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
                     let rx = strp(rx)?;
                     let ry = strp(ry)?;
                     Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))

@@ -108,3 +108,26 @@ fn test_roundtrip_cdata() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, input);
 }
+
+#[test]
+fn test_roundtrip_svg_units() {
+    // Tests units on width / height don't break things
+    let input = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100cm" height="50cm">
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, input);
+}
+
+#[test]
+fn test_roundtrip_svg_percent() {
+    // Tests %age on width / height don't break things
+    let input = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100cm" height="50cm">
+  <rect x="10%" y="10%" width="50%" height="50%"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, input);
+}

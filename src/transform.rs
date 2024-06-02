@@ -1317,28 +1317,35 @@ impl Transformer {
             if !orig_svg_attrs.contains(&"xmlns".to_owned()) {
                 new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
             }
-            if let Some(bb) = extent {
-                let view_width = fstr(bb.width());
-                let view_height = fstr(bb.height());
-                let width = fstr(bb.width() * self.config.scale);
-                let height = fstr(bb.height() * self.config.scale);
-                if !orig_svg_attrs.contains(&"width".to_owned()) {
-                    new_svg_bs
-                        .push_attribute(Attribute::from(("width", format!("{width}mm").as_str())));
-                }
-                if !orig_svg_attrs.contains(&"height".to_owned()) {
-                    new_svg_bs.push_attribute(Attribute::from((
-                        "height",
-                        format!("{height}mm").as_str(),
-                    )));
-                }
-                if !orig_svg_attrs.contains(&"viewBox".to_owned()) {
-                    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-                    new_svg_bs.push_attribute(Attribute::from((
-                        "viewBox",
-                        format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
-                            .as_str(),
-                    )));
+            // If width or height are provided, leave width/height/viewBox alone.
+            if !orig_svg_attrs.contains(&"width".to_owned())
+                && !orig_svg_attrs.contains(&"height".to_owned())
+            {
+                if let Some(bb) = extent {
+                    let view_width = fstr(bb.width());
+                    let view_height = fstr(bb.height());
+                    let width = fstr(bb.width() * self.config.scale);
+                    let height = fstr(bb.height() * self.config.scale);
+                    if !orig_svg_attrs.contains(&"width".to_owned()) {
+                        new_svg_bs.push_attribute(Attribute::from((
+                            "width",
+                            format!("{width}mm").as_str(),
+                        )));
+                    }
+                    if !orig_svg_attrs.contains(&"height".to_owned()) {
+                        new_svg_bs.push_attribute(Attribute::from((
+                            "height",
+                            format!("{height}mm").as_str(),
+                        )));
+                    }
+                    if !orig_svg_attrs.contains(&"viewBox".to_owned()) {
+                        let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+                        new_svg_bs.push_attribute(Attribute::from((
+                            "viewBox",
+                            format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
+                                .as_str(),
+                        )));
+                    }
                 }
             }
 
