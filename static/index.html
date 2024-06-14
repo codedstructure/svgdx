@@ -6,20 +6,14 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.min.css" />
     <style>
-        body {
-            font-family: sans-serif;
-        }
+        body { font-family: sans-serif; }
         .container {
             display: flex;
             flex: 1;
             height: calc(100svh - 20px);
         }
-        .container[data-layout="vertical"] {
-            flex-direction: row;
-        }
-        .container[data-layout="horizontal"] {
-            flex-direction: column;
-        }
+        .container[data-layout="vertical"] { flex-direction: row; }
+        .container[data-layout="horizontal"] { flex-direction: column; }
 
         #editor-container, #output {
             border: 1px solid #ccc;
@@ -28,19 +22,13 @@
             min-height: 100px;
         }
 
-        #output {
-            flex: 1 1 auto;
-        }
+        #output { flex: 1 1 auto; }
         #svg-output, #text-output {
             height: 100%;
             width: 100%;
         }
-        #svg-output {
-            overflow: hidden;
-        }
-        #text-output {
-            overflow-y: auto;
-        }
+        #svg-output { overflow: hidden; }
+        #text-output { overflow-y: auto; }
 
         #editor-container {
             display: flex;
@@ -52,85 +40,60 @@
             border-top: 1px solid #ccc;
             border-bottom: 1px solid #ccc;
         }
-        #controls div {
-            margin: 10px;
-        }
+        #controls div { margin: 10px; }
         #error-output {
             color: red;
             font-family: monospace;
             max-height: 120px;
             overflow-y: auto;
         }
-        #statusbar {
-            font-family: monospace;
-        }
+        #statusbar { font-family: monospace; }
 
-        #splitter {
-            min-width: 8px;
-            min-height: 8px;
-            background-color: #eee;
-            flex: none;
-        }
-        .container[data-layout="horizontal"] #splitter{
-            cursor: row-resize;
-            margin: -5px 10px;
-        }
-        .container[data-layout="vertical"] #splitter{
-            cursor: col-resize;
-            margin: 10px -5px;
-        }
-        #splitter:hover {
-            background-color: #ddd;
-        }
-        #splitter:active {
-            background-color: #ccc;
-        }
+        #splitter { min-width: 8px; min-height: 8px; background-color: #eee; flex: none; }
+        .container[data-layout="horizontal"] #splitter { cursor: row-resize; margin: -5px 10px; }
+        .container[data-layout="vertical"] #splitter { cursor: col-resize; margin: 10px -5px; }
+        #splitter:hover { background-color: #ddd; }
+        #splitter:active { background-color: #ccc; }
 
-        .CodeMirror .error-line {
-            background-color: #ffdddd;
-        }
+        .CodeMirror .error-line { background-color: #ffdddd; }
+        .CodeMirror .hover-line { background-color: #f0f0f0; }
+        .CodeMirror { height: 100%; }
 
-        .CodeMirror .hover-line {
-            background-color: #f0f0f0;
-        }
+        svg { width: 100%; height: 100%; }
 
-        .CodeMirror {
-            height: 100%;
-        }
-        svg {
-            width: 100%;
-            height: 100%;
-        }
+        button { background-color: #eee; border-radius: 2px; box-shadow: 2px 2px 3px #000; border: none; }
+        #tabs { padding: 10px; }
+        #tabs button { border-radius: 0px; margin: 3px; }
+        button:hover, button:focus { box-shadow: 1px 1px 2px #000; }
+        button:active { box-shadow: inset 1px 1px 2px #000; }
+        button[data-checked="true"] { background-color: #ccc; box-shadow: inset 1px 1px 2px #000; }
+        button[data-checked="true"]:hover, button[data-checked="true"]:focus { box-shadow: inset 2px 2px 3px #000; }
+        button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
 
-        button {
-            background-color: #eee;
-            border-radius: 2px;
-            box-shadow: 2px 2px 3px #000;
-            border: none;
+        /* outer popup container - must be relative */
+        #controls div.copy-popup { display: inline-flex; position: relative; margin: 0; padding: 0; }
+        /* popup buttons appear immediately above the previous button */
+        #controls div.popup-buttons { position: absolute; bottom: 100%; margin: 0; }
+
+        /* hide popup buttons by default */
+        #controls div .popup-button { display: none; }
+        /* initial reveal */
+        #copy-png:hover ~ .popup-buttons .popup-button { display: block; }
+        /* keep shown when hovering over popup */
+        #controls .popup-buttons:hover .popup-button { display: block; }
+
+        .popup-buttons button {
+            display: block;
+            box-shadow: none;
+            border-radius: 0;
+            border: 1px solid #ccc;
         }
-        #tabs {
-            padding: 10px;
-        }
-        #tabs button {
-            border-radius: 0px;
-            margin: 3px;
-        }
-        button:hover, button:focus {
-            box-shadow: 1px 1px 2px #000;
-        }
-        button:active {
-            box-shadow: inset 1px 1px 2px #000;
-        }
-        button[data-checked="true"] {
-            background-color: #ccc;
-            box-shadow: inset 1px 1px 2px #000;
-        }
-        button[data-checked="true"]:hover, button[data-checked="true"]:focus {
-            box-shadow: inset 2px 2px 3px #000;
-        }
-        button[data-checked="true"]:active {
-            box-shadow: inset 3px 3px 4px #000;
-        }
+        /* avoid double border */
+        .popup-buttons button + button { border-top: none; }
+
+        /* interactive appearance for hover buttons */
+        .popup-button:hover { background-color: #ddd; }
+        .popup-button:active { background-color: #bbb; }
     </style>
 </head>
 
@@ -152,15 +115,22 @@
             <div id="editor"></div>
             <div id="controls">
                 <div id="error-output"></div>
-                <div style="position: inline-block">
+                <div style="display: inline-block">
                     <button id="toggle-layout">Layout</button>
                     <button id="toggle-output">Text Output</button>
                     <button id="auto-viewbox">Auto Fit</button>
                     <button id="reset-view">Reset View</button>
                     <button id="save-input">Save Input</button>
                     <button id="save-output">Save SVG</button>
-                    <button id="copy-png">Copy PNG</button>
                     <button id="copy-base64">Copy SVG URI</button>
+                    <div class="copy-popup">
+                      <button id="copy-png">Copy PNG</button>
+                      <div class="popup-buttons">
+                        <button class="popup-button" id="copy-png-big">Large (2048px)</button>
+                        <button class="popup-button" id="copy-png-medium">Medium (1024px)</button>
+                        <button class="popup-button" id="copy-png-small">Small (512px)</button>
+                      </div>
+                    </div>
                 </div>
                 <div style="position: inline-block;">
                     <pre id="statusbar">svgdx editor</pre>

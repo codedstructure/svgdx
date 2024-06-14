@@ -22,7 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where size / position attributes have units or %age values - e.g. `x="5%" width="10cm"`
   etc. Previously this prevented processing many SVG examples using units or percentages.
 
-- svgdx-editor: Added 'Copy PNG' button which copies high-resolution PNG to clipboard.
+- svgdx-editor: Added 'Copy PNG' button(s) which copy a PNG image to clipboard in the
+  selected resolution.
 
 ## [0.9.2 - 2024-05-28]
 

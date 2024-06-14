@@ -94,7 +94,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             localStorage.setItem(`svgdx-editor-value-${activeTab()}`, editor.getValue());
 
             statusbar.style.opacity = "0.3";
-            const response = await fetch('/transform', {
+            const response = await fetch('transform', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml'
@@ -264,23 +264,47 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         svg.setAttribute('viewBox', saved_viewbox);
     });
 
-    // copy PNG button
-    document.getElementById('copy-png').addEventListener('click', async () => {
-        await copyPng();
-    }, false);
+    // copy PNG buttons
+    document.querySelectorAll('.copy-popup .popup-button').forEach(
+        el => el.addEventListener('click', async (e) => {
+            let id = e.target.id;
+            const res = id === "copy-png-big" ? 2048 : (id === "copy-png-medium" ? 1024 : 512);
+            try {
+                navigator.clipboard.write([
+                    new ClipboardItem({
+                        // Note for Safari on MacOS requires clipboard actions to happen in
+                        // an event handler triggered by a user action; having `await` in here
+                        // seems to defeat that, so resolve things directly here.
+                        ["image/png"]: Promise.resolve(generatePng(res)),
+                    }),
+                ]);
+                console.log(`PNG image copied to clipboard (${res}px)`);
+                // Hide the buttons again after copying. This is quite hacky (including
+                // the timeout values), due to pure-CSS popup not having a way to close.
+                // We make all the inner elements invisible, which will (should!) cause
+                // the popup to no longer be :hover, at which point it will be hidden,
+                // but then we need to remove the display:none to allow it to be used again...
+                setTimeout(() => {
+                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
+                    setTimeout(() => {
+                        document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
+                    }, 200);
+                }, 200);
+            } catch (error) {
+                console.error("Error copying PNG image to clipboard:", error);
+            }
+        })
+    );
 
-    async function copyPng() {
-        const svg = document.querySelector('#svg-output svg');
-        const saved_viewbox = svg.getAttribute('viewBox');
+    async function generatePng(maxDim = 2048) {
+        // Since we're async, clone the SVG to avoid glitching on resize
+        const svg = document.querySelector('#svg-output svg').cloneNode(true);
         // temporarily set width, height, and viewBox to original values
         svg.setAttribute('width', original_width);
         svg.setAttribute('height', original_height);
         svg.setAttribute('viewBox', original_viewbox);
 
-        // scale to a consistent (high) resolution
-        // TODO: additionally support a lower (e.g. 512px) resolution for smaller PNGs
-        // probably from a hover menu on the button
-        const maxDim = 2048;
+        // scale to the given resolution in the maximum dimension
         let pxWidth = svg.width.baseVal.value;
         let pxHeight = svg.height.baseVal.value;
         if (pxWidth > pxHeight) {
@@ -314,21 +338,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const pngBlob = await new Promise((resolve) => {
             canvas.toBlob((blob) => resolve(blob), "image/png");
         });
-        try {
-            await navigator.clipboard.write([
-              new ClipboardItem({
-                [pngBlob.type]: pngBlob,
-              }),
-            ]);
-            console.log("PNG image copied to clipboard!");
-        } catch (error) {
-            console.error("Error copying PNG image to clipboard:", error);
-        }
 
-        // restore previous values
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', '100%');
-        svg.setAttribute('viewBox', saved_viewbox);
+        return pngBlob;
     }
 
     // copy as base64 button
@@ -482,6 +493,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             "reset-view": "Resize and center the SVG",
             "save-input": "Download the input",
             "save-output": "Download the SVG",
+            "copy-png": "Copy as PNG to clipboard",
             "copy-base64": "Copy the SVG as base64 to clipboard"
         };
 
