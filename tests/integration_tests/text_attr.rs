@@ -379,3 +379,19 @@ fn test_text_inset_dxy() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_style() {
+    let input = r#"
+<rect xy="0" wh="10" text="thing" text-style="font-size: 2em; font-weight: bold;"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" style="font-size: 2em; font-weight: bold;" class="d-tbox">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}

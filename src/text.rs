@@ -148,9 +148,12 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
     // Whether text is pre-formatted (i.e. spaces are not collapsed)
     let text_pre = orig_elem.pop_attr("text-pre").is_some();
-
-    // Copy style and class(es) from original element
-    if let Some(style) = orig_elem.get_attr("style") {
+    // Extract style and class(es) from original element. Note we use
+    // `text-style` for styling text rather than copying `style` to both outer
+    // element and generated text, as is likely there will be conflicts with
+    // the original element's desired style (e.g. setting `style="fill:red"`
+    // on a rect with `text` present would cause red-on-red invisible text).
+    if let Some(style) = orig_elem.pop_attr("text-style") {
         text_elem.set_attr("style", &style);
     }
     text_elem.classes = orig_elem.classes.clone();

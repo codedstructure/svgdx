@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Change (minor): `style` attributes are no longer copied into any `<text>` elements generated
+  by `text` attributes, as conflicts between 'outer' and 'text' element styles are common.
+  A new `text-style` attribute is provided which becomes the `style` attribute of any
+  generated text element.
+
 - Added: Support for multiple (comma-separated) expressions in a single `{{...}}`
   block. This also provides the concept of an 'expression list', which is a natural
   fit for variadic functions. The `min()` and `max()` functions can now take any
