@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3 - 2024-06-14]
+
 - Change (minor): `style` attributes are no longer copied into any `<text>` elements generated
   by `text` attributes, as conflicts between 'outer' and 'text' element styles are common.
   A new `text-style` attribute is provided which becomes the `style` attribute of any
