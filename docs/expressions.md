@@ -57,6 +57,16 @@ Expressions may include the following. Note these are listed in order of precede
 * `(`, `)` - parenthesis, for increasing precedence.
 * `*`, `/`, `%` - multiply, divide, remainder. Precedence is left-to-right among these.
 * `+`, `-` - addition and subtraction. Precedence is left-to-right among these.
+* `,` - expression separator.
+
+## Multiple expressions
+
+Note that multiple expressions may be provided within a single `{{...}}` pair, and must be comma-separated.
+This allows attributes such as `wh="{{$t + 3, $t + 2}}"` rather than the (slightly) more verbose `wh="{{$t + 3}} {{$t + 2}}"`.
+
+Note that *input* expressions must be **comma** separated, and the resulting list of expression results are separated with `", "`.
+Most SVG attributes which take multiple values use the `comma-wsp` format, where commas are optional and whitespace may be used to separate values,
+but allowing whitespace-only separation for multiple expressions makes errors more likely.
 
 ## Built-in functions
 

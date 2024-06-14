@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: Support for multiple (comma-separated) expressions in a single `{{...}}`
+  block. This also provides the concept of an 'expression list', which is a natural
+  fit for variadic functions. The `min()` and `max()` functions can now take any
+  number of arguments, as can the new variadic `sum()`, `product()` and `mean()` functions.
+  Note all these functions require at least one argument.
+
 - Fixed: don't attempt to derive bounding box for elements (including root `<svg>`)
   where size / position attributes have units or %age values - e.g. `x="5%" width="10cm"`
   etc. Previously this prevented processing many SVG examples using units or percentages.

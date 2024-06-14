@@ -105,7 +105,7 @@ fn test_loop_nested() {
 <var i="3"/>
 <loop while="{{gt($i, 0)}}">
 <var j="3"/>
-<loop while="{{gt($j, 0)}}"><rect wh="1" xy="{{$j}} {{$i}}"/>
+<loop while="{{gt($j, 0)}}"><rect wh="1" xy="{{$j, $i}}"/>
 <var j="{{$j - 1}}"/>
 </loop>
 <var i="{{$i - 1}}"/>
@@ -137,7 +137,7 @@ fn test_loop_nested_deep() {
 <loop while="{{gt($j, 0)}}">
 <var k="3"/>
 <loop while="{{gt($k, 0)}}">
-<rect wh="1" xy="{{3 * $j + $k/3}} {{3 * $i + $k/3}}" class="d-thin"/>
+<rect wh="1" xy="{{3 * $j + $k/3, 3 * $i + $k/3}}" class="d-thin"/>
 <var k="{{$k - 1}}"/>
 </loop>
 <var j="{{$j - 1}}"/>
@@ -161,7 +161,7 @@ fn test_loop_count_loop_var() {
     let input = r#"
 <loop count="2" loop-var="i">
 <loop count="3" loop-var="j">
-<rect wh="1" xy="{{3 * $j}} {{3 * $i}}"/>
+<rect wh="1" xy="{{3 * $j, 3 * $i}}"/>
 </loop>
 </loop>
 "#;

@@ -46,10 +46,16 @@ enum Function {
     Random,
     /// randint(min, max) - generate uniform random integer in range min..max
     RandInt,
-    /// min(a, b) - minimum of two values
+    /// min(a, ...) - minimum of values
     Min,
-    /// max(a, b) - maximum of two values
+    /// max(a, ...) - maximum of values
     Max,
+    /// sum(a, ...) - sum of values
+    Sum,
+    /// product(a, ...) - product of values
+    Product,
+    /// mean(a, ...) - mean of values
+    Mean,
     /// clamp(x, min, max) - return x, clamped between min and max
     Clamp,
     /// mix(start, end, amount) - linear interpolation between start and end
@@ -102,6 +108,9 @@ impl FromStr for Function {
             "randint" => Self::RandInt,
             "min" => Self::Min,
             "max" => Self::Max,
+            "sum" => Self::Sum,
+            "product" => Self::Product,
+            "mean" => Self::Mean,
             "clamp" => Self::Clamp,
             "mix" => Self::Mix,
             "eq" => Self::Equal,
@@ -134,7 +143,7 @@ enum Token {
     OpenParen,
     /// A literal ')'
     CloseParen,
-    /// A literal ',' - used for separating function arguments
+    /// A literal ',' - used for separating function arguments or expressions
     Comma,
     /// A literal '+' for addition
     Add,
@@ -277,11 +286,17 @@ impl<'a> EvalState<'a> {
             bail!("Circular reference in variable lookup")
         }
         self.checked_vars.push(v.to_string());
-        let result = self
-            .context
-            .get_var(v)
-            .and_then(|t| evaluate_inner(tokenize(&t).ok()?, self.context, &self.checked_vars).ok())
-            .context("Could not evaluate variable");
+        let result = if let Some(inner) = self.context.get_var(v) {
+            let mut es = EvalState::new(tokenize(&inner)?, self.context, &self.checked_vars);
+            let e = expr(&mut es);
+            if es.peek().is_none() {
+                e
+            } else {
+                bail!("Unexpected trailing tokens")
+            }
+        } else {
+            bail!("Could not evaluate variable")
+        };
         // Need this to allow e.g. "$var + $var"
         self.checked_vars.pop();
         result
@@ -322,7 +337,10 @@ impl<'a> EvalState<'a> {
     }
 }
 
-fn evaluate(tokens: impl IntoIterator<Item = Token>, context: &TransformerContext) -> Result<f32> {
+fn evaluate(
+    tokens: impl IntoIterator<Item = Token>,
+    context: &TransformerContext,
+) -> Result<Vec<f32>> {
     // This just forwards with initial empty checked_vars
     evaluate_inner(tokens, context, &[])
 }
@@ -331,14 +349,30 @@ fn evaluate_inner(
     tokens: impl IntoIterator<Item = Token>,
     context: &TransformerContext,
     checked_vars: &[String],
-) -> Result<f32> {
+) -> Result<Vec<f32>> {
     let mut eval_state = EvalState::new(tokens, context, checked_vars);
-    let e = expr(&mut eval_state);
+    let e = expr_list(&mut eval_state);
     if eval_state.peek().is_none() {
         e
     } else {
         bail!("Unexpected trailing tokens")
     }
+}
+
+fn expr_list(eval_state: &mut EvalState) -> Result<Vec<f32>> {
+    let mut out = Vec::new();
+    loop {
+        out.push(expr(eval_state)?);
+        match eval_state.peek() {
+            Some(Token::Comma) => {
+                eval_state.advance();
+            }
+            _ => {
+                break;
+            }
+        }
+    }
+    Ok(out)
 }
 
 fn expr(eval_state: &mut EvalState) -> Result<f32> {
@@ -448,16 +482,32 @@ fn factor(eval_state: &mut EvalState) -> Result<f32> {
                         .gen_range(min..=max) as f32
                 }
                 Function::Max => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    a.max(b)
+                    let a = expr_list(eval_state)?;
+                    a.into_iter()
+                        .max_by(|a, b| a.total_cmp(b))
+                        .context("max() requires at least one argument")?
                 }
                 Function::Min => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    a.min(b)
+                    let a = expr_list(eval_state)?;
+                    a.into_iter()
+                        .min_by(|a, b| a.total_cmp(b))
+                        .context("min() requires at least one argument")?
+                }
+                Function::Sum => {
+                    let a = expr_list(eval_state)?;
+                    a.into_iter().sum()
+                }
+                Function::Product => {
+                    let a = expr_list(eval_state)?;
+                    a.into_iter().product()
+                }
+                Function::Mean => {
+                    let a = expr_list(eval_state)?;
+                    if a.is_empty() {
+                        bail!("mean() requires at least one argument");
+                    }
+                    let n = a.len() as f32;
+                    a.into_iter().sum::<f32>() / n
                 }
                 Function::Clamp => {
                     let x = expr(eval_state)?;
@@ -646,7 +696,10 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
 fn eval_str(value: &str, context: &TransformerContext) -> String {
     if let Ok(tokens) = tokenize(value) {
         if let Ok(parsed) = evaluate(tokens, context) {
-            fstr(parsed)
+            // Note use of `, ` rather than just ` ` to allow use
+            // in contexts which require comma-separated values
+            // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
+            parsed.iter().map(|v| fstr(*v)).join(", ")
         } else {
             value.to_owned()
         }
@@ -683,6 +736,19 @@ mod tests {
     use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
 
     use super::*;
+
+    fn evaluate_one(
+        tokens: impl IntoIterator<Item = Token>,
+        context: &TransformerContext,
+    ) -> Result<f32> {
+        let mut eval_state = EvalState::new(tokens, context, &[]);
+        let e = expr(&mut eval_state);
+        if eval_state.peek().is_none() {
+            e
+        } else {
+            bail!("Unexpected trailing tokens")
+        }
+    }
 
     #[test]
     fn test_eval_var() {
@@ -815,7 +881,10 @@ mod tests {
             ("mix(-10, 30, 1)", Some(30.)),
             ("mix(-10, 30, 10)", Some(390.)),
         ] {
-            assert_eq!(evaluate(tokenize(expr).expect("test"), &ctx).ok(), expected);
+            assert_eq!(
+                evaluate_one(tokenize(expr).expect("test"), &ctx).ok(),
+                expected
+            );
         }
     }
 
@@ -861,7 +930,9 @@ mod tests {
             ("pow(9, 0.5)", 3.),
         ] {
             assert_in_delta!(
-                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                evaluate_one(tokenize(expr).expect("test"), &ctx)
+                    .ok()
+                    .unwrap(),
                 expected,
                 0.00001
             );
@@ -890,7 +961,9 @@ mod tests {
             ("atan(tan(60))", 60.),
         ] {
             assert_in_delta!(
-                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                evaluate_one(tokenize(expr).expect("test"), &ctx)
+                    .ok()
+                    .unwrap(),
                 expected,
                 0.00001
             );
@@ -906,7 +979,7 @@ mod tests {
         let mut count_a = 0;
         let mut count_b = 0;
         for counter in 0..1000 {
-            let sample = evaluate(tokens.clone(), &ctx).ok().unwrap();
+            let sample = evaluate_one(tokens.clone(), &ctx).ok().unwrap();
             assert!((0. ..=1.).contains(&sample));
             if count_a == 0 && sample > 0.3 && sample < 0.35 {
                 count_a = counter;
@@ -929,7 +1002,7 @@ mod tests {
         let mut count_a = 0;
         let mut count_b = 0;
         for counter in 0..1000 {
-            let sample = evaluate(tokens.clone(), &ctx).ok().unwrap();
+            let sample = evaluate_one(tokens.clone(), &ctx).ok().unwrap();
             assert!((1. ..=6.).contains(&sample));
             if count_a == 0 && sample == 1. {
                 count_a = counter;
@@ -969,8 +1042,45 @@ mod tests {
             ("ge(1, 1)", 1.),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                evaluate_one(tokenize(expr).expect("test"), &ctx)
+                    .ok()
+                    .unwrap(),
                 expected,
+            );
+        }
+    }
+
+    #[test]
+    fn test_func_variadic() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("min(-10)", Some(-10.)),
+            ("min(1,2)", Some(1.)),
+            ("min(2,2.5,3,4,2.25)", Some(2.)),
+            ("min(1,min(2,3,4,5),6)", Some(1.)),
+            ("min()", None),
+            ("max(-10)", Some(-10.)),
+            ("max(1,2)", Some(2.)),
+            ("max(2,2.5,3,4,2.25)", Some(4.)),
+            ("max(1,max(2,3,4,5),6)", Some(6.)),
+            ("max()", None),
+            ("sum(10)", Some(10.)),
+            ("sum(2,2.5,3,4,2.25)", Some(13.75)),
+            ("sum(1,sum(2,3,4,5),6)", Some(21.)),
+            ("sum()", None),
+            ("product(10)", Some(10.)),
+            ("product(2,2.5,3,4,2.25)", Some(135.)),
+            ("product(1,2,3,4,5,6)", Some(720.)),
+            ("product()", None),
+            ("mean(234)", Some(234.)),
+            ("mean(2,2.5,3,4,2.25)", Some(2.75)),
+            ("mean(1,sum(2,3,4,5),6)", Some(7.)),
+            ("mean()", None),
+        ] {
+            assert_eq!(
+                evaluate_one(tokenize(expr).expect("test"), &ctx).ok(),
+                expected,
+                "Failed: {expr} != {expected:?}"
             );
         }
     }
@@ -999,7 +1109,9 @@ mod tests {
             ("xor(0, 0)", 0.),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &ctx).ok().unwrap(),
+                evaluate_one(tokenize(expr).expect("test"), &ctx)
+                    .ok()
+                    .unwrap(),
                 expected,
             );
         }
@@ -1039,7 +1151,10 @@ mod tests {
         let mut ctx = TransformerContext::new();
         ctx.set_var("numbers", "20 40");
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
-            assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
+            assert!(
+                evaluate_one(tokenize(expr).expect("test"), &ctx).is_err(),
+                "Should have failed: {expr}"
+            );
         }
     }
 
@@ -1051,7 +1166,10 @@ mod tests {
         ctx.set_var("b", "$a");
         // These should successfully return error rather than cause stack overflow.
         for expr in ["$k - 1", "$a"] {
-            assert!(evaluate(tokenize(expr).expect("test"), &ctx).is_err());
+            assert!(
+                evaluate_one(tokenize(expr).expect("test"), &ctx).is_err(),
+                "Should have failed: {expr}"
+            );
         }
     }
 
@@ -1072,7 +1190,7 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate(tokenize(expr).expect("test"), &TransformerContext::new()).ok(),
+                evaluate_one(tokenize(expr).expect("test"), &TransformerContext::new()).ok(),
                 expected
             );
         }
@@ -1145,5 +1263,16 @@ mod tests {
         ] {
             assert_eq!(eval_condition(expr, &ctx).expect("test"), expected);
         }
+    }
+
+    #[test]
+    fn test_eval_multiple() {
+        assert_eq!(
+            eval_attr(
+                "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
+                &TransformerContext::new()
+            ),
+            "10, 23, 5, 1, 2.5"
+        );
     }
 }

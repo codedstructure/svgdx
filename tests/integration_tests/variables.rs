@@ -90,3 +90,16 @@ fn test_var_swap() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_var_expr() {
+    let input = r#"
+<var r="0.7" g="0.3" b="0.5"/>
+<rect wh="10" fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"/>
+"#;
+    let expected = r#"
+<rect width="10" height="10" fill="rgb(178.5, 76.5, 127.5)"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, expected);
+}
