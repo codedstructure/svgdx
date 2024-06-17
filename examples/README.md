@@ -157,3 +157,11 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 [source](loops.svg)
 
 [input file](loops.xml)
+
+## Polar coordinates
+
+![](sunshine.svg)
+
+[source](sunshine.svg)
+
+[input file](sunshine.xml)
