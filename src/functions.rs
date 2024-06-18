@@ -3,7 +3,7 @@ use anyhow::{bail, Context, Result};
 use rand::Rng;
 use std::str::FromStr;
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Function {
     /// abs(x) - absolute value of x
     Abs,
@@ -83,6 +83,12 @@ pub enum Function {
     Polar2Rect,
     /// select(n, a, b, ...) - select nth argument
     Select,
+    /// addv(a1, a2, ..., aN, b1, b2, ...bN) - vector sum
+    Addv,
+    /// subv(a1, a2, ..., aN, b1, b2, ...bN) - vector difference
+    Subv,
+    /// scalev(s, a1, a2, ..., aN) - scale vector by s
+    Scalev,
 }
 
 impl FromStr for Function {
@@ -129,44 +135,11 @@ impl FromStr for Function {
             "r2p" => Self::Rect2Polar,
             "p2r" => Self::Polar2Rect,
             "select" => Self::Select,
+            "addv" => Self::Addv,
+            "subv" => Self::Subv,
+            "scalev" => Self::Scalev,
             _ => bail!("Unknown function"),
         })
-    }
-}
-
-trait FnArgs {
-    fn get_only(&self) -> Result<f32>;
-    fn get_pair(&self) -> Result<(f32, f32)>;
-    fn get_triple(&self) -> Result<(f32, f32, f32)>;
-}
-
-impl FnArgs for ExprValue {
-    fn get_only(&self) -> Result<f32> {
-        match self {
-            ExprValue::Number(n) => Ok(*n),
-            ExprValue::NumberList(l) => {
-                if l.len() != 1 {
-                    bail!("Expected exactly one argument");
-                }
-                Ok(l[0])
-            }
-        }
-    }
-
-    fn get_pair(&self) -> Result<(f32, f32)> {
-        let nl = self.number_list()?;
-        if nl.len() == 2 {
-            return Ok((nl[0], nl[1]));
-        }
-        bail!("Expected exactly two arguments");
-    }
-
-    fn get_triple(&self) -> Result<(f32, f32, f32)> {
-        let nl = self.number_list()?;
-        if nl.len() == 3 {
-            return Ok((nl[0], nl[1], nl[2]));
-        }
-        bail!("Expected exactly three arguments");
     }
 }
 
@@ -188,6 +161,41 @@ pub fn eval_function(
             let (r, theta) = args.get_pair()?;
             let theta = theta.to_radians();
             return Ok(vec![r * theta.cos(), r * theta.sin()].into());
+        }
+        Function::Addv => {
+            let args = args.number_list()?;
+            if args.len() % 2 != 0 {
+                bail!("addv() requires an even number of arguments");
+            }
+            let halflen = args.len() / 2;
+            let mut result = Vec::with_capacity(halflen);
+            for i in 0..halflen {
+                result.push(args[i] + args[i + halflen]);
+            }
+            return Ok(result.into());
+        }
+        Function::Subv => {
+            let args = args.number_list()?;
+            if args.len() % 2 != 0 {
+                bail!("addv() requires an even number of arguments");
+            }
+            let halflen = args.len() / 2;
+            let mut result = Vec::with_capacity(halflen);
+            for i in 0..halflen {
+                result.push(args[i] - args[i + halflen]);
+            }
+            return Ok(result.into());
+        }
+        Function::Scalev => {
+            let args = args.number_list()?;
+            if args.len() < 2 {
+                bail!("scalev() requires at least two arguments");
+            }
+            let mut result = Vec::new();
+            for i in 1..args.len() {
+                result.push(args[0] * args[i]);
+            }
+            return Ok(result.into());
         }
         Function::Select => {
             let args = args.number_list()?;

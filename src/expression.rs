@@ -1,4 +1,6 @@
 /// Recursive descent expression parser
+use std::fmt::{self, Display, Formatter};
+
 use itertools::Itertools;
 use lazy_regex::regex;
 use regex::Captures;
@@ -9,6 +11,7 @@ use crate::functions::{eval_function, Function};
 use crate::transform::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {
     Number(f32),
     NumberList(Vec<f32>),
@@ -23,6 +26,15 @@ impl From<f32> for ExprValue {
 impl From<Vec<f32>> for ExprValue {
     fn from(v: Vec<f32>) -> Self {
         Self::NumberList(v)
+    }
+}
+
+impl Display for ExprValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // Note use of `, ` rather than just ` ` to allow use
+        // in contexts which require comma-separated values
+        // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
+        write!(f, "{}", self.iter().map(fstr).join(", "))
     }
 }
 
@@ -58,9 +70,37 @@ impl ExprValue {
             _ => bail!("Expected number list"),
         }
     }
+
+    pub fn get_only(&self) -> Result<f32> {
+        match self {
+            ExprValue::Number(n) => Ok(*n),
+            ExprValue::NumberList(l) => {
+                if l.len() != 1 {
+                    bail!("Expected exactly one argument");
+                }
+                Ok(l[0])
+            }
+        }
+    }
+
+    pub fn get_pair(&self) -> Result<(f32, f32)> {
+        let nl = self.number_list()?;
+        if nl.len() == 2 {
+            return Ok((nl[0], nl[1]));
+        }
+        bail!("Expected exactly two arguments");
+    }
+
+    pub fn get_triple(&self) -> Result<(f32, f32, f32)> {
+        let nl = self.number_list()?;
+        if nl.len() == 3 {
+            return Ok((nl[0], nl[1], nl[2]));
+        }
+        bail!("Expected exactly three arguments");
+    }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 enum Token {
     /// A numeric literal
     Number(f32),
@@ -190,16 +230,16 @@ impl<'a> EvalState<'a> {
     }
 
     /// Peek the next token without advancing
-    fn peek(&self) -> Option<Token> {
-        self.tokens.get(self.index).cloned()
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.index)
     }
 
     /// Peek the previous token
-    fn prev(&self) -> Option<Token> {
+    fn prev(&self) -> Option<&Token> {
         if self.index == 0 {
             return None;
         }
-        self.tokens.get(self.index - 1).cloned()
+        self.tokens.get(self.index - 1)
     }
 
     fn next(&mut self) -> Option<Token> {
@@ -214,11 +254,14 @@ impl<'a> EvalState<'a> {
     }
 
     fn require(&mut self, token: Token) -> Result<()> {
-        if self.peek() == Some(token) {
+        if self.peek() == Some(&token) {
             self.advance();
             Ok(())
         } else {
-            bail!("Expected token not matched")
+            bail!(
+                "Expected token '{token:?}' not matched (got '{:?}')",
+                self.peek()
+            )
         }
     }
 
@@ -229,7 +272,7 @@ impl<'a> EvalState<'a> {
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
             let mut es = EvalState::new(tokenize(&inner)?, self.context, &self.checked_vars);
-            let e = expr(&mut es);
+            let e = expr_list(&mut es);
             if es.peek().is_none() {
                 e
             } else {
@@ -294,7 +337,7 @@ fn evaluate_inner(
     let mut eval_state = EvalState::new(tokens, context, checked_vars);
     let e = expr_list(&mut eval_state);
     if eval_state.peek().is_none() {
-        e // .map(ExprResult::NumberList)
+        e
     } else {
         bail!("Unexpected trailing tokens")
     }
@@ -312,7 +355,7 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
         let e = expr(eval_state)?;
         match e {
             ExprValue::Number(n) => out.push(n),
-            ExprValue::NumberList(nl) => out.extend(nl.iter().copied()),
+            ExprValue::NumberList(nl) => out.extend(nl.iter()),
         }
         match eval_state.peek() {
             Some(Token::Comma) => {
@@ -328,54 +371,54 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
 
 fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
     let t = term(eval_state)?;
-    if let ExprValue::NumberList(nl) = t {
-        return Ok(nl.into());
-    }
-    let mut e = t.number()?;
-    loop {
-        match eval_state.peek() {
-            Some(Token::Add) => {
-                eval_state.advance();
-                e += term(eval_state)?.number()?;
-            }
-            Some(Token::Sub) => {
-                eval_state.advance();
-                e -= term(eval_state)?.number()?;
-            }
-            _ => {
-                break;
+    if let Ok(mut e) = t.get_only() {
+        loop {
+            match eval_state.peek() {
+                Some(Token::Add) => {
+                    eval_state.advance();
+                    e += term(eval_state)?.get_only()?;
+                }
+                Some(Token::Sub) => {
+                    eval_state.advance();
+                    e -= term(eval_state)?.get_only()?;
+                }
+                _ => {
+                    break;
+                }
             }
         }
+        Ok(e.into())
+    } else {
+        Ok(t)
     }
-    Ok(e.into())
 }
 
 fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
     let f = factor(eval_state)?;
-    if let ExprValue::NumberList(nl) = f {
-        return Ok(nl.into());
-    }
-    let mut e = f.number()?;
-    loop {
-        match eval_state.peek() {
-            Some(Token::Mul) => {
-                eval_state.advance();
-                e *= factor(eval_state)?.number()?;
-            }
-            Some(Token::Div) => {
-                eval_state.advance();
-                e /= factor(eval_state)?.number()?;
-            }
-            Some(Token::Mod) => {
-                eval_state.advance();
-                e %= factor(eval_state)?.number()?;
-            }
-            _ => {
-                break;
+    if let Ok(mut e) = f.get_only() {
+        loop {
+            match eval_state.peek() {
+                Some(Token::Mul) => {
+                    eval_state.advance();
+                    e *= factor(eval_state)?.get_only()?;
+                }
+                Some(Token::Div) => {
+                    eval_state.advance();
+                    e /= factor(eval_state)?.get_only()?;
+                }
+                Some(Token::Mod) => {
+                    eval_state.advance();
+                    e %= factor(eval_state)?.get_only()?;
+                }
+                _ => {
+                    break;
+                }
             }
         }
+        Ok(e.into())
+    } else {
+        Ok(f)
     }
-    Ok(e.into())
 }
 
 fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
@@ -384,7 +427,7 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
         Some(Token::Var(v)) => eval_state.lookup(&v),
         Some(Token::ElementRef(v)) => eval_state.element_ref(&v),
         Some(Token::OpenParen) => {
-            let e = expr(eval_state)?;
+            let e = expr_list(eval_state)?;
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
@@ -455,10 +498,7 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
 fn eval_str(value: &str, context: &TransformerContext) -> String {
     if let Ok(tokens) = tokenize(value) {
         if let Ok(parsed) = evaluate(tokens, context) {
-            // Note use of `, ` rather than just ` ` to allow use
-            // in contexts which require comma-separated values
-            // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
-            parsed.iter().map(fstr).join(", ")
+            parsed.to_string()
         } else {
             value.to_owned()
         }
@@ -506,6 +546,38 @@ mod tests {
             Ok(e?.number()?)
         } else {
             bail!("Unexpected trailing tokens")
+        }
+    }
+
+    fn expr_check(
+        tokens: impl IntoIterator<Item = Token>,
+        context: &TransformerContext,
+    ) -> Result<ExprValue> {
+        let mut eval_state = EvalState::new(tokens, context, &[]);
+        expr(&mut eval_state)
+    }
+
+    #[test]
+    fn test_expr() {
+        let mut ctx = TransformerContext::new();
+        for (name, value) in [
+            ("list", "1, 2, 3"),
+            ("kilo", "1000"),
+            ("mega", "($kilo * $kilo)"),
+        ] {
+            ctx.set_var(name, value);
+        }
+        for (expr, expected) in [
+            ("2 * 2", Some(ExprValue::Number(4.))),
+            ("swap(2, 1)", Some(ExprValue::NumberList(vec![1., 2.]))),
+            ("2 * 2, 5", Some(ExprValue::Number(4.))),
+            ("$mega", Some(ExprValue::Number(1000000.))),
+            ("$list", Some(ExprValue::NumberList(vec![1., 2., 3.]))),
+        ] {
+            assert_eq!(
+                expr_check(tokenize(expr).expect("test"), &ctx).ok(),
+                expected,
+            )
         }
     }
 
@@ -1026,52 +1098,56 @@ mod tests {
 
     #[test]
     fn test_eval_multiple() {
-        assert_eq!(
-            eval_attr(
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            (
                 "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
-                &TransformerContext::new()
+                "10, 23, 5, 1, 2.5",
             ),
-            "10, 23, 5, 1, 2.5"
-        );
+            ("{{3, 2, swap(1, 2)}}", "3, 2, 2, 1"),
+            ("{{p2r(10, 0)}}", "10, 0"),
+            ("{{p2r(10, 180)}}", "-10, 0"),
+            ("{{p2r(10, 90)}}", "0, 10"),
+            ("{{r2p(p2r(0, 0))}}", "0, 0"),
+            ("{{(r2p(1, 1))}}", "1.414, 45"),
+            ("{{select(0, 1, 2, 3)}}", "1"),
+            ("{{select(2, 1, 2, 3)}}", "3"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
 
-        assert_eq!(
-            eval_attr("{{3, 2, swap(1, 2)}}", &TransformerContext::new()),
-            "3, 2, 2, 1"
-        );
+    #[test]
+    fn test_eval_vector() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("{{addv(1,2)}}", "3"),
+            ("{{addv(1,2, 3,4)}}", "4, 6"),
+            ("{{addv(1,2,3, 7,8,9)}}", "8, 10, 12"),
+            ("{{subv(4, 1)}}", "3"),
+            ("{{subv(4,2, 1,0)}}", "3, 2"),
+            ("{{scalev(0, 123)}}", "0"),
+            ("{{scalev(0.5, 123)}}", "61.5"),
+            ("{{scalev(0.5, 1,2,3)}}", "0.5, 1, 1.5"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
 
-        assert_eq!(
-            eval_attr("{{p2r(10, 0)}}", &TransformerContext::new()),
-            "10, 0"
-        );
-
-        assert_eq!(
-            eval_attr("{{p2r(10, 180)}}", &TransformerContext::new()),
-            "-10, 0"
-        );
-
-        assert_eq!(
-            eval_attr("{{p2r(10, 90)}}", &TransformerContext::new()),
-            "0, 10"
-        );
-
-        assert_eq!(
-            eval_attr("{{r2p(p2r(0, 0))}}", &TransformerContext::new()),
-            "0, 0"
-        );
-
-        assert_eq!(
-            eval_attr("{{(r2p(1, 1))}}", &TransformerContext::new()),
-            "1.414, 45"
-        );
-
-        assert_eq!(
-            eval_attr("{{select(0, 1, 2, 3)}}", &TransformerContext::new()),
-            "1"
-        );
-
-        assert_eq!(
-            eval_attr("{{select(2, 1, 2, 3)}}", &TransformerContext::new()),
-            "3"
-        );
+    #[test]
+    fn test_eval_list_var() {
+        let mut ctx = TransformerContext::new();
+        for (name, value) in [("list", "1,2"), ("double", "$list, $list")] {
+            ctx.set_var(name, value);
+        }
+        for (expr, expected) in [
+            ("{{$list}}", "1, 2"),
+            ("{{addv(1, $list, 3)}}", "3, 4"),
+            ("{{addv(1, $list, 3, 4, 5)}}", "4, 5, 7"),
+            ("{{$double}}", "1, 2, 1, 2"),
+            ("{{scalev(2, $double)}}", "2, 4, 2, 4"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
     }
 }
