@@ -7,6 +7,10 @@ use anyhow::bail;
 
 /// Return a 'minimal' representation of the given number
 pub fn fstr(x: f32) -> String {
+    if x.abs() < 0.0001 {
+        // Handle very small negative values to avoid '-0'
+        return "0".to_string();
+    }
     if x == (x as i32) as f32 {
         return (x as i32).to_string();
     }

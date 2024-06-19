@@ -1,0 +1,6 @@
+<svg>
+  <circle r="60" class="d-none d-fill-gold"/>
+  <loop count="36" step="10" loop-var="theta">
+    <line xy1="{{p2r(70, $theta)}}" xy2="{{p2r(100, $theta)}}" class="d-gold d-thick"/>
+  </loop>
+</svg>

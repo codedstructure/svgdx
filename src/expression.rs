@@ -1,135 +1,119 @@
 /// Recursive descent expression parser
+use std::fmt::{self, Display, Formatter};
+
 use itertools::Itertools;
 use lazy_regex::regex;
-use rand::Rng;
 use regex::Captures;
-use std::str::FromStr;
 
 use anyhow::{bail, Context, Result};
 
+use crate::functions::{eval_function, Function};
 use crate::transform::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
-#[derive(Clone, PartialEq)]
-enum Function {
-    /// abs(x) - absolute value of x
-    Abs,
-    /// ceil(x) - ceiling of x
-    Ceil,
-    /// floor(x) - floor of x
-    Floor,
-    /// fract(x) - fractional part of x
-    Fract,
-    /// sign(x) - -1 for x < 0, 0 for x == 0, 1 for x > 0
-    Sign,
-    /// sqrt(x) - square root of x
-    Sqrt,
-    /// log(x) - (natural) log of x
-    Log,
-    /// exp(x) - raise e to the power of x
-    Exp,
-    /// pow(x, y) - raise x to the power of y
-    Pow,
-    /// sin(x) - sine of x (x in degrees)
-    Sin,
-    /// cos(x) - cosine of x (x in degrees)
-    Cos,
-    /// tan(x) - tangent of x (x in degrees)
-    Tan,
-    /// asin(x) - arcsine of x degrees
-    Asin,
-    /// acos(x) - arccosine of x in degrees
-    Acos,
-    /// atan(x) - arctangent of x in degrees
-    Atan,
-    /// random() - generate uniform random number in range 0..1
-    Random,
-    /// randint(min, max) - generate uniform random integer in range min..max
-    RandInt,
-    /// min(a, ...) - minimum of values
-    Min,
-    /// max(a, ...) - maximum of values
-    Max,
-    /// sum(a, ...) - sum of values
-    Sum,
-    /// product(a, ...) - product of values
-    Product,
-    /// mean(a, ...) - mean of values
-    Mean,
-    /// clamp(x, min, max) - return x, clamped between min and max
-    Clamp,
-    /// mix(start, end, amount) - linear interpolation between start and end
-    Mix,
-    /// eq(a, b) - 1 if a == b, 0 otherwise
-    Equal,
-    /// ne(a, b) - 1 if a != b, 0 otherwise
-    NotEqual,
-    /// lt(a, b) - 1 if a < b, 0 otherwise
-    LessThan,
-    /// le(a, b) - 1 if a <= b, 0 otherwise
-    LessThanEqual,
-    /// gt(a, b) - 1 if a > b, 0 otherwise
-    GreaterThan,
-    /// ge(a, b) - 1 if a >= b, 0 otherwise
-    GreaterThanEqual,
-    /// if(cond, a, b) - if cond is non-zero, return a, else return b
-    If,
-    /// not(a) - 1 if a is zero, 0 otherwise
-    Not,
-    /// and(a, b) - 1 if both a and b are non-zero, 0 otherwise
-    And,
-    /// or(a, b) - 1 if either a or b are non-zero, 0 otherwise
-    Or,
-    /// xor(a, b) - 1 if either a or b are non-zero but not both, 0 otherwise
-    Xor,
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprValue {
+    Number(f32),
+    NumberList(Vec<f32>),
 }
 
-impl FromStr for Function {
-    type Err = anyhow::Error;
-
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
-        Ok(match value {
-            "abs" => Self::Abs,
-            "ceil" => Self::Ceil,
-            "floor" => Self::Floor,
-            "fract" => Self::Fract,
-            "sign" => Self::Sign,
-            "sqrt" => Self::Sqrt,
-            "log" => Self::Log,
-            "exp" => Self::Exp,
-            "pow" => Self::Pow,
-            "sin" => Self::Sin,
-            "cos" => Self::Cos,
-            "tan" => Self::Tan,
-            "asin" => Self::Asin,
-            "acos" => Self::Acos,
-            "atan" => Self::Atan,
-            "random" => Self::Random,
-            "randint" => Self::RandInt,
-            "min" => Self::Min,
-            "max" => Self::Max,
-            "sum" => Self::Sum,
-            "product" => Self::Product,
-            "mean" => Self::Mean,
-            "clamp" => Self::Clamp,
-            "mix" => Self::Mix,
-            "eq" => Self::Equal,
-            "ne" => Self::NotEqual,
-            "lt" => Self::LessThan,
-            "le" => Self::LessThanEqual,
-            "gt" => Self::GreaterThan,
-            "ge" => Self::GreaterThanEqual,
-            "if" => Self::If,
-            "not" => Self::Not,
-            "and" => Self::And,
-            "or" => Self::Or,
-            "xor" => Self::Xor,
-            _ => bail!("Unknown function"),
-        })
+impl From<f32> for ExprValue {
+    fn from(v: f32) -> Self {
+        Self::Number(v)
     }
 }
 
-#[derive(Clone, PartialEq)]
+impl From<Vec<f32>> for ExprValue {
+    fn from(v: Vec<f32>) -> Self {
+        Self::NumberList(v)
+    }
+}
+
+impl From<&[f32]> for ExprValue {
+    fn from(v: &[f32]) -> Self {
+        Self::NumberList(v.to_vec())
+    }
+}
+
+impl Display for ExprValue {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // Note use of `, ` rather than just ` ` to allow use
+        // in contexts which require comma-separated values
+        // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
+        write!(f, "{}", self.iter().map(fstr).join(", "))
+    }
+}
+
+impl ExprValue {
+    pub fn iter(&self) -> impl Iterator<Item = f32> + '_ {
+        match self {
+            Self::Number(v) => Box::new(std::iter::once(*v)),
+            Self::NumberList(v) => Box::new(v.iter().copied()) as Box<dyn Iterator<Item = f32>>,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Number(_) => 1,
+            Self::NumberList(v) => v.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn number(&self) -> Result<f32> {
+        match self {
+            Self::Number(v) => Ok(*v),
+            _ => bail!("Expected single number"),
+        }
+    }
+
+    pub fn number_list(&self) -> Result<Vec<f32>> {
+        match self {
+            Self::NumberList(v) => Ok(v.clone()),
+            _ => bail!("Expected number list"),
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<f32> {
+        match self {
+            Self::Number(v) => vec![*v],
+            Self::NumberList(v) => v.clone(),
+        }
+    }
+
+    pub fn get_only(&self) -> Result<f32> {
+        match self {
+            ExprValue::Number(n) => Ok(*n),
+            ExprValue::NumberList(l) => {
+                if l.len() != 1 {
+                    bail!("Expected exactly one argument");
+                }
+                Ok(l[0])
+            }
+        }
+    }
+
+    pub fn get_pair(&self) -> Result<(f32, f32)> {
+        let nl = self.number_list()?;
+        if nl.len() == 2 {
+            return Ok((nl[0], nl[1]));
+        }
+        bail!("Expected exactly two arguments");
+    }
+
+    pub fn get_triple(&self) -> Result<(f32, f32, f32)> {
+        let nl = self.number_list()?;
+        if nl.len() == 3 {
+            return Ok((nl[0], nl[1], nl[2]));
+        }
+        bail!("Expected exactly three arguments");
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 enum Token {
     /// A numeric literal
     Number(f32),
@@ -155,7 +139,8 @@ enum Token {
     Div,
     /// A literal '%' for mod operation
     Mod,
-    /// Tabs and spaces are whitespace
+    /// Internal-only token used for separating otherwise
+    /// indistinguishable tokens. (Tabs & spaces).
     Whitespace,
     /// Internal-only token for collecting characters for use in
     /// `Number`, `Var` or `ElementRef` variants.
@@ -234,10 +219,10 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-struct EvalState<'a> {
+pub struct EvalState<'a> {
     tokens: Vec<Token>,
     index: usize,
-    context: &'a TransformerContext,
+    pub context: &'a TransformerContext,
     // Used to check for circular variable references
     // Vec - likely to be few vars, and need stack behaviour
     checked_vars: Vec<String>,
@@ -257,8 +242,17 @@ impl<'a> EvalState<'a> {
         }
     }
 
-    fn peek(&self) -> Option<Token> {
-        self.tokens.get(self.index).cloned()
+    /// Peek the next token without advancing
+    fn peek(&self) -> Option<&Token> {
+        self.tokens.get(self.index)
+    }
+
+    /// Peek the previous token
+    fn prev(&self) -> Option<&Token> {
+        if self.index == 0 {
+            return None;
+        }
+        self.tokens.get(self.index - 1)
     }
 
     fn next(&mut self) -> Option<Token> {
@@ -273,26 +267,34 @@ impl<'a> EvalState<'a> {
     }
 
     fn require(&mut self, token: Token) -> Result<()> {
-        if self.peek() == Some(token) {
+        if self.peek() == Some(&token) {
             self.advance();
             Ok(())
         } else {
-            bail!("Expected token not matched")
+            bail!(
+                "Expected token '{token:?}' not matched (got '{:?}')",
+                self.peek()
+            )
         }
     }
 
-    fn lookup(&mut self, v: &str) -> Result<f32> {
+    fn lookup(&mut self, v: &str) -> Result<ExprValue> {
         if self.checked_vars.iter().contains(&String::from(v)) {
             bail!("Circular reference in variable lookup")
         }
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
-            let mut es = EvalState::new(tokenize(&inner)?, self.context, &self.checked_vars);
-            let e = expr(&mut es);
-            if es.peek().is_none() {
-                e
+            let tokens = tokenize(&inner)?;
+            if tokens.is_empty() {
+                Ok(ExprValue::NumberList(Vec::new()))
             } else {
-                bail!("Unexpected trailing tokens")
+                let mut es = EvalState::new(tokens, self.context, &self.checked_vars);
+                let e = expr_list(&mut es);
+                if es.peek().is_none() {
+                    e
+                } else {
+                    bail!("Unexpected trailing tokens")
+                }
             }
         } else {
             bail!("Could not evaluate variable")
@@ -313,7 +315,7 @@ impl<'a> EvalState<'a> {
     /// l - the x coordinate of the left of the element
     /// w - the width of the element
     /// h - the height of the element
-    fn element_ref(&self, v: &str) -> Result<f32> {
+    fn element_ref(&self, v: &str) -> Result<ExprValue> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
@@ -324,7 +326,7 @@ impl<'a> EvalState<'a> {
             let val: ScalarSpec = val.parse()?;
             if let Some(elem) = self.context.get_element(id) {
                 if let Some(bb) = elem.bbox()? {
-                    Ok(bb.scalarspec(val))
+                    Ok(bb.scalarspec(val).into())
                 } else {
                     bail!("No bounding box for #{}", id);
                 }
@@ -340,7 +342,7 @@ impl<'a> EvalState<'a> {
 fn evaluate(
     tokens: impl IntoIterator<Item = Token>,
     context: &TransformerContext,
-) -> Result<Vec<f32>> {
+) -> Result<ExprValue> {
     // This just forwards with initial empty checked_vars
     evaluate_inner(tokens, context, &[])
 }
@@ -349,7 +351,7 @@ fn evaluate_inner(
     tokens: impl IntoIterator<Item = Token>,
     context: &TransformerContext,
     checked_vars: &[String],
-) -> Result<Vec<f32>> {
+) -> Result<ExprValue> {
     let mut eval_state = EvalState::new(tokens, context, checked_vars);
     let e = expr_list(&mut eval_state);
     if eval_state.peek().is_none() {
@@ -359,10 +361,20 @@ fn evaluate_inner(
     }
 }
 
-fn expr_list(eval_state: &mut EvalState) -> Result<Vec<f32>> {
+fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
     let mut out = Vec::new();
+    if let (Some(Token::OpenParen), Some(Token::CloseParen)) =
+        (eval_state.prev(), eval_state.peek())
+    {
+        // Support empty expr_list for function calls
+        return Ok(out.into());
+    }
     loop {
-        out.push(expr(eval_state)?);
+        let e = expr(eval_state)?;
+        match e {
+            ExprValue::Number(n) => out.push(n),
+            ExprValue::NumberList(nl) => out.extend(nl.iter()),
+        }
         match eval_state.peek() {
             Some(Token::Comma) => {
                 eval_state.advance();
@@ -372,273 +384,81 @@ fn expr_list(eval_state: &mut EvalState) -> Result<Vec<f32>> {
             }
         }
     }
-    Ok(out)
+    Ok(out.into())
 }
 
-fn expr(eval_state: &mut EvalState) -> Result<f32> {
-    let mut e = term(eval_state)?;
-    loop {
-        match eval_state.peek() {
-            Some(Token::Add) => {
-                eval_state.advance();
-                e += term(eval_state)?;
-            }
-            Some(Token::Sub) => {
-                eval_state.advance();
-                e -= term(eval_state)?;
-            }
-            _ => {
-                break;
+fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
+    let t = term(eval_state)?;
+    if let Ok(mut e) = t.get_only() {
+        loop {
+            match eval_state.peek() {
+                Some(Token::Add) => {
+                    eval_state.advance();
+                    e += term(eval_state)?.get_only()?;
+                }
+                Some(Token::Sub) => {
+                    eval_state.advance();
+                    e -= term(eval_state)?.get_only()?;
+                }
+                _ => {
+                    break;
+                }
             }
         }
+        Ok(e.into())
+    } else {
+        Ok(t)
     }
-    Ok(e)
 }
 
-fn term(eval_state: &mut EvalState) -> Result<f32> {
-    let mut e = factor(eval_state)?;
-    loop {
-        match eval_state.peek() {
-            Some(Token::Mul) => {
-                eval_state.advance();
-                e *= factor(eval_state)?;
-            }
-            Some(Token::Div) => {
-                eval_state.advance();
-                e /= factor(eval_state)?;
-            }
-            Some(Token::Mod) => {
-                eval_state.advance();
-                e %= factor(eval_state)?;
-            }
-            _ => {
-                break;
+fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
+    let f = factor(eval_state)?;
+    if let Ok(mut e) = f.get_only() {
+        loop {
+            match eval_state.peek() {
+                Some(Token::Mul) => {
+                    eval_state.advance();
+                    e *= factor(eval_state)?.get_only()?;
+                }
+                Some(Token::Div) => {
+                    eval_state.advance();
+                    e /= factor(eval_state)?.get_only()?;
+                }
+                Some(Token::Mod) => {
+                    eval_state.advance();
+                    e %= factor(eval_state)?.get_only()?;
+                }
+                _ => {
+                    break;
+                }
             }
         }
+        Ok(e.into())
+    } else {
+        Ok(f)
     }
-    Ok(e)
 }
 
-fn factor(eval_state: &mut EvalState) -> Result<f32> {
+fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
     match eval_state.next() {
-        Some(Token::Number(x)) => Ok(x),
+        Some(Token::Number(x)) => Ok(ExprValue::Number(x)),
         Some(Token::Var(v)) => eval_state.lookup(&v),
         Some(Token::ElementRef(v)) => eval_state.element_ref(&v),
         Some(Token::OpenParen) => {
-            let e = expr(eval_state)?;
+            let e = expr_list(eval_state)?;
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
         Some(Token::Sub) => match eval_state.peek() {
             Some(Token::OpenParen) | Some(Token::Number(_)) | Some(Token::Var(_)) => {
-                Ok(-expr(eval_state)?)
+                Ok(ExprValue::Number(-expr(eval_state)?.number()?))
             }
             _ => bail!("Invalid unary minus"),
         },
         Some(Token::FnRef(fun)) => {
             eval_state.require(Token::OpenParen)?;
-            let e = match fun {
-                Function::Abs => expr(eval_state)?.abs(),
-                Function::Ceil => expr(eval_state)?.ceil(),
-                Function::Floor => expr(eval_state)?.floor(),
-                Function::Fract => expr(eval_state)?.fract(),
-                Function::Sign => {
-                    // Can't just use signum since it returns +1 for
-                    // input of (positive) zero.
-                    let e = expr(eval_state)?;
-                    if e == 0. {
-                        0.
-                    } else {
-                        e.signum()
-                    }
-                }
-                Function::Sqrt => expr(eval_state)?.sqrt(),
-                Function::Log => expr(eval_state)?.ln(),
-                Function::Exp => expr(eval_state)?.exp(),
-                Function::Pow => {
-                    let x = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let y = expr(eval_state)?;
-                    x.powf(y)
-                }
-                Function::Sin => expr(eval_state)?.to_radians().sin(),
-                Function::Cos => expr(eval_state)?.to_radians().cos(),
-                Function::Tan => expr(eval_state)?.to_radians().tan(),
-                Function::Asin => expr(eval_state)?.asin().to_degrees(),
-                Function::Acos => expr(eval_state)?.acos().to_degrees(),
-                Function::Atan => expr(eval_state)?.atan().to_degrees(),
-                Function::Random => eval_state.context.get_rng().borrow_mut().gen::<f32>(),
-                Function::RandInt => {
-                    let min = expr(eval_state)? as i32;
-                    eval_state.require(Token::Comma)?;
-                    let max = expr(eval_state)? as i32;
-                    if min > max {
-                        bail!("randint(min, max) - `min` must be <= `max`");
-                    }
-                    eval_state
-                        .context
-                        .get_rng()
-                        .borrow_mut()
-                        .gen_range(min..=max) as f32
-                }
-                Function::Max => {
-                    let a = expr_list(eval_state)?;
-                    a.into_iter()
-                        .max_by(|a, b| a.total_cmp(b))
-                        .context("max() requires at least one argument")?
-                }
-                Function::Min => {
-                    let a = expr_list(eval_state)?;
-                    a.into_iter()
-                        .min_by(|a, b| a.total_cmp(b))
-                        .context("min() requires at least one argument")?
-                }
-                Function::Sum => {
-                    let a = expr_list(eval_state)?;
-                    a.into_iter().sum()
-                }
-                Function::Product => {
-                    let a = expr_list(eval_state)?;
-                    a.into_iter().product()
-                }
-                Function::Mean => {
-                    let a = expr_list(eval_state)?;
-                    if a.is_empty() {
-                        bail!("mean() requires at least one argument");
-                    }
-                    let n = a.len() as f32;
-                    a.into_iter().sum::<f32>() / n
-                }
-                Function::Clamp => {
-                    let x = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let min = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let max = expr(eval_state)?;
-                    if min > max {
-                        bail!("clamp(x, min, max) - `min` must be <= `max`");
-                    }
-                    x.clamp(min, max)
-                }
-                Function::Mix => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let c = expr(eval_state)?;
-                    a * (1. - c) + b * c
-                }
-                Function::Equal => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a == b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::NotEqual => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a != b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::LessThan => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a < b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::LessThanEqual => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a <= b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::GreaterThan => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a > b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::GreaterThanEqual => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a >= b {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::If => {
-                    let cond = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if cond != 0. {
-                        a
-                    } else {
-                        b
-                    }
-                }
-                Function::Not => {
-                    let a = expr(eval_state)?;
-                    if a == 0. {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::And => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a != 0. && b != 0. {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::Or => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if a != 0. || b != 0. {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-                Function::Xor => {
-                    let a = expr(eval_state)?;
-                    eval_state.require(Token::Comma)?;
-                    let b = expr(eval_state)?;
-                    if (a != 0.) ^ (b != 0.) {
-                        1.
-                    } else {
-                        0.
-                    }
-                }
-            };
+            let args = expr_list(eval_state)?;
+            let e = eval_function(fun, &args, eval_state)?;
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
@@ -696,10 +516,7 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
 fn eval_str(value: &str, context: &TransformerContext) -> String {
     if let Ok(tokens) = tokenize(value) {
         if let Ok(parsed) = evaluate(tokens, context) {
-            // Note use of `, ` rather than just ` ` to allow use
-            // in contexts which require comma-separated values
-            // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
-            parsed.iter().map(|v| fstr(*v)).join(", ")
+            parsed.to_string()
         } else {
             value.to_owned()
         }
@@ -744,9 +561,41 @@ mod tests {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         let e = expr(&mut eval_state);
         if eval_state.peek().is_none() {
-            e
+            Ok(e?.number()?)
         } else {
             bail!("Unexpected trailing tokens")
+        }
+    }
+
+    fn expr_check(
+        tokens: impl IntoIterator<Item = Token>,
+        context: &TransformerContext,
+    ) -> Result<ExprValue> {
+        let mut eval_state = EvalState::new(tokens, context, &[]);
+        expr(&mut eval_state)
+    }
+
+    #[test]
+    fn test_expr() {
+        let mut ctx = TransformerContext::new();
+        for (name, value) in [
+            ("list", "1, 2, 3"),
+            ("kilo", "1000"),
+            ("mega", "($kilo * $kilo)"),
+        ] {
+            ctx.set_var(name, value);
+        }
+        for (expr, expected) in [
+            ("2 * 2", Some(ExprValue::Number(4.))),
+            ("swap(2, 1)", Some(ExprValue::NumberList(vec![1., 2.]))),
+            ("2 * 2, 5", Some(ExprValue::Number(4.))),
+            ("$mega", Some(ExprValue::Number(1000000.))),
+            ("$list", Some(ExprValue::NumberList(vec![1., 2., 3.]))),
+        ] {
+            assert_eq!(
+                expr_check(tokenize(expr).expect("test"), &ctx).ok(),
+                expected,
+            )
         }
     }
 
@@ -1067,11 +916,11 @@ mod tests {
             ("sum(10)", Some(10.)),
             ("sum(2,2.5,3,4,2.25)", Some(13.75)),
             ("sum(1,sum(2,3,4,5),6)", Some(21.)),
-            ("sum()", None),
+            ("sum()", Some(0.)),
             ("product(10)", Some(10.)),
             ("product(2,2.5,3,4,2.25)", Some(135.)),
             ("product(1,2,3,4,5,6)", Some(720.)),
-            ("product()", None),
+            ("product()", Some(1.)),
             ("mean(234)", Some(234.)),
             ("mean(2,2.5,3,4,2.25)", Some(2.75)),
             ("mean(1,sum(2,3,4,5),6)", Some(7.)),
@@ -1267,12 +1116,93 @@ mod tests {
 
     #[test]
     fn test_eval_multiple() {
-        assert_eq!(
-            eval_attr(
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            (
                 "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
-                &TransformerContext::new()
+                "10, 23, 5, 1, 2.5",
             ),
-            "10, 23, 5, 1, 2.5"
-        );
+            ("{{3, 2, swap(1, 2)}}", "3, 2, 2, 1"),
+            ("{{p2r(10, 0)}}", "10, 0"),
+            ("{{p2r(10, 180)}}", "-10, 0"),
+            ("{{p2r(10, 90)}}", "0, 10"),
+            ("{{r2p(p2r(0, 0))}}", "0, 0"),
+            ("{{(r2p(1, 1))}}", "1.414, 45"),
+            ("{{select(0, 1, 2, 3)}}", "1"),
+            ("{{select(2, 1, 2, 3)}}", "3"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_vector() {
+        let ctx = TransformerContext::new();
+        for (expr, expected) in [
+            ("{{addv(1,2)}}", "3"),
+            ("{{addv(1,2, 3,4)}}", "4, 6"),
+            ("{{addv(1,2,3, 7,8,9)}}", "8, 10, 12"),
+            ("{{subv(4, 1)}}", "3"),
+            ("{{subv(4,2, 1,0)}}", "3, 2"),
+            ("{{scalev(0, 123)}}", "0"),
+            ("{{scalev(0.5, 123)}}", "61.5"),
+            ("{{scalev(0.5, 1,2,3)}}", "0.5, 1, 1.5"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_list_var() {
+        let mut ctx = TransformerContext::new();
+        for (name, value) in [("list", "1,2"), ("double", "$list, $list")] {
+            ctx.set_var(name, value);
+        }
+        for (expr, expected) in [
+            ("{{$list}}", "1, 2"),
+            ("{{addv(1, $list, 3)}}", "3, 4"),
+            ("{{addv(1, $list, 3, 4, 5)}}", "4, 5, 7"),
+            ("{{$double}}", "1, 2, 1, 2"),
+            ("{{scalev(2, $double)}}", "2, 4, 2, 4"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_head_tail() {
+        let mut ctx = TransformerContext::new();
+        ctx.set_var("blank", "");
+        for (expr, expected) in [
+            ("{{head(1, 2, 3, 4, 5)}}", "1"),
+            ("{{head()}}", ""),
+            ("{{head(1)}}", "1"),
+            ("{{head(1, 2)}}", "1"),
+            ("{{head(1, 2, 3)}}", "1"),
+            ("{{tail(1, 2, 3, 4, 5)}}", "2, 3, 4, 5"),
+            ("{{tail()}}", ""),
+            ("{{tail(1)}}", ""),
+            ("{{tail(1, 2)}}", "2"),
+            ("{{tail(1, 2, 3)}}", "2, 3"),
+            ("{{empty(1)}}", "0"),
+            ("{{empty(1, 2, 3)}}", "0"),
+            ("{{empty()}}", "1"),
+            ("{{empty(tail(1))}}", "1"),
+            ("{{empty($blank)}}", "1"),
+            ("{{head($blank)}}", ""),
+            ("{{tail($blank)}}", ""),
+            ("{{head($blank, 4)}}", "4"),
+            ("{{head(4, $blank)}}", "4"),
+            ("{{count()}}", "0"),
+            ("{{count(1)}}", "1"),
+            ("{{count(1, 2, 3, 4, 5)}}", "5"),
+            ("{{count($blank)}}", "0"),
+            ("{{count($blank, $blank)}}", "0"),
+            ("{{count($blank, 4)}}", "1"),
+            ("{{count(4, $blank)}}", "1"),
+            ("{{count($blank, 4, $blank)}}", "1"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
     }
 }

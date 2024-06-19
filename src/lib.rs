@@ -40,6 +40,7 @@ pub mod cli;
 mod connector;
 mod element;
 mod expression;
+mod functions;
 mod path;
 #[cfg(feature = "server")]
 pub mod server;

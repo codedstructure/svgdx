@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: various functions making use of expression lists:
+  * Rectangular / polar conversion functions `r2p(x, y)` and `p2r(r, theta)`.
+  * Vector-arithmetic functions `addv(a0, a1, ...aN, b0, b1, ...bN)`,
+    `subv(a0, a1, ...aN, b0, b1, ...bN)` and `scalev(s, a0, a1, ...aN)`,
+    where `addv` and `subv` return the element-wise sum / difference of each list,
+    and `scalev` multiplies each element by the first `s` argument.
+  * List processing functions: `head()` (return first entry),
+    `tail()` (remainder after removing head), `empty()` (return 1 if the
+    given list is empty, else 0), and `count()` (cardinality of list) -
+    each taking a (possibly empty) list, and `select(n, a0, a1, ...aN)`
+    to retrieve the nth item in the list.
+
+- Added: support for `loop-var`, `start` and `step` attributes in `while` and
+  `until` loop types (in addition to `count`).
+
 ## [0.9.3 - 2024-06-14]
 
 - Change (minor): `style` attributes are no longer copied into any `<text>` elements generated
