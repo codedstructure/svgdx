@@ -54,37 +54,47 @@ impl Default for TransformerContext {
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
-    Repeat(String, Option<(String, String, String)>),
+    Repeat(String),
     While(String),
     Until(String),
 }
 
-impl TryFrom<&SvgElement> for LoopType {
+#[derive(Debug, Clone, PartialEq)]
+struct LoopDef {
+    loop_type: LoopType,
+    loop_spec: Option<(String, String, String)>,
+}
+
+impl TryFrom<&SvgElement> for LoopDef {
     type Error = anyhow::Error;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name != "loop" {
             bail!("LoopType can only be created from a loop element");
         }
-        if let Some(count) = element.get_attr("count") {
+        let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
             // Note we don't parse attributes here as they might be expressions,
-            // and we don't have access to a context to evaluate them.
-            let count_spec = if let Some(loop_var) = element.get_attr("loop-var") {
-                let start = element.get_attr("start").unwrap_or("0".to_string());
-                let step = element.get_attr("step").unwrap_or("1".to_string());
-                Some((loop_var, start, step))
-            } else {
-                None
-            };
-            return Ok(LoopType::Repeat(count, count_spec));
+            // and we don't have access to a context to evaluate them
+            let start = element.get_attr("start").unwrap_or("0".to_string());
+            let step = element.get_attr("step").unwrap_or("1".to_string());
+            Some((loop_var, start, step))
+        } else {
+            None
+        };
+        let loop_type;
+        if let Some(count) = element.get_attr("count") {
+            loop_type = LoopType::Repeat(count); //, loop_spec));
+        } else if let Some(while_expr) = element.get_attr("while") {
+            loop_type = LoopType::While(while_expr);
+        } else if let Some(until_expr) = element.get_attr("until") {
+            loop_type = LoopType::Until(until_expr);
+        } else {
+            bail!("Loop element should have a count, while or until attribute");
         }
-        if let Some(while_expr) = element.get_attr("while") {
-            return Ok(LoopType::While(while_expr));
-        }
-        if let Some(until_expr) = element.get_attr("until") {
-            return Ok(LoopType::Until(until_expr));
-        }
-        bail!("Loop element should have a count, while or until attribute");
+        Ok(Self {
+            loop_type,
+            loop_spec,
+        })
     }
 }
 
@@ -809,8 +819,8 @@ impl Transformer {
 
     fn handle_loop_element(&mut self, event_element: &SvgElement) -> Result<EventList> {
         let mut gen_events = EventList::new();
-        if let (Ok(loop_type), Some((start, end))) =
-            (LoopType::try_from(event_element), event_element.event_range)
+        if let (Ok(loop_def), Some((start, end))) =
+            (LoopDef::try_from(event_element), event_element.event_range)
         {
             // opening loop element is not included in the processed inner events to avoid
             // infinite recursion...
@@ -821,28 +831,29 @@ impl Transformer {
             let mut loop_count = 0;
             let mut loop_var_value = 0.;
             let mut loop_step = 1.;
-            if let LoopType::Repeat(count, loop_spec) = &loop_type {
+            if let Some((loop_var, start, step)) = loop_def.loop_spec {
+                loop_var_name = eval_attr(&loop_var, &self.context);
+                loop_var_value = eval_attr(&start, &self.context).parse()?;
+                loop_step = eval_attr(&step, &self.context).parse()?;
+            }
+            if let LoopType::Repeat(count) = &loop_def.loop_type {
                 loop_count = eval_attr(count, &self.context).parse()?;
-                if let Some((loop_var, start, step)) = loop_spec {
-                    loop_var_name = eval_attr(loop_var, &self.context);
-                    loop_var_value = eval_attr(start, &self.context).parse()?;
-                    loop_step = eval_attr(step, &self.context).parse()?;
-                }
             }
             loop {
-                if let LoopType::Repeat(_, _) = &loop_type {
+                if let LoopType::Repeat(_) = &loop_def.loop_type {
                     if iteration >= loop_count {
                         break;
                     }
-                    if !loop_var_name.is_empty() {
-                        self.context
-                            .variables
-                            .insert(loop_var_name.clone(), loop_var_value.to_string());
-                    }
-                } else if let LoopType::While(expr) = &loop_type {
+                } else if let LoopType::While(expr) = &loop_def.loop_type {
                     if !eval_condition(expr, &self.context)? {
                         break;
                     }
+                }
+
+                if !loop_var_name.is_empty() {
+                    self.context
+                        .variables
+                        .insert(loop_var_name.clone(), loop_var_value.to_string());
                 }
 
                 let mut btree = BTreeMap::new();
@@ -867,7 +878,7 @@ impl Transformer {
                     gen_events.extend(&ev);
                 }
 
-                if let LoopType::Until(expr) = &loop_type {
+                if let LoopType::Until(expr) = &loop_def.loop_type {
                     if eval_condition(expr, &self.context)? {
                         break;
                     }
