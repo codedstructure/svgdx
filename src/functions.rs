@@ -89,6 +89,14 @@ pub enum Function {
     Subv,
     /// scalev(s, a1, a2, ..., aN) - scale vector by s
     Scalev,
+    /// head(a, ...) - first element of list
+    Head,
+    /// tail(a, ...) - all but the first element of list
+    Tail,
+    /// empty(a, ...) - 1 if list is empty, 0 otherwise
+    Empty,
+    /// count(a, ...) - number of elements in list
+    Count,
 }
 
 impl FromStr for Function {
@@ -138,6 +146,10 @@ impl FromStr for Function {
             "addv" => Self::Addv,
             "subv" => Self::Subv,
             "scalev" => Self::Scalev,
+            "head" => Self::Head,
+            "tail" => Self::Tail,
+            "empty" => Self::Empty,
+            "count" => Self::Count,
             _ => bail!("Unknown function"),
         })
     }
@@ -151,16 +163,16 @@ pub fn eval_function(
     let e = match fun {
         Function::Swap => {
             let (a, b) = args.get_pair()?;
-            return Ok(vec![b, a].into());
+            return Ok([b, a].as_slice().into());
         }
         Function::Rect2Polar => {
             let (x, y) = args.get_pair()?;
-            return Ok(vec![x.hypot(y), y.atan2(x).to_degrees()].into());
+            return Ok([x.hypot(y), y.atan2(x).to_degrees()].as_slice().into());
         }
         Function::Polar2Rect => {
             let (r, theta) = args.get_pair()?;
             let theta = theta.to_radians();
-            return Ok(vec![r * theta.cos(), r * theta.sin()].into());
+            return Ok([r * theta.cos(), r * theta.sin()].as_slice().into());
         }
         Function::Addv => {
             let args = args.number_list()?;
@@ -197,6 +209,28 @@ pub fn eval_function(
             }
             return Ok(result.into());
         }
+        Function::Head => {
+            let args = args.to_vec();
+            if args.is_empty() {
+                return Ok([].as_slice().into());
+            }
+            args[0]
+        }
+        Function::Tail => {
+            let args = args.to_vec();
+            if args.len() < 2 {
+                return Ok([].as_slice().into());
+            }
+            return Ok(args[1..args.len()].into());
+        }
+        Function::Empty => {
+            if args.is_empty() {
+                1.
+            } else {
+                0.
+            }
+        }
+        Function::Count => args.len() as f32,
         Function::Select => {
             let args = args.number_list()?;
             if args.len() < 2 {

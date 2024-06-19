@@ -29,6 +29,12 @@ impl From<Vec<f32>> for ExprValue {
     }
 }
 
+impl From<&[f32]> for ExprValue {
+    fn from(v: &[f32]) -> Self {
+        Self::NumberList(v.to_vec())
+    }
+}
+
 impl Display for ExprValue {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Note use of `, ` rather than just ` ` to allow use
@@ -68,6 +74,13 @@ impl ExprValue {
         match self {
             Self::NumberList(v) => Ok(v.clone()),
             _ => bail!("Expected number list"),
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<f32> {
+        match self {
+            Self::Number(v) => vec![*v],
+            Self::NumberList(v) => v.clone(),
         }
     }
 
@@ -271,12 +284,17 @@ impl<'a> EvalState<'a> {
         }
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
-            let mut es = EvalState::new(tokenize(&inner)?, self.context, &self.checked_vars);
-            let e = expr_list(&mut es);
-            if es.peek().is_none() {
-                e
+            let tokens = tokenize(&inner)?;
+            if tokens.is_empty() {
+                Ok(ExprValue::NumberList(Vec::new()))
             } else {
-                bail!("Unexpected trailing tokens")
+                let mut es = EvalState::new(tokens, self.context, &self.checked_vars);
+                let e = expr_list(&mut es);
+                if es.peek().is_none() {
+                    e
+                } else {
+                    bail!("Unexpected trailing tokens")
+                }
             }
         } else {
             bail!("Could not evaluate variable")
@@ -1146,6 +1164,43 @@ mod tests {
             ("{{addv(1, $list, 3, 4, 5)}}", "4, 5, 7"),
             ("{{$double}}", "1, 2, 1, 2"),
             ("{{scalev(2, $double)}}", "2, 4, 2, 4"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_head_tail() {
+        let mut ctx = TransformerContext::new();
+        ctx.set_var("blank", "");
+        for (expr, expected) in [
+            ("{{head(1, 2, 3, 4, 5)}}", "1"),
+            ("{{head()}}", ""),
+            ("{{head(1)}}", "1"),
+            ("{{head(1, 2)}}", "1"),
+            ("{{head(1, 2, 3)}}", "1"),
+            ("{{tail(1, 2, 3, 4, 5)}}", "2, 3, 4, 5"),
+            ("{{tail()}}", ""),
+            ("{{tail(1)}}", ""),
+            ("{{tail(1, 2)}}", "2"),
+            ("{{tail(1, 2, 3)}}", "2, 3"),
+            ("{{empty(1)}}", "0"),
+            ("{{empty(1, 2, 3)}}", "0"),
+            ("{{empty()}}", "1"),
+            ("{{empty(tail(1))}}", "1"),
+            ("{{empty($blank)}}", "1"),
+            ("{{head($blank)}}", ""),
+            ("{{tail($blank)}}", ""),
+            ("{{head($blank, 4)}}", "4"),
+            ("{{head(4, $blank)}}", "4"),
+            ("{{count()}}", "0"),
+            ("{{count(1)}}", "1"),
+            ("{{count(1, 2, 3, 4, 5)}}", "5"),
+            ("{{count($blank)}}", "0"),
+            ("{{count($blank, $blank)}}", "0"),
+            ("{{count($blank, 4)}}", "1"),
+            ("{{count(4, $blank)}}", "1"),
+            ("{{count($blank, 4, $blank)}}", "1"),
         ] {
             assert_eq!(eval_attr(expr, &ctx), expected);
         }
