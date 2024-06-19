@@ -1,0 +1,17 @@
+<svg>
+  <defs>
+    <linearGradient id="g" x2="1" y2="0.2">
+      <stop stop-color="azure" offset="0.2"/>
+      <stop stop-color="silver" offset="0.4"/>
+    </linearGradient>
+  </defs>
+  <style>rect{rx:1px; fill:url(#g);}</style>
+  <var sizes="1,0,2,4,8,10,8,4,5,6,7,5,4"/>
+  <var max_h="{{10 * max($sizes)}}" halfcount="{{count($sizes) / 2}}" build=""/>
+  <loop while="not(empty($sizes))" loop-var="idx" step="10">
+    <var h="{{10 * head($sizes)}}" sizes="{{tail($sizes)}}"/>
+    <rect x="$idx" y="{{$max_h - $h}}" width="9" height="$h"/>
+    <var build="{{$build, $h}}"/>
+  </loop>
+  <text x="{{10 * $halfcount}}" y="-5" text="Data: {{scalev(0.1, $build)}}"/>
+</svg>

@@ -831,13 +831,13 @@ impl Transformer {
             let mut loop_count = 0;
             let mut loop_var_value = 0.;
             let mut loop_step = 1.;
+            if let LoopType::Repeat(count) = &loop_def.loop_type {
+                loop_count = eval_attr(count, &self.context).parse()?;
+            }
             if let Some((loop_var, start, step)) = loop_def.loop_spec {
                 loop_var_name = eval_attr(&loop_var, &self.context);
                 loop_var_value = eval_attr(&start, &self.context).parse()?;
                 loop_step = eval_attr(&step, &self.context).parse()?;
-            }
-            if let LoopType::Repeat(count) = &loop_def.loop_type {
-                loop_count = eval_attr(count, &self.context).parse()?;
             }
             loop {
                 if let LoopType::Repeat(_) = &loop_def.loop_type {
