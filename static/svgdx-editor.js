@@ -74,8 +74,6 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     mode: 'xml',
     readOnly: true,
     lineNumbers: true,
-    autoRefresh: true,
-    autofocus: true,
     foldGutter: true,
     lineWrapping: true,
     gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
@@ -87,6 +85,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let original_viewbox = null;
     let original_width = null;
     let original_height = null;
+    let last_text_response = "";
 
     async function update() {
         try {
@@ -111,7 +110,12 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 }
 
                 const svgData = await response.text();
-                textViewer.setValue(svgData);
+                last_text_response = svgData;
+                if (document.getElementById('text-output').style.display !== "none") {
+                    // Updating the codemirror editor while hidden is ineffective;
+                    // we set if visible or when it becomes visible.
+                    textViewer.setValue(svgData);
+                }
                 svg_container.innerHTML = svgData;
                 const svg = svg_container.querySelector('svg');
                 if (svg === null) {
@@ -391,6 +395,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         if (toggleOutputChecked === "true") {
             document.getElementById('svg-output').style.display = "none";
             document.getElementById('text-output').style.display = "";
+            textViewer.setValue(last_text_response);
         } else {
             document.getElementById('svg-output').style.display = "";
             document.getElementById('text-output').style.display = "none";
