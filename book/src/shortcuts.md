@@ -85,9 +85,11 @@ Using the shortcuts introduced so far, this SVG file can be created from the fol
 
 ## Summary
 
-We've seen how `svgdx` allows less boilerplate to be written through the use of shortcut attribute names which can expand across multiple attributes, and how the tedious job of determining the root SVG element is eliminated entirely in most cases.
+We've seen how `svgdx` allows less boilerplate to be written through the use of shortcut attributes which can expand to multiple attributes, and how the tedious job of determining the root SVG element is eliminated entirely in many cases.
 
-The theme of being able to express more with less will return as we continue looking at `svgdx`, and we'll see even more concise ways that the given image can be authored.
+One outcome of having shortcuts available is there may be several ways to express the same concept. The most concise is not always the most understandable, and if both a shortcut and a more explicit instruction are present, the more explicit instruction should always take priority.
+
+The theme of being able to express more with less will return as we continue looking at `svgdx`, and we'll see even more concise (and - hopefully - clear) ways that the given image can be authored.
 
 ---
 
