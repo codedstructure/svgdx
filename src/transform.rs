@@ -775,9 +775,12 @@ impl Transformer {
         let mut repeat = if self.context.in_specs { 0 } else { 1 };
         if let Some(rep_count) = event_element.pop_attr("repeat") {
             if event_element.is_graphics_element() {
-                repeat = rep_count.parse().unwrap_or(1);
+                repeat = eval_attr(&rep_count, &self.context).parse().unwrap_or(1);
             } else {
-                todo!("Repeat is not implemented for non-graphics elements");
+                bail!(
+                    "`repeat` not allowed on non-graphics elements (line {})",
+                    event_element.src_line
+                );
             }
         }
         for rep_idx in 0..repeat {
@@ -1084,7 +1087,7 @@ impl Transformer {
                         }
                     }
                     if is_empty {
-                        if loop_depth == 0 {
+                        if loop_depth == 0 && !self.context.in_specs {
                             let events = self.generate_element_events(&mut event_element);
                             if let Ok(ref events) = events {
                                 if !events.is_empty() {
@@ -1132,8 +1135,10 @@ impl Transformer {
                             } else {
                                 Ok(EventList::new())
                             }
-                        } else {
+                        } else if !self.context.in_specs {
                             self.generate_element_events(&mut event_element)
+                        } else {
+                            Ok(EventList::new())
                         };
                         if let Ok(ref mut events) = events {
                             if !events.is_empty() {
@@ -1158,6 +1163,7 @@ impl Transformer {
                                 }
                             }
                         } else {
+                            // TODO - handle 'retriable' errors separately for better error reporting
                             remain.push(input_ev.clone());
                         }
                         last_element = Some(event_element);

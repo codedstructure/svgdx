@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: support for `loop-var`, `start` and `step` attributes in `while` and
   `until` loop types (in addition to `count`).
 
+- Added: the `repeat` element is now available within `<reuse>` targets and
+  supports expressions rather than only hardcoded integer counts.
+
 ## [0.9.3 - 2024-06-14]
 
 - Change (minor): `style` attributes are no longer copied into any `<text>` elements generated

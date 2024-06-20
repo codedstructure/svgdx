@@ -74,3 +74,20 @@ fn test_reuse_group() {
     // exact equality check: ensure that <specs> doesn't appear in the output.
     assert_eq!(output, expected);
 }
+
+#[test]
+fn test_reuse_repeat() {
+    let input = r##"
+<specs>
+<rect id="register" xy="0" wh="5" repeat="$reg_size"/>
+</specs>
+<reuse href="#register" reg_size="3"/>
+"##;
+    let expected = r#"
+<rect x="0" y="0" width="5" height="5" class="register"/>
+<rect x="0" y="0" width="5" height="5" class="register"/>
+<rect x="0" y="0" width="5" height="5" class="register"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, expected);
+}
