@@ -1,6 +1,6 @@
+use crate::context::TransformerContext;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
-use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
     DirSpec, EdgeSpec, Length, LocSpec, OrderIndex,
@@ -205,6 +205,15 @@ impl SvgElement {
 
     pub fn set_attr(&mut self, key: &str, value: &str) {
         self.attrs.insert(key, value);
+    }
+
+    /// Resolve any expressions in attributes. Note attributes are unchanged on failure.
+    pub fn eval_attributes(&mut self, context: &mut TransformerContext) {
+        // Step 0: Resolve any attributes
+        for (key, value) in self.attrs.clone() {
+            let replace = eval_attr(&value, context);
+            self.attrs.insert(&key, &replace);
+        }
     }
 
     pub fn is_phantom_element(&self) -> bool {
@@ -702,14 +711,8 @@ impl SvgElement {
         Ok(input.to_owned())
     }
 
-    /// Process and expand attributes as needed
-    pub fn expand_attributes(&mut self, context: &mut TransformerContext) -> Result<()> {
-        // Step 0: Resolve any attributes
-        for (key, value) in self.attrs.clone() {
-            let replace = eval_attr(&value, context);
-            self.attrs.insert(&key, &replace);
-        }
-
+    /// Process and expand layout attributes as needed. Assumes numeric attributes.
+    pub fn resolve_layout(&mut self, context: &mut TransformerContext) -> Result<()> {
         // Step 1: Evaluate size from wh attributes
         if let Some((wh, idx)) = self.attrs.pop_idx("wh") {
             let value = self.eval_size(&wh, context)?;
@@ -893,7 +896,6 @@ impl SvgElement {
         }
 
         self.attrs = new_attrs;
-        context.update_element(self);
 
         Ok(())
     }

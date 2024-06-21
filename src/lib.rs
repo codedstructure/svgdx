@@ -26,19 +26,18 @@
 //! println!("{output}");
 //! ```
 
-use std::io::{BufRead, Cursor, IsTerminal, Read, Write};
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader, Cursor, IsTerminal, Read, Write};
 
 use anyhow::Result;
-use std::{
-    fs::{self, File},
-    io::BufReader,
-};
 use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
 pub mod cli;
 mod connector;
+mod context;
 mod element;
+mod events;
 mod expression;
 mod functions;
 mod path;
