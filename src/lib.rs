@@ -39,6 +39,7 @@ use tempfile::NamedTempFile;
 pub mod cli;
 mod connector;
 mod element;
+mod events;
 mod expression;
 mod functions;
 mod path;
