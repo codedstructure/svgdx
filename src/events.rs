@@ -18,14 +18,14 @@ pub enum SvgEvent {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct InputEvent<'a> {
-    pub event: Event<'a>,
+pub struct InputEvent {
+    pub event: Event<'static>,
     pub index: usize,
     pub line: usize,
     pub indent: usize,
 }
 
-impl Clone for InputEvent<'_> {
+impl Clone for InputEvent {
     fn clone(&self) -> Self {
         Self {
             event: self.event.clone().into_owned(),
@@ -36,8 +36,8 @@ impl Clone for InputEvent<'_> {
     }
 }
 
-impl<'a> InputEvent<'a> {
-    fn into_owned(self) -> InputEvent<'static> {
+impl InputEvent {
+    fn into_owned(self) -> InputEvent {
         InputEvent {
             event: self.event.into_owned(),
             index: self.index,
@@ -48,17 +48,17 @@ impl<'a> InputEvent<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EventList<'a> {
-    pub events: Vec<InputEvent<'a>>,
+pub struct EventList {
+    pub events: Vec<InputEvent>,
 }
 
-impl From<&str> for EventList<'_> {
+impl From<&str> for EventList {
     fn from(value: &str) -> Self {
         Self::from_str(value).expect("failed to parse string")
     }
 }
 
-impl From<Event<'_>> for EventList<'_> {
+impl From<Event<'_>> for EventList {
     fn from(value: Event) -> Self {
         Self {
             events: vec![InputEvent {
@@ -71,19 +71,19 @@ impl From<Event<'_>> for EventList<'_> {
     }
 }
 
-impl From<SvgEvent> for InputEvent<'_> {
+impl From<SvgEvent> for InputEvent {
     fn from(value: SvgEvent) -> Self {
         InputEvent::from(Event::from(value))
     }
 }
 
-impl From<SvgEvent> for EventList<'_> {
+impl From<SvgEvent> for EventList {
     fn from(value: SvgEvent) -> Self {
         Event::from(value).into()
     }
 }
 
-impl From<Vec<InputEvent<'_>>> for EventList<'_> {
+impl From<Vec<InputEvent>> for EventList {
     fn from(value: Vec<InputEvent>) -> Self {
         Self {
             events: value
@@ -99,7 +99,7 @@ impl From<Vec<InputEvent<'_>>> for EventList<'_> {
     }
 }
 
-impl From<Vec<Event<'_>>> for EventList<'_> {
+impl From<Vec<Event<'_>>> for EventList {
     fn from(value: Vec<Event>) -> Self {
         Self {
             events: value
@@ -115,16 +115,16 @@ impl From<Vec<Event<'_>>> for EventList<'_> {
     }
 }
 
-impl<'a> IntoIterator for EventList<'a> {
-    type Item = InputEvent<'a>;
-    type IntoIter = std::vec::IntoIter<InputEvent<'a>>;
+impl IntoIterator for EventList {
+    type Item = InputEvent;
+    type IntoIter = std::vec::IntoIter<InputEvent>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.events.into_iter()
     }
 }
 
-impl From<Event<'_>> for InputEvent<'_> {
+impl From<Event<'_>> for InputEvent {
     fn from(value: Event) -> Self {
         Self {
             event: value.into_owned(),
@@ -135,7 +135,7 @@ impl From<Event<'_>> for InputEvent<'_> {
     }
 }
 
-impl EventList<'_> {
+impl EventList {
     pub fn new() -> Self {
         Self { events: vec![] }
     }
@@ -152,7 +152,7 @@ impl EventList<'_> {
         self.events.len()
     }
 
-    pub fn push<'a>(&mut self, ev: impl Into<InputEvent<'a>>) {
+    pub fn push(&mut self, ev: impl Into<InputEvent>) {
         let ev = ev.into();
         self.events.push(ev.clone().into_owned());
     }

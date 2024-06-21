@@ -22,7 +22,7 @@ pub struct TransformerContext {
     rng: RefCell<SmallRng>,
     pub real_svg: bool,
     pub in_specs: bool,
-    pub events: Vec<InputEvent<'static>>,
+    pub events: Vec<InputEvent>,
 }
 
 impl Default for TransformerContext {
@@ -46,7 +46,7 @@ impl TransformerContext {
         Self::default()
     }
 
-    pub fn set_events(&mut self, events: Vec<InputEvent<'static>>) {
+    pub fn set_events(&mut self, events: Vec<InputEvent>) {
         self.events = events;
     }
 
@@ -230,7 +230,9 @@ impl TransformerContext {
         events.extend(self.handle_comments(&mut e));
         self.handle_containment(&mut e)?;
 
-        e.expand_attributes(self)?;
+        e.eval_attributes(self);
+        e.resolve_layout(self)?;
+        self.update_element(&e);
 
         // "xy-loc" attr allows us to position based on a non-top-left position
         // assumes the bounding-box is well-defined by this point.

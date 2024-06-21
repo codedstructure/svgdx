@@ -319,15 +319,15 @@ impl Transformer {
         Ok(instance_element)
     }
 
-    fn process_seq<'a>(
+    fn process_seq(
         &mut self,
-        seq: EventList<'a>,
+        seq: EventList,
         idx_output: &mut BTreeMap<OrderIndex, EventList>,
-    ) -> Result<EventList<'a>> {
+    ) -> Result<EventList> {
         let mut remain = EventList::new();
         let mut last_event = None;
         let mut last_element = None;
-        let mut gen_events: Vec<(OrderIndex, EventList<'_>)>;
+        let mut gen_events: Vec<(OrderIndex, EventList)>;
         // Stack of event indices of open elements.
         let mut idx_stack = Vec::new();
         let mut loop_depth = 0;
@@ -577,7 +577,7 @@ impl Transformer {
         Ok(remain)
     }
 
-    fn process_events<'a>(&mut self, input: EventList<'a>) -> Result<EventList<'a>> {
+    fn process_events(&mut self, input: EventList) -> Result<EventList> {
         let mut output = EventList { events: vec![] };
         let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
@@ -807,7 +807,7 @@ fn indent_all(s: Vec<String>, indent: usize) -> Vec<String> {
 fn transform_element<'a>(
     element: &'a SvgElement,
     context: &'a mut TransformerContext,
-) -> Result<EventList<'a>> {
+) -> Result<EventList> {
     if element.name == "phantom" {
         return Ok(EventList::new());
     }
