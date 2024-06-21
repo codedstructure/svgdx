@@ -3,7 +3,8 @@ use crate::element::SvgElement;
 use std::io::{BufRead, Write};
 
 use lazy_regex::regex;
-use quick_xml::events::{BytesText, Event};
+use quick_xml::events::attributes::Attribute;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 
 use anyhow::{bail, Result};
@@ -302,5 +303,95 @@ impl EventList<'_> {
         }
 
         (Self { events: before }, pivot, Self { events: after })
+    }
+}
+
+impl<'a> From<SvgEvent> for Event<'a> {
+    fn from(svg_ev: SvgEvent) -> Event<'a> {
+        match svg_ev {
+            SvgEvent::Empty(e) => Event::Empty(e.into()),
+            SvgEvent::Start(e) => Event::Start(e.into()),
+            SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
+            SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            SvgEvent::End(name) => Event::End(BytesEnd::new(name)),
+        }
+    }
+}
+
+impl From<SvgElement> for BytesStart<'static> {
+    fn from(e: SvgElement) -> BytesStart<'static> {
+        let mut bs = BytesStart::new(e.name);
+        for (k, v) in e.attrs {
+            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+        }
+        if !e.classes.is_empty() {
+            bs.push_attribute(Attribute::from((
+                "class".as_bytes(),
+                e.classes
+                    .into_iter()
+                    .collect::<Vec<String>>()
+                    .join(" ")
+                    .as_bytes(),
+            )));
+        }
+        bs
+    }
+}
+
+impl TryFrom<&BytesStart<'_>> for SvgElement {
+    type Error = anyhow::Error;
+
+    /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
+    /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
+    /// semantic about svgdx / svg formats.
+    fn try_from(e: &BytesStart) -> Result<Self, Self::Error> {
+        let elem_name: String =
+            String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
+
+        let attrs: Result<Vec<(String, String)>, Self::Error> = e
+            .attributes()
+            .map(move |a| {
+                let aa = a?;
+                let key = String::from_utf8(aa.key.into_inner().to_vec())?;
+                let value = aa.unescape_value()?.into_owned();
+                Ok((key, value))
+            })
+            .collect();
+        Ok(Self::new(&elem_name, &attrs?))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_eventlist_minimal() {
+        let input = r#"<svg></svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 2);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_eventlist_indent() {
+        let input = r#"<svg>
+        </svg>"#;
+        let el = EventList::from_str(input).unwrap();
+        assert_eq!(el.events.len(), 3);
+        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].indent, 0);
+        assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
+        assert_eq!(el.events[1].line, 2);
+        assert_eq!(
+            el.events[1].event,
+            Event::Text(BytesText::new("\n        "))
+        );
+        assert_eq!(el.events[2].line, 2);
+        assert_eq!(el.events[2].indent, 8);
+        assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
     }
 }

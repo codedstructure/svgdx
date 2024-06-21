@@ -1,6 +1,6 @@
+use crate::context::TransformerContext;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
-use crate::transform::TransformerContext;
 use crate::types::{
     attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
     DirSpec, EdgeSpec, Length, LocSpec, OrderIndex,

@@ -7,8 +7,8 @@ use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
+use crate::context::TransformerContext;
 use crate::functions::{eval_function, Function};
-use crate::transform::TransformerContext;
 use crate::types::{fstr, ScalarSpec};
 
 #[derive(Debug, Clone, PartialEq)]
