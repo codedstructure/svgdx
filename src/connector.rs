@@ -1,4 +1,4 @@
-use crate::context::TransformerContext;
+use crate::context::ElementMap;
 use crate::element::SvgElement;
 use crate::types::{attr_split, fstr, strp, strp_length, Length};
 use lazy_regex::regex;
@@ -124,7 +124,7 @@ impl Connector {
 
     pub fn from_element(
         element: &SvgElement,
-        context: &TransformerContext,
+        elem_map: &impl ElementMap,
         conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
@@ -156,7 +156,7 @@ impl Connector {
             let name = &caps["id"];
             start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             start_dir = Self::loc_to_dir(&start_loc);
-            start_el = context.get_element(name);
+            start_el = elem_map.get_element(name);
         } else {
             let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
             start_point = Some((
@@ -168,7 +168,7 @@ impl Connector {
             let name = &caps["id"];
             end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
             end_dir = Self::loc_to_dir(&end_loc);
-            end_el = context.get_element(name);
+            end_el = elem_map.get_element(name);
         } else {
             let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
             end_point = Some((

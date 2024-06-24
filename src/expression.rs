@@ -7,7 +7,7 @@ use regex::Captures;
 
 use anyhow::{bail, Context, Result};
 
-use crate::context::TransformerContext;
+use crate::context::{ContextView, VariableMap};
 use crate::functions::{eval_function, Function};
 use crate::types::{fstr, ScalarSpec};
 
@@ -222,7 +222,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
 pub struct EvalState<'a> {
     tokens: Vec<Token>,
     index: usize,
-    pub context: &'a TransformerContext,
+    pub context: &'a dyn ContextView,
     // Used to check for circular variable references
     // Vec - likely to be few vars, and need stack behaviour
     checked_vars: Vec<String>,
@@ -231,7 +231,7 @@ pub struct EvalState<'a> {
 impl<'a> EvalState<'a> {
     fn new(
         tokens: impl IntoIterator<Item = Token>,
-        context: &'a TransformerContext,
+        context: &'a dyn ContextView,
         checked_vars: &[String],
     ) -> Self {
         Self {
@@ -341,7 +341,7 @@ impl<'a> EvalState<'a> {
 
 fn evaluate(
     tokens: impl IntoIterator<Item = Token>,
-    context: &TransformerContext,
+    context: &impl ContextView,
 ) -> Result<ExprValue> {
     // This just forwards with initial empty checked_vars
     evaluate_inner(tokens, context, &[])
@@ -349,7 +349,7 @@ fn evaluate(
 
 fn evaluate_inner(
     tokens: impl IntoIterator<Item = Token>,
-    context: &TransformerContext,
+    context: &impl ContextView,
     checked_vars: &[String],
 ) -> Result<ExprValue> {
     let mut eval_state = EvalState::new(tokens, context, checked_vars);
@@ -468,7 +468,7 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
 
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
-pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
+pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
     let re = regex!(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))");
     let value = re.replace_all(value, |caps: &Captures| {
         let inner = caps
@@ -499,7 +499,7 @@ pub fn eval_vars(value: &str, context: &TransformerContext) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(value: &str, context: &TransformerContext) -> String {
+fn eval_expr(value: &str, context: &impl ContextView) -> String {
     // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let re = regex!(r"\{\{(?<inner>.+?)\}\}");
     re.replace_all(value, |caps: &Captures| {
@@ -513,7 +513,7 @@ fn eval_expr(value: &str, context: &TransformerContext) -> String {
     .to_string()
 }
 
-fn eval_str(value: &str, context: &TransformerContext) -> String {
+fn eval_str(value: &str, context: &impl ContextView) -> String {
     if let Ok(tokens) = tokenize(value) {
         if let Ok(parsed) = evaluate(tokens, context) {
             parsed.to_string()
@@ -526,7 +526,7 @@ fn eval_str(value: &str, context: &TransformerContext) -> String {
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
+pub fn eval_attr(value: &str, context: &impl ContextView) -> String {
     // Step 1: Evaluate arithmetic expressions. All variables referenced within
     // {{...}} blocks are assumed to resolve to a numeric expression.
     let value = eval_expr(value, context);
@@ -535,7 +535,7 @@ pub fn eval_attr(value: &str, context: &TransformerContext) -> String {
 }
 
 /// Evaluate a condition expression, returning true iff the result is non-zero
-pub fn eval_condition(value: &str, context: &TransformerContext) -> Result<bool> {
+pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
     // Conditions don't need surrounding by {{...}} since they always evaluate to
     // a single numeric expression, but allow for consistency with other attr values.
     let re = regex!(r"\{\{(?<inner>.+?)\}\}");
@@ -549,14 +549,65 @@ pub fn eval_condition(value: &str, context: &TransformerContext) -> Result<bool>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
     use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
+    use rand::prelude::*;
+    use std::cell::RefCell;
 
     use super::*;
 
+    struct TestContext {
+        vars: HashMap<String, String>,
+        rng: RefCell<SmallRng>,
+    }
+
+    impl TestContext {
+        fn new() -> Self {
+            Self {
+                vars: HashMap::new(),
+                rng: RefCell::new(SmallRng::seed_from_u64(0)),
+            }
+        }
+
+        fn with_vars(vars: &[(&str, &str)]) -> Self {
+            Self {
+                vars: vars
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
+                    .collect(),
+                rng: RefCell::new(SmallRng::seed_from_u64(0)),
+            }
+        }
+    }
+
+    impl ElementMap for TestContext {
+        fn get_element(&self, _id: &str) -> Option<&SvgElement> {
+            None
+        }
+
+        fn get_prev_element(&self) -> Option<&SvgElement> {
+            None
+        }
+    }
+
+    impl VariableMap for TestContext {
+        fn get_var(&self, name: &str) -> Option<String> {
+            self.vars.get(name).cloned()
+        }
+
+        fn get_rng(&self) -> &std::cell::RefCell<rand::prelude::SmallRng> {
+            &self.rng
+        }
+    }
+
+    impl ContextView for TestContext {}
+
     fn evaluate_one(
         tokens: impl IntoIterator<Item = Token>,
-        context: &TransformerContext,
+        context: &impl ContextView,
     ) -> Result<f32> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         let e = expr(&mut eval_state);
@@ -569,7 +620,7 @@ mod tests {
 
     fn expr_check(
         tokens: impl IntoIterator<Item = Token>,
-        context: &TransformerContext,
+        context: &impl ContextView,
     ) -> Result<ExprValue> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         expr(&mut eval_state)
@@ -577,14 +628,11 @@ mod tests {
 
     #[test]
     fn test_expr() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [
+        let ctx = TestContext::with_vars(&[
             ("list", "1, 2, 3"),
             ("kilo", "1000"),
             ("mega", "($kilo * $kilo)"),
-        ] {
-            ctx.set_var(name, value);
-        }
+        ]);
         for (expr, expected) in [
             ("2 * 2", Some(ExprValue::Number(4.))),
             ("swap(2, 1)", Some(ExprValue::NumberList(vec![1., 2.]))),
@@ -601,15 +649,12 @@ mod tests {
 
     #[test]
     fn test_eval_var() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [
+        let ctx = TestContext::with_vars(&[
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
-        ] {
-            ctx.set_var(name, value);
-        }
+        ]);
 
         assert_eq!(eval_vars("$one", &ctx), "1");
         assert_eq!(eval_vars("${one}", &ctx), "1");
@@ -632,6 +677,8 @@ mod tests {
 
     #[test]
     fn test_eval_local_vars() {
+        use crate::context::TransformerContext;
+
         let mut ctx = TransformerContext::new();
         // provide some global variables so we can check they are overridden
         for (name, value) in [("one", "1"), ("this_year", "2023")] {
@@ -693,17 +740,14 @@ mod tests {
 
     #[test]
     fn test_valid_expressions() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [
+        let ctx = TestContext::with_vars(&[
             ("pi", "3.1415927"),
             ("tau", "(2. * $pi)"),
             ("milli", "0.001"),
             ("micro", "($milli * $milli)"),
             ("kilo", "1000"),
             ("mega", "($kilo * $kilo)"),
-        ] {
-            ctx.set_var(name, value);
-        }
+        ]);
         for (expr, expected) in [
             ("2 * 2", Some(4.)),
             ("2 * 2 + 1", Some(5.)),
@@ -739,10 +783,7 @@ mod tests {
 
     #[test]
     fn test_func_simple() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [("kilo", "1000"), ("mega", "($kilo * $kilo)")] {
-            ctx.set_var(name, value);
-        }
+        let ctx = TestContext::with_vars(&[("kilo", "1000"), ("mega", "($kilo * $kilo)")]);
         for (expr, expected) in [
             ("abs(1)", 1.),
             ("abs(-1)", 1.),
@@ -790,7 +831,7 @@ mod tests {
 
     #[test]
     fn test_func_trig() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("sin(0)", 0.),
             ("sin(45)", 2_f32.sqrt() / 2.),
@@ -822,7 +863,7 @@ mod tests {
     #[test]
     fn test_func_random() {
         // Check random() provides reasonable samples
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         let expr = "random()";
         let tokens = tokenize(expr).unwrap();
         let mut count_a = 0;
@@ -871,7 +912,7 @@ mod tests {
 
     #[test]
     fn test_func_comparison() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("eq(1, 1)", 1.),
             ("eq(1, 2)", 0.),
@@ -901,7 +942,7 @@ mod tests {
 
     #[test]
     fn test_func_variadic() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("min(-10)", Some(-10.)),
             ("min(1,2)", Some(1.)),
@@ -936,7 +977,7 @@ mod tests {
 
     #[test]
     fn test_func_logic() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("if(1, 2, 3)", 2.),
             ("if(0, 2, 3)", 3.),
@@ -997,8 +1038,7 @@ mod tests {
 
     #[test]
     fn test_bad_expressions() {
-        let mut ctx = TransformerContext::new();
-        ctx.set_var("numbers", "20 40");
+        let ctx = TestContext::with_vars(&[("numbers", "20 40")]);
         for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
             assert!(
                 evaluate_one(tokenize(expr).expect("test"), &ctx).is_err(),
@@ -1009,10 +1049,7 @@ mod tests {
 
     #[test]
     fn test_circular_reference() {
-        let mut ctx = TransformerContext::new();
-        ctx.set_var("k", "$k - 1");
-        ctx.set_var("a", "$b");
-        ctx.set_var("b", "$a");
+        let ctx = TestContext::with_vars(&[("k", "$k - 1"), ("a", "$b"), ("b", "$a")]);
         // These should successfully return error rather than cause stack overflow.
         for expr in ["$k - 1", "$a"] {
             assert!(
@@ -1039,7 +1076,7 @@ mod tests {
             ("-4*-(2+1)", Some(12.)),
         ] {
             assert_eq!(
-                evaluate_one(tokenize(expr).expect("test"), &TransformerContext::new()).ok(),
+                evaluate_one(tokenize(expr).expect("test"), &TestContext::new()).ok(),
                 expected
             );
         }
@@ -1047,16 +1084,13 @@ mod tests {
 
     #[test]
     fn test_eval_attr() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [
+        let ctx = TestContext::with_vars(&[
             ("one", "1"),
             ("this_year", "2023"),
             ("empty", ""),
             ("me", "Ben"),
             ("numbers", "20  40"),
-        ] {
-            ctx.set_var(name, value);
-        }
+        ]);
 
         assert_eq!(
             eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &ctx),
@@ -1072,7 +1106,7 @@ mod tests {
 
     #[test]
     fn test_eval_condition() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("0.", false),
             ("0", false),
@@ -1116,7 +1150,7 @@ mod tests {
 
     #[test]
     fn test_eval_multiple() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             (
                 "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
@@ -1137,7 +1171,7 @@ mod tests {
 
     #[test]
     fn test_eval_vector() {
-        let ctx = TransformerContext::new();
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("{{addv(1,2)}}", "3"),
             ("{{addv(1,2, 3,4)}}", "4, 6"),
@@ -1154,10 +1188,7 @@ mod tests {
 
     #[test]
     fn test_eval_list_var() {
-        let mut ctx = TransformerContext::new();
-        for (name, value) in [("list", "1,2"), ("double", "$list, $list")] {
-            ctx.set_var(name, value);
-        }
+        let ctx = TestContext::with_vars(&[("list", "1,2"), ("double", "$list, $list")]);
         for (expr, expected) in [
             ("{{$list}}", "1, 2"),
             ("{{addv(1, $list, 3)}}", "3, 4"),
@@ -1171,8 +1202,7 @@ mod tests {
 
     #[test]
     fn test_eval_head_tail() {
-        let mut ctx = TransformerContext::new();
-        ctx.set_var("blank", "");
+        let ctx = TestContext::with_vars(&[("blank", "")]);
         for (expr, expected) in [
             ("{{head(1, 2, 3, 4, 5)}}", "1"),
             ("{{head()}}", ""),

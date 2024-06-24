@@ -1,4 +1,4 @@
-use crate::context::TransformerContext;
+use crate::context::{ContextView, ElementMap};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::types::{
@@ -15,13 +15,13 @@ use regex::Captures;
 /// which may contain many such entries.
 ///
 /// Infallible; any invalid refspec will be left unchanged.
-fn expand_relspec(value: &str, context: &TransformerContext) -> String {
+fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
 
     let result = locspec.replace_all(value, |caps: &Captures| {
         let elref = caps.name("id").expect("Regex Match").as_str();
         let loc = caps.name("loc").expect("Regex Match").as_str();
-        if let Some(elem) = context.get_element(elref) {
+        if let Some(elem) = ctx.get_element(elref) {
             if let Ok(Some(pos)) = elem.coord(loc) {
                 format!("{} {}", fstr(pos.0), fstr(pos.1))
             } else {
@@ -208,10 +208,10 @@ impl SvgElement {
     }
 
     /// Resolve any expressions in attributes. Note attributes are unchanged on failure.
-    pub fn eval_attributes(&mut self, context: &mut TransformerContext) {
+    pub fn eval_attributes(&mut self, ctx: &impl ContextView) {
         // Step 0: Resolve any attributes
         for (key, value) in self.attrs.clone() {
-            let replace = eval_attr(&value, context);
+            let replace = eval_attr(&value, ctx);
             self.attrs.insert(&key, &replace);
         }
     }
@@ -546,15 +546,10 @@ impl SvgElement {
     /// `anchor`: the anchor point for the position. This is only relevant for dirspec
     /// (e.g. `^:h`) and bare elref (e.g. `#id`), not for locspec or edgespec.
     ///
-    /// `context`: the transformer context, used for lookup of the reference element.
-    fn eval_pos(
-        &self,
-        input: &str,
-        anchor: LocSpec,
-        context: &TransformerContext,
-    ) -> Result<String> {
+    /// `ctx`: the transformer context, used for lookup of the reference element.
+    fn eval_pos(&self, input: &str, anchor: LocSpec, ctx: &impl ElementMap) -> Result<String> {
         let input = input.trim();
-        let (ref_el, remain) = self.split_relspec(input, context)?;
+        let (ref_el, remain) = self.split_relspec(input, ctx)?;
         let ref_el = match ref_el {
             Some(el) => el,
             None => return Ok(input.to_owned()),
@@ -576,11 +571,11 @@ impl SvgElement {
     fn split_relspec<'a, 'b>(
         &self,
         input: &'b str,
-        context: &'a TransformerContext,
+        ctx: &'a impl ElementMap,
     ) -> Result<(Option<&'a SvgElement>, &'b str)> {
         if input.starts_with('^') {
             let skip_prev = input.strip_prefix('^').unwrap_or(input);
-            Ok((context.get_prev_element(), skip_prev.trim_start()))
+            Ok((ctx.get_prev_element(), skip_prev.trim_start()))
         } else if input.starts_with('#') {
             let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
             let (id, remain) = extract_ref_id_re
@@ -592,7 +587,7 @@ impl SvgElement {
                     )
                 })
                 .unwrap_or(("INVALID ELEMENT ID", input));
-            if let Some(el) = context.get_element(id) {
+            if let Some(el) = ctx.get_element(id) {
                 Ok((Some(el), remain))
             } else {
                 bail!("Reference to unknown element '{}'", id);
@@ -685,10 +680,10 @@ impl SvgElement {
     ///
     /// `input`: the relspec string
     ///
-    /// `context`: the transformer context, used for lookup of the reference element.
-    fn eval_size(&self, input: &str, context: &TransformerContext) -> Result<String> {
+    /// `ctx`: the transformer context, used for lookup of the reference element.
+    fn eval_size(&self, input: &str, ctx: &impl ElementMap) -> Result<String> {
         let input = input.trim();
-        let (ref_el, remain) = self.split_relspec(input, context)?;
+        let (ref_el, remain) = self.split_relspec(input, ctx)?;
         let ref_el = match ref_el {
             Some(el) => el,
             None => return Ok(input.to_owned()),
@@ -712,10 +707,10 @@ impl SvgElement {
     }
 
     /// Process and expand layout attributes as needed. Assumes numeric attributes.
-    pub fn resolve_layout(&mut self, context: &mut TransformerContext) -> Result<()> {
+    pub fn resolve_layout(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Step 1: Evaluate size from wh attributes
         if let Some((wh, idx)) = self.attrs.pop_idx("wh") {
-            let value = self.eval_size(&wh, context)?;
+            let value = self.eval_size(&wh, ctx)?;
             let mut parts = attr_split_cycle(&value);
             let w = parts.next().context("wh must not be empty")?;
             let h = parts.next().context("wh must not be empty")?;
@@ -741,7 +736,7 @@ impl SvgElement {
         for (key, value) in &self.orig_attrs {
             // Single dimension size attributes
             if let "r" | "rx" | "ry" | "width" | "height" = key.as_str() {
-                self.attrs.insert(key.clone(), eval_attr(value, context));
+                self.attrs.insert(key.clone(), eval_attr(value, ctx));
             }
         }
 
@@ -783,10 +778,10 @@ impl SvgElement {
             match key.as_str() {
                 "xy" | "xy1" | "xy2" => {
                     // TODO: maybe split up? pos may depend on size, but size doesn't depend on pos
-                    value = self.eval_pos(value.as_str(), LocSpec::TopLeft, context)?;
+                    value = self.eval_pos(value.as_str(), LocSpec::TopLeft, ctx)?;
                 }
                 "cxy" => {
-                    value = self.eval_pos(value.as_str(), LocSpec::Center, context)?;
+                    value = self.eval_pos(value.as_str(), LocSpec::Center, ctx)?;
                 }
                 _ => (),
             }
@@ -873,10 +868,10 @@ impl SvgElement {
                         }
                     }
                     ("points", "polyline" | "polygon") => {
-                        pass_two_attrs.insert("points", expand_relspec(&value, context));
+                        pass_two_attrs.insert("points", expand_relspec(&value, ctx));
                     }
                     ("d", "path") => {
-                        pass_two_attrs.insert("d", expand_relspec(&value, context));
+                        pass_two_attrs.insert("d", expand_relspec(&value, ctx));
                     }
                     _ => pass_two_attrs.insert(key.clone(), value.clone()),
                 }
@@ -888,7 +883,7 @@ impl SvgElement {
             for (key, value) in &self.orig_attrs {
                 // Single dimension position attributes
                 if let "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" = key.as_str() {
-                    pass_two_attrs.insert(key.clone(), eval_attr(value, context));
+                    pass_two_attrs.insert(key.clone(), eval_attr(value, ctx));
                 }
             }
 

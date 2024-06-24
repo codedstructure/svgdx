@@ -28,7 +28,7 @@ pub struct InputEvent {
 impl Clone for InputEvent {
     fn clone(&self) -> Self {
         Self {
-            event: self.event.clone().into_owned(),
+            event: self.event.clone(),
             index: self.index,
             line: self.line,
             indent: self.indent,
@@ -39,7 +39,7 @@ impl Clone for InputEvent {
 impl InputEvent {
     fn into_owned(self) -> InputEvent {
         InputEvent {
-            event: self.event.into_owned(),
+            event: self.event,
             index: self.index,
             line: self.line,
             indent: self.indent,

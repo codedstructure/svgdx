@@ -41,6 +41,51 @@ impl Default for TransformerContext {
     }
 }
 
+pub trait ElementMap {
+    fn get_element(&self, id: &str) -> Option<&SvgElement>;
+    fn get_prev_element(&self) -> Option<&SvgElement>;
+}
+
+pub trait VariableMap {
+    fn get_var(&self, name: &str) -> Option<String>;
+    fn get_rng(&self) -> &RefCell<SmallRng>;
+}
+
+pub trait ContextView: ElementMap + VariableMap {}
+
+impl ElementMap for TransformerContext {
+    fn get_element(&self, id: &str) -> Option<&SvgElement> {
+        self.elem_map.get(id)
+    }
+
+    fn get_prev_element(&self) -> Option<&SvgElement> {
+        self.prev_element.as_ref()
+    }
+}
+
+impl VariableMap for TransformerContext {
+    /// Lookup variable in either parent attribute values or global variables
+    /// set using the `<var>` element.
+    fn get_var(&self, name: &str) -> Option<String> {
+        // Note we skip the element we're currently processing so we can access
+        // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
+        // requires that when evaluating `x="$x"` we don't look up `x` in the
+        // `rect` element itself.
+        for element_scope in self.current_element.iter().rev().skip(1) {
+            if let Some(value) = element_scope.get_attr(name) {
+                return Some(value.to_string());
+            }
+        }
+        return self.variables.get(name).cloned();
+    }
+
+    fn get_rng(&self) -> &RefCell<SmallRng> {
+        &self.rng
+    }
+}
+
+impl ContextView for TransformerContext {}
+
 impl TransformerContext {
     pub fn new() -> Self {
         Self::default()
@@ -50,16 +95,8 @@ impl TransformerContext {
         self.events = events;
     }
 
-    pub fn get_element(&self, id: &str) -> Option<&SvgElement> {
-        self.elem_map.get(id)
-    }
-
     pub fn get_original_element(&self, id: &str) -> Option<&SvgElement> {
         self.original_map.get(id)
-    }
-
-    pub fn get_rng(&self) -> &RefCell<SmallRng> {
-        &self.rng
     }
 
     pub fn seed_rng(&mut self, seed: u64) {
@@ -85,25 +122,6 @@ impl TransformerContext {
 
     pub fn get_current_element_mut(&mut self) -> Option<&mut SvgElement> {
         self.current_element.last_mut()
-    }
-
-    /// Lookup variable in either parent attribute values or global variables
-    /// set using the `<var>` element.
-    pub fn get_var(&self, name: &str) -> Option<String> {
-        // Note we skip the element we're currently processing so we can access
-        // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
-        // requires that when evaluating `x="$x"` we don't look up `x` in the
-        // `rect` element itself.
-        for element_scope in self.current_element.iter().rev().skip(1) {
-            if let Some(value) = element_scope.get_attr(name) {
-                return Some(value.to_string());
-            }
-        }
-        return self.variables.get(name).cloned();
-    }
-
-    pub fn get_prev_element(&self) -> Option<&SvgElement> {
-        self.prev_element.as_ref()
     }
 
     pub fn update_element(&mut self, el: &SvgElement) {
