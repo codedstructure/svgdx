@@ -1,10 +1,8 @@
 use crate::context::{ContextView, ElementMap};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
-use crate::types::{
-    attr_split, attr_split_cycle, fstr, strp, strp_length, AttrMap, BoundingBox, ClassList,
-    DirSpec, EdgeSpec, Length, LocSpec, OrderIndex,
-};
+use crate::position::{strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec};
+use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::regex;

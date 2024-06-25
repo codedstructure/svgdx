@@ -2,8 +2,9 @@ use crate::connector::{ConnectionType, Connector};
 use crate::element::{ContentType, SvgElement};
 use crate::events::{InputEvent, SvgEvent};
 use crate::expression::eval_attr;
+use crate::position::{position_element, BoundingBox, LocSpec, Position, TrblLength};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, strp, BoundingBox, LocSpec, TrblLength};
+use crate::types::{attr_split, attr_split_cycle, strp};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -250,6 +251,12 @@ impl TransformerContext {
 
         e.eval_attributes(self);
         e.resolve_layout(self)?;
+
+        // TODO: ultimately this should replace resolve_layout
+        let p = Position::from(&e);
+        if let Some(bb) = p.to_bbox() {
+            position_element(&mut e, bb);
+        }
         self.update_element(&e);
 
         // "xy-loc" attr allows us to position based on a non-top-left position

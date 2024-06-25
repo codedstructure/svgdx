@@ -41,6 +41,7 @@ mod events;
 mod expression;
 mod functions;
 mod path;
+mod position;
 #[cfg(feature = "server")]
 pub mod server;
 mod svg_defs;
