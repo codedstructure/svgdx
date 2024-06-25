@@ -36,6 +36,6 @@
   <text x="51" y="30" class="d-none d-code d-tbox d-text-left">
   <tspan x="51" dy="-1.8em">​</tspan><tspan x="51" dy="0.9em">def area(w, h):</tspan><tspan x="51" dy="0.9em">  &quot;&quot;&quot;Return area of thing&quot;&quot;&quot;</tspan><tspan x="51" dy="0.9em">  return w * h</tspan><tspan x="51" dy="0.9em">  </tspan>
   </text>
-  
+
 
 </svg>

@@ -13,76 +13,76 @@
   ]]>
   </style>
   <circle r="60" class="d-none d-fill-gold"/>
-  
+
     <line x1="70" y1="0" x2="100" y2="0" class="d-gold d-thick"/>
-  
+
     <line x1="68.937" y1="12.155" x2="98.481" y2="17.365" class="d-gold d-thick"/>
-  
+
     <line x1="65.778" y1="23.941" x2="93.969" y2="34.202" class="d-gold d-thick"/>
-  
+
     <line x1="60.622" y1="35" x2="86.603" y2="50" class="d-gold d-thick"/>
-  
+
     <line x1="53.623" y1="44.995" x2="76.604" y2="64.279" class="d-gold d-thick"/>
-  
+
     <line x1="44.995" y1="53.623" x2="64.279" y2="76.604" class="d-gold d-thick"/>
-  
+
     <line x1="35" y1="60.622" x2="50" y2="86.603" class="d-gold d-thick"/>
-  
+
     <line x1="23.941" y1="65.778" x2="34.202" y2="93.969" class="d-gold d-thick"/>
-  
+
     <line x1="12.155" y1="68.937" x2="17.365" y2="98.481" class="d-gold d-thick"/>
-  
+
     <line x1="0" y1="70" x2="0" y2="100" class="d-gold d-thick"/>
-  
+
     <line x1="-12.155" y1="68.937" x2="-17.365" y2="98.481" class="d-gold d-thick"/>
-  
+
     <line x1="-23.941" y1="65.778" x2="-34.202" y2="93.969" class="d-gold d-thick"/>
-  
+
     <line x1="-35" y1="60.622" x2="-50" y2="86.603" class="d-gold d-thick"/>
-  
+
     <line x1="-44.995" y1="53.623" x2="-64.279" y2="76.604" class="d-gold d-thick"/>
-  
+
     <line x1="-53.623" y1="44.995" x2="-76.604" y2="64.279" class="d-gold d-thick"/>
-  
+
     <line x1="-60.622" y1="35" x2="-86.603" y2="50" class="d-gold d-thick"/>
-  
+
     <line x1="-65.778" y1="23.941" x2="-93.969" y2="34.202" class="d-gold d-thick"/>
-  
+
     <line x1="-68.937" y1="12.155" x2="-98.481" y2="17.365" class="d-gold d-thick"/>
-  
+
     <line x1="-70" y1="0" x2="-100" y2="0" class="d-gold d-thick"/>
-  
+
     <line x1="-68.937" y1="-12.155" x2="-98.481" y2="-17.365" class="d-gold d-thick"/>
-  
+
     <line x1="-65.778" y1="-23.941" x2="-93.969" y2="-34.202" class="d-gold d-thick"/>
-  
+
     <line x1="-60.622" y1="-35" x2="-86.603" y2="-50" class="d-gold d-thick"/>
-  
+
     <line x1="-53.623" y1="-44.995" x2="-76.604" y2="-64.279" class="d-gold d-thick"/>
-  
+
     <line x1="-44.995" y1="-53.623" x2="-64.279" y2="-76.604" class="d-gold d-thick"/>
-  
+
     <line x1="-35" y1="-60.622" x2="-50" y2="-86.603" class="d-gold d-thick"/>
-  
+
     <line x1="-23.941" y1="-65.778" x2="-34.202" y2="-93.969" class="d-gold d-thick"/>
-  
+
     <line x1="-12.155" y1="-68.937" x2="-17.365" y2="-98.481" class="d-gold d-thick"/>
-  
+
     <line x1="0" y1="-70" x2="0" y2="-100" class="d-gold d-thick"/>
-  
+
     <line x1="12.155" y1="-68.937" x2="17.365" y2="-98.481" class="d-gold d-thick"/>
-  
+
     <line x1="23.941" y1="-65.778" x2="34.202" y2="-93.969" class="d-gold d-thick"/>
-  
+
     <line x1="35" y1="-60.622" x2="50" y2="-86.603" class="d-gold d-thick"/>
-  
+
     <line x1="44.995" y1="-53.623" x2="64.279" y2="-76.604" class="d-gold d-thick"/>
-  
+
     <line x1="53.623" y1="-44.995" x2="76.604" y2="-64.279" class="d-gold d-thick"/>
-  
+
     <line x1="60.622" y1="-35" x2="86.603" y2="-50" class="d-gold d-thick"/>
-  
+
     <line x1="65.778" y1="-23.941" x2="93.969" y2="-34.202" class="d-gold d-thick"/>
-  
+
     <line x1="68.937" y1="-12.155" x2="98.481" y2="-17.365" class="d-gold d-thick"/>
   </svg>

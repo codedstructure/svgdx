@@ -261,19 +261,33 @@ impl EventList {
     pub fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
 
-        let blank_line_remover = regex!("\n[ \t]+\n");
+        // Separate buffer for coalescing text events
+        let mut text_buf = String::new();
+
+        let blank_line_remover = regex!("[ \t]+\n");
         for event_pos in &self.events {
             // trim trailing whitespace.
             // just using `trim_end()` on Text events won't work
             // as Text event may be followed by a Start/Empty event.
             // blank lines *within* Text can be trimmed.
-            let mut event = event_pos.event.clone();
-            if let Event::Text(t) = event {
-                let mut content = String::from_utf8(t.as_ref().to_vec())?;
-                content = blank_line_remover.replace_all(&content, "\n\n").to_string();
-                event = Event::Text(BytesText::new(&content).into_owned());
+            let event = event_pos.event.clone();
+            if let Event::Text(ref t) = event {
+                let content = String::from_utf8(t.as_ref().to_vec())?;
+                text_buf.push_str(&content);
+                continue;
+            } else if !text_buf.is_empty() {
+                let content = blank_line_remover.replace_all(&text_buf, "\n").to_string();
+                let text_event = Event::Text(BytesText::new(&content).into_owned());
+                text_buf.clear();
+                writer.write_event(text_event)?;
             }
             writer.write_event(event)?;
+        }
+        // re-add any trailing text
+        if !text_buf.is_empty() {
+            let content = blank_line_remover.replace_all(&text_buf, "\n").to_string();
+            let text_event = Event::Text(BytesText::new(&content).into_owned());
+            writer.write_event(text_event)?;
         }
         Ok(())
     }
