@@ -1,12 +1,13 @@
 use crate::context::{ContextView, ElementMap};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
-use crate::position::{strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec};
+use crate::position::{strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, ScalarSpec};
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::regex;
 use regex::Captures;
+use std::str::FromStr;
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -595,6 +596,24 @@ impl SvgElement {
         }
     }
 
+    fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> String {
+        if let Ok(ss) = ScalarSpec::from_str(name) {
+            if let Ok((Some(el), length)) = self.split_relspec(value, ctx) {
+                if let Ok(Some(bbox)) = el.bbox() {
+                    let mut x = bbox.scalarspec(ss);
+                    // NOTE: ratio lengths don't make much sense for position attrs,
+                    // but don't currently check that here. Maybe ScalarSpec should
+                    // distinguish between position and size attributes.
+                    if let Ok(len) = strp_length(length) {
+                        x = len.adjust(x);
+                    }
+                    return fstr(x).to_string();
+                }
+            }
+        }
+        value.to_owned()
+    }
+
     /// Extract dx/dy from a string such as '10 20' or '10' (in which case dy is 0)
     fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)> {
         let mut parts = attr_split(input);
@@ -734,7 +753,10 @@ impl SvgElement {
         for (key, value) in &self.orig_attrs {
             // Single dimension size attributes
             if let "r" | "rx" | "ry" | "width" | "height" = key.as_str() {
-                self.attrs.insert(key.clone(), eval_attr(value, ctx));
+                let computed_orig = self.eval_rel_attr(key, value, ctx);
+                if strp(&computed_orig).is_ok() {
+                    self.attrs.insert(key.clone(), computed_orig);
+                }
             }
         }
 
@@ -881,7 +903,10 @@ impl SvgElement {
             for (key, value) in &self.orig_attrs {
                 // Single dimension position attributes
                 if let "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" = key.as_str() {
-                    pass_two_attrs.insert(key.clone(), eval_attr(value, ctx));
+                    let computed_orig = self.eval_rel_attr(key, value, ctx);
+                    if strp(&computed_orig).is_ok() {
+                        pass_two_attrs.insert(key.clone(), computed_orig);
+                    }
                 }
             }
 

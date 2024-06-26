@@ -54,6 +54,34 @@ impl Position {
             None
         }
     }
+
+    pub fn to_bbox_circle(&self) -> Option<BoundingBox> {
+        // For circles, width and height are the same, so we only need one plus a single
+        // other value to define the circle. The same logic would apply for squares,
+        // but that's not an SVG primitive.
+        let mut pos = self.clone();
+        if let Some((x1, x2)) = self.x_def() {
+            if let Some(cy) = self.cy {
+                pos.ymax = Some(cy + (x2 - x1) / 2.);
+            } else if let Some(y1) = self.ymin {
+                pos.ymax = Some(y1 + (x2 - x1));
+            } else if let Some(y2) = self.ymax {
+                pos.ymin = Some(y2 - (x2 - x1));
+            }
+            pos.to_bbox()
+        } else if let Some((y1, y2)) = self.y_def() {
+            if let Some(cx) = self.cx {
+                pos.xmax = Some(cx + (y2 - y1) / 2.);
+            } else if let Some(x1) = self.xmin {
+                pos.xmax = Some(x1 + (y2 - y1));
+            } else if let Some(x2) = self.xmax {
+                pos.xmin = Some(x2 - (y2 - y1));
+            }
+            pos.to_bbox()
+        } else {
+            None
+        }
+    }
 }
 
 impl SvgElement {
@@ -67,6 +95,10 @@ impl SvgElement {
 impl From<&SvgElement> for Position {
     fn from(value: &SvgElement) -> Self {
         let mut p = Position::new();
+
+        // TODO: need to fail on reference to unknown element to ensure
+        // forward references work (while still passing through e.g. x="10%"
+        // unchanged)
 
         let x = value.get_attr("x1").or(value.get_attr("x"));
         let y = value.get_attr("y1").or(value.get_attr("y"));
