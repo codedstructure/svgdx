@@ -115,3 +115,41 @@ fn test_position_relspec() {
 "#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+fn test_position_deferred() {
+    let input = r##"
+<rect x="#a" y="2" width="#a 50%" height="4"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"##;
+    let expected = r#"
+<rect x="1" y="2" width="1.5" height="4"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_position_deferred_inferred() {
+    // This checks both deferred values and inference from y1/y2 => r
+    let input = r##"
+<circle cx="#a" y1="#a" y2="#a"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"##;
+    let expected = r#"
+<circle cx="2.5" cy="4" r="2"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    // check inferred cx/x2/y2
+    let input = r##"
+<circle cx="#a" x2="#a" y2="#a"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"##;
+    let expected = r#"
+<circle cx="2.5" cy="4.5" r="1.5"/>
+<rect id="a" x="1" y="2" width="3" height="4"/>
+"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

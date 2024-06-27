@@ -596,9 +596,9 @@ impl SvgElement {
         }
     }
 
-    fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> String {
+    fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
         if let Ok(ss) = ScalarSpec::from_str(name) {
-            if let Ok((Some(el), length)) = self.split_relspec(value, ctx) {
+            if let (Some(el), length) = self.split_relspec(value, ctx)? {
                 if let Ok(Some(bbox)) = el.bbox() {
                     let mut x = bbox.scalarspec(ss);
                     // NOTE: ratio lengths don't make much sense for position attrs,
@@ -607,11 +607,11 @@ impl SvgElement {
                     if let Ok(len) = strp_length(length) {
                         x = len.adjust(x);
                     }
-                    return fstr(x).to_string();
+                    return Ok(fstr(x).to_string());
                 }
             }
         }
-        value.to_owned()
+        Ok(value.to_owned())
     }
 
     /// Extract dx/dy from a string such as '10 20' or '10' (in which case dy is 0)
@@ -753,7 +753,7 @@ impl SvgElement {
         for (key, value) in &self.orig_attrs {
             // Single dimension size attributes
             if let "r" | "rx" | "ry" | "width" | "height" = key.as_str() {
-                let computed_orig = self.eval_rel_attr(key, value, ctx);
+                let computed_orig = self.eval_rel_attr(key, value, ctx)?;
                 if strp(&computed_orig).is_ok() {
                     self.attrs.insert(key.clone(), computed_orig);
                 }
@@ -903,7 +903,7 @@ impl SvgElement {
             for (key, value) in &self.orig_attrs {
                 // Single dimension position attributes
                 if let "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" = key.as_str() {
-                    let computed_orig = self.eval_rel_attr(key, value, ctx);
+                    let computed_orig = self.eval_rel_attr(key, value, ctx)?;
                     if strp(&computed_orig).is_ok() {
                         pass_two_attrs.insert(key.clone(), computed_orig);
                     }
