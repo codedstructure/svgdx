@@ -254,11 +254,7 @@ impl TransformerContext {
 
         // TODO: ultimately this should replace resolve_layout
         let p = Position::from(&e);
-        if e.name == "circle" {
-            if let Some(bb) = p.to_bbox_circle() {
-                position_element(&mut e, bb);
-            }
-        } else if let Some(bb) = p.to_bbox() {
+        if let Some(bb) = p.to_bbox() {
             position_element(&mut e, bb);
         }
         self.update_element(&e);

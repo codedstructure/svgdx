@@ -902,7 +902,7 @@ impl SvgElement {
             // to take position from #other but override x.
             for (key, value) in &self.orig_attrs {
                 // Single dimension position attributes
-                if let "x" | "y" | "cx" | "cy" | "y1" | "x2" | "y2" = key.as_str() {
+                if let "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2" = key.as_str() {
                     let computed_orig = self.eval_rel_attr(key, value, ctx)?;
                     if strp(&computed_orig).is_ok() {
                         pass_two_attrs.insert(key.clone(), computed_orig);

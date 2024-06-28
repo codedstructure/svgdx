@@ -15,14 +15,20 @@ pub struct Position {
     pub cy: Option<f32>,
     pub width: Option<f32>,
     pub height: Option<f32>,
+
+    shape: String,
 }
 
 impl Position {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(shape: impl Into<String>) -> Self {
+        Self {
+            shape: shape.into(),
+            ..Default::default()
+        }
     }
 
     fn extent(
+        &self,
         start: Option<f32>,
         end: Option<f32>,
         middle: Option<f32>,
@@ -35,49 +41,66 @@ impl Position {
             (Some(s), _, _, Some(l)) => Some((s, s + l)),
             (_, Some(e), _, Some(l)) => Some((e - l, e)),
             (_, _, Some(m), Some(l)) => Some((m - l / 2.0, m + l / 2.0)),
+            // The following case allows lines to be specified by cx/cy in one dimension
+            (None, None, Some(m), None) => {
+                if self.shape == "line" {
+                    Some((m, m))
+                } else {
+                    None
+                }
+            }
             _ => None,
         }
     }
 
+    // For 'square' elements, a single value in one dimension plus extent
+    // in the other leads to extent in both dimensions.
+    fn three_point(
+        &self,
+        extent: f32,
+        start: Option<f32>,
+        middle: Option<f32>,
+        end: Option<f32>,
+    ) -> Option<(f32, f32)> {
+        let (s, e) = match (start, middle, end) {
+            (Some(s), _, _) => (s, s + extent),
+            (_, Some(m), _) => (m - extent / 2., m + extent / 2.),
+            (_, _, Some(e)) => (e - extent, e),
+            _ => return None,
+        };
+        Some((s, e))
+    }
+
     fn x_def(&self) -> Option<(f32, f32)> {
-        Self::extent(self.xmin, self.xmax, self.cx, self.width)
+        self.extent(self.xmin, self.xmax, self.cx, self.width)
     }
 
     fn y_def(&self) -> Option<(f32, f32)> {
-        Self::extent(self.ymin, self.ymax, self.cy, self.height)
+        self.extent(self.ymin, self.ymax, self.cy, self.height)
     }
 
     pub fn to_bbox(&self) -> Option<BoundingBox> {
         if let (Some((x1, x2)), Some((y1, y2))) = (self.x_def(), self.y_def()) {
             Some(BoundingBox::new(x1, y1, x2, y2))
-        } else {
-            None
-        }
-    }
-
-    pub fn to_bbox_circle(&self) -> Option<BoundingBox> {
-        // For circles, width and height are the same, so we only need one plus a single
-        // other value to define the circle. The same logic would apply for squares,
-        // but that's not an SVG primitive.
-        let mut pos = self.clone();
-        if let Some((x1, x2)) = self.x_def() {
-            if let Some(cy) = self.cy {
-                pos.ymax = Some(cy + (x2 - x1) / 2.);
-            } else if let Some(y1) = self.ymin {
-                pos.ymax = Some(y1 + (x2 - x1));
-            } else if let Some(y2) = self.ymax {
-                pos.ymin = Some(y2 - (x2 - x1));
+        } else if self.shape == "circle" {
+            // For circles, width and height are the same, so we only need one plus a single
+            // other value to define the circle. The same logic would apply for squares,
+            // but that's not an SVG primitive.
+            if let Some((x1, x2)) = self.x_def() {
+                if let Some((y1, y2)) = self.three_point(x2 - x1, self.ymin, self.cy, self.ymax) {
+                    Some(BoundingBox::new(x1, y1, x2, y2))
+                } else {
+                    None
+                }
+            } else if let Some((y1, y2)) = self.y_def() {
+                if let Some((x1, x2)) = self.three_point(y2 - y1, self.xmin, self.cx, self.xmax) {
+                    Some(BoundingBox::new(x1, y1, x2, y2))
+                } else {
+                    None
+                }
+            } else {
+                None
             }
-            pos.to_bbox()
-        } else if let Some((y1, y2)) = self.y_def() {
-            if let Some(cx) = self.cx {
-                pos.xmax = Some(cx + (y2 - y1) / 2.);
-            } else if let Some(x1) = self.xmin {
-                pos.xmax = Some(x1 + (y2 - y1));
-            } else if let Some(x2) = self.xmax {
-                pos.xmin = Some(x2 - (y2 - y1));
-            }
-            pos.to_bbox()
         } else {
             None
         }
@@ -94,7 +117,7 @@ impl SvgElement {
 
 impl From<&SvgElement> for Position {
     fn from(value: &SvgElement) -> Self {
-        let mut p = Position::new();
+        let mut p = Position::new(&value.name);
 
         // TODO: need to fail on reference to unknown element to ensure
         // forward references work (while still passing through e.g. x="10%"
