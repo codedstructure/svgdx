@@ -1,0 +1,17 @@
+<svg>
+  <config background="green"/>
+  <style>svg * { fill: green; stroke: white}</style>
+  <var size="100"/>
+  <rect id="o" wh="{{$size, $size / 1.667}}"/>
+
+  <circle wh="{{$size / 6}}" cxy="#o"/>
+  <line cx="#o" y1="#o" y2="#o"/>
+
+  <circle cy="#o" cx="#pa1 3" r="{{$size / 12}}"/>
+  <rect id="pa1" wh="#o 15% 60%" cy="#o" x1="#o"/>
+  <rect wh="#o 5% 30%" cy="#o" x1="#o"/>
+
+  <circle cy="#o" cx="#pa2 -3" r="{{$size / 12}}"/>
+  <rect id="pa2" wh="#o 15% 60%" cy="#o" x2="#o"/>
+  <rect wh="#o 5% 30%" cy="#o" x2="#o"/>
+</svg>
