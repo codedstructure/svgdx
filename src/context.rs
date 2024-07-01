@@ -2,16 +2,43 @@ use crate::connector::{ConnectionType, Connector};
 use crate::element::{ContentType, SvgElement};
 use crate::events::{InputEvent, SvgEvent};
 use crate::expression::eval_attr;
-use crate::position::{position_element, BoundingBox, LocSpec, Position, TrblLength};
+use crate::position::{BoundingBox, Position, TrblLength};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, strp};
+use crate::types::{attr_split, attr_split_cycle, fstr, strp};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 
 use anyhow::{bail, Context, Result};
 
+use lazy_regex::regex;
 use rand::prelude::*;
+use regex::Captures;
+
+/// Replace all refspec entries in a string with lookup results
+/// Suitable for use with path `d` or polyline `points` attributes
+/// which may contain many such entries.
+///
+/// Infallible; any invalid refspec will be left unchanged.
+fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
+    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
+
+    let result = locspec.replace_all(value, |caps: &Captures| {
+        let elref = caps.name("id").expect("Regex Match").as_str();
+        let loc = caps.name("loc").expect("Regex Match").as_str();
+        if let Some(elem) = ctx.get_element(elref) {
+            if let Ok(Some(pos)) = elem.coord(loc) {
+                format!("{} {}", fstr(pos.0), fstr(pos.1))
+            } else {
+                value.to_string()
+            }
+        } else {
+            value.to_string()
+        }
+    });
+
+    result.to_string()
+}
 
 pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
@@ -249,36 +276,25 @@ impl TransformerContext {
         events.extend(self.handle_comments(&mut e));
         self.handle_containment(&mut e)?;
 
+        // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         e.eval_attributes(self);
-        e.resolve_layout(self)?;
+        // Need size before can evaluate relative position
+        e.expand_compound_size(self)?;
+        e.eval_rel_position(self)?;
+        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        e.expand_compound_pos(self)?;
+        e.eval_rel_attributes(self)?;
 
-        // TODO: ultimately this should replace resolve_layout
+        if let ("polyline" | "polygon", Some(points)) = (e.name.as_str(), e.get_attr("points")) {
+            e.set_attr("points", &expand_relspec(&points, self));
+        }
+        if let ("path", Some(d)) = (e.name.as_str(), e.get_attr("d")) {
+            e.set_attr("d", &expand_relspec(&d, self));
+        }
+
         let p = Position::from(&e);
-        if let Some(bb) = p.to_bbox() {
-            position_element(&mut e, bb);
-        }
+        p.set_position_attrs(&mut e);
         self.update_element(&e);
-
-        // "xy-loc" attr allows us to position based on a non-top-left position
-        // assumes the bounding-box is well-defined by this point.
-        if let (Some(bbox), Some(xy_loc)) = (e.bbox()?, e.pop_attr("xy-loc")) {
-            let xy_loc: LocSpec = xy_loc.as_str().parse().context("Invalid xy-loc value")?;
-            let width = bbox.width();
-            let height = bbox.height();
-            let (dx, dy) = match xy_loc {
-                LocSpec::TopLeft => (0., 0.),
-                LocSpec::Top => (width / 2., 0.),
-                LocSpec::TopRight => (width, 0.),
-                LocSpec::Right => (width, height / 2.),
-                LocSpec::BottomRight => (width, height),
-                LocSpec::Bottom => (width / 2., height),
-                LocSpec::BottomLeft => (0., height),
-                LocSpec::Left => (0., height / 2.),
-                LocSpec::Center => (width / 2., height / 2.),
-            };
-            e = e.translated(-dx, -dy)?;
-            self.update_element(&e);
-        }
 
         if e.is_connector() {
             if let Ok(conn) = Connector::from_element(

@@ -73,9 +73,9 @@ impl OrderIndex {
 /// architectures, this is not considered a problem.
 #[derive(Debug, Clone, Default)]
 pub struct AttrMap {
-    attrs: BTreeMap<(usize, String), String>,
-    index_map: HashMap<String, usize>,
-    next_index: usize,
+    attrs: BTreeMap<(isize, String), String>,
+    index_map: HashMap<String, isize>,
+    next_index: isize,
 }
 
 impl Display for AttrMap {
@@ -103,29 +103,43 @@ impl AttrMap {
         self.attrs.is_empty()
     }
 
+    fn tweak_index(&self, key: &str, index: isize) -> isize {
+        match key {
+            "id" => -10000,
+            "version" => -9900,
+            "xmlns" => -9800,
+            "href" => -9700,
+            "x" => -9000,
+            "cx" => -8500,
+            "y" => -8000,
+            "cy" => -7500,
+            "width" => -7000,
+            "rx" => -6500,
+            "height" => -6000,
+            "ry" => -5500,
+            "r" => -5000,
+            _ => index,
+        }
+    }
+
     /// Insert-or-update the given key/value into the `AttrMap`.
     /// If the key is already present, update in place; otherwise append.
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
         let value = value.into();
-        let index = *self.index_map.entry(key.clone()).or_insert_with(|| {
-            // Provide a gap so additional attributes can be inserted 'between' these,
-            // e.g. in the case of removal with `pop_idx` and insertion of replacement
-            // attributes with `insert_idx`.
-            // TODO: The value here should ideally be > the max number of attributes supported
-            // by this struct so we never have an overlap, though that assumes sensible
-            // use of `insert_idx` by clients - not sustainable. Should improve the API here.
-            self.next_index += 256;
-            self.next_index
-        });
+        let tweaked = self.tweak_index(&key, self.next_index + 1);
+        if tweaked >= 0 {
+            self.next_index += 1;
+        }
+        let index = *self.index_map.entry(key.clone()).or_insert_with(|| tweaked);
         self.attrs.insert((index, key), value);
     }
 
-    pub fn insert_idx(&mut self, key: impl Into<String>, value: impl Into<String>, idx: usize) {
+    pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
-        let value = value.into();
-        let index = *self.index_map.entry(key.clone()).or_insert_with(|| idx);
-        self.attrs.insert((index, key), value);
+        if !self.contains_key(&key) {
+            self.insert(key, value);
+        }
     }
 
     pub fn contains_key(&self, key: impl Into<String>) -> bool {
@@ -151,17 +165,6 @@ impl AttrMap {
         } else {
             None
         }
-    }
-
-    pub fn pop_idx(&mut self, key: impl Into<String>) -> Option<(String, usize)> {
-        let key = key.into();
-        if let Some(&index) = self.index_map.get(&key) {
-            let idx = self.index_map.remove(&key).expect("invariant");
-            if let Some(value) = self.attrs.remove(&(index, key)) {
-                return Some((value, idx));
-            }
-        }
-        None
     }
 
     pub fn to_vec(&self) -> Vec<(String, String)> {

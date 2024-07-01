@@ -80,29 +80,117 @@ impl Position {
     }
 
     pub fn to_bbox(&self) -> Option<BoundingBox> {
-        if let (Some((x1, x2)), Some((y1, y2))) = (self.x_def(), self.y_def()) {
+        let x_ext = self.x_def();
+        let y_ext = self.y_def();
+        if let (Some((x1, x2)), Some((y1, y2))) = (x_ext, y_ext) {
             Some(BoundingBox::new(x1, y1, x2, y2))
         } else if self.shape == "circle" {
             // For circles, width and height are the same, so we only need one plus a single
             // other value to define the circle. The same logic would apply for squares,
             // but that's not an SVG primitive.
-            if let Some((x1, x2)) = self.x_def() {
+            if let Some((x1, x2)) = x_ext {
                 if let Some((y1, y2)) = self.three_point(x2 - x1, self.ymin, self.cy, self.ymax) {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
                     None
                 }
-            } else if let Some((y1, y2)) = self.y_def() {
+            } else if let Some((y1, y2)) = y_ext {
                 if let Some((x1, x2)) = self.three_point(y2 - y1, self.xmin, self.cx, self.xmax) {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
                     None
                 }
             } else {
-                None
+                // if cx/cy (etc) are absent, SVG says they are treated as zero.
+                self.width.map(|r| BoundingBox::new(-r, -r, r, r))
             }
+        } else if let (Some(w), Some(h)) = (self.width, self.height) {
+            // if x/y (etc) are absent, SVG says they are treated as zero.
+            Some(BoundingBox::new(0., 0., w, h))
         } else {
             None
+        }
+    }
+
+    fn has_x_position(&self) -> bool {
+        self.xmin.is_some() || self.xmax.is_some() || self.cx.is_some()
+    }
+
+    fn has_y_position(&self) -> bool {
+        self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some()
+    }
+
+    pub fn set_position_attrs(&self, element: &mut SvgElement) {
+        if let Some(bbox) = self.to_bbox() {
+            // TODO: should xy-loc be handled here?
+            match element.name.as_str() {
+                "rect" | "use" | "image" | "svg" | "foreignObject" => {
+                    let width = bbox.width();
+                    let height = bbox.height();
+                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                    if self.has_x_position() {
+                        element.set_attr("x", &fstr(x1));
+                    }
+                    if self.has_y_position() {
+                        element.set_attr("y", &fstr(y1));
+                    }
+                    element.set_attr("width", &fstr(width));
+                    element.set_attr("height", &fstr(height));
+                    element.remove_attrs(&[
+                        "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy",
+                    ]);
+                }
+                "circle" => {
+                    let (cx, cy) = bbox.center();
+                    let r = bbox.width() / 2.0;
+                    if self.has_x_position() {
+                        element.set_attr("cx", &fstr(cx));
+                    }
+                    if self.has_y_position() {
+                        element.set_attr("cy", &fstr(cy));
+                    }
+                    element.set_attr("r", &fstr(r));
+                    element.remove_attrs(&[
+                        "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "rx", "ry",
+                        "width", "height",
+                    ]);
+                }
+                "ellipse" => {
+                    let (cx, cy) = bbox.center();
+                    let rx = bbox.width() / 2.0;
+                    let ry = bbox.height() / 2.0;
+                    if self.has_x_position() {
+                        element.set_attr("cx", &fstr(cx));
+                    }
+                    if self.has_y_position() {
+                        element.set_attr("cy", &fstr(cy));
+                    }
+                    element.set_attr("rx", &fstr(rx));
+                    element.set_attr("ry", &fstr(ry));
+                    element.remove_attrs(&[
+                        "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "r", "width",
+                        "height",
+                    ]);
+                }
+                "line" => {
+                    // NOTE: lines are directional, so we don't want to set x1/y1 if they're already set
+                    if element.get_attr("x1").is_none() && element.get_attr("y1").is_none() {
+                        let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                        element.set_attr("x1", &fstr(x1));
+                        element.set_attr("y1", &fstr(y1));
+                    }
+                    if element.get_attr("x2").is_none() && element.get_attr("y2").is_none() {
+                        let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
+                        element.set_attr("x2", &fstr(x2));
+                        element.set_attr("y2", &fstr(y2));
+                    }
+                    element.remove_attrs(&[
+                        "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
+                        "height",
+                    ]);
+                }
+                _ => (),
+            }
         }
     }
 }
@@ -122,6 +210,15 @@ impl From<&SvgElement> for Position {
         // TODO: need to fail on reference to unknown element to ensure
         // forward references work (while still passing through e.g. x="10%"
         // unchanged)
+
+        let dx = value.get_attr("dx").and_then(|dx| strp(dx.as_ref()).ok());
+        let dy = value.get_attr("dy").and_then(|dy| strp(dy.as_ref()).ok());
+        let dw = value
+            .get_attr("dw")
+            .and_then(|dw| strp_length(dw.as_ref()).ok());
+        let dh = value
+            .get_attr("dh")
+            .and_then(|dh| strp_length(dh.as_ref()).ok());
 
         let x = value.get_attr("x1").or(value.get_attr("x"));
         let y = value.get_attr("y1").or(value.get_attr("y"));
@@ -175,64 +272,27 @@ impl From<&SvgElement> for Position {
             }
         }
 
-        p
-    }
-}
+        if let Some(dx) = dx {
+            p.xmin = p.xmin.map(|x| x + dx);
+            p.xmax = p.xmax.map(|x| x + dx);
+            p.cx = p.cx.map(|x| x + dx);
+        }
+        if let Some(dy) = dy {
+            p.ymin = p.ymin.map(|y| y + dy);
+            p.ymax = p.ymax.map(|y| y + dy);
+            p.cy = p.cy.map(|y| y + dy);
+        }
+        if let Some(dw) = dw {
+            println!("dw: {:?}", dw);
+            println!("before: {:?}", p);
+            p.width = p.width.map(|w| dw.adjust(w));
+            println!("after: {:?}", p);
+        }
+        if let Some(dh) = dh {
+            p.height = p.height.map(|h| dh.adjust(h));
+        }
 
-pub fn position_element(element: &mut SvgElement, bbox: BoundingBox) {
-    // TODO: should xy-loc be handled here?
-    match element.name.as_str() {
-        "rect" | "use" | "image" | "svg" | "foreignObject" => {
-            let width = bbox.width();
-            let height = bbox.height();
-            let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-            element.set_attr("x", &fstr(x1));
-            element.set_attr("y", &fstr(y1));
-            element.set_attr("width", &fstr(width));
-            element.set_attr("height", &fstr(height));
-            element.remove_attrs(&["x1", "y1", "x2", "y2", "cx", "cy"]);
-        }
-        "circle" => {
-            let (cx, cy) = bbox.center();
-            let r = bbox.width() / 2.0;
-            element.set_attr("cx", &fstr(cx));
-            element.set_attr("cy", &fstr(cy));
-            element.set_attr("r", &fstr(r));
-            element.remove_attrs(&[
-                "x", "y", "x1", "y1", "x2", "y2", "rx", "ry", "width", "height",
-            ]);
-        }
-        "ellipse" => {
-            let (cx, cy) = bbox.center();
-            let rx = bbox.width() / 2.0;
-            let ry = bbox.height() / 2.0;
-            element.set_attr("cx", &fstr(cx));
-            element.set_attr("cy", &fstr(cy));
-            element.set_attr("rx", &fstr(rx));
-            element.set_attr("ry", &fstr(ry));
-            element.remove_attrs(&["x", "y", "x1", "y1", "x2", "y2", "r", "width", "height"]);
-        }
-        "line" => {
-            // NOTE: lines are directional, so we don't want to set x1/y1 if they're already set
-            if element.get_attr("x1").is_none() {
-                let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-                element.set_attr("x1", &fstr(x1));
-                element.set_attr("y1", &fstr(y1));
-            }
-            if element.get_attr("x2").is_none() {
-                let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
-                element.set_attr("x2", &fstr(x2));
-                element.set_attr("y2", &fstr(y2));
-            }
-            let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-            let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
-            element.set_attr("x1", &fstr(x1));
-            element.set_attr("y1", &fstr(y1));
-            element.set_attr("x2", &fstr(x2));
-            element.set_attr("y2", &fstr(y2));
-            element.remove_attrs(&["x", "y", "cx", "cy", "rx", "ry", "r", "width", "height"]);
-        }
-        _ => (),
+        p
     }
 }
 
@@ -315,7 +375,7 @@ pub fn strp_length(s: &str) -> anyhow::Result<Length> {
     }
 }
 /// `DirSpec` defines a location relative to an element's `BoundingBox`
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum DirSpec {
     InFront,
     Behind,

@@ -47,7 +47,7 @@ fn test_roundtrip_shapes() {
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
 
         <rect x="1" y="2" width="3" height="4"/>
-        <rect y="1" height="5" width="9" x="3"/>
+        <rect x="1" y="1" width="9" height="5"/>
 
 
     <circle cx="12" cy="34" r="56"/>

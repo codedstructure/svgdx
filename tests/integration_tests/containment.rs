@@ -102,7 +102,7 @@ fn test_surround_connectors() {
 "##;
     let expected1 = r#"<rect id="s1" x="-1" y="-1" width="7" height="14" class="d-surround"/>"#;
     let expected2 = r#"<rect id="s2" x="22" y="2.5" width="9" height="17" class="d-surround"/>"#;
-    let expected3 = r#"<polyline points="6 6, 14 6, 14 11, 22 11" id="ll"/>"#;
+    let expected3 = r#"<polyline id="ll" points="6 6, 14 6, 14 11, 22 11"/>"#;
 
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
@@ -145,7 +145,7 @@ fn test_surround_connectors_permute() {
         let expected1 = r#"<rect id="s1" x="-1" y="-1" width="7" height="14" class="d-surround"/>"#;
         let expected2 =
             r#"<rect id="s2" x="22" y="2.5" width="9" height="17" class="d-surround"/>"#;
-        let expected3 = r#"<polyline points="6 6, 14 6, 14 11, 22 11" id="ll"/>"#;
+        let expected3 = r#"<polyline id="ll" points="6 6, 14 6, 14 11, 22 11"/>"#;
 
         assert_contains!(output, expected1);
         assert_contains!(output, expected2);

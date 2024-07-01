@@ -112,17 +112,17 @@ fn test_loop_nested() {
 </loop>
 "#;
     let expected = r#"
-<rect width="1" height="1" x="3" y="3"/>
-<rect width="1" height="1" x="2" y="3"/>
-<rect width="1" height="1" x="1" y="3"/>
+<rect x="3" y="3" width="1" height="1"/>
+<rect x="2" y="3" width="1" height="1"/>
+<rect x="1" y="3" width="1" height="1"/>
 
-<rect width="1" height="1" x="3" y="2"/>
-<rect width="1" height="1" x="2" y="2"/>
-<rect width="1" height="1" x="1" y="2"/>
+<rect x="3" y="2" width="1" height="1"/>
+<rect x="2" y="2" width="1" height="1"/>
+<rect x="1" y="2" width="1" height="1"/>
 
-<rect width="1" height="1" x="3" y="1"/>
-<rect width="1" height="1" x="2" y="1"/>
-<rect width="1" height="1" x="1" y="1"/>
+<rect x="3" y="1" width="1" height="1"/>
+<rect x="2" y="1" width="1" height="1"/>
+<rect x="1" y="1" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
@@ -146,11 +146,11 @@ fn test_loop_nested_deep() {
 </loop>
 "#;
     let expected = r#"
-<rect width="1" height="1" x="4" y="4" class="d-thin"/>
+<rect x="4" y="4" width="1" height="1" class="d-thin"/>
 
-<rect width="1" height="1" x="3.667" y="3.667" class="d-thin"/>
+<rect x="3.667" y="3.667" width="1" height="1" class="d-thin"/>
 
-<rect width="1" height="1" x="3.333" y="3.333" class="d-thin"/>
+<rect x="3.333" y="3.333" width="1" height="1" class="d-thin"/>
 "#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
@@ -166,18 +166,18 @@ fn test_loop_count_loop_var() {
 </loop>
 "#;
     let expected = r#"
-<rect width="1" height="1" x="0" y="0"/>
+<rect x="0" y="0" width="1" height="1"/>
 
-<rect width="1" height="1" x="3" y="0"/>
+<rect x="3" y="0" width="1" height="1"/>
 
-<rect width="1" height="1" x="6" y="0"/>
+<rect x="6" y="0" width="1" height="1"/>
 
 
-<rect width="1" height="1" x="0" y="3"/>
+<rect x="0" y="3" width="1" height="1"/>
 
-<rect width="1" height="1" x="3" y="3"/>
+<rect x="3" y="3" width="1" height="1"/>
 
-<rect width="1" height="1" x="6" y="3"/>
+<rect x="6" y="3" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
@@ -191,11 +191,11 @@ fn test_loop_count_loop_start_step() {
 </loop>
 "#;
     let expected = r#"
-<rect width="1" height="1" x="-4.5" y="10"/>
+<rect x="-4.5" y="10" width="1" height="1"/>
 
-<rect width="1" height="1" x="-3" y="10"/>
+<rect x="-3" y="10" width="1" height="1"/>
 
-<rect width="1" height="1" x="-1.5" y="10"/>
+<rect x="-1.5" y="10" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);

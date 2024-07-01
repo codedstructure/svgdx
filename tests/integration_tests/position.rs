@@ -8,7 +8,7 @@ fn test_position_trivial() {
 
     // Check x1/y1 are treated as alternatives to x/y
     let input = r#"<rect x1="1" y1="2" width="3" height="4"/>"#;
-    let expected = r#"<rect width="3" height="4" x="1" y="2"/>"#;
+    let expected = r#"<rect x="1" y="2" width="3" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 
@@ -16,27 +16,27 @@ fn test_position_trivial() {
 fn test_position_x_spec() {
     // Specify cx and width
     let input = r#"<rect cx="1" y="2" width="3" height="4"/>"#;
-    let expected = r#"<rect y="2" width="3" height="4" x="-0.5"/>"#;
+    let expected = r#"<rect x="-0.5" y="2" width="3" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify x2 and width
     let input = r#"<rect x2="1" y="2" width="3" height="4"/>"#;
-    let expected = r#"<rect y="2" width="3" height="4" x="-2"/>"#;
+    let expected = r#"<rect x="-2" y="2" width="3" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify x1 and x2
     let input = r#"<rect x1="1" y="2" x2="3" height="4"/>"#;
-    let expected = r#"<rect y="2" height="4" x="1" width="2"/>"#;
+    let expected = r#"<rect x="1" y="2" width="2" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify x2 and cx
     let input = r#"<rect x2="3" cx="1" y="2" height="4"/>"#;
-    let expected = r#"<rect y="2" height="4" x="-1" width="4"/>"#;
+    let expected = r#"<rect x="-1" y="2" width="4" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify x1 and cx
     let input = r#"<rect x1="1" cx="4" y="2" height="4"/>"#;
-    let expected = r#"<rect y="2" height="4" x="1" width="6"/>"#;
+    let expected = r#"<rect x="1" y="2" width="6" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 
@@ -44,27 +44,27 @@ fn test_position_x_spec() {
 fn test_position_y_spec() {
     // Specify cy and height
     let input = r#"<rect cy="1" x="2" height="3" width="4"/>"#;
-    let expected = r#"<rect x="2" height="3" width="4" y="-0.5"/>"#;
+    let expected = r#"<rect x="2" y="-0.5" width="4" height="3"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify y2 and height
     let input = r#"<rect y2="1" x="2" height="3" width="4"/>"#;
-    let expected = r#"<rect x="2" height="3" width="4" y="-2"/>"#;
+    let expected = r#"<rect x="2" y="-2" width="4" height="3"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify y1 and y2
     let input = r#"<rect y1="1" x="2" y2="3" width="4"/>"#;
-    let expected = r#"<rect x="2" width="4" y="1" height="2"/>"#;
+    let expected = r#"<rect x="2" y="1" width="4" height="2"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify y2 and cy
     let input = r#"<rect y2="3" cy="1" x="2" width="4"/>"#;
-    let expected = r#"<rect x="2" width="4" y="-1" height="4"/>"#;
+    let expected = r#"<rect x="2" y="-1" width="4" height="4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Specify y1 and cy
     let input = r#"<rect y1="1" cy="4" x="2" width="4"/>"#;
-    let expected = r#"<rect x="2" width="4" y="1" height="6"/>"#;
+    let expected = r#"<rect x="2" y="1" width="4" height="6"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 
@@ -77,7 +77,7 @@ fn test_position_circle() {
 
     // Specify x1/cx and cy for circle
     let input = r#"<circle x1="1" y2="6" cy="3" />"#;
-    let expected = r#"<circle cy="3" cx="4" r="3"/>"#;
+    let expected = r#"<circle cx="4" cy="3" r="3"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 

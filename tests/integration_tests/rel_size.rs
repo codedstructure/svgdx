@@ -7,7 +7,7 @@ fn test_rel_size_prev() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="25 35" wh="^" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="25" y="35" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="25" y="35" width="20" height="60"/>"#;
     let output = transform_str_default(rel_wh_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -20,7 +20,7 @@ fn test_rel_size_refid() {
 <rect xy="22 23" wh="234 654" />
 <rect xy="12 0" wh="#abc" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="12" y="0" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="12" y="0" width="20" height="60"/>"#;
     let output = transform_str_default(rel_size_refid_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -31,7 +31,7 @@ fn test_rel_size_dxy() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="1 2" wh="^ 2 -5" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="1" y="2" width="22" height="55" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="1" y="2" width="22" height="55"/>"#;
     let output = transform_str_default(rel_size_dxy_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -41,7 +41,7 @@ fn test_rel_size_dxy() {
 <rect xy="22 23" wh="234 654" />
 <rect xy="1 2" wh="#abc -2 5" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="1" y="2" width="18" height="65" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="1" y="2" width="18" height="65"/>"#;
     let output = transform_str_default(rel_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -52,7 +52,7 @@ fn test_rel_size_dxy_pct() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="1 2" wh="^ 110% 50%" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="1" y="2" width="22" height="30" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="1" y="2" width="22" height="30"/>"#;
     let output = transform_str_default(rel_size_dxy_pct_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -62,7 +62,7 @@ fn test_rel_size_dxy_pct() {
 <rect xy="22 23" wh="234 654" />
 <rect xy="1 2" wh="#abc 40% 150%" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="1" y="2" width="8" height="90" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="1" y="2" width="8" height="90"/>"#;
     let output = transform_str_default(rel_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -82,13 +82,13 @@ fn test_rel_size_recursive() {
 <rect xy="1 1" wh="2"/>
 <rect xy="1 1" wh="#y" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="12" y="34" width="23" height="30" id="x"/>"#;
+    let expected_rect = r#"<rect id="x" x="12" y="34" width="23" height="30"/>"#;
     let output = transform_str_default(rel_recur_input).unwrap();
     assert_contains!(output, expected_rect);
-    let expected_rect = r#"<rect x="2" y="2" width="46" height="27" id="y"/>"#;
+    let expected_rect = r#"<rect id="y" x="2" y="2" width="46" height="27"/>"#;
     let output = transform_str_default(rel_recur_input).unwrap();
     assert_contains!(output, expected_rect);
-    let expected_rect = r#"<rect x="1" y="1" width="46" height="27" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="1" y="1" width="46" height="27"/>"#;
     let output = transform_str_default(rel_recur_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -102,7 +102,7 @@ fn test_rel_size_dwh() {
 <rect cxy="#b@br" wh="1" id="z" />
 "##;
     let expected_rect = r#"
-<rect x="34.5" y="2" width="1" height="1" id="z"/>
+<rect id="z" x="34.5" y="2" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_rect);

@@ -14,17 +14,17 @@
     * { stroke-width: 0.2; fill: none; stroke: black; }
     ]]>
   </style>
-  <rect x="0" y="0" width="5" height="5" id="a"/>
+  <rect id="a" x="0" y="0" width="5" height="5"/>
   <rect x="0" y="7" width="5" height="5"/>
   <rect x="0" y="14" width="5" height="5"/>
   <rect x="0" y="21" width="5" height="5"/>
-  <ellipse cx="20" cy="30" rx="10" ry="5" id="z"/>
+  <ellipse id="z" cx="20" cy="30" rx="10" ry="5"/>
   <text x="20" y="30" style="font-size:5px" class="d-tbox">ellipse</text>
   <line x1="5" y1="5" x2="10" y2="25"/>
   <polyline points="0 0, 3 3, 5 5, 5 2.5"/>
   <polyline points="2 3 5 6 7 8 7 5.5"/>
-  <rect x="-9" y="-15.5" width="21" height="41" id="z"/>
-  <rect x="1.5" y="5" width="21" height="41" id="zz"/>
+  <rect id="z" x="-9" y="-15.5" width="21" height="41"/>
+  <rect id="zz" x="1.5" y="5" width="21" height="41"/>
   <rect width="100" height="50"/>
   <text x="1" y="25" class="d-tbox d-text-left">3 * 11 = 33</text>
 </svg>
