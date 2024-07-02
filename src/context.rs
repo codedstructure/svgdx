@@ -278,11 +278,14 @@ impl TransformerContext {
 
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         e.eval_attributes(self);
+
         // Need size before can evaluate relative position
-        e.expand_compound_size(self)?;
+        e.expand_compound_size();
+        e.eval_rel_attributes(self)?;
+
         e.eval_rel_position(self)?;
         // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        e.expand_compound_pos(self)?;
+        e.expand_compound_pos();
         e.eval_rel_attributes(self)?;
 
         if let ("polyline" | "polygon", Some(points)) = (e.name.as_str(), e.get_attr("points")) {

@@ -153,3 +153,38 @@ fn test_position_deferred_inferred() {
 "#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+fn test_position_missing_attrs() {
+    let input = r#"<rect wh="4"/>"#;
+    let expected = r#"<rect width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect x="2" wh="4"/>"#;
+    let expected = r#"<rect x="2" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect y="2" wh="4"/>"#;
+    let expected = r#"<rect y="2" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect cx="1" wh="4"/>"#;
+    let expected = r#"<rect x="-1" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect cy="1" wh="4"/>"#;
+    let expected = r#"<rect y="-1" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<circle wh="4"/>"#;
+    let expected = r#"<circle r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<circle cx="1" wh="4"/>"#;
+    let expected = r#"<circle cx="1" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<circle cy="1" wh="4"/>"#;
+    let expected = r#"<circle cy="1" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

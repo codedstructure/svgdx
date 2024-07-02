@@ -47,6 +47,54 @@ fn test_rel_size_dxy() {
 }
 
 #[test]
+fn test_rel_size_delta() {
+    // No delta
+    let rel_input = r##"
+<rect wh="20 60" id="abc"/>
+<rect xy="40" wh="#abc"/>
+"##;
+    let expected_rect = r#"<rect x="40" y="40" width="20" height="60"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Single delta - %age
+    let rel_input = r##"
+<rect wh="20 60" id="abc"/>
+<rect xy="40" wh="#abc 10%"/>
+"##;
+    let expected_rect = r#"<rect x="40" y="40" width="2" height="6"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Single delta - absolute
+    let rel_input = r##"
+<rect wh="20 60" id="abc"/>
+<rect xy="40" wh="#abc 10"/>
+"##;
+    let expected_rect = r#"<rect x="40" y="40" width="30" height="70"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Double delta - %age
+    let rel_input = r##"
+<rect wh="20 60" id="abc"/>
+<rect xy="40" wh="#abc 10% 20%"/>
+"##;
+    let expected_rect = r#"<rect x="40" y="40" width="2" height="12"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Double delta - absolute
+    let rel_input = r##"
+<rect wh="20 60" id="abc"/>
+<rect xy="40" wh="#abc 10 5"/>
+"##;
+    let expected_rect = r#"<rect x="40" y="40" width="30" height="65"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+}
+
+#[test]
 fn test_rel_size_dxy_pct() {
     let rel_size_dxy_pct_input = r#"
 <rect xy="10 20" wh="20 60" />

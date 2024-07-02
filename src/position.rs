@@ -92,21 +92,34 @@ impl Position {
                 if let Some((y1, y2)) = self.three_point(x2 - x1, self.ymin, self.cy, self.ymax) {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
-                    None
+                    let radius = (x2 - x1) / 2.;
+                    Some(BoundingBox::new(x1, -radius, x2, radius))
                 }
             } else if let Some((y1, y2)) = y_ext {
                 if let Some((x1, x2)) = self.three_point(y2 - y1, self.xmin, self.cx, self.xmax) {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
-                    None
+                    let radius = (y2 - y1) / 2.;
+                    Some(BoundingBox::new(-radius, y1, radius, y2))
                 }
             } else {
                 // if cx/cy (etc) are absent, SVG says they are treated as zero.
-                self.width.map(|r| BoundingBox::new(-r, -r, r, r))
+                if let Some(diameter) = self.width.or(self.height) {
+                    let r = diameter / 2.;
+                    Some(BoundingBox::new(-r, -r, r, r))
+                } else {
+                    None
+                }
             }
         } else if let (Some(w), Some(h)) = (self.width, self.height) {
-            // if x/y (etc) are absent, SVG says they are treated as zero.
-            Some(BoundingBox::new(0., 0., w, h))
+            if let Some((x1, x2)) = x_ext {
+                Some(BoundingBox::new(x1, 0., x2, h))
+            } else if let Some((y1, y2)) = y_ext {
+                Some(BoundingBox::new(0., y1, w, y2))
+            } else {
+                // if x/y (etc) are absent, SVG says they are treated as zero.
+                Some(BoundingBox::new(0., 0., w, h))
+            }
         } else {
             None
         }
@@ -122,9 +135,8 @@ impl Position {
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
         if let Some(bbox) = self.to_bbox() {
-            // TODO: should xy-loc be handled here?
             match element.name.as_str() {
-                "rect" | "use" | "image" | "svg" | "foreignObject" => {
+                "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
                     let width = bbox.width();
                     let height = bbox.height();
                     let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
@@ -283,10 +295,7 @@ impl From<&SvgElement> for Position {
             p.cy = p.cy.map(|y| y + dy);
         }
         if let Some(dw) = dw {
-            println!("dw: {:?}", dw);
-            println!("before: {:?}", p);
             p.width = p.width.map(|w| dw.adjust(w));
-            println!("after: {:?}", p);
         }
         if let Some(dh) = dh {
             p.height = p.height.map(|h| dh.adjust(h));
@@ -476,6 +485,23 @@ impl FromStr for LocSpec {
             "l" => Ok(Self::Left),
             "c" => Ok(Self::Center),
             _ => bail!("Invalid LocSpec format {value}"),
+        }
+    }
+}
+
+impl From<ScalarSpec> for LocSpec {
+    fn from(value: ScalarSpec) -> Self {
+        match value {
+            ScalarSpec::Minx => Self::Left,
+            ScalarSpec::Maxx => Self::Right,
+            ScalarSpec::Cx => Self::Center,
+            ScalarSpec::Miny => Self::Top,
+            ScalarSpec::Maxy => Self::Bottom,
+            ScalarSpec::Cy => Self::Center,
+            ScalarSpec::Width => Self::Right,
+            ScalarSpec::Rx => Self::Right,
+            ScalarSpec::Height => Self::Bottom,
+            ScalarSpec::Ry => Self::Bottom,
         }
     }
 }

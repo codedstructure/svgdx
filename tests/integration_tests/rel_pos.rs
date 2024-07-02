@@ -219,6 +219,36 @@ fn test_rel_dx_dy() {
 }
 
 #[test]
+fn test_rel_pos_delta() {
+    // No delta
+    //     let rel_input = r##"
+    // <rect xy="20 60" wh="10" id="abc"/>
+    // <rect xy="#abc" wh="10"/>
+    // "##;
+    //     let expected_rect = r#"<rect x="20" y="60" width="10" height="10"/>"#;
+    //     let output = transform_str_default(rel_input).unwrap();
+    //     assert_contains!(output, expected_rect);
+
+    // Single delta
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc -5" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="15" y="55" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Double delta
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc -5 10" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="15" y="70" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+}
+
+#[test]
 fn test_rel_recursive() {
     // Ensure a relative position can be derived from a referenced
     // (not just previous) element which is also relatively positioned
@@ -259,4 +289,26 @@ fn test_rel_multi_recursive() {
     let expected_rect = r#"<rect id="a" x="38" y="50" width="2" height="2"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
+}
+
+#[test]
+fn test_rel_scalar_point() {
+    let input = r##"
+<rect id="a" xy="10" wh="100 50" />
+<circle x1="#a" y2="#a@l" wh="10" />
+"##;
+    let expected = r#"<circle cx="15" cy="30" r="5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_rel_scalar_point_delta() {
+    let input = r##"
+<rect id="a" xy="10" wh="100 50" />
+<circle x1="#a" y2="#a@l 3" wh="10" />
+"##;
+    let expected = r#"<circle cx="15" cy="33" r="5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
 }
