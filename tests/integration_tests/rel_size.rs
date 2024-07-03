@@ -155,3 +155,41 @@ fn test_rel_size_dwh() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_rect);
 }
+
+#[test]
+fn test_rel_size_dwh_anchor() {
+    // 'anchor' position (e.g. from xy-loc or implicit cx/cy) shouldn't change if dwh is applied.
+
+    // Basic (implied top-left)
+    let input = r#"<rect xy="10" wh="5" dwh="1 2"/>"#;
+    let expected = r#"<rect x="10" y="10" width="6" height="7"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"<rect xy="10" wh="6" dwh="50% 125%"/>"#;
+    let expected = r#"<rect x="10" y="10" width="3" height="7.5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // Centre - implicit from cxy
+    let input = r#"<rect cxy="10" wh="5" dwh="1 2"/>"#;
+    let expected = r#"<rect x="7" y="6.5" width="6" height="7"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"<rect cxy="10" wh="6" dwh="50% 125%"/>"#;
+    let expected = r#"<rect x="8.5" y="6.25" width="3" height="7.5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // Bottom-right - explicit from xy-loc
+    let input = r#"<rect xy="10" wh="5" dwh="1 2" xy-loc="br"/>"#;
+    let expected = r#"<rect x="4" y="3" width="6" height="7"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"<rect xy="10" wh="6" dwh="50% 125%" xy-loc="br"/>"#;
+    let expected = r#"<rect x="7" y="2.5" width="3" height="7.5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

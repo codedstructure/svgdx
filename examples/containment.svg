@@ -16,11 +16,11 @@
   ]]>
   </style>
   <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/>
-  <rect id="o2" opacity="0.4" x="-8" y="-8" width="71" height="70" class="d-fill-grey d-surround"/>
-  <rect id="o3" opacity="0.4" x="-3" y="-3" width="26" height="60" class="d-fill-grey d-dash d-surround"/>
-  <rect id="o4" opacity="0.4" x="32" y="-3" width="26" height="44" class="d-fill-grey d-surround"/>
+  <rect id="o2" x="-8" y="-8" width="71" height="70" opacity="0.4" class="d-fill-grey d-surround"/>
+  <rect id="o3" x="-3" y="-3" width="26" height="60" opacity="0.4" class="d-fill-grey d-dash d-surround"/>
+  <rect id="o4" x="32" y="-3" width="26" height="44" opacity="0.4" class="d-fill-grey d-surround"/>
   <!-- TODO: would be nice to specify xy on o5, (e.g. xy="#o3:v 10") and have elements organise within -->
-  <rect id="o5" opacity="0.4" x="14.5" y="65" width="48" height="34" class="d-fill-grey d-surround"/>
+  <rect id="o5" x="14.5" y="65" width="48" height="34" opacity="0.4" class="d-fill-grey d-surround"/>
 
   <rect id="inp" width="20" height="8"/>
   <text x="10" y="4" class="d-tbox">input</text>

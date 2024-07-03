@@ -117,6 +117,25 @@ fn test_position_relspec() {
 }
 
 #[test]
+fn test_position_inferred_line() {
+    let input = r#"<line cx="10" y1="0" y2="4"/>"#;
+    let expected = r#"<line x1="10" y1="0" x2="10" y2="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<line cy="10" x1="0" x2="4"/>"#;
+    let expected = r#"<line x1="0" y1="10" x2="4" y2="10"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<line x2="3" cx="10" cy="10" y2="20"/>"#;
+    let expected = r#"<line x1="17" y1="0" x2="3" y2="20"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<line x2="3" cx="10" cy="10" y2="20" dxy="2"/>"#;
+    let expected = r#"<line x1="19" y1="2" x2="5" y2="22"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
 fn test_position_deferred() {
     let input = r##"
 <rect x="#a" y="2" width="#a 50%" height="4"/>
@@ -186,5 +205,28 @@ fn test_position_missing_attrs() {
 
     let input = r#"<circle cy="1" wh="4"/>"#;
     let expected = r#"<circle cy="1" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_position_dxy() {
+    let input = r#"<circle cx="1" wh="4" dxy="5"/>"#;
+    let expected = r#"<circle cx="6" cy="5" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<circle cx="1" wh="4" dxy="2 5"/>"#;
+    let expected = r#"<circle cx="3" cy="5" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<circle cx="1" wh="4" dx="3"/>"#;
+    let expected = r#"<circle cx="4" r="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<line xy1="0" xy2="10" dxy="5"/>"#;
+    let expected = r#"<line x1="5" y1="5" x2="15" y2="15"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<line xy1="0" xy2="10" dxy="-2 5"/>"#;
+    let expected = r#"<line x1="-2" y1="5" x2="8" y2="15"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }

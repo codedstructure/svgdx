@@ -15,6 +15,8 @@ pub struct Position {
     pub cy: Option<f32>,
     pub width: Option<f32>,
     pub height: Option<f32>,
+    pub dx: Option<f32>,
+    pub dy: Option<f32>,
 
     shape: String,
 }
@@ -126,11 +128,11 @@ impl Position {
     }
 
     fn has_x_position(&self) -> bool {
-        self.xmin.is_some() || self.xmax.is_some() || self.cx.is_some()
+        self.xmin.is_some() || self.xmax.is_some() || self.cx.is_some() || self.dx.is_some()
     }
 
     fn has_y_position(&self) -> bool {
-        self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some()
+        self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some() || self.dy.is_some()
     }
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
@@ -141,25 +143,25 @@ impl Position {
                     let height = bbox.height();
                     let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
                     if self.has_x_position() {
-                        element.set_attr("x", &fstr(x1));
+                        element.set_attr("x", &fstr(x1 + self.dx.unwrap_or(0.)));
                     }
                     if self.has_y_position() {
-                        element.set_attr("y", &fstr(y1));
+                        element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
                     }
                     element.set_attr("width", &fstr(width));
                     element.set_attr("height", &fstr(height));
                     element.remove_attrs(&[
-                        "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy",
+                        "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
                     ]);
                 }
                 "circle" => {
                     let (cx, cy) = bbox.center();
                     let r = bbox.width() / 2.0;
                     if self.has_x_position() {
-                        element.set_attr("cx", &fstr(cx));
+                        element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
                     }
                     if self.has_y_position() {
-                        element.set_attr("cy", &fstr(cy));
+                        element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
                     }
                     element.set_attr("r", &fstr(r));
                     element.remove_attrs(&[
@@ -172,10 +174,10 @@ impl Position {
                     let rx = bbox.width() / 2.0;
                     let ry = bbox.height() / 2.0;
                     if self.has_x_position() {
-                        element.set_attr("cx", &fstr(cx));
+                        element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
                     }
                     if self.has_y_position() {
-                        element.set_attr("cy", &fstr(cy));
+                        element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
                     }
                     element.set_attr("rx", &fstr(rx));
                     element.set_attr("ry", &fstr(ry));
@@ -185,16 +187,38 @@ impl Position {
                     ]);
                 }
                 "line" => {
-                    // NOTE: lines are directional, so we don't want to set x1/y1 if they're already set
-                    if element.get_attr("x1").is_none() && element.get_attr("y1").is_none() {
-                        let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-                        element.set_attr("x1", &fstr(x1));
-                        element.set_attr("y1", &fstr(y1));
+                    // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
+                    // if they're already set, but we do need to add dx/dy to any existing attrs.
+                    let zstr = "0".to_owned();
+                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                    if element.get_attr("x1").is_none() {
+                        element.set_attr("x1", &fstr(x1 + self.dx.unwrap_or(0.)));
+                    } else if let Some(dx) = self.dx {
+                        if let Ok(x1) = strp(&element.get_attr("x1").unwrap_or(zstr.clone())) {
+                            element.set_attr("x1", &fstr(x1 + dx));
+                        }
                     }
-                    if element.get_attr("x2").is_none() && element.get_attr("y2").is_none() {
-                        let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
-                        element.set_attr("x2", &fstr(x2));
-                        element.set_attr("y2", &fstr(y2));
+                    if element.get_attr("y1").is_none() {
+                        element.set_attr("y1", &fstr(y1 + self.dy.unwrap_or(0.)));
+                    } else if let Some(dy) = self.dy {
+                        if let Ok(y1) = strp(&element.get_attr("y1").unwrap_or(zstr.clone())) {
+                            element.set_attr("y1", &fstr(y1 + dy));
+                        }
+                    }
+                    let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
+                    if element.get_attr("x2").is_none() {
+                        element.set_attr("x2", &fstr(x2 + self.dx.unwrap_or(0.)));
+                    } else if let Some(dx) = self.dx {
+                        if let Ok(x2) = strp(&element.get_attr("x2").unwrap_or(zstr.clone())) {
+                            element.set_attr("x2", &fstr(x2 + dx));
+                        }
+                    }
+                    if element.get_attr("y2").is_none() {
+                        element.set_attr("y2", &fstr(y2 + self.dy.unwrap_or(0.)));
+                    } else if let Some(dy) = self.dy {
+                        if let Ok(y2) = strp(&element.get_attr("y2").unwrap_or(zstr.clone())) {
+                            element.set_attr("y2", &fstr(y2 + dy));
+                        }
                     }
                     element.remove_attrs(&[
                         "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
@@ -219,18 +243,8 @@ impl From<&SvgElement> for Position {
     fn from(value: &SvgElement) -> Self {
         let mut p = Position::new(&value.name);
 
-        // TODO: need to fail on reference to unknown element to ensure
-        // forward references work (while still passing through e.g. x="10%"
-        // unchanged)
-
-        let dx = value.get_attr("dx").and_then(|dx| strp(dx.as_ref()).ok());
-        let dy = value.get_attr("dy").and_then(|dy| strp(dy.as_ref()).ok());
-        let dw = value
-            .get_attr("dw")
-            .and_then(|dw| strp_length(dw.as_ref()).ok());
-        let dh = value
-            .get_attr("dh")
-            .and_then(|dh| strp_length(dh.as_ref()).ok());
+        p.dx = value.get_attr("dx").and_then(|dx| strp(dx.as_ref()).ok());
+        p.dy = value.get_attr("dy").and_then(|dy| strp(dy.as_ref()).ok());
 
         let x = value.get_attr("x1").or(value.get_attr("x"));
         let y = value.get_attr("y1").or(value.get_attr("y"));
@@ -282,23 +296,6 @@ impl From<&SvgElement> for Position {
             if let Some(Ok(r)) = ry.map(|r| strp(r.as_ref())) {
                 p.height = Some(r * 2.);
             }
-        }
-
-        if let Some(dx) = dx {
-            p.xmin = p.xmin.map(|x| x + dx);
-            p.xmax = p.xmax.map(|x| x + dx);
-            p.cx = p.cx.map(|x| x + dx);
-        }
-        if let Some(dy) = dy {
-            p.ymin = p.ymin.map(|y| y + dy);
-            p.ymax = p.ymax.map(|y| y + dy);
-            p.cy = p.cy.map(|y| y + dy);
-        }
-        if let Some(dw) = dw {
-            p.width = p.width.map(|w| dw.adjust(w));
-        }
-        if let Some(dh) = dh {
-            p.height = p.height.map(|h| dh.adjust(h));
         }
 
         p

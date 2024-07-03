@@ -4,7 +4,7 @@ use crate::events::{InputEvent, SvgEvent};
 use crate::expression::eval_attr;
 use crate::position::{BoundingBox, Position, TrblLength};
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp};
+use crate::types::{attr_split, fstr, strp};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -282,6 +282,7 @@ impl TransformerContext {
         // Need size before can evaluate relative position
         e.expand_compound_size();
         e.eval_rel_attributes(self)?;
+        e.resolve_size_delta();
 
         e.eval_rel_position(self)?;
         // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
@@ -319,19 +320,16 @@ impl TransformerContext {
             }
         }
 
-        // Process dx / dy / dxy as translation offsets if not an element
+        // Process dx / dy as translation offsets if not an element
         // where they already have intrinsic meaning.
+        // TODO: would be nice to get rid of this; it's mostly handled
+        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
+        // then that won't do anything and this does.
         if !matches!(e.name.as_str(), "text" | "tspan" | "feOffset") {
             let dx = e.pop_attr("dx");
             let dy = e.pop_attr("dy");
-            let dxy = e.pop_attr("dxy");
             let mut d_x = None;
             let mut d_y = None;
-            if let Some(dxy) = dxy {
-                let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-                d_x = Some(parts.next().context("dx from dxy should be numeric")?);
-                d_y = Some(parts.next().context("dy from dxy should be numeric")?);
-            }
             if let Some(dx) = dx {
                 d_x = Some(strp(&dx)?);
             }

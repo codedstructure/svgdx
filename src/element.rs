@@ -443,22 +443,6 @@ impl SvgElement {
         Ok(new_elem)
     }
 
-    pub fn resized_by(&self, dw: Length, dh: Length) -> Result<Self> {
-        let mut new_elem = self.clone();
-        for (key, value) in &self.attrs {
-            match key.as_str() {
-                "width" => {
-                    new_elem.set_attr(key, &fstr(dw.adjust(strp(value)?)));
-                }
-                "height" => {
-                    new_elem.set_attr(key, &fstr(dh.adjust(strp(value)?)));
-                }
-                _ => (),
-            }
-        }
-        Ok(new_elem)
-    }
-
     pub fn position_from_bbox(&mut self, bb: &BoundingBox) {
         let width = bb.width();
         let height = bb.height();
@@ -732,14 +716,47 @@ impl SvgElement {
         }
     }
 
+    pub fn resolve_size_delta(&mut self) {
+        // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
+        let (w, h) = match self.name.as_str() {
+            "circle" => {
+                let diam = self.get_attr("r").map(|r| 2. * strp(&r).unwrap_or(0.));
+                (diam, diam)
+            }
+            "ellipse" => (
+                self.get_attr("rx")
+                    .and_then(|rx| strp(&rx).ok())
+                    .map(|x| x * 2.),
+                self.get_attr("ry")
+                    .and_then(|ry| strp(&ry).ok())
+                    .map(|x| x * 2.),
+            ),
+            _ => (
+                self.get_attr("width").and_then(|w| strp(&w).ok()),
+                self.get_attr("height").and_then(|h| strp(&h).ok()),
+            ),
+        };
+
+        if let Some(dw) = self.pop_attr("dw") {
+            if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
+                self.set_attr("width", &fstr(new_w));
+            }
+        }
+        if let Some(dh) = self.pop_attr("dh") {
+            if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
+                self.set_attr("height", &fstr(new_h));
+            }
+        }
+    }
+
     // Compound attributes, e.g.
     // xy="#o" -> x="#o", y="#o"
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
     pub fn expand_compound_pos(&mut self) {
-        if let Some(xy) = self.attrs.pop("xy") {
+        if let Some(xy) = self.pop_attr("xy") {
             let (x, y) = Self::split_compound_attr(&xy);
-            let (x_attr, y_attr) = match self.attrs.pop("xy-loc").as_deref() {
+            let (x_attr, y_attr) = match self.pop_attr("xy-loc").as_deref() {
                 Some("t") => ("cx", "y1"),
                 Some("tr") => ("x2", "y1"),
                 Some("r") => ("x2", "cy"),
@@ -753,22 +770,22 @@ impl SvgElement {
             self.attrs.insert_first(x_attr, x);
             self.attrs.insert_first(y_attr, y);
         }
-        if let Some(cxy) = self.attrs.pop("cxy") {
+        if let Some(cxy) = self.pop_attr("cxy") {
             let (cx, cy) = Self::split_compound_attr(&cxy);
             self.attrs.insert_first("cx", cx);
             self.attrs.insert_first("cy", cy);
         }
-        if let Some(xy1) = self.attrs.pop("xy1") {
+        if let Some(xy1) = self.pop_attr("xy1") {
             let (x1, y1) = Self::split_compound_attr(&xy1);
             self.attrs.insert_first("x1", x1);
             self.attrs.insert_first("y1", y1);
         }
-        if let Some(xy2) = self.attrs.pop("xy2") {
+        if let Some(xy2) = self.pop_attr("xy2") {
             let (x2, y2) = Self::split_compound_attr(&xy2);
             self.attrs.insert_first("x2", x2);
             self.attrs.insert_first("y2", y2);
         }
-        if let Some(dxy) = self.attrs.pop("dxy") {
+        if let Some(dxy) = self.pop_attr("dxy") {
             let (dx, dy) = Self::split_compound_attr(&dxy);
             self.attrs.insert_first("dx", dx);
             self.attrs.insert_first("dy", dy);

@@ -10,14 +10,14 @@
   <style>svg * { fill: green; stroke: white}</style>
   <rect id="o" width="100" height="59.988"/>
 
-  <circle r="8.333" cx="50" cy="29.994"/>
-  <line y1="0" y2="59.988" x1="50" x2="50"/>
+  <circle cx="50" cy="29.994" r="8.333"/>
+  <line x1="50" y1="0" x2="50" y2="59.988"/>
 
-  <circle cy="29.994" cx="10.5" r="8.333"/>
-  <rect id="pa1" width="15" height="35.993" x="0" y="11.997"/>
-  <rect width="5" height="17.996" x="0" y="20.996"/>
+  <circle cx="10.5" cy="29.994" r="8.333"/>
+  <rect id="pa1" x="0" y="11.997" width="15" height="35.993"/>
+  <rect x="0" y="20.996" width="5" height="17.996"/>
 
-  <circle cy="29.994" cx="89.5" r="8.333"/>
-  <rect id="pa2" width="15" height="35.993" x="85" y="11.997"/>
-  <rect width="5" height="17.996" x="95" y="20.996"/>
+  <circle cx="89.5" cy="29.994" r="8.333"/>
+  <rect id="pa2" x="85" y="11.997" width="15" height="35.993"/>
+  <rect x="95" y="20.996" width="5" height="17.996"/>
 </svg>

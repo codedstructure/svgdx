@@ -60,8 +60,8 @@
   <tspan x="111.5" dy="-1.575em">ORBIT ATTITUDE</tspan><tspan x="111.5" dy="1.05em">AND MANEUVER</tspan><tspan x="111.5" dy="1.05em">REACTION CONTROL</tspan><tspan x="111.5" dy="1.05em">SYSTEM</tspan>
   </text>
 
-  <circle id="ppi" r="0.75" cx="35" cy="39" class="d-fill-black"/>
-  <circle id="jfc" r="0.75" cx="49" cy="7.5" class="d-fill-black"/>
+  <circle id="ppi" cx="35" cy="39" r="0.75" class="d-fill-black"/>
+  <circle id="jfc" cx="49" cy="7.5" r="0.75" class="d-fill-black"/>
 
   <polyline points="0 39, -8 39, -8 11.25, 0 11.25" class="d-arrow"/>
   <text x="-1" y="38" class="d-arrow d-tbox d-text-bottom d-text-right">p,q,r</text>
