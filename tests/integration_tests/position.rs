@@ -81,8 +81,6 @@ fn test_position_circle() {
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 
-// TODO: xy-loc handling
-
 #[test]
 fn test_position_relspec() {
     let input = r##"

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Substantial refactor of positioning / layout logic with following key changes:
+  * Changed: 'relspec deltas' such as the '1 2' in 'xy="#abc@t 1 2"' indicate an
+    offsets from the point given by the relspec as an (x, y) pair. Previously if
+    only a single value was given, it would be the 'dx' value with 'dy' implicitly
+    set to zero. From this release a single value is *duplicated* across both dx
+    and dy, equivalent to a single entry in a `dxy` attribute.
+  * Added: constraint-based positioning. The x1/x2/y1/y2/cx/cy/width/height attributes
+    (and compound combinations, e.g. xy1, cxy) may be provided for *any* basic shape,
+    providing the position is sufficiently tied down. For example, a circle may be
+    specified by the combination `y2`, `x1` and `r`, or the combination `cx`,  `y1`,
+    and `x2`.
+  * Changed: attribute ordering is no longer preserved. Given the additional number
+    of positional source attributes and transformations around these, a different
+    approach of forcing selected generated attributes to appear in a specific order
+    is used - for example in a rectangle the generated `x` / `y` / `width` / `height`
+    attributes will always appear in that order, and any `id` attribute will always
+    be the first attribute of an output element.
+
 - Added: various functions making use of expression lists:
   * Rectangular / polar conversion functions `r2p(x, y)` and `p2r(r, theta)`.
   * Vector-arithmetic functions `addv(a0, a1, ...aN, b0, b1, ...bN)`,

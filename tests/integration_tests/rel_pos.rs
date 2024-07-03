@@ -221,13 +221,13 @@ fn test_rel_dx_dy() {
 #[test]
 fn test_rel_pos_delta() {
     // No delta
-    //     let rel_input = r##"
-    // <rect xy="20 60" wh="10" id="abc"/>
-    // <rect xy="#abc" wh="10"/>
-    // "##;
-    //     let expected_rect = r#"<rect x="20" y="60" width="10" height="10"/>"#;
-    //     let output = transform_str_default(rel_input).unwrap();
-    //     assert_contains!(output, expected_rect);
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="20" y="60" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
 
     // Single delta
     let rel_input = r##"
