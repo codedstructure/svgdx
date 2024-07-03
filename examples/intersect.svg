@@ -14,9 +14,9 @@
   ]]>
   </style>
   <style>#a, #b { fill: none; stroke-width: 2; }</style>
-  <rect opacity="0.2" x="-3" y="-3" width="71" height="71" class="d-fill-lime d-surround"/>
-  <rect width="50" height="50" id="a"/>
-  <rect x="15" y="15" width="50" height="50" id="b"/>
-  <rect opacity="0.2" x="17" y="12" width="31" height="41" class="d-fill-blue d-inside"/>
+  <rect x="-3" y="-3" width="71" height="71" opacity="0.2" class="d-fill-lime d-surround"/>
+  <rect id="a" width="50" height="50"/>
+  <rect id="b" x="15" y="15" width="50" height="50"/>
+  <rect x="17" y="12" width="31" height="41" opacity="0.2" class="d-fill-blue d-inside"/>
   <rect x="20.25" y="20.25" width="24.5" height="24.5" class="d-fill-red d-inside"/>
 </svg>

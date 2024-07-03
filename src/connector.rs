@@ -1,6 +1,7 @@
 use crate::context::ElementMap;
 use crate::element::SvgElement;
-use crate::types::{attr_split, fstr, strp, strp_length, Length};
+use crate::position::{strp_length, Length, ScalarSpec};
+use crate::types::{attr_split, fstr, strp};
 use lazy_regex::regex;
 
 use anyhow::{Context, Result};
@@ -282,11 +283,11 @@ impl Connector {
                         let start_bb = start_el.bbox()?.context("start element bbox")?;
                         let end_bb = end_el.bbox()?.context("end element bbox")?;
                         let overlap_top = start_bb
-                            .scalarspec(crate::types::ScalarSpec::Miny)
-                            .max(end_bb.scalarspec(crate::types::ScalarSpec::Miny));
+                            .scalarspec(ScalarSpec::Miny)
+                            .max(end_bb.scalarspec(ScalarSpec::Miny));
                         let overlap_bottom = start_bb
-                            .scalarspec(crate::types::ScalarSpec::Maxy)
-                            .min(end_bb.scalarspec(crate::types::ScalarSpec::Maxy));
+                            .scalarspec(ScalarSpec::Maxy)
+                            .min(end_bb.scalarspec(ScalarSpec::Maxy));
                         (overlap_top + overlap_bottom) / 2.
                     } else {
                         y1
@@ -309,11 +310,11 @@ impl Connector {
                         let start_bb = start_el.bbox()?.context("start element bbox")?;
                         let end_bb = end_el.bbox()?.context("end element bbox")?;
                         let overlap_left = start_bb
-                            .scalarspec(crate::types::ScalarSpec::Minx)
-                            .max(end_bb.scalarspec(crate::types::ScalarSpec::Minx));
+                            .scalarspec(ScalarSpec::Minx)
+                            .max(end_bb.scalarspec(ScalarSpec::Minx));
                         let overlap_right = start_bb
-                            .scalarspec(crate::types::ScalarSpec::Maxx)
-                            .min(end_bb.scalarspec(crate::types::ScalarSpec::Maxx));
+                            .scalarspec(ScalarSpec::Maxx)
+                            .min(end_bb.scalarspec(ScalarSpec::Maxx));
                         (overlap_left + overlap_right) / 2.
                     } else {
                         x1

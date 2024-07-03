@@ -2,8 +2,9 @@ use crate::context::TransformerContext;
 use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
+use crate::position::{BoundingBox, LocSpec};
 use crate::svg_defs::{build_defs, build_styles};
-use crate::types::{fstr, BoundingBox, LocSpec, OrderIndex};
+use crate::types::{fstr, OrderIndex};
 use crate::TransformConfig;
 
 use std::collections::{BTreeMap, HashSet};

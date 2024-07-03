@@ -19,27 +19,27 @@
         #charles { stroke: red; }
     ]]>
   </style>
-    <path d="M 0 26.667 h 20
+    <path id="alice" d="M 0 26.667 h 20
     M 10 20 v 20
     M 0 60 l 10 -20 10 20
     M 10 0
     A 10 10 0 1 0 10 20
     A 10 10 0 1 0 10 0
-    " id="alice" class="person"/>
-    <path d="M 150 26.667 h 20
+    " class="person"/>
+    <path id="bob" d="M 150 26.667 h 20
     M 160 20 v 20
     M 150 60 l 10 -20 10 20
     M 160 0
     A 10 10 0 1 0 160 20
     A 10 10 0 1 0 160 0
-    " id="bob" class="person"/>
-    <path d="M 75 76.667 h 20
+    " class="person"/>
+    <path id="charles" d="M 75 76.667 h 20
     M 85 70 v 20
     M 75 110 l 10 -20 10 20
     M 85 50
     A 10 10 0 1 0 85 70
     A 10 10 0 1 0 85 50
-    " id="charles" class="person"/>
+    " class="person"/>
 
     <line x1="10" y1="30" x2="160" y2="30" class="d-arrow"/>
     <line x1="85" y1="80" x2="10" y2="30" class="d-arrow"/>

@@ -8,9 +8,7 @@
 svgdx svgdx.xml -o svgdx.svg
 ```
 
-[svgdx.svg](svgdx.svg)
-
-[svgdx.xml](svgdx.xml)
+[svgdx.svg](svgdx.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[svgdx.xml](svgdx.xml)
 
 ## Functional Block Diagram
 
@@ -26,150 +24,118 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 
 ![](functional_block_diagram.svg)
 
-[source](functional_block_diagram.svg)
-
-[input file](functional_block_diagram.xml)
+[source](functional_block_diagram.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](functional_block_diagram.xml)
 
 ## Connectors
 
 ![](edge-connector.svg)
 
-[source](edge-connector.svg)
-
-[input file](edge-connector.xml)
+[source](edge-connector.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](edge-connector.xml)
 
 ## More connectors
 
 ![](corner-lines.svg)
 
-[source](corner-lines.svg)
-
-[input file](corner-lines.xml)
+[source](corner-lines.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](corner-lines.xml)
 
 ## Text boxes
 
 ![](rect-text.svg)
 
-[source](rect-text.svg)
-
-[input file](rect-text.xml)
+[source](rect-text.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](rect-text.xml)
 
 ## Multi-line text alignment
 
 ![](multiline-text.svg)
 
-[source](multiline-text.svg)
-
-[input file](multiline-text.xml)
+[source](multiline-text.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](multiline-text.xml)
 
 ## Multi-line vertical text
 
 ![](vertical-text.svg)
 
-[source](vertical-text.svg)
-
-[input file](vertical-text.xml)
+[source](vertical-text.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](vertical-text.xml)
 
 ## Text associated with lines
 
 ![](line-text.svg)
 
-[source](line-text.svg)
-
-[input file](line-text.xml)
+[source](line-text.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](line-text.xml)
 
 ## Pre-formatted text
 
 ![](bigtext.svg)
 
-[source](bigtext.svg)
-
-[input file](bigtext.xml)
+[source](bigtext.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](bigtext.xml)
 
 ## Relative positioning
 
 ![](loc.svg)
 
-[source](loc.svg)
-
-[input file](loc.xml)
+[source](loc.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](loc.xml)
 
 ## Surrounding shapes
 
 ![](surround.svg)
 
-[source](surround.svg)
-
-[input file](surround.xml)
+[source](surround.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](surround.xml)
 
 ## Intersection of shapes
 
 ![](intersect.svg)
 
-[source](intersect.svg)
-
-[input file](intersect.xml)
+[source](intersect.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](intersect.xml)
 
 ## Hierarchies and containment
 
 ![](containment.svg)
 
-[source](containment.svg)
-
-[input file](containment.xml)
+[source](containment.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](containment.xml)
 
 ## Text within shapes
 
 ![](text-attr.svg)
 
-[source](text-attr.svg)
-
-[input file](text-attr.xml)
+[source](text-attr.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](text-attr.xml)
 
 ## Repeating elements
 
 ![](repeat.svg)
 
-[source](repeat.svg)
-
-[input file](repeat.xml)
+[source](repeat.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](repeat.xml)
 
 ## Variables and expressions
 
 ![](define.svg)
 
-[source](define.svg)
-
-[input file](define.xml)
+[source](define.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](define.xml)
 
 ## Reuse and templating
 
 ![](reuse.svg)
 
-[source](reuse.svg)
-
-[input file](reuse.xml)
+[source](reuse.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](reuse.xml)
 
 ## Loops and conditions
 
 ![](loops.svg)
 
-[source](loops.svg)
-
-[input file](loops.xml)
+[source](loops.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](loops.xml)
 
 ## Polar coordinates
 
 ![](sunshine.svg)
 
-[source](sunshine.svg)
-
-[input file](sunshine.xml)
+[source](sunshine.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](sunshine.xml)
 
 ## List operations
 
 ![](list-funcs.svg)
 
-[source](list-funcs.svg)
+[source](list-funcs.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](list-funcs.xml)
 
-[input file](list-funcs.xml)
+## Universal layout attributes
+
+![](football.svg)
+
+[source](football.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](football.xml)

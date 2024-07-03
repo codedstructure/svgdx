@@ -9,7 +9,8 @@ use anyhow::{bail, Context, Result};
 
 use crate::context::{ContextView, VariableMap};
 use crate::functions::{eval_function, Function};
-use crate::types::{fstr, ScalarSpec};
+use crate::position::ScalarSpec;
+use crate::types::fstr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {

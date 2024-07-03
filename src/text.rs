@@ -1,5 +1,6 @@
 use crate::element::{ContentType, SvgElement};
-use crate::types::{attr_split_cycle, fstr, strp, LocSpec};
+use crate::position::LocSpec;
+use crate::types::{attr_split_cycle, fstr, strp};
 
 use anyhow::{Context, Result};
 use lazy_regex::regex;

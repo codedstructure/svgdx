@@ -12,15 +12,15 @@
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
         <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
       </marker>
-      <pattern id="grid-1" patternUnits="userSpaceOnUse" width="1" height="1" viewBox="0,0,10,10">
+      <pattern id="grid-1" width="1" height="1" patternUnits="userSpaceOnUse" viewBox="0,0,10,10">
         <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.6)"/>
         <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.6)"/>
       </pattern>
-      <pattern id="grid-5" patternUnits="userSpaceOnUse" width="5" height="5" viewBox="0,0,10,10">
+      <pattern id="grid-5" width="5" height="5" patternUnits="userSpaceOnUse" viewBox="0,0,10,10">
         <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.4)"/>
         <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.4)"/>
       </pattern>
-      <pattern id="grid-10" patternUnits="userSpaceOnUse" width="10" height="10" viewBox="0,0,10,10">
+      <pattern id="grid-10" width="10" height="10" patternUnits="userSpaceOnUse" viewBox="0,0,10,10">
         <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.3)"/>
         <line x1="0" y1="0" x2="0" y2="10" style="stroke: rgba(0, 0, 255, 0.3)"/>
       </pattern>
@@ -46,19 +46,19 @@
     </style>
 
     <rect x="-50" y="-50" width="200" height="200" class="background-grid"/>
-    <rect x="0" y="0" width="10" height="30" id="base"/>
+    <rect id="base" x="0" y="0" width="10" height="30"/>
     <text x="5" y="15" class="d-tbox">base</text>
-    <rect x="15" y="0" width="10" height="5" id="a"/>
+    <rect id="a" x="15" y="0" width="10" height="5"/>
     <text x="20" y="2.5" class="d-tbox">a</text>
-    <rect x="15" y="10" width="10" height="5" id="b"/>
+    <rect id="b" x="15" y="10" width="10" height="5"/>
     <text x="20" y="12.5" class="d-tbox">b</text>
-    <rect x="15" y="25" width="10" height="5" id="c"/>
+    <rect id="c" x="15" y="25" width="10" height="5"/>
     <text x="20" y="27.5" class="d-tbox">c</text>
-    <rect x="5" y="40" width="20" height="5" id="d"/>
+    <rect id="d" x="5" y="40" width="20" height="5"/>
     <text x="15" y="42.5" class="d-tbox">d</text>
-    <rect x="-15" y="15" width="10" height="30" id="e"/>
+    <rect id="e" x="-15" y="15" width="10" height="30"/>
     <text x="-10" y="30" class="d-tbox">e</text>
-    <rect x="-15" y="7.5" width="10" height="5" id="f"/>
+    <rect id="f" x="-15" y="7.5" width="10" height="5"/>
     <text x="-10" y="10" class="d-tbox">f</text>
     <line x1="10" y1="2.5" x2="15" y2="2.5" marker-end="url(#arrow)"/>
     <line x1="10" y1="12.5" x2="15" y2="12.5" marker-end="url(#arrow)"/>

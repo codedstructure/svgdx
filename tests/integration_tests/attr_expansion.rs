@@ -73,7 +73,7 @@ fn test_expand_ellipse() {
 // by explicit attributes
 fn test_attr_priority() {
     let input = r#"<rect y="2" xy="3 4"/>"#;
-    let expected = r#"<rect y="2" x="3"/>"#;
+    let expected = r#"<rect x="3" y="2"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<rect xy="3 4" x="1"/>"#;
@@ -88,11 +88,11 @@ fn test_attr_priority_delta() {
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<rect wh="7 8" width="12" dw="-1"/>"#;
-    let expected = r#"<rect height="8" width="11"/>"#;
+    let expected = r#"<rect width="11" height="8"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     // Note only size attributes can have ratio deltas
     let input = r#"<rect wh="7 8" width="12" dw="25%"/>"#;
-    let expected = r#"<rect height="8" width="3"/>"#;
+    let expected = r#"<rect width="3" height="8"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }

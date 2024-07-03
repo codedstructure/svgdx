@@ -7,7 +7,7 @@ fn test_rel_prev() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^@tr" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="30" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="30" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -15,7 +15,7 @@ fn test_rel_prev() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^@bl -1 1" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="9" y="81" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="9" y="81" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -28,7 +28,7 @@ fn test_rel_refid() {
 <rect xy="22 23" wh="234 654" />
 <rect xy="#abc@tr" wh="20 60" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="30" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="30" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -40,7 +40,7 @@ fn test_relh() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:h" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="30" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="30" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -49,7 +49,7 @@ fn test_relh() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:h 3" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="33" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="33" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -58,7 +58,7 @@ fn test_relh() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:H" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="-10" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="-10" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -67,7 +67,7 @@ fn test_relh() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:H 3" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="-13" y="20" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="-13" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -79,7 +79,7 @@ fn test_relv() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:v" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="10" y="80" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="10" y="80" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -88,7 +88,7 @@ fn test_relv() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:v 5" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="10" y="85" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="10" y="85" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -97,7 +97,7 @@ fn test_relv() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:V" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="10" y="-40" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="10" y="-40" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -106,7 +106,7 @@ fn test_relv() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:V 5" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="10" y="-45" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="10" y="-45" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -203,7 +203,7 @@ fn test_rel_dx_dy() {
 <rect xy="10 20" wh="20 60" />
 <rect xy="^:h" dxy="-1.23 4.56" wh="20 60" id="z"/>
 "#;
-    let expected_rect = r#"<rect x="28.77" y="24.56" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="28.77" y="24.56" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
@@ -213,7 +213,37 @@ fn test_rel_dx_dy() {
 <rect xy="22 23" wh="234 654" />
 <rect xy="#abc@tr 10 100" wh="20 60" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="40" y="120" width="20" height="60" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="40" y="120" width="20" height="60"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+}
+
+#[test]
+fn test_rel_pos_delta() {
+    // No delta
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="20" y="60" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Single delta
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc -5" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="15" y="55" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Double delta
+    let rel_input = r##"
+<rect xy="20 60" wh="10" id="abc"/>
+<rect xy="#abc -5 10" wh="10"/>
+"##;
+    let expected_rect = r#"<rect x="15" y="70" width="10" height="10"/>"#;
     let output = transform_str_default(rel_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -233,13 +263,13 @@ fn test_rel_recursive() {
 <rect xy="^@tl 1 1" wh="2"/>
 <rect xy="^@tl 1 1" wh="2" id="z"/>
 "##;
-    let expected_rect = r#"<rect x="42" y="20" width="10" height="10" id="x"/>"#;
+    let expected_rect = r#"<rect id="x" x="42" y="20" width="10" height="10"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
-    let expected_rect = r#"<rect x="64" y="20" width="7" height="7" id="y"/>"#;
+    let expected_rect = r#"<rect id="y" x="64" y="20" width="7" height="7"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
-    let expected_rect = r#"<rect x="67" y="23" width="2" height="2" id="z"/>"#;
+    let expected_rect = r#"<rect id="z" x="67" y="23" width="2" height="2"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
 }
@@ -259,4 +289,26 @@ fn test_rel_multi_recursive() {
     let expected_rect = r#"<rect id="a" x="38" y="50" width="2" height="2"/>"#;
     let output = transform_str_default(rel_refid_input).unwrap();
     assert_contains!(output, expected_rect);
+}
+
+#[test]
+fn test_rel_scalar_point() {
+    let input = r##"
+<rect id="a" xy="10" wh="100 50" />
+<circle x1="#a" y2="#a@l" wh="10" />
+"##;
+    let expected = r#"<circle cx="15" cy="30" r="5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_rel_scalar_point_delta() {
+    let input = r##"
+<rect id="a" xy="10" wh="100 50" />
+<circle x1="#a" y2="#a@l 3" wh="10" />
+"##;
+    let expected = r#"<circle cx="15" cy="33" r="5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
 }

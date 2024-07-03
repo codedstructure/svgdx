@@ -1,4 +1,5 @@
-use crate::{element::SvgElement, types::BoundingBox};
+use crate::element::SvgElement;
+use crate::position::BoundingBox;
 use anyhow::{bail, Context, Result};
 
 struct PathParser {

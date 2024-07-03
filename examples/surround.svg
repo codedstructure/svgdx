@@ -23,8 +23,8 @@
     text.d-red, text.d-red * { fill: red; }
   ]]>
   </style>
-  <rect opacity="0.5" x="-2" y="-2" width="104" height="24" class="d-dash d-fill-blue d-surround"/>
-  <rect rx="3" opacity="0.5" x="25" y="-5" width="30" height="55" class="d-dot d-fill-red d-surround"/>
+  <rect x="-2" y="-2" width="104" height="24" opacity="0.5" class="d-dash d-fill-blue d-surround"/>
+  <rect x="25" y="-5" width="30" rx="3" height="55" opacity="0.5" class="d-dot d-fill-red d-surround"/>
   <rect id="a" x="0" y="0" width="20" height="20" class="d-red"/>
   <text x="10" y="10" class="d-red d-tbox">a</text>
   <rect id="b" x="30" y="0" width="20" height="20" class="d-fill-green"/>
