@@ -115,6 +115,32 @@ fn test_position_relspec() {
 }
 
 #[test]
+fn test_position_scalar_locspec() {
+    let input = r##"
+<rect id="a" x="1" y="2" width="3" height="4"/>
+<rect x="#a@b 3" cy="#a@bl 1" width="3" height="4"/>
+"##;
+    let expected = r#"
+<rect id="a" x="1" y="2" width="3" height="4"/>
+<rect x="5.5" y="5" width="3" height="4"/>
+"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_position_scalar_edgespec() {
+    let input = r##"
+<rect id="a" x="1" y="2" width="3" height="4"/>
+<rect cx="#a@b:25%" y2="#a@r:75%" width="3" height="4"/>
+"##;
+    let expected = r#"
+<rect id="a" x="1" y="2" width="3" height="4"/>
+<rect x="0.25" y="1" width="3" height="4"/>
+"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
 fn test_position_inferred_line() {
     let input = r#"<line cx="10" y1="0" y2="4"/>"#;
     let expected = r#"<line x1="10" y1="0" x2="10" y2="4"/>"#;
@@ -208,6 +234,18 @@ fn test_position_missing_attrs() {
 
 #[test]
 fn test_position_dxy() {
+    let input = r#"<rect wh="4" dx="2"/>"#;
+    let expected = r#"<rect x="2" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect wh="4" dy="3"/>"#;
+    let expected = r#"<rect y="3" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<rect wh="4" dxy="-2 3"/>"#;
+    let expected = r#"<rect x="-2" y="3" width="4" height="4"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
     let input = r#"<circle cx="1" wh="4" dxy="5"/>"#;
     let expected = r#"<circle cx="6" cy="5" r="2"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
@@ -226,5 +264,24 @@ fn test_position_dxy() {
 
     let input = r#"<line xy1="0" xy2="10" dxy="-2 5"/>"#;
     let expected = r#"<line x1="-2" y1="5" x2="8" y2="15"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_position_dxy_polyline() {
+    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dxy="2"/>"#;
+    let expected = r#"<polyline points="3 3 4 3 4 4 5 4 5 3 6 3"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dx="1"/>"#;
+    let expected = r#"<polyline points="2 1 3 1 3 2 4 2 4 1 5 1"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dy="-2"/>"#;
+    let expected = r#"<polyline points="1 -1 2 -1 2 0 3 0 3 -1 4 -1"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dxy="-1 3"/>"#;
+    let expected = r#"<polyline points="0 4 1 4 1 5 2 5 2 4 3 4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }

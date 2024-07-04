@@ -311,4 +311,12 @@ fn test_rel_scalar_point_delta() {
     let expected = r#"<circle cx="15" cy="33" r="5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
+
+    let input = r##"
+<rect xy="2 6" wh="10" id="abc"/>
+<rect x="#abc" wh="4" dxy="1"/>
+"##;
+    let expected = r#"<rect x="3" y="1" width="4" height="4"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
 }
