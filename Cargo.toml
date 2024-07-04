@@ -15,7 +15,7 @@ cli = ["shlex", "notify", "notify-debouncer-mini", "clap"]
 server = ["axum", "hyper", "tokio"]
 
 [dependencies]
-quick-xml = "0.32.0"
+quick-xml = "0.35.0"
 regex = "1.10.2"
 tempfile = "3.9.0"
 anyhow = "1.0.78"

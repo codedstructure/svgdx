@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0 - 2024-07-04]
+
 - Substantial refactor of positioning / layout logic with following key changes:
   * Changed: 'relspec deltas' such as the '1 2' in 'xy="#abc@t 1 2"' indicate an
     offsets from the point given by the relspec as an (x, y) pair. Previously if
