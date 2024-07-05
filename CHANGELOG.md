@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: variable expansion now works in `class` attributes.
+
 ## [0.10.0 - 2024-07-04]
 
 - Substantial refactor of positioning / layout logic with following key changes:

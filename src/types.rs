@@ -257,6 +257,13 @@ impl ClassList {
         self.classes.iter().map(|item| (&item.1))
     }
 
+    pub fn replace(&mut self, old: impl Into<String>, new: impl Into<String>) {
+        // Can't just do an in-place update in a BTreeSet
+        if self.remove(old) {
+            self.insert(new);
+        }
+    }
+
     pub fn remove(&mut self, class: impl Into<String>) -> bool {
         let class = class.into();
         if let Some(&index) = self.index_map.get(&class) {

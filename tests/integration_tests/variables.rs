@@ -103,3 +103,16 @@ fn test_var_expr() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, expected);
 }
+
+#[test]
+fn test_var_classes() {
+    let input = r#"
+<var cls_a="d-red d-text-bold" cls_b="d-fill-none"/>
+<rect wh="10" class="$cls_a $cls_b"/>
+"#;
+    let expected = r#"
+<rect width="10" height="10" class="d-red d-text-bold d-fill-none"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, expected);
+}

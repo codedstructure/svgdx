@@ -178,10 +178,14 @@ impl SvgElement {
 
     /// Resolve any expressions in attributes. Note attributes are unchanged on failure.
     pub fn eval_attributes(&mut self, ctx: &impl ContextView) {
-        // Step 0: Resolve any attributes
+        // Resolve any attributes
         for (key, value) in self.attrs.clone() {
             let replace = eval_attr(&value, ctx);
             self.attrs.insert(&key, &replace);
+        }
+        // Classes are handled separately to other attributes
+        for class in &self.classes.clone() {
+            self.classes.replace(class, eval_attr(class, ctx));
         }
     }
 
