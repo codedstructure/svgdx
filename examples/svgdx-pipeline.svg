@@ -1,0 +1,105 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="168mm" height="153mm" viewBox="-20 -21 168 153">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+    </marker>
+    <filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1"/>
+      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
+    </filter>
+  </defs>
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    text { font-family: sans-serif; font-size: 3px; }
+    .d-thin { stroke-width: 0.25; }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-left, text.d-text-left * { text-anchor: start; }
+    text.d-text-largest, text.d-text-largest * { font-size: 10px; }
+    text.d-text-bold, text.d-text-bold * { font-weight: bold; }
+    text.d-text-italic, text.d-text-italic * { font-style: italic; }
+    .d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    .d-dot { stroke-dasharray: 0.5 0.5; }
+    .d-surround:not(text,tspan) { fill: none; }
+    .d-fill-lightblue:not(text,tspan) { fill: lightblue; }
+    text.d-fill-lightblue, text.d-fill-lightblue * { fill: black; }
+    .d-fill-lightgreen:not(text,tspan) { fill: lightgreen; }
+    text.d-fill-lightgreen, text.d-fill-lightgreen * { fill: black; }
+    .d-fill-lightgrey:not(text,tspan) { fill: lightgrey; }
+    text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; }
+    .d-fill-pink:not(text,tspan) { fill: pink; }
+    text.d-fill-pink, text.d-fill-pink * { fill: black; }
+    .d-none:not(text,tspan) { stroke: none; }
+  ]]>
+  </style>
+  <style>rect {rx: 2;} rect.d-none {opacity: 0.8}</style>
+
+  <rect x="62.5" y="-16" width="0" height="0" class="d-text-bold d-text-largest"/>
+  <text x="62.5" y="-16" class="d-text-bold d-text-largest d-tbox">svgdx pipeline</text>
+
+  <rect id="xml" x="-5" y="-5" width="45" height="132" class="d-fill-pink d-none d-text-bold d-text-italic d-surround"/>
+  <text x="-4" y="61" class="d-fill-pink d-none d-text-bold d-text-italic d-surround d-tbox d-text-left">text (XML)</text>
+  <rect id="ev" x="40" y="-5" width="45" height="132" class="d-fill-lightgreen d-none d-text-bold d-text-italic d-surround"/>
+  <text x="41" y="61" class="d-fill-lightgreen d-none d-text-bold d-text-italic d-surround d-tbox d-text-left">events</text>
+  <rect id="el" x="85" y="-5" width="45" height="132" class="d-fill-lightblue d-none d-text-bold d-text-italic d-surround"/>
+  <text x="86" y="61" class="d-fill-lightblue d-none d-text-bold d-text-italic d-surround d-tbox d-text-left">elements</text>
+
+  <rect id="1" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="17.5" y="6" class="d-softshadow d-fill-lightgrey d-tbox">1) Read input</text>
+  <rect id="2" x="45" y="22" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="62.5" y="28" class="d-softshadow d-fill-lightgrey d-tbox">2) Generate elements</text>
+  <rect id="3" x="90" y="44" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="107.5" y="50" class="d-softshadow d-fill-lightgrey d-tbox">3) Process elements</text>
+  <rect id="4" x="90" y="66" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="107.5" y="72" class="d-softshadow d-fill-lightgrey d-tbox">4) Generate events</text>
+  <rect id="5" x="45" y="88" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="62.5" y="94" class="d-softshadow d-fill-lightgrey d-tbox">5) Post processing</text>
+  <rect id="6" x="0" y="110" width="35" height="12" class="d-softshadow d-fill-lightgrey"/>
+  <text x="17.5" y="116" class="d-softshadow d-fill-lightgrey d-tbox">6) Write output</text>
+
+  <line x1="35" y1="12" x2="45" y2="22" class="d-arrow"/>
+  <line x1="80" y1="34" x2="90" y2="44" class="d-arrow"/>
+  <line x1="107.5" y1="56" x2="107.5" y2="66" class="d-arrow"/>
+  <line x1="90" y1="78" x2="80" y2="88" class="d-arrow"/>
+  <line x1="45" y1="100" x2="35" y2="110" class="d-arrow"/>
+
+  <rect id="n1" x="-15" y="23.151" width="40" height="9" class="d-text-bold d-none"/>
+  <text x="-14" y="27.651" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="-14" dy="-1.575em">​</tspan><tspan x="-14" dy="1.05em">Read entire document and</tspan><tspan x="-14" dy="1.05em">parse into a list of events</tspan><tspan x="-14" dy="1.05em">  </tspan>
+  </text>
+  <line x1="5" y1="23.151" x2="8.75" y2="12" class="d-arrow d-thin d-dot"/>
+
+  <rect id="n2" x="52.5" y="0.349" width="45" height="12" class="d-text-bold d-none"/>
+  <text x="53.5" y="6.349" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="53.5" dy="-2.1em">​</tspan><tspan x="53.5" dy="1.05em">Convert events into elements</tspan><tspan x="53.5" dy="1.05em">considering loop, repeat and</tspan><tspan x="53.5" dy="1.05em">reuse attributes</tspan><tspan x="53.5" dy="1.05em">  </tspan>
+  </text>
+  <line x1="75" y1="12.349" x2="71.25" y2="22" class="d-arrow d-thin d-dot"/>
+
+  <rect id="n3" x="97.5" y="22.349" width="45" height="12" class="d-text-bold d-none"/>
+  <text x="98.5" y="28.349" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="98.5" dy="-2.1em">​</tspan><tspan x="98.5" dy="1.05em">Generate additional elements,</tspan><tspan x="98.5" dy="1.05em">split compound attributes</tspan><tspan x="98.5" dy="1.05em">and compute layout</tspan><tspan x="98.5" dy="1.05em">  </tspan>
+  </text>
+  <line x1="120" y1="34.349" x2="116.25" y2="44" class="d-arrow d-thin d-dot"/>
+
+  <rect id="n4" x="97.5" y="87.651" width="45" height="12" class="d-text-bold d-none"/>
+  <text x="98.5" y="93.651" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="98.5" dy="-2.1em">​</tspan><tspan x="98.5" dy="1.05em">Generate events (including</tspan><tspan x="98.5" dy="1.05em">text content) representing</tspan><tspan x="98.5" dy="1.05em">element(s)</tspan><tspan x="98.5" dy="1.05em">  </tspan>
+  </text>
+  <line x1="120" y1="87.651" x2="116.25" y2="78" class="d-arrow d-thin d-dot"/>
+
+  <rect id="n5" x="30" y="70.679" width="45" height="12" class="d-text-bold d-none"/>
+  <text x="31" y="76.679" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="31" dy="-2.1em">​</tspan><tspan x="31" dy="1.05em">Determine bounding box for</tspan><tspan x="31" dy="1.05em">entire document; include</tspan><tspan x="31" dy="1.05em">relevant auto-style classes</tspan><tspan x="31" dy="1.05em">  </tspan>
+  </text>
+  <line x1="52.5" y1="82.679" x2="53.75" y2="88" class="d-arrow d-thin d-dot"/>
+
+  <rect id="n6" x="45" y="110" width="40" height="12" class="d-text-bold d-none"/>
+  <text x="46" y="116" class="d-text-bold d-none d-tbox d-text-left">
+  <tspan x="46" dy="-2.1em">​</tspan><tspan x="46" dy="1.05em">Iterate over ordered events</tspan><tspan x="46" dy="1.05em">writing them to the given</tspan><tspan x="46" dy="1.05em">output stream</tspan><tspan x="46" dy="1.05em">  </tspan>
+  </text>
+  <line x1="45" y1="116" x2="35" y2="116" class="d-arrow d-thin d-dot"/>
+</svg>

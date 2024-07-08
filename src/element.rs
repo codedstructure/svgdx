@@ -637,6 +637,7 @@ impl SvgElement {
     /// ```
     pub fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
+        let rel_p_re = regex!(r"^:(?<r>-?[0-9.]+)r(?<theta>-?[0-9.]+)(\s+(?<remain>.*))?$");
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
         if let Some(input) = input {
@@ -645,7 +646,8 @@ impl SvgElement {
                 Some(el) => el,
                 None => return Ok(()),
             };
-            if let (Some(bbox), Some(caps)) = (ref_el.bbox()?, rel_re.captures(remain)) {
+            let el_bbox = ref_el.bbox()?;
+            if let (Some(bbox), Some(caps)) = (el_bbox, rel_re.captures(remain)) {
                 let rel: DirSpec = caps.name("rel").expect("Regex Match").as_str().parse()?;
                 // this relies on x / y defaulting to 0 if not present, so we can get a bbox
                 // from only having a defined width / height.
@@ -668,6 +670,19 @@ impl SvgElement {
                 self.pop_attr("xy"); // don't need this anymore
                 self.set_attr("x", &fstr(x + dx));
                 self.set_attr("y", &fstr(y + dy));
+            } else if let (Some(bbox), Some(caps)) = (el_bbox, rel_p_re.captures(remain)) {
+                let r = strp(caps.name("r").expect("Regex Match").as_str())?;
+                let theta = strp(caps.name("theta").expect("Regex Match").as_str())?;
+                let (cx, cy) = bbox.center();
+                let (x, y) = (cx + r * theta.to_radians().cos(), cy + r * theta.to_radians().sin());
+                let (dx, dy) = if let Some(remain) = caps.name("remain") {
+                    self.extract_dx_dy(remain.as_str())?
+                } else {
+                    (0., 0.)
+                };
+                self.pop_attr("xy"); // don't need this anymore
+                self.set_attr("cx", &fstr(x + dx));
+                self.set_attr("cy", &fstr(y + dy));
             }
         }
 

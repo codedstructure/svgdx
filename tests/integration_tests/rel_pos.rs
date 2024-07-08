@@ -320,3 +320,39 @@ fn test_rel_scalar_point_delta() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_rel_polar() {
+    let input = r##"
+<rect cxy="0" wh="0" id="abc"/>
+<rect xy="#abc:10r45" wh="0"/>
+"##;
+    let expected = r##"
+<rect id="abc" x="0" y="0" width="0" height="0"/>
+<rect x="7.071" y="7.071" width="0" height="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect cxy="0" wh="0" id="abc"/>
+<rect xy="#abc:10r30" wh="0"/>
+"##;
+    let expected = r##"
+<rect id="abc" x="0" y="0" width="0" height="0"/>
+<rect x="8.66" y="5" width="0" height="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect cxy="0" wh="0" id="abc"/>
+<rect xy="#abc:10r-90" wh="0"/>
+"##;
+    let expected = r##"
+<rect id="abc" x="0" y="0" width="0" height="0"/>
+<rect x="0" y="-10" width="0" height="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

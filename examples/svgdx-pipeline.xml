@@ -1,0 +1,65 @@
+<svg>
+  <style>rect {rx: 2;} rect.d-none {opacity: 0.8}</style>
+
+  <rect cx="#2" y2="#2 -50" wh="0" text="svgdx pipeline" class="d-text-bold d-text-largest"/>
+  
+  <rect surround="#1 #6" id="xml" margin="5" text="text (XML)" text-loc="l" class="d-fill-pink d-none d-text-bold d-text-italic"/>
+  <rect surround="#2 #5" id="ev" y1="^" y2="^" margin="5" text="events" text-loc="l"class="d-fill-lightgreen d-none d-text-bold d-text-italic"/>
+  <rect surround="#3 #4" id="el" y1="^" y2="^" margin="5" text="elements" text-loc="l" class="d-fill-lightblue d-none d-text-bold d-text-italic"/>
+
+  <var item="d-softshadow d-fill-lightgrey"/>
+  <rect id="1" wh="35 12" text="1) Read input" class="$item"/>
+  <rect id="2" xy="^@br 10" wh="^" text="2) Generate elements" class="$item"/>
+  <rect id="3" xy="^@br 10" wh="^" text="3) Process elements" class="$item"/>  
+  <rect id="4" xy="^:v 10" wh="^" text="4) Generate events" class="$item"/>  
+  <rect id="5" xy="^@bl -10 10" xy-loc="tr" wh="^" text="5) Post processing" class="$item"/>
+  <rect id="6" xy="^@bl -10 10" xy-loc="tr" wh="^" text="6) Write output" class="$item"/>
+
+  <line start="#1" end="#2" class="d-arrow"/>
+  <line start="#2" end="#3" class="d-arrow"/>
+  <line start="#3" end="#4" class="d-arrow"/>
+  <line start="#4" end="#5" class="d-arrow"/>
+  <line start="#5" end="#6" class="d-arrow"/>
+  
+  <var note="d-text-bold d-none" notearw="d-arrow d-thin d-dot"/>
+  <rect xy="#1:25r120" wh="40 9" text-loc="l" class="$note" id="n1">
+Read entire document and
+parse into a list of events
+  </rect>
+  <line start="#n1" end="#1@b:25%" class="$notearw"/>
+  
+  <rect xy="#2:25r-60" wh="45 12" text-loc="l" class="$note" id="n2">
+Convert events into elements
+considering loop, repeat and
+reuse attributes
+  </rect>
+  <line start="#n2" end="#2@t:75%" class="$notearw"/>
+  
+  <rect xy="#3:25r-60" wh="45 12" text-loc="l" class="$note" id="n3">
+Generate additional elements,
+split compound attributes
+and compute layout
+  </rect>
+  <line start="#n3" end="#3@t:75%" class="$notearw"/>
+
+  <rect xy="#4:25r60" wh="45 12" text-loc="l" class="$note" id="n4">
+Generate events (including
+text content) representing
+element(s)
+  </rect>
+  <line start="#n4@t" end="#4@b:75%" class="$notearw"/>
+  
+  <rect xy="#5:20r240" wh="45 12" text-loc="l" class="$note" id="n5">
+Determine bounding box for
+entire document; include
+relevant auto-style classes
+  </rect>
+  <line start="#n5" end="#5@t:25%" class="$notearw"/>
+
+  <rect xy="#6:h 10" wh="40 12" text-loc="l" class="$note" id="n6">
+Iterate over ordered events
+writing them to the given
+output stream
+  </rect>
+  <line start="#n6" end="#6" class="$notearw"/>
+</svg>
