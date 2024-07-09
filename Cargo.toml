@@ -60,3 +60,8 @@ required-features = ["cli"]
 [profile.release]
 lto = true
 opt-level = 's'
+
+# wasm-pack docs imply that `profiling` profile should include debug info,
+# but it doesn't seem to. (Useful e.g. for minimizing size with `twiggy`)
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ['-g', '-O']

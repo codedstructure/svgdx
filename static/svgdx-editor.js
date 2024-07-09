@@ -87,65 +87,94 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let original_height = null;
     let last_text_response = "";
 
-    async function update() {
-        try {
-            // save editor content to localStorage
-            localStorage.setItem(`svgdx-editor-value-${activeTab()}`, editor.getValue());
+    function update_response(svgData) {
+        last_text_response = svgData;
+        if (document.getElementById('text-output').style.display !== "none") {
+            // Updating the codemirror editor while hidden is ineffective;
+            // we set if visible or when it becomes visible.
+            textViewer.setValue(svgData);
+        }
+        svg_container.innerHTML = svgData;
+        const svg = svg_container.querySelector('svg');
+        if (svg === null) {
+            throw new Error("No SVG returned");
+        }
+        // tweak the SVG to make it fill the container
+        // save first so we can restore during save operations
+        original_width = svg.width.baseVal.value;
+        original_height = svg.height.baseVal.value;
+        svg.width.baseVal.valueAsString = '100%';
+        svg.height.baseVal.valueAsString = '100%';
+        original_viewbox = svg.getAttribute('viewBox');
+        if (document.getElementById('auto-viewbox').dataset.checked !== "true" && last_viewbox) {
+            svg.setAttribute('viewBox', last_viewbox);
+        }
 
+        document.getElementById('editor').style.backgroundColor = "white";
+        error_output.innerText = "";
+        error_output.style.display = "none";
+
+        // TODO: return error line numbers info in response to highlight
+        // for (let i = 0; i < editor.lineCount(); i++) {
+        //     editor.removeLineClass(i, "background", "error-line");
+        // }
+        // for (const lineNumber of linesWithErrors) {
+        //     editor.addLineClass(lineNumber, "background", "error-line");
+        // }
+    }
+
+    async function svgdx_transform_server(svgdx_input) {
+        try {
             statusbar.style.opacity = "0.3";
             const response = await fetch('transform', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml'
                 },
-                body: editor.getValue()
+                body: svgdx_input
             });
             statusbar.style.opacity = null;
             statusbar.style.color = null;
+            return [response.ok, await response.text()]
+        } catch (e) {
+            statusbar.style.color = "darkred";
+            statusbar.innerText = `svgdx editor - error: ${e.message}`;
+            console.error('Error sending data to /transform', e);
+            return [false, ""];
+        }
+    }
 
-            if (response.ok) {
+    function svgdx_transform_local(svgdx_input) {
+        let result, ok;
+        try {
+            result = svgdx_transform(svgdx_input);
+            ok = true;
+        } catch (e) {
+            result = e.toString();
+            ok = false;
+        }
+        return Promise.resolve([ok, result]);
+    }
+
+    async function update() {
+        try {
+            const svgdx_input = editor.getValue();
+            // save editor content to localStorage
+            localStorage.setItem(`svgdx-editor-value-${activeTab()}`, svgdx_input);
+
+            //const result = await svgdx_transform_server(svgdx_input);
+            const result = await svgdx_transform_local(svgdx_input);
+            const responseOk = result[0];
+            const responseText = result[1];
+
+            if (responseOk) {
                 const oldSvg = svg_container.querySelector('svg');
                 if (oldSvg) {
                     last_viewbox = oldSvg.getAttribute('viewBox');
                 }
 
-                const svgData = await response.text();
-                last_text_response = svgData;
-                if (document.getElementById('text-output').style.display !== "none") {
-                    // Updating the codemirror editor while hidden is ineffective;
-                    // we set if visible or when it becomes visible.
-                    textViewer.setValue(svgData);
-                }
-                svg_container.innerHTML = svgData;
-                const svg = svg_container.querySelector('svg');
-                if (svg === null) {
-                    throw new Error("No SVG returned");
-                }
-                // tweak the SVG to make it fill the container
-                // save first so we can restore during save operations
-                original_width = svg.width.baseVal.value;
-                original_height = svg.height.baseVal.value;
-                svg.width.baseVal.valueAsString = '100%';
-                svg.height.baseVal.valueAsString = '100%';
-                original_viewbox = svg.getAttribute('viewBox');
-                if (document.getElementById('auto-viewbox').dataset.checked !== "true" && last_viewbox) {
-                    svg.setAttribute('viewBox', last_viewbox);
-                }
-
-                document.getElementById('editor').style.backgroundColor = "white";
-                error_output.innerText = "";
-                error_output.style.display = "none";
-
-                // TODO: return error line numbers info in response to highlight
-                // for (let i = 0; i < editor.lineCount(); i++) {
-                //     editor.removeLineClass(i, "background", "error-line");
-                // }
-                // for (const lineNumber of linesWithErrors) {
-                //     editor.addLineClass(lineNumber, "background", "error-line");
-                // }
-
+                update_response(responseText);
             } else {
-                const responseText = await response.text();
                 document.getElementById('editor').style.backgroundColor = 'red';
                 error_output.innerText = responseText;
                 error_output.style.display = "";
@@ -164,10 +193,10 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     //const savedValue = localStorage.getItem(`svgdx-editor-value`);
     if (savedValue) {
         editor.setValue(savedValue);
-        update();
+        setTimeout(update, 100);  // hack to allow WASM to load
     } else {
         editor.setValue(DEFAULT_CONTENT);
-        update();
+        setTimeout(update, 100);  // hack to allow WASM to load
     }
 
     editor.on('change', update);
