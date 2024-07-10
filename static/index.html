@@ -152,6 +152,14 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldgutter.js" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/fold/foldcode.js" referrerpolicy="no-referrer"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/display/autorefresh.min.js" referrerpolicy="no-referrer"></script>
+    <script type="module">
+        import init, {transform_string} from "./pkg/svgdx.js";
+        async function run() {
+            await init();
+            window.svgdx_transform = transform_string;
+        }
+        run();
+    </script>
     <script src="svgdx-editor.js"></script>
 </body>
 </html>

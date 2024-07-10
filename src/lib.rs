@@ -26,10 +26,19 @@
 //! println!("{output}");
 //! ```
 
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "cli")]
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Cursor, IsTerminal, Read, Write};
+#[cfg(feature = "cli")]
+use std::io::{BufReader, IsTerminal, Read};
+
+use std::io::{BufRead, Cursor, Write};
 
 use anyhow::Result;
+
+#[cfg(feature = "cli")]
 use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
@@ -109,6 +118,7 @@ pub fn transform_stream(
 /// and write to file given by `output` ('-' for stdout).
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
+#[cfg(feature = "cli")]
 pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
     let mut in_reader = if input == "-" {
         let mut stdin = std::io::stdin().lock();
@@ -147,6 +157,15 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
 /// Transform `input` provided as a string, returning the result as a string.
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn transform_string(input: String) -> core::result::Result<String, String> {
+    let cfg = TransformConfig {
+        add_metadata: true,
+        ..Default::default()
+    };
+    transform_str(input, &cfg).map_err(|e| e.to_string())
+}
+
 pub fn transform_str<T: Into<String>>(input: T, cfg: &TransformConfig) -> Result<String> {
     let input = input.into();
 
