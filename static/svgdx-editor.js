@@ -147,8 +147,14 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     function svgdx_transform_local(svgdx_input) {
         let result, ok;
         try {
-            result = svgdx_transform(svgdx_input);
-            ok = true;
+            if (!window.hasOwnProperty('svgdx_transform')) {
+                result = "loading svgdx...";
+                ok = false;
+                setTimeout(update, 100);
+            } else {
+                result = svgdx_transform(svgdx_input);
+                ok = true;
+            }
         } catch (e) {
             result = e.toString();
             ok = false;
@@ -193,10 +199,10 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     //const savedValue = localStorage.getItem(`svgdx-editor-value`);
     if (savedValue) {
         editor.setValue(savedValue);
-        setTimeout(update, 100);  // hack to allow WASM to load
+        update();
     } else {
         editor.setValue(DEFAULT_CONTENT);
-        setTimeout(update, 100);  // hack to allow WASM to load
+        update();
     }
 
     editor.on('change', update);
