@@ -52,9 +52,10 @@ function resetLayout() {
 
 const DEFAULT_CONTENT = `<svg>
   <!-- Example svgdx document -->
-  <rect id="in" wh="20 10" text="input" />
-  <rect id="proc" xy="^:h 10" wh="^" text="process" />
-  <rect id="out" xy="^:h 10" wh="^" text="output" />
+  <rect id="in" wh="20 10" text="input" class="d-softshadow d-fill-azure"/>
+  <!-- Try changing the ':h 10' below to ':v 30' or ':V 5' -->
+  <rect id="proc" xy="^:h 10" wh="^" text="process" class="d-softshadow d-fill-silver"/>
+  <rect id="out" xy="^:h 10" wh="^" text="output" class="d-softshadow d-fill-skyblue"/>
 
   <line start="#in" end="#proc" class="d-arrow"/>
   <line start="#proc" end="#out" class="d-arrow"/>
@@ -304,7 +305,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     });
 
     // copy PNG buttons
-    document.querySelectorAll('.copy-popup .popup-button').forEach(
+    document.querySelectorAll('#copy-popup .popup-button').forEach(
         el => el.addEventListener('click', async (e) => {
             let id = e.target.id;
             const res = id === "copy-png-big" ? 2048 : (id === "copy-png-medium" ? 1024 : 512);
@@ -528,13 +529,14 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
         const tooltips = {
             "toggle-layout": "Toggle layout between horizontal and vertical",
+            "toggle-output": "View output as text rather than image",
             "auto-viewbox": "When active, auto-resize and center the SVG on update",
-            "text-output": "View output as text rather than image",
             "reset-view": "Resize and center the SVG",
             "save-input": "Download the input",
             "save-output": "Download the SVG",
+            "copy-base64": "Copy the SVG as base64 to clipboard",
             "copy-png": "Copy as PNG to clipboard",
-            "copy-base64": "Copy the SVG as base64 to clipboard"
+            "help": "Show help links"
         };
 
         if (e.target.id in tooltips) {
