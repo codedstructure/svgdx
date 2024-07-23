@@ -5,6 +5,7 @@ use crate::expression::eval_attr;
 use crate::position::{BoundingBox, Position, TrblLength};
 use crate::text::process_text_attr;
 use crate::types::{attr_split, fstr, strp};
+use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -51,6 +52,7 @@ pub struct TransformerContext {
     pub real_svg: bool,
     pub in_specs: bool,
     pub events: Vec<InputEvent>,
+    pub config: TransformConfig,
 }
 
 impl Default for TransformerContext {
@@ -65,6 +67,7 @@ impl Default for TransformerContext {
             real_svg: false,
             in_specs: false,
             events: Vec::new(),
+            config: TransformConfig::default(),
         }
     }
 }
