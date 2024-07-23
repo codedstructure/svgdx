@@ -83,10 +83,10 @@ async fn script() -> impl IntoResponse {
 async fn wasm_script() -> impl IntoResponse {
     // If configured as a release build, use include_str! to embed the file.
     #[cfg(not(debug_assertions))]
-    let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/pkg/svgdx.js")).to_string();
+    let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx.js")).to_string();
     // During development it's useful to have it re-read each request.
     #[cfg(debug_assertions)]
-    let content = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/pkg/svgdx.js"))
+    let content = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx.js"))
         .await
         .unwrap();
 
@@ -100,10 +100,10 @@ async fn wasm_bin() -> impl IntoResponse {
     // If configured as a release build, use include_str! to embed the file.
     #[cfg(not(debug_assertions))]
     let content =
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/pkg/svgdx_bg.wasm")).to_vec();
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx_bg.wasm")).to_vec();
     // During development it's useful to have it re-read each request.
     #[cfg(debug_assertions)]
-    let content = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/pkg/svgdx_bg.wasm"))
+    let content = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx_bg.wasm"))
         .await
         .unwrap();
 
