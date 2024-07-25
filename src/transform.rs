@@ -307,6 +307,11 @@ fn process_seq(
     seq: EventList,
     idx_output: &mut BTreeMap<OrderIndex, EventList>,
 ) -> Result<EventList> {
+    // Recursion base-case
+    if seq.is_empty() {
+        return Ok(EventList::new());
+    }
+
     let mut remain = EventList::new();
     let mut last_event = None;
     let mut last_element = None;
@@ -314,6 +319,8 @@ fn process_seq(
     // Stack of event indices of open elements.
     let mut idx_stack = Vec::new();
     let mut loop_depth = 0;
+
+    let init_seq_len = seq.len();
 
     for input_ev in seq {
         let ev = &input_ev.event;
@@ -549,7 +556,17 @@ fn process_seq(
         last_event = Some(ev.clone());
     }
 
-    Ok(remain)
+    if init_seq_len == remain.len() {
+        bail!(
+            "Could not resolve the following elements:\n{}",
+            remain
+                .iter()
+                .map(|r| format!("{:4}: {:?}", r.line, r.event))
+                .join("\n")
+        );
+    }
+
+    process_seq(context, remain, idx_output)
 }
 
 pub struct Transformer {
@@ -575,22 +592,7 @@ impl Transformer {
         let mut output = EventList { events: vec![] };
         let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
-        // First pass with original input data
-        let mut remain = process_seq(&mut self.context, input, &mut idx_output)?;
-        // Repeatedly process remaining elements while useful
-        while !remain.is_empty() {
-            let last_len = remain.len();
-            remain = process_seq(&mut self.context, remain, &mut idx_output)?;
-            if last_len == remain.len() {
-                bail!(
-                    "Could not resolve the following elements:\n{}",
-                    remain
-                        .iter()
-                        .map(|r| format!("{:4}: {:?}", r.line, r.event))
-                        .join("\n")
-                );
-            }
-        }
+        process_seq(&mut self.context, input, &mut idx_output)?;
 
         for (_idx, events) in idx_output {
             output.events.extend(events.events);
