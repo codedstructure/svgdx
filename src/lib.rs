@@ -49,8 +49,10 @@ mod element;
 mod events;
 mod expression;
 mod functions;
+mod loop_el;
 mod path;
 mod position;
+mod reuse;
 #[cfg(feature = "server")]
 pub mod server;
 mod svg_defs;

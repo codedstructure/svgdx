@@ -1,11 +1,13 @@
 use crate::context::TransformerContext;
 use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
-use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, LocSpec};
 use crate::svg_defs::{build_defs, build_styles};
 use crate::types::{fstr, OrderIndex};
 use crate::TransformConfig;
+
+use crate::loop_el::LoopElement;
+use crate::reuse::ReuseElement;
 
 use std::collections::{BTreeMap, HashSet};
 use std::io::{BufRead, Write};
@@ -16,293 +18,142 @@ use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 
 use anyhow::{bail, Context, Result};
 
-#[derive(Debug, Clone, PartialEq)]
-enum LoopType {
-    Repeat(String),
-    While(String),
-    Until(String),
-}
+pub trait ElementLike: std::fmt::Debug {
+    fn handle_element_start(
+        &mut self,
+        _element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        Ok(())
+    }
 
-#[derive(Debug, Clone, PartialEq)]
-struct LoopDef {
-    loop_type: LoopType,
-    loop_spec: Option<(String, String, String)>,
-}
+    fn handle_element_end(
+        &mut self,
+        _element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        Ok(())
+    }
 
-impl TryFrom<&SvgElement> for LoopDef {
-    type Error = anyhow::Error;
-
-    fn try_from(element: &SvgElement) -> Result<Self> {
-        if element.name != "loop" {
-            bail!("LoopType can only be created from a loop element");
-        }
-        let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
-            // Note we don't parse attributes here as they might be expressions,
-            // and we don't have access to a context to evaluate them
-            let start = element.get_attr("start").unwrap_or("0".to_string());
-            let step = element.get_attr("step").unwrap_or("1".to_string());
-            Some((loop_var, start, step))
-        } else {
-            None
-        };
-        let loop_type;
-        if let Some(count) = element.get_attr("count") {
-            loop_type = LoopType::Repeat(count); //, loop_spec));
-        } else if let Some(while_expr) = element.get_attr("while") {
-            loop_type = LoopType::While(while_expr);
-        } else if let Some(until_expr) = element.get_attr("until") {
-            loop_type = LoopType::Until(until_expr);
-        } else {
-            bail!("Loop element should have a count, while or until attribute");
-        }
-        Ok(Self {
-            loop_type,
-            loop_spec,
-        })
+    fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
+        Ok(EventList::new())
     }
 }
 
-fn handle_svg_root(context: &mut TransformerContext, element: &SvgElement) -> Result<()> {
-    // "Real" SVG documents will have an `xmlns` attribute.
-    if element.get_attr("xmlns") == Some("http://www.w3.org/2000/svg".to_owned()) {
-        context.real_svg = true;
+impl ElementLike for SvgElement {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+        transform_element(self, context)
     }
 
-    Ok(())
+    fn handle_element_start(
+        &mut self,
+        _element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        //context.push_current_element(&element);
+        Ok(())
+    }
+
+    fn handle_element_end(
+        &mut self,
+        _element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        //context.pop_current_element();
+        Ok(())
+    }
 }
 
-fn handle_config_element(context: &mut TransformerContext, element: &SvgElement) -> Result<()> {
-    for (key, value) in &element.attrs {
-        match key.as_str() {
-            "scale" => context.config.scale = value.parse()?,
-            "debug" => context.config.debug = value.parse()?,
-            "add-auto-styles" => context.config.add_auto_defs = value.parse()?,
-            "border" => context.config.border = value.parse()?,
-            "background" => context.config.background.clone_from(value),
-            "seed" => {
-                context.config.seed = value.parse()?;
-                context.seed_rng(context.config.seed);
-            }
-            _ => bail!("Unknown config setting {key}"),
+#[derive(Debug, Clone)]
+struct RootSvgElement(SvgElement);
+
+impl ElementLike for RootSvgElement {
+    fn handle_element_start(
+        &mut self,
+        element: &SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        // The outer <svg> element is a special case.
+        // "Real" SVG documents will have an `xmlns` attribute.
+        if context.get_current_element().is_none()
+            && element.get_attr("xmlns") == Some("http://www.w3.org/2000/svg".to_owned())
+        {
+            context.real_svg = true;
         }
+
+        Ok(())
     }
-    Ok(())
+
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+        transform_element(&self.0, context)
+    }
 }
 
-fn generate_element_events(
-    context: &mut TransformerContext,
-    event_element: &mut SvgElement,
-) -> Result<EventList> {
-    let mut gen_events = EventList::new();
-    let mut repeat = if context.in_specs { 0 } else { 1 };
-    if let Some(rep_count) = event_element.pop_attr("repeat") {
-        if event_element.is_graphics_element() {
-            repeat = eval_attr(&rep_count, context).parse().unwrap_or(1);
-        } else {
-            bail!(
-                "`repeat` not allowed on non-graphics elements (line {})",
-                event_element.src_line
-            );
-        }
-    }
-    for rep_idx in 0..repeat {
-        let events = transform_element(event_element, context).context(format!(
-            "processing element on line {}",
-            event_element.src_line
-        ));
-        if let Err(err) = events {
-            // TODO: save the error context with the element to show to user if it is unrecoverable.
-            bail!(
-                "Error '{}' processing element on line {}",
-                err,
-                event_element.src_line
-            );
-        }
-        let events = events?;
-        if events.is_empty() {
-            // if an input event doesn't generate any output events,
-            // ignore text following that event to avoid blank lines in output.
-            break;
-        }
+#[derive(Debug, Clone)]
+struct ConfigElement {}
 
-        for ev in events.iter() {
-            gen_events.push(ev.event.clone());
-        }
-
-        if rep_idx < (repeat - 1) {
-            gen_events.push(Event::Text(BytesText::new(&format!(
-                "\n{}",
-                " ".repeat(event_element.indent)
-            ))));
-        }
-        if let Some(tail) = &event_element.tail {
-            gen_events.push(Event::Text(BytesText::new(tail)));
-        }
-    }
-    Ok(gen_events)
-}
-
-fn handle_loop_element(
-    context: &mut TransformerContext,
-    event_element: &SvgElement,
-) -> Result<EventList> {
-    let mut gen_events = EventList::new();
-    if let (Ok(loop_def), Some((start, end))) =
-        (LoopDef::try_from(event_element), event_element.event_range)
-    {
-        // opening loop element is not included in the processed inner events to avoid
-        // infinite recursion...
-        let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
-
-        let mut iteration = 0;
-        let mut loop_var_name = String::new();
-        let mut loop_count = 0;
-        let mut loop_var_value = 0.;
-        let mut loop_step = 1.;
-        if let LoopType::Repeat(count) = &loop_def.loop_type {
-            loop_count = eval_attr(count, context).parse()?;
-        }
-        if let Some((loop_var, start, step)) = loop_def.loop_spec {
-            loop_var_name = eval_attr(&loop_var, context);
-            loop_var_value = eval_attr(&start, context).parse()?;
-            loop_step = eval_attr(&step, context).parse()?;
-        }
-        loop {
-            if let LoopType::Repeat(_) = &loop_def.loop_type {
-                if iteration >= loop_count {
-                    break;
+impl ElementLike for ConfigElement {
+    fn handle_element_start(
+        &mut self,
+        element: &SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        for (key, value) in &element.attrs {
+            match key.as_str() {
+                "scale" => context.config.scale = value.parse()?,
+                "debug" => context.config.debug = value.parse()?,
+                "add-auto-styles" => context.config.add_auto_defs = value.parse()?,
+                "border" => context.config.border = value.parse()?,
+                "background" => context.config.background.clone_from(value),
+                "seed" => {
+                    context.config.seed = value.parse()?;
+                    context.seed_rng(context.config.seed);
                 }
-            } else if let LoopType::While(expr) = &loop_def.loop_type {
-                if !eval_condition(expr, context)? {
-                    break;
-                }
-            }
-
-            if !loop_var_name.is_empty() {
-                context
-                    .variables
-                    .insert(loop_var_name.clone(), loop_var_value.to_string());
-            }
-
-            let mut btree = BTreeMap::new();
-            let remain = process_seq(context, inner_events.clone(), &mut btree);
-            if let Ok(remain) = remain {
-                // The resulting error string output is a bit convoluted in the case
-                // of nested loops with errors, but better to have too much info.
-                if !remain.is_empty() {
-                    bail!(
-                        "Could not resolve the following elements:\n{}",
-                        remain
-                            .iter()
-                            .map(|r| format!("{:4}: {:?}", r.line, r.event))
-                            .join("\n")
-                    );
-                }
-            } else {
-                bail!("Loop error:\n{remain:?}");
-            }
-
-            for (_, ev) in btree {
-                gen_events.extend(&ev);
-            }
-
-            if let LoopType::Until(expr) = &loop_def.loop_type {
-                if eval_condition(expr, context)? {
-                    break;
-                }
-            }
-            iteration += 1;
-            loop_var_value += loop_step;
-            if iteration == context.config.loop_limit {
-                bail!("Excessive looping detected");
+                _ => bail!("Unknown config setting {key}"),
             }
         }
+        Ok(())
     }
-    Ok(gen_events)
 }
 
-fn handle_reuse_element(
-    context: &mut TransformerContext,
-    mut event_element: SvgElement,
-    idx_output: &mut BTreeMap<OrderIndex, EventList>,
-) -> Result<SvgElement> {
-    let elref = event_element
-        .pop_attr("href")
-        .context("reuse element should have an href attribute")?;
-    let referenced_element = context
-        .get_original_element(
-            elref
-                .strip_prefix('#')
-                .context("href value should begin with '#'")?,
-        )
-        .context("unknown reference")?
-        .to_owned();
-    let mut instance_element = referenced_element.clone();
+#[derive(Debug, Clone)]
+struct SpecsElement {}
 
-    if referenced_element.name == "g" {
-        if let Some((start, end)) = referenced_element.event_range {
-            let mut btree = BTreeMap::new();
-
-            // opening g element is not included in the processed inner events to avoid
-            // infinite recursion...
-            let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
-            // ...but we do want to include it for attribute-variable lookups, so push the
-            // referenced element onto the element stack (just while we run process_seq)
-            context.push_current_element(&referenced_element);
-            let remain = process_seq(context, inner_events, &mut btree);
-            context.pop_current_element();
-            if !remain?.is_empty() {
-                bail!("No support for forward references in reuse groups");
-            }
-
-            // Use sub-index to have group open at 0, content at 1.x, close at 2
-            for (idx, ev) in btree {
-                idx_output.insert(
-                    event_element.order_index.with_index(1).with_sub_index(&idx),
-                    ev,
-                );
-            }
-            let mut group_element = SvgElement::new("g", &[]);
-            group_element.set_indent(event_element.indent);
-            group_element.set_src_line(event_element.src_line);
-            group_element.add_classes(&event_element.classes);
-            if let Some(inst_id) = event_element.pop_attr("id") {
-                group_element.set_attr("id", &inst_id);
-            }
-            let group_open = EventList::from(SvgEvent::Start(group_element));
-            let group_close = EventList::from(SvgEvent::End("g".to_string()));
-            idx_output.insert(event_element.order_index.with_index(0), group_open);
-            idx_output.insert(event_element.order_index.with_index(2), group_close);
-
-            return Ok(SvgElement::new("phantom", &[]));
+impl ElementLike for SpecsElement {
+    fn handle_element_start(
+        &mut self,
+        _element: &SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        if context.in_specs {
+            bail!("Cannot nest <specs> elements");
         }
+        context.in_specs = true;
+        Ok(())
     }
 
-    // the referenced element will have an `id` attribute (which it was
-    // referenced by) but the new instance should not have this to avoid
-    // multiple elements with the same id.
-    // However we *do* want the instance element to inherit any `id` which
-    // was on the `reuse` element.
-    let ref_id = instance_element
-        .pop_attr("id")
-        .context("referenced element should have id")?;
-    if let Some(inst_id) = event_element.pop_attr("id") {
-        instance_element.set_attr("id", &inst_id);
-        context.update_element(&event_element);
+    fn handle_element_end(
+        &mut self,
+        _element: &SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        context.in_specs = false;
+        Ok(())
     }
-    // the instanced element should have the same indent as the original
-    // `reuse` element, as well as inherit `style` and `class` values.
-    instance_element.set_indent(event_element.indent);
-    instance_element.set_src_line(event_element.src_line);
-    if let Some(inst_style) = event_element.pop_attr("style") {
-        instance_element.set_attr("style", &inst_style);
-    }
-    instance_element.add_classes(&event_element.classes);
-    instance_element.add_class(&ref_id);
-    Ok(instance_element)
 }
 
-fn process_seq(
+fn gen_thing(element: &SvgElement) -> Box<dyn ElementLike> {
+    match element.name.as_str() {
+        "loop" => Box::new(LoopElement(element.clone())), //LoopDef::try_from(element).unwrap())),
+        "config" => Box::new(ConfigElement {}),
+        "reuse" => Box::new(ReuseElement(element.clone())),
+        "svg" => Box::new(RootSvgElement(element.clone())),
+        "specs" => Box::new(SpecsElement {}),
+        _ => Box::new(element.clone()),
+    }
+}
+
+pub fn process_seq(
     context: &mut TransformerContext,
     seq: EventList,
     idx_output: &mut BTreeMap<OrderIndex, EventList>,
@@ -318,7 +169,6 @@ fn process_seq(
     let mut gen_events: Vec<(OrderIndex, EventList)>;
     // Stack of event indices of open elements.
     let mut idx_stack = Vec::new();
-    let mut loop_depth = 0;
 
     let init_seq_len = seq.len();
 
@@ -359,25 +209,14 @@ fn process_seq(
                 last_element = Some(event_element.clone());
                 last_event = Some(ev.clone());
 
-                if event_element.name == "svg" && context.get_current_element().is_none() {
-                    // The outer <svg> element is a special case.
-                    handle_svg_root(context, &event_element)?;
-                }
+                let mut eeee = gen_thing(&event_element);
+                eeee.handle_element_start(&event_element, context)?;
 
                 if event_element.name == "config" {
-                    handle_config_element(context, &event_element)?;
                     continue;
                 }
 
-                if event_element.name == "specs" && !is_empty {
-                    if context.in_specs {
-                        bail!("Cannot nest <specs> elements");
-                    }
-                    context.in_specs = true;
-                }
-                if event_element.name == "loop" && !is_empty {
-                    loop_depth += 1;
-                }
+                context.push_current_element(&event_element);
 
                 // List of events generated by *this* event.
                 let mut ev_events = EventList::new();
@@ -400,13 +239,14 @@ fn process_seq(
                 // Note this must be done before `<reuse>` processing, which 'switches out' the
                 // element being processed to its target. The 'current_element' is used for
                 // local variable lookup from attributes.
-                context.push_current_element(&event_element);
+                //context.push_current_element(&event_element);
                 // support reuse element
                 let mut pop_needed = false;
-                if loop_depth == 0 && event_element.name == "reuse" {
-                    match handle_reuse_element(context, event_element, idx_output) {
+                if context.loop_depth == 0 && event_element.name == "reuse" {
+                    match crate::reuse::handle_reuse_element(context, event_element, idx_output) {
                         Ok(ev_el) => {
                             event_element = ev_el;
+                            eeee = gen_thing(&event_element);
                             context.push_current_element(&event_element);
                             pop_needed = true;
                         }
@@ -417,8 +257,8 @@ fn process_seq(
                     }
                 }
                 if is_empty {
-                    if loop_depth == 0 && !context.in_specs {
-                        let events = generate_element_events(context, &mut event_element);
+                    if context.loop_depth == 0 && !context.in_specs {
+                        let events = eeee.generate_events(context);
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
@@ -429,6 +269,7 @@ fn process_seq(
                         }
                     }
 
+                    eeee.handle_element_end(&event_element, context)?;
                     context.pop_current_element();
                 }
                 if pop_needed {
@@ -453,20 +294,11 @@ fn process_seq(
                         );
                     }
 
-                    if ee_name.as_str() == "specs" {
-                        context.in_specs = false;
-                    }
-                    let mut events = if ee_name.as_str() == "loop" {
-                        loop_depth -= 1;
-                        if loop_depth == 0 {
-                            // Note we don't support remain from loop events, so exit if error
-                            // and re-wrap ok state.
-                            Ok(handle_loop_element(context, &event_element)?)
-                        } else {
-                            Ok(EventList::new())
-                        }
-                    } else if !context.in_specs {
-                        generate_element_events(context, &mut event_element)
+                    let mut eeee = gen_thing(&event_element);
+                    eeee.handle_element_end(&event_element, context)?;
+
+                    let mut events = if !context.in_specs {
+                        eeee.generate_events(context)
                     } else {
                         Ok(EventList::new())
                     };
@@ -540,7 +372,7 @@ fn process_seq(
                     }
                     _ => {}
                 }
-                if !(processed || context.in_specs || loop_depth > 0) {
+                if !(processed || context.in_specs || context.loop_depth > 0) {
                     gen_events.push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
                 }
             }
@@ -887,16 +719,15 @@ mod tests {
         </svg>"##,
         );
 
-        let remain = process_seq(&mut transformer.context, seq, &mut idx_output);
+        let result = process_seq(&mut transformer.context, seq, &mut idx_output);
+        assert!(result.is_ok());
 
         let ok_ev_count = idx_output
             .iter()
             .map(|entry| entry.1.events.len())
             .reduce(|a, b| a + b)
             .unwrap();
-        assert_eq!(ok_ev_count, 6);
-        let remain_ev_count = remain.unwrap().len();
-        assert_eq!(remain_ev_count, 1);
+        assert_eq!(ok_ev_count, 7);
     }
 
     #[test]

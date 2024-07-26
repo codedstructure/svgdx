@@ -51,6 +51,7 @@ pub struct TransformerContext {
     rng: RefCell<SmallRng>,
     pub real_svg: bool,
     pub in_specs: bool,
+    pub loop_depth: usize,
     pub events: Vec<InputEvent>,
     pub config: TransformConfig,
 }
@@ -66,6 +67,7 @@ impl Default for TransformerContext {
             rng: RefCell::new(SmallRng::seed_from_u64(0)),
             real_svg: false,
             in_specs: false,
+            loop_depth: 0,
             events: Vec::new(),
             config: TransformConfig::default(),
         }

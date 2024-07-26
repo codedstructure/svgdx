@@ -13,7 +13,6 @@ mod loops;
 mod position;
 mod rel_pos;
 mod rel_size;
-mod repeat_el;
 mod reuse;
 mod roundtrip;
 mod text_attr;
