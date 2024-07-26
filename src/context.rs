@@ -166,22 +166,6 @@ impl TransformerContext {
         }
     }
 
-    fn handle_var_element(&mut self, e: &mut SvgElement) {
-        // variables are updated 'in parallel' rather than one-by-one,
-        // allowing e.g. swap in a single `<var>` element:
-        // `<var a="$b" b="$a" />`
-        let mut new_vars = HashMap::new();
-        for (key, value) in e.attrs.clone() {
-            // Note comments in `var` elements are permitted (and encouraged!)
-            // in the input, but not propagated to the output.
-            if key != "_" && key != "__" {
-                let value = eval_attr(&value, self);
-                new_vars.insert(key, value);
-            }
-        }
-        self.variables.extend(new_vars);
-    }
-
     fn handle_comments(&self, e: &mut SvgElement) -> Vec<SvgEvent> {
         let mut events = vec![];
 
@@ -271,13 +255,6 @@ impl TransformerContext {
 
         let mut e = e.clone();
 
-        if &e.name == "var" {
-            self.handle_var_element(&mut e);
-            return Ok(vec![]);
-        }
-        if &e.name == "specs" {
-            return Ok(vec![]);
-        }
         events.extend(self.handle_comments(&mut e));
         self.handle_containment(&mut e)?;
 
