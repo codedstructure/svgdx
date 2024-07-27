@@ -233,7 +233,7 @@ fn gen_thing(element: &SvgElement) -> Box<dyn ElementLike> {
     }
 }
 
-pub fn process_seq(
+fn process_seq(
     context: &mut TransformerContext,
     seq: EventList,
     idx_output: &mut BTreeMap<OrderIndex, EventList>,
@@ -481,6 +481,19 @@ pub fn process_seq(
     process_seq(context, remain, idx_output)
 }
 
+pub fn process_events(input: EventList, context: &mut TransformerContext) -> Result<EventList> {
+    let mut output = EventList { events: vec![] };
+    let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
+
+    process_seq(context, input, &mut idx_output)?;
+
+    for (_idx, events) in idx_output {
+        output.events.extend(events.events);
+    }
+
+    Ok(output)
+}
+
 pub struct Transformer {
     pub context: TransformerContext,
 }
@@ -496,21 +509,8 @@ impl Transformer {
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
         let input = EventList::from_reader(reader)?;
         self.context.set_events(input.events.clone());
-        let output = self.process_events(input)?;
+        let output = process_events(input, &mut self.context)?;
         self.postprocess(output, writer)
-    }
-
-    fn process_events(&mut self, input: EventList) -> Result<EventList> {
-        let mut output = EventList { events: vec![] };
-        let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
-
-        process_seq(&mut self.context, input, &mut idx_output)?;
-
-        for (_idx, events) in idx_output {
-            output.events.extend(events.events);
-        }
-
-        Ok(output)
     }
 
     fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {

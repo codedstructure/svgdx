@@ -1,11 +1,11 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::events::{EventList, SvgEvent};
-use crate::transform::ElementLike;
+use crate::transform::{process_events, ElementLike};
 use crate::types::OrderIndex;
 use std::collections::BTreeMap;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
@@ -54,27 +54,15 @@ pub fn handle_reuse_element(
 
     if referenced_element.name == "g" {
         if let Some((start, end)) = referenced_element.event_range {
-            let mut btree = BTreeMap::new();
-
             // opening g element is not included in the processed inner events to avoid
             // infinite recursion...
             let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
             // ...but we do want to include it for attribute-variable lookups, so push the
-            // referenced element onto the element stack (just while we run process_seq)
+            // referenced element onto the element stack (just while we run process_events)
             context.push_current_element(&referenced_element);
-            let remain = crate::transform::process_seq(context, inner_events, &mut btree);
+            let g_events = process_events(inner_events, context)?;
             context.pop_current_element();
-            if !remain?.is_empty() {
-                bail!("No support for forward references in reuse groups");
-            }
 
-            // Use sub-index to have group open at 0, content at 1.x, close at 2
-            for (idx, ev) in btree {
-                idx_output.insert(
-                    event_element.order_index.with_index(1).with_sub_index(&idx),
-                    ev,
-                );
-            }
             let mut group_element = SvgElement::new("g", &[]);
             group_element.set_indent(event_element.indent);
             group_element.set_src_line(event_element.src_line);
@@ -85,6 +73,7 @@ pub fn handle_reuse_element(
             let group_open = EventList::from(SvgEvent::Start(group_element));
             let group_close = EventList::from(SvgEvent::End("g".to_string()));
             idx_output.insert(event_element.order_index.with_index(0), group_open);
+            idx_output.insert(event_element.order_index.with_index(1), g_events);
             idx_output.insert(event_element.order_index.with_index(2), group_close);
 
             return Ok(SvgElement::new("phantom", &[]));

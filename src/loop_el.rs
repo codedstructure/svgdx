@@ -2,10 +2,7 @@ use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::events::EventList;
 use crate::expression::{eval_attr, eval_condition};
-use crate::transform::{process_seq, ElementLike};
-
-use itertools::Itertools;
-use std::collections::BTreeMap;
+use crate::transform::{process_events, ElementLike};
 
 use anyhow::{bail, Result};
 
@@ -117,27 +114,7 @@ impl ElementLike for LoopElement {
                         .insert(loop_var_name.clone(), loop_var_value.to_string());
                 }
 
-                let mut btree = BTreeMap::new();
-                let remain = process_seq(context, inner_events.clone(), &mut btree);
-                if let Ok(remain) = remain {
-                    // The resulting error string output is a bit convoluted in the case
-                    // of nested loops with errors, but better to have too much info.
-                    if !remain.is_empty() {
-                        bail!(
-                            "Could not resolve the following elements:\n{}",
-                            remain
-                                .iter()
-                                .map(|r| format!("{:4}: {:?}", r.line, r.event))
-                                .join("\n")
-                        );
-                    }
-                } else {
-                    bail!("Loop error:\n{remain:?}");
-                }
-
-                for (_, ev) in btree {
-                    gen_events.extend(&ev);
-                }
+                gen_events.extend(&process_events(inner_events.clone(), context)?);
 
                 if let LoopType::Until(expr) = &loop_def.loop_type {
                     if eval_condition(expr, context)? {
