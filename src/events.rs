@@ -135,6 +135,12 @@ impl From<Event<'_>> for InputEvent {
     }
 }
 
+impl Default for EventList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventList {
     pub fn new() -> Self {
         Self { events: vec![] }

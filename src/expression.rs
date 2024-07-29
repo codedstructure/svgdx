@@ -688,54 +688,54 @@ mod tests {
 
         // Check attributes as locals; this would be something like the attributes
         // of a surrounding <g> element, which can be referenced by child elements.
-        ctx.push_current_element(&SvgElement::new(
-            "g",
-            &[
-                ("width".to_string(), "3".to_string()),
-                ("height".to_string(), "4".to_string()),
-                // Check this overrides the 'global' variables
-                ("this_year".to_string(), "2024".to_string()),
-            ],
-        ));
+        ctx.push_element(
+            SvgElement::new(
+                "g",
+                &[
+                    ("width".to_string(), "3".to_string()),
+                    ("height".to_string(), "4".to_string()),
+                    // Check this overrides the 'global' variables
+                    ("this_year".to_string(), "2024".to_string()),
+                ],
+            )
+            .as_element_like(),
+        );
         // push another element - the actual 'current' element containing this attribute.
         // This is skipped in variable lookup, so needed so the previous ('<g>') element
         // is used.
-        ctx.push_current_element(&SvgElement::new("rect", &[]));
+        ctx.push_element(SvgElement::new("rect", &[]).as_element_like());
         assert_eq!(
             eval_vars("$this_year: $width.$one$height", &ctx),
             "2024: 3.14"
         );
 
-        ctx.pop_current_element();
-        ctx.pop_current_element();
+        ctx.pop_element();
+        ctx.pop_element();
         // Now `this_year` isn't overridden by the local variable should revert to
         // the global value.
         assert_eq!(eval_vars("$this_year", &ctx), "2023");
 
         // Check multiple levels of override
-        ctx.push_current_element(&SvgElement::new(
-            "g",
-            &[("level".to_string(), "1".to_string())],
-        ));
-        ctx.push_current_element(&SvgElement::new(
-            "g",
-            &[("level".to_string(), "2".to_string())],
-        ));
-        ctx.push_current_element(&SvgElement::new(
-            "g",
-            &[("level".to_string(), "3".to_string())],
-        ));
+        ctx.push_element(
+            SvgElement::new("g", &[("level".to_string(), "1".to_string())]).as_element_like(),
+        );
+        ctx.push_element(
+            SvgElement::new("g", &[("level".to_string(), "2".to_string())]).as_element_like(),
+        );
+        ctx.push_element(
+            SvgElement::new("g", &[("level".to_string(), "3".to_string())]).as_element_like(),
+        );
         // The 'inner' element, where attributes should be ignored in variable lookup
-        ctx.push_current_element(&SvgElement::new(
-            "rect",
-            &[("level".to_string(), "inside!!".to_string())],
-        ));
+        ctx.push_element(
+            SvgElement::new("rect", &[("level".to_string(), "inside!!".to_string())])
+                .as_element_like(),
+        );
         assert_eq!(eval_vars("$level", &ctx), "3");
-        ctx.pop_current_element();
+        ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "2");
-        ctx.pop_current_element();
+        ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "1");
-        ctx.pop_current_element();
+        ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "$level");
     }
 

@@ -2,10 +2,13 @@ use crate::context::{ContextView, ElementMap};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, ScalarSpec};
+use crate::transform::ElementLike;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
 use anyhow::{bail, Result};
 use core::fmt::Display;
 use lazy_regex::regex;
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -80,6 +83,10 @@ impl SvgElement {
             src_line: 0,
             event_range: None,
         }
+    }
+
+    pub fn as_element_like(&self) -> Rc<RefCell<dyn ElementLike>> {
+        Rc::new(RefCell::new(self.clone()))
     }
 
     pub fn set_indent(&mut self, indent: usize) {

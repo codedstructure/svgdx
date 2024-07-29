@@ -130,4 +130,12 @@ impl ElementLike for LoopElement {
         }
         Ok(gen_events)
     }
+
+    fn get_element(&self) -> Option<SvgElement> {
+        Some(self.0.clone())
+    }
+
+    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
+        Some(&mut self.0)
+    }
 }

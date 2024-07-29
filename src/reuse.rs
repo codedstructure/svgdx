@@ -19,6 +19,10 @@ impl ElementLike for ReuseElement {
         Ok(())
     }
 
+    fn get_element(&self) -> Option<SvgElement> {
+        Some(self.0.clone())
+    }
+
     // fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
     //     match handle_reuse_element(context, self.0, idx_output) {
     //         Ok(ev_el) => {
@@ -34,6 +38,8 @@ impl ElementLike for ReuseElement {
     // }
 }
 
+// TODO: this should be a method on ReuseElement, not a special-cased
+// call from process_seq.
 pub fn handle_reuse_element(
     context: &mut TransformerContext,
     mut event_element: SvgElement,
@@ -59,9 +65,9 @@ pub fn handle_reuse_element(
             let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
             // ...but we do want to include it for attribute-variable lookups, so push the
             // referenced element onto the element stack (just while we run process_events)
-            context.push_current_element(&referenced_element);
+            context.push_element(referenced_element.as_element_like());
             let g_events = process_events(inner_events, context)?;
-            context.pop_current_element();
+            context.pop_element();
 
             let mut group_element = SvgElement::new("g", &[]);
             group_element.set_indent(event_element.indent);

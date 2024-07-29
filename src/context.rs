@@ -4,11 +4,13 @@ use crate::events::{InputEvent, SvgEvent};
 use crate::expression::eval_attr;
 use crate::position::{BoundingBox, Position, TrblLength};
 use crate::text::process_text_attr;
+use crate::transform::ElementLike;
 use crate::types::{attr_split, fstr, strp};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use anyhow::{bail, Context, Result};
 
@@ -42,17 +44,27 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
 }
 
 pub struct TransformerContext {
+    // Current state of given element; may be updated as processing continues
     elem_map: HashMap<String, SvgElement>,
+    // Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    current_element: Vec<SvgElement>,
+    // Stack of elements currently being processed
+    element_stack: Vec<Rc<RefCell<dyn ElementLike>>>,
+    // The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
+    // Current variable values
     pub variables: HashMap<String, String>,
     // SmallRng is used as it is seedable.
     rng: RefCell<SmallRng>,
+    // Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
+    // Are we in a <specs> block?
     pub in_specs: bool,
+    // How many <loop> elements deep are we?
     pub loop_depth: usize,
+    // The event-representation of the entire input SVG
     pub events: Vec<InputEvent>,
+    // Config of transformer processing; updated by <config> elements
     pub config: TransformConfig,
 }
 
@@ -61,7 +73,7 @@ impl Default for TransformerContext {
         Self {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
-            current_element: Vec::new(),
+            element_stack: Vec::new(),
             prev_element: None,
             variables: HashMap::new(),
             rng: RefCell::new(SmallRng::seed_from_u64(0)),
@@ -104,8 +116,12 @@ impl VariableMap for TransformerContext {
         // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
         // requires that when evaluating `x="$x"` we don't look up `x` in the
         // `rect` element itself.
-        for element_scope in self.current_element.iter().rev().skip(1) {
-            if let Some(value) = element_scope.get_attr(name) {
+        for element_scope in self.element_stack.iter().rev().skip(1) {
+            if let Some(Some(value)) = element_scope
+                .borrow()
+                .get_element()
+                .map(|el| el.get_attr(name))
+            {
                 return Some(value.to_string());
             }
         }
@@ -141,20 +157,16 @@ impl TransformerContext {
         self.variables.insert(name.into(), value.into());
     }
 
-    pub fn push_current_element(&mut self, el: &SvgElement) {
-        self.current_element.push(el.clone());
+    pub fn push_element(&mut self, ell: Rc<RefCell<dyn ElementLike>>) {
+        self.element_stack.push(ell);
     }
 
-    pub fn pop_current_element(&mut self) -> Option<SvgElement> {
-        self.current_element.pop()
+    pub fn pop_element(&mut self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+        self.element_stack.pop()
     }
 
-    pub fn get_current_element(&self) -> Option<&SvgElement> {
-        self.current_element.last()
-    }
-
-    pub fn get_current_element_mut(&mut self) -> Option<&mut SvgElement> {
-        self.current_element.last_mut()
+    pub fn get_current_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+        self.element_stack.last().cloned()
     }
 
     pub fn update_element(&mut self, el: &SvgElement) {
