@@ -58,6 +58,16 @@ pub fn handle_reuse_element(
         .to_owned();
     let mut instance_element = referenced_element.clone();
 
+    // the referenced element will have an `id` attribute (which it was
+    // referenced by) but the new instance should not have this to avoid
+    // multiple elements with the same id. We remove it here and re-add as
+    // a class.
+    // However we *do* want the instance element to inherit any `id` which
+    // was on the `reuse` element.
+    let ref_id = instance_element
+        .pop_attr("id")
+        .context("referenced element should have id")?;
+
     if referenced_element.name == "g" {
         if let Some((start, end)) = referenced_element.event_range {
             // opening g element is not included in the processed inner events to avoid
@@ -73,8 +83,10 @@ pub fn handle_reuse_element(
             group_element.set_indent(event_element.indent);
             group_element.set_src_line(event_element.src_line);
             group_element.add_classes(&event_element.classes);
+            group_element.add_class(&ref_id);
             if let Some(inst_id) = event_element.pop_attr("id") {
                 group_element.set_attr("id", &inst_id);
+                context.update_element(&group_element);
             }
             let group_open = EventList::from(SvgEvent::Start(group_element));
             let group_close = EventList::from(SvgEvent::End("g".to_string()));
@@ -86,14 +98,6 @@ pub fn handle_reuse_element(
         }
     }
 
-    // the referenced element will have an `id` attribute (which it was
-    // referenced by) but the new instance should not have this to avoid
-    // multiple elements with the same id.
-    // However we *do* want the instance element to inherit any `id` which
-    // was on the `reuse` element.
-    let ref_id = instance_element
-        .pop_attr("id")
-        .context("referenced element should have id")?;
     if let Some(inst_id) = event_element.pop_attr("id") {
         instance_element.set_attr("id", &inst_id);
         context.update_element(&event_element);

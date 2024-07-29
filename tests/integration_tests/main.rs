@@ -8,6 +8,7 @@ mod connector;
 mod containment;
 mod error_handling;
 mod eval_locs;
+mod group;
 mod indent;
 mod loops;
 mod position;

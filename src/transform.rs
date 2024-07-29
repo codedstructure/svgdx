@@ -151,6 +151,14 @@ impl ElementLike for GroupElement {
         Some(self.0.clone())
     }
 
+    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
+        Some(&mut self.0)
+    }
+
+    fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
+        Ok(EventList::from(SvgEvent::Start(self.0.clone())))
+    }
+
     // TODO: fill this out!
 }
 

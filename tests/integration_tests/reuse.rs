@@ -54,17 +54,17 @@ fn test_reuse_group() {
 <reuse id="third" href="#a" h="20" class="test-class"/>
 "##;
     let expected = r#"
-<g id="first">
+<g id="first" class="a">
 <rect x="0" y="0" width="50" height="40"/>
 <text x="1" y="39" class="d-tbox d-text-bottom d-text-left">40</text>
 <circle cx="0" cy="40" r="0.5"/>
 </g>
-<g>
+<g class="a">
 <rect x="0" y="0" width="40" height="30"/>
 <text x="1" y="29" class="d-tbox d-text-bottom d-text-left">30</text>
 <circle cx="0" cy="30" r="0.5"/>
 </g>
-<g id="third" class="test-class">
+<g id="third" class="test-class a">
 <rect x="0" y="0" width="30" height="20"/>
 <text x="1" y="19" class="d-tbox d-text-bottom d-text-left">20</text>
 <circle cx="0" cy="20" r="0.5"/>
