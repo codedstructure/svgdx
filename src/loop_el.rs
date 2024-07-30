@@ -67,7 +67,7 @@ impl ElementLike for LoopElement {
 
     fn handle_element_end(
         &mut self,
-        _element: &SvgElement,
+        _element: &mut SvgElement,
         context: &mut TransformerContext,
     ) -> Result<()> {
         context.loop_depth -= 1;

@@ -1,3 +1,4 @@
+use assertables::{assert_contains, assert_contains_as_result};
 use svgdx::transform_str_default;
 
 #[test]
@@ -62,4 +63,30 @@ fn test_group_reuse() {
     let output = transform_str_default(input).unwrap();
     // exact equality check: ensure that <specs> doesn't appear in the output.
     assert_eq!(output, expected);
+}
+
+#[test]
+fn test_group_rel_pos() {
+    let rel_h_input = r##"
+<g id="a"><rect x="0" y="0" width="10" height="10" /></g>
+<rect xy="#a:h 5" wh="10" id="z"/>
+"##;
+    let expected_rect = r#"<rect id="z" x="15" y="0" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_h_input).unwrap();
+    assert_contains!(output, expected_rect);
+}
+
+#[test]
+fn test_group_bbox() {
+    let rel_h_input = r##"
+<g id="a">
+ <rect wh="10"/>
+ <rect xy="^:h" wh="10"/>
+ <rect xy="^:h" wh="10"/>
+</g>
+<rect xy="#a:h 5" wh="10" id="z"/>
+"##;
+    let expected_rect = r#"<rect id="z" x="35" y="0" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_h_input).unwrap();
+    assert_contains!(output, expected_rect);
 }

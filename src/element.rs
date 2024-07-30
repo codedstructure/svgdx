@@ -1,12 +1,14 @@
 use crate::context::{ContextView, ElementMap};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
-use crate::position::{strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, ScalarSpec};
+use crate::position::{
+    strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, Position, ScalarSpec, TrblLength,
+};
 use crate::transform::ElementLike;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 use core::fmt::Display;
-use lazy_regex::regex;
+use lazy_regex::{regex, Captures};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::str::FromStr;
@@ -42,6 +44,7 @@ pub struct SvgElement {
     pub indent: usize,
     pub src_line: usize,
     pub event_range: Option<(usize, usize)>,
+    pub computed_bbox: Option<BoundingBox>,
 }
 
 impl Display for SvgElement {
@@ -56,6 +59,31 @@ impl Display for SvgElement {
         write!(f, ">")?;
         Ok(())
     }
+}
+
+/// Replace all refspec entries in a string with lookup results
+/// Suitable for use with path `d` or polyline `points` attributes
+/// which may contain many such entries.
+///
+/// Infallible; any invalid refspec will be left unchanged.
+fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
+    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
+
+    let result = locspec.replace_all(value, |caps: &Captures| {
+        let elref = caps.name("id").expect("Regex Match").as_str();
+        let loc = caps.name("loc").expect("Regex Match").as_str();
+        if let Some(elem) = ctx.get_element(elref) {
+            if let Ok(Some(pos)) = elem.coord(loc) {
+                format!("{} {}", fstr(pos.0), fstr(pos.1))
+            } else {
+                value.to_string()
+            }
+        } else {
+            value.to_string()
+        }
+    });
+
+    result.to_string()
 }
 
 impl SvgElement {
@@ -82,11 +110,41 @@ impl SvgElement {
             indent: 0,
             src_line: 0,
             event_range: None,
+            computed_bbox: None,
         }
     }
 
     pub fn as_element_like(&self) -> Rc<RefCell<dyn ElementLike>> {
         Rc::new(RefCell::new(self.clone()))
+    }
+
+    pub fn resolve(&mut self, ctx: &impl ContextView) -> Result<()> {
+        // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
+        self.eval_attributes(ctx);
+
+        // Need size before can evaluate relative position
+        self.expand_compound_size();
+        self.eval_rel_attributes(ctx)?;
+        self.resolve_size_delta();
+
+        self.eval_rel_position(ctx)?;
+        // Compound attributes, self.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        self.expand_compound_pos();
+        self.eval_rel_attributes(ctx)?;
+
+        if let ("polyline" | "polygon", Some(points)) =
+            (self.name.as_str(), self.get_attr("points"))
+        {
+            self.set_attr("points", &expand_relspec(&points, ctx));
+        }
+        if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
+            self.set_attr("d", &expand_relspec(&d, ctx));
+        }
+
+        let p = Position::from(self as &SvgElement);
+        p.set_position_attrs(self);
+
+        Ok(())
     }
 
     pub fn set_indent(&mut self, indent: usize) {
@@ -187,6 +245,10 @@ impl SvgElement {
     pub fn eval_attributes(&mut self, ctx: &impl ContextView) {
         // Resolve any attributes
         for (key, value) in self.attrs.clone() {
+            if key == "__" {
+                // Raw comments are not evaluated
+                continue;
+            }
             let replace = eval_attr(&value, ctx);
             self.attrs.insert(&key, &replace);
         }
@@ -261,7 +323,65 @@ impl SvgElement {
             && (self.name == "line" || self.name == "polyline")
     }
 
+    pub fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
+        let (surround, inside) = (self.pop_attr("surround"), self.pop_attr("inside"));
+
+        if surround.is_some() && inside.is_some() {
+            bail!("Cannot have 'surround' and 'inside' on an element");
+        }
+        if surround.is_none() && inside.is_none() {
+            return Ok(());
+        }
+
+        let is_surround = surround.is_some();
+        let contain_str = if is_surround { "surround" } else { "inside" };
+        let ref_list = surround.unwrap_or_else(|| inside.unwrap());
+
+        let mut bbox_list = vec![];
+
+        for elref in attr_split(&ref_list) {
+            let ref_id = elref
+                .strip_prefix('#')
+                .context(format!("Invalid {} value {elref}", contain_str))?;
+            let el = ctx
+                .get_element(ref_id)
+                .context("Ref lookup failed at this time")?;
+            {
+                if let Ok(Some(el_bb)) = el.bbox() {
+                    bbox_list.push(el_bb);
+                } else {
+                    bail!("Element #{elref} has no bounding box at this time");
+                }
+            }
+        }
+        let mut bbox = if is_surround {
+            BoundingBox::union(bbox_list)
+        } else {
+            BoundingBox::intersection(bbox_list)
+        };
+
+        if let Some(margin) = self.pop_attr("margin") {
+            let margin: TrblLength = margin.parse()?;
+
+            if let Some(bb) = &mut bbox {
+                if is_surround {
+                    bb.expand_trbl_length(margin);
+                } else {
+                    bb.shrink_trbl_length(margin);
+                }
+            }
+        }
+        if let Some(bb) = bbox {
+            self.position_from_bbox(&bb);
+        }
+        self.add_class(&format!("d-{contain_str}"));
+        Ok(())
+    }
+
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
+        if let Some(comp_bbox) = self.computed_bbox {
+            return Ok(Some(comp_bbox));
+        }
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require

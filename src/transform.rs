@@ -2,7 +2,7 @@ use crate::context::TransformerContext;
 use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
 use crate::expression::eval_attr;
-use crate::position::{BoundingBox, LocSpec};
+use crate::position::{BoundingBox, LocSpec, Position};
 use crate::svg_defs::{build_defs, build_styles};
 use crate::types::{fstr, OrderIndex};
 use crate::TransformConfig;
@@ -32,9 +32,12 @@ pub trait ElementLike: std::fmt::Debug {
 
     fn handle_element_end(
         &mut self,
-        _element: &SvgElement,
-        _context: &mut TransformerContext,
+        _element: &mut SvgElement,
+        context: &mut TransformerContext,
     ) -> Result<()> {
+        if let (Some(this_el), Some(parent)) = (self.get_element(), context.get_parent_element()) {
+            parent.borrow_mut().on_child_element(&this_el, context)?;
+        }
         Ok(())
     }
 
@@ -42,6 +45,18 @@ pub trait ElementLike: std::fmt::Debug {
     /// to a given `SvgElement`
     fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
         Ok(EventList::new())
+    }
+
+    fn get_position(&self) -> Option<Position> {
+        None
+    }
+
+    fn on_child_element(
+        &mut self,
+        _element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        Ok(())
     }
 
     fn get_element(&self) -> Option<SvgElement> {
@@ -144,22 +159,47 @@ impl ElementLike for RootSvgElement {
 }
 
 #[derive(Debug, Clone)]
-struct GroupElement(SvgElement);
+struct GroupElement {
+    el: SvgElement,
+    bbox: Option<BoundingBox>,
+}
 
 impl ElementLike for GroupElement {
     fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
+        Some(self.el.clone())
     }
 
     fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        Some(&mut self.0)
+        Some(&mut self.el)
     }
 
     fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
-        Ok(EventList::from(SvgEvent::Start(self.0.clone())))
+        Ok(EventList::from(SvgEvent::Start(self.el.clone())))
     }
 
-    // TODO: fill this out!
+    fn handle_element_end(
+        &mut self,
+        element: &mut SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        element.computed_bbox = self.bbox;
+        Ok(())
+    }
+
+    fn on_child_element(
+        &mut self,
+        element: &SvgElement,
+        _context: &mut TransformerContext,
+    ) -> Result<()> {
+        if let Ok(Some(el_bbox)) = element.bbox() {
+            if let Some(bbox) = self.bbox {
+                self.bbox = Some(bbox.combine(&el_bbox));
+            } else {
+                self.bbox = Some(el_bbox);
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -207,7 +247,7 @@ impl ElementLike for SpecsElement {
 
     fn handle_element_end(
         &mut self,
-        _element: &SvgElement,
+        _element: &mut SvgElement,
         context: &mut TransformerContext,
     ) -> Result<()> {
         context.in_specs = false;
@@ -252,7 +292,10 @@ pub fn gen_thing(element: &SvgElement) -> Rc<RefCell<dyn ElementLike>> {
         "svg" => Rc::new(RefCell::new(RootSvgElement(element.clone()))),
         "specs" => Rc::new(RefCell::new(SpecsElement {})),
         "var" => Rc::new(RefCell::new(VarElement {})),
-        "g" => Rc::new(RefCell::new(GroupElement(element.clone()))),
+        "g" => Rc::new(RefCell::new(GroupElement {
+            el: element.clone(),
+            bbox: None,
+        })),
         _ => Rc::new(RefCell::new(element.clone())),
     }
 }
@@ -358,6 +401,14 @@ fn process_seq(
                 if is_empty {
                     let ell_ref = context.get_current_element().unwrap();
                     if context.loop_depth == 0 && !context.in_specs {
+                        // TODO: for group bbox extension, we need element to have 'resolved'
+                        // attributes, if possible. This is done in generate_events, but only
+                        // to a local cloned object, so it doesn't get reflected here. Ideally
+                        // we should split generate_events() to a 'resolve' and 'generate' phase,
+                        // where only the resolve part could produce retriable reference errors.
+                        if let Some(el) = ell_ref.borrow_mut().get_element_mut() {
+                            let _ = el.resolve(context);
+                        }
                         let events = ell_ref.borrow_mut().generate_events(context);
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
@@ -371,7 +422,7 @@ fn process_seq(
 
                     ell_ref
                         .borrow_mut()
-                        .handle_element_end(&event_element, context)?;
+                        .handle_element_end(&mut event_element, context)?;
                     context.pop_element();
                 }
                 if pop_needed {
@@ -392,7 +443,7 @@ fn process_seq(
                         .unwrap();
 
                     ell.borrow_mut()
-                        .handle_element_end(&event_element, context)?;
+                        .handle_element_end(&mut event_element, context)?;
 
                     let start_idx = idx_stack.pop().expect("unreachable");
                     event_element.set_event_range((start_idx, input_ev.index));

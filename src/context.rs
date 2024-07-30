@@ -2,46 +2,18 @@ use crate::connector::{ConnectionType, Connector};
 use crate::element::{ContentType, SvgElement};
 use crate::events::{InputEvent, SvgEvent};
 use crate::expression::eval_attr;
-use crate::position::{BoundingBox, Position, TrblLength};
 use crate::text::process_text_attr;
 use crate::transform::ElementLike;
-use crate::types::{attr_split, fstr, strp};
+use crate::types::strp;
 use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 
-use lazy_regex::regex;
 use rand::prelude::*;
-use regex::Captures;
-
-/// Replace all refspec entries in a string with lookup results
-/// Suitable for use with path `d` or polyline `points` attributes
-/// which may contain many such entries.
-///
-/// Infallible; any invalid refspec will be left unchanged.
-fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
-
-    let result = locspec.replace_all(value, |caps: &Captures| {
-        let elref = caps.name("id").expect("Regex Match").as_str();
-        let loc = caps.name("loc").expect("Regex Match").as_str();
-        if let Some(elem) = ctx.get_element(elref) {
-            if let Ok(Some(pos)) = elem.coord(loc) {
-                format!("{} {}", fstr(pos.0), fstr(pos.1))
-            } else {
-                value.to_string()
-            }
-        } else {
-            value.to_string()
-        }
-    });
-
-    result.to_string()
-}
 
 pub struct TransformerContext {
     // Current state of given element; may be updated as processing continues
@@ -169,6 +141,14 @@ impl TransformerContext {
         self.element_stack.last().cloned()
     }
 
+    pub fn get_parent_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+        let len = self.element_stack.len();
+        if len < 2 {
+            return None;
+        }
+        self.element_stack.get(len - 2).cloned()
+    }
+
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
             let id = eval_attr(&id, self);
@@ -198,63 +178,6 @@ impl TransformerContext {
         events
     }
 
-    fn handle_containment(&mut self, e: &mut SvgElement) -> Result<()> {
-        let (surround, inside) = (e.pop_attr("surround"), e.pop_attr("inside"));
-
-        if surround.is_some() && inside.is_some() {
-            bail!("Cannot have 'surround' and 'inside' on an element");
-        }
-        if surround.is_none() && inside.is_none() {
-            return Ok(());
-        }
-
-        let is_surround = surround.is_some();
-        let contain_str = if is_surround { "surround" } else { "inside" };
-        let ref_list = surround.unwrap_or_else(|| inside.unwrap());
-
-        let mut bbox_list = vec![];
-
-        for elref in attr_split(&ref_list) {
-            let el = self
-                .elem_map
-                .get(
-                    elref
-                        .strip_prefix('#')
-                        .context(format!("Invalid {} value {elref}", contain_str))?,
-                )
-                .context("Ref lookup failed at this time")?;
-            {
-                if let Ok(Some(el_bb)) = el.bbox() {
-                    bbox_list.push(el_bb);
-                } else {
-                    bail!("Element #{elref} has no bounding box at this time");
-                }
-            }
-        }
-        let mut bbox = if is_surround {
-            BoundingBox::union(bbox_list)
-        } else {
-            BoundingBox::intersection(bbox_list)
-        };
-
-        if let Some(margin) = e.pop_attr("margin") {
-            let margin: TrblLength = margin.parse()?;
-
-            if let Some(bb) = &mut bbox {
-                if is_surround {
-                    bb.expand_trbl_length(margin);
-                } else {
-                    bb.shrink_trbl_length(margin);
-                }
-            }
-        }
-        if let Some(bb) = bbox {
-            e.position_from_bbox(&bb);
-        }
-        e.add_class(&format!("d-{contain_str}"));
-        Ok(())
-    }
-
     /// Process a given `SvgElement` into a list of `SvgEvent`s
     ///
     /// Called once per element, and may have side-effects such
@@ -268,31 +191,9 @@ impl TransformerContext {
         let mut e = e.clone();
 
         events.extend(self.handle_comments(&mut e));
-        self.handle_containment(&mut e)?;
 
-        // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
-        e.eval_attributes(self);
-
-        // Need size before can evaluate relative position
-        e.expand_compound_size();
-        e.eval_rel_attributes(self)?;
-        e.resolve_size_delta();
-
-        e.eval_rel_position(self)?;
-        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        e.expand_compound_pos();
-        e.eval_rel_attributes(self)?;
-
-        if let ("polyline" | "polygon", Some(points)) = (e.name.as_str(), e.get_attr("points")) {
-            e.set_attr("points", &expand_relspec(&points, self));
-        }
-        if let ("path", Some(d)) = (e.name.as_str(), e.get_attr("d")) {
-            e.set_attr("d", &expand_relspec(&d, self));
-        }
-
-        let p = Position::from(&e);
-        p.set_position_attrs(&mut e);
-        self.update_element(&e);
+        e.handle_containment(self)?;
+        e.resolve(self)?;
 
         if e.is_connector() {
             if let Ok(conn) = Connector::from_element(
@@ -308,7 +209,6 @@ impl TransformerContext {
             ) {
                 // replace with rendered connection element
                 e = conn.render()?.without_attr("edge-type");
-                self.update_element(&e);
             } else {
                 bail!("Cannot create connector {e}");
             }
@@ -332,7 +232,6 @@ impl TransformerContext {
             }
             if d_x.is_some() || d_y.is_some() {
                 e = e.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
-                self.update_element(&e);
             }
         }
 
@@ -385,6 +284,8 @@ impl TransformerContext {
             }
             omit = true;
         }
+
+        self.update_element(&e);
 
         if !omit {
             let new_elem = e.clone();
