@@ -80,35 +80,28 @@ async fn script() -> impl IntoResponse {
         .unwrap()
 }
 
-async fn wasm_script() -> impl IntoResponse {
+// Note svgdx-server injects a different bootstrap script (-server.js) vs the bootstrap
+// picked up by a static file server (such as `python3 -m http.server`). This is to ensure
+// transform requests come to the server rather than being handled by the browser WASM code.
+async fn bootstrap() -> impl IntoResponse {
     // If configured as a release build, use include_str! to embed the file.
     #[cfg(not(debug_assertions))]
-    let content = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx.js")).to_string();
+    let content = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/static/svgdx-bootstrap-server.js"
+    ))
+    .to_string();
     // During development it's useful to have it re-read each request.
     #[cfg(debug_assertions)]
-    let content = fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx.js"))
-        .await
-        .unwrap();
+    let content = fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/static/svgdx-bootstrap-server.js"
+    ))
+    .await
+    .unwrap();
 
     Response::builder()
         .header("Content-Type", "application/javascript")
-        .body(Body::from(content))
-        .unwrap()
-}
-
-async fn wasm_bin() -> impl IntoResponse {
-    // If configured as a release build, use include_str! to embed the file.
-    #[cfg(not(debug_assertions))]
-    let content =
-        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx_bg.wasm")).to_vec();
-    // During development it's useful to have it re-read each request.
-    #[cfg(debug_assertions)]
-    let content = fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/static/pkg/svgdx_bg.wasm"))
-        .await
-        .unwrap();
-
-    Response::builder()
-        .header("Content-Type", "application/wasm")
         .body(Body::from(content))
         .unwrap()
 }
@@ -118,8 +111,7 @@ pub async fn start_server(listen_addr: Option<&str>) {
     let app = Router::new()
         .route("/", get(index))
         .route("/svgdx-editor.js", get(script))
-        .route("/pkg/svgdx.js", get(wasm_script))
-        .route("/pkg/svgdx_bg.wasm", get(wasm_bin))
+        .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/transform", post(transform));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{}", addr);
