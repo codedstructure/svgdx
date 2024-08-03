@@ -8,12 +8,10 @@
 // - Zoom and pan SVG with mouse wheel / drag
 // - Split between edit and output panes
 // TODO:
-// - use a WASM build rather than needing external /transform endpoint
 // - Highlight lines with errors
 // - Ability to load examples
 // - Ability to select SVG elements and get info about them (in status bar?)
 // - Editor shortcuts for folding etc
-// - Save multiple documents in localStorage
 
 /* global CodeMirror */
 
@@ -164,13 +162,27 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     }
 
     async function update() {
+        // svgdx-bootstrap.js sets svgdx_use_server as appropriate
+        // to toggle between local (WASM) and server-side transform
+        if (!window.hasOwnProperty('svgdx_use_server')) {
+            error_output.innerText = "loading svgdx...";
+            error_output.style.display = "";
+            setTimeout(update, 100);
+            return;
+        }
+
         try {
             const svgdx_input = editor.getValue();
             // save editor content to localStorage
             localStorage.setItem(`svgdx-editor-value-${activeTab()}`, svgdx_input);
 
-            //const result = await svgdx_transform_server(svgdx_input);
-            const result = await svgdx_transform_local(svgdx_input);
+            let result;
+            if (window.svgdx_use_server) {
+                result = await svgdx_transform_server(svgdx_input);
+            } else {
+                result = await svgdx_transform_local(svgdx_input);
+            }
+
             const responseOk = result[0];
             const responseText = result[1];
 
