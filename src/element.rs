@@ -1,9 +1,12 @@
-use crate::context::{ContextView, ElementMap};
+use crate::connector::{ConnectionType, Connector};
+use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::events::SvgEvent;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
     strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, Position, ScalarSpec, TrblLength,
 };
+use crate::text::process_text_attr;
 use crate::transform::ElementLike;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
 use anyhow::{bail, Context, Result};
@@ -36,6 +39,7 @@ impl ContentType {
 #[derive(Clone, Debug)]
 pub struct SvgElement {
     pub name: String,
+    pub original: String,
     pub attrs: AttrMap,
     pub classes: ClassList,
     pub content: ContentType,
@@ -102,6 +106,7 @@ impl SvgElement {
         }
         Self {
             name: name.to_string(),
+            original: format!("<{name} {}>", attr_map),
             attrs: attr_map.clone(),
             classes,
             content: ContentType::Empty,
@@ -118,9 +123,142 @@ impl SvgElement {
         Rc::new(RefCell::new(self.clone()))
     }
 
-    pub fn resolve(&mut self, ctx: &impl ContextView) -> Result<()> {
+    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+        if self.is_connector() {
+            if let Ok(conn) = Connector::from_element(
+                self,
+                ctx,
+                if let Some(e_type) = self.get_attr("edge-type") {
+                    ConnectionType::from_str(&e_type)
+                } else if self.name == "polyline" {
+                    ConnectionType::Corner
+                } else {
+                    ConnectionType::Straight
+                },
+            ) {
+                // replace with rendered connection element
+                *self = conn.render()?.without_attr("edge-type");
+            } else {
+                bail!("Cannot create connector {self}");
+            }
+        }
+
+        // Process dx / dy as translation offsets if not an element
+        // where they already have intrinsic meaning.
+        // TODO: would be nice to get rid of this; it's mostly handled
+        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
+        // then that won't do anything and this does.
+        if !matches!(self.name.as_str(), "text" | "tspan" | "feOffset") {
+            let dx = self.pop_attr("dx");
+            let dy = self.pop_attr("dy");
+            let mut d_x = None;
+            let mut d_y = None;
+            if let Some(dx) = dx {
+                d_x = Some(strp(&dx)?);
+            }
+            if let Some(dy) = dy {
+                d_y = Some(strp(&dy)?);
+            }
+            if d_x.is_some() || d_y.is_some() {
+                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
+            }
+        }
+
+        if self.is_content_text() && !self.has_attr("text") {
+            if let ContentType::Ready(ref value) = self.clone().content {
+                self.set_attr("text", value);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Process a given `SvgElement` into a list of `SvgEvent`s
+    // TODO: would be nice to make this infallible and have any potential errors handled earlier.
+    pub fn element_events(&self, ctx: &TransformerContext) -> Result<Vec<SvgEvent>> {
+        let mut events = vec![];
+
+        if ctx.config.debug {
+            // Prefix replaced element(s) with a representation of the original element
+            //
+            // Replace double quote with backtick to avoid messy XML entity conversion
+            // (i.e. &quot; or &apos; if single quotes were used)
+            events.push(SvgEvent::Comment(
+                format!(" {} ", self.original)
+                    .replace('"', "`")
+                    .replace(['<', '>'], ""),
+            ));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        // Standard comment: expressions & variables are evaluated.
+        if let Some(comment) = self.get_attr("_") {
+            // Expressions in comments are evaluated
+            let value = eval_attr(&comment, ctx);
+            events.push(SvgEvent::Comment(value));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        // 'Raw' comment: no evaluation of expressions occurs here
+        if let Some(comment) = self.get_attr("__") {
+            events.push(SvgEvent::Comment(comment));
+            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        if self.has_attr("text") {
+            let (orig_elem, text_elements) = process_text_attr(self)?;
+            if orig_elem.name != "text" {
+                // We only care about the original element if it wasn't a text element
+                // (otherwise we generate a useless empty text element for the original)
+                events.push(SvgEvent::Empty(orig_elem));
+                events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            }
+            match text_elements.as_slice() {
+                [] => {}
+                [elem] => {
+                    events.push(SvgEvent::Start(elem.clone()));
+                    if let ContentType::Ready(value) = &elem.content {
+                        events.push(SvgEvent::Text(value.clone()));
+                    } else {
+                        bail!("Text element should have content");
+                    }
+                    events.push(SvgEvent::End("text".to_string()));
+                }
+                _ => {
+                    // Multiple text spans
+                    let text_elem = &text_elements[0];
+                    events.push(SvgEvent::Start(text_elem.clone()));
+                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    for elem in &text_elements[1..] {
+                        // Note: we can't insert a newline/last_indent here as whitespace
+                        // following a tspan is compressed to a single space and causes
+                        // misalignment - see https://stackoverflow.com/q/41364908
+                        events.push(SvgEvent::Start(elem.clone()));
+                        if let ContentType::Ready(value) = &elem.content {
+                            events.push(SvgEvent::Text(value.clone()));
+                        } else {
+                            bail!("Text element should have content");
+                        }
+                        events.push(SvgEvent::End("tspan".to_string()));
+                    }
+                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(SvgEvent::End("text".to_string()));
+                }
+            }
+        } else if self.is_empty_element() {
+            events.push(SvgEvent::Empty(self.clone()));
+        } else {
+            events.push(SvgEvent::Start(self.clone()));
+        }
+
+        Ok(events)
+    }
+
+    pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         self.eval_attributes(ctx);
+
+        self.handle_containment(ctx)?;
 
         // Need size before can evaluate relative position
         self.expand_compound_size();
@@ -324,7 +462,7 @@ impl SvgElement {
     }
 
     pub fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
-        let (surround, inside) = (self.pop_attr("surround"), self.pop_attr("inside"));
+        let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
             bail!("Cannot have 'surround' and 'inside' on an element");
@@ -360,7 +498,7 @@ impl SvgElement {
             BoundingBox::intersection(bbox_list)
         };
 
-        if let Some(margin) = self.pop_attr("margin") {
+        if let Some(margin) = self.get_attr("margin") {
             let margin: TrblLength = margin.parse()?;
 
             if let Some(bb) = &mut bbox {
@@ -375,6 +513,7 @@ impl SvgElement {
             self.position_from_bbox(&bb);
         }
         self.add_class(&format!("d-{contain_str}"));
+        self.remove_attrs(&["surround", "inside", "margin"]);
         Ok(())
     }
 
