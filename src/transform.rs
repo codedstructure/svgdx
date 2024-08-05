@@ -291,19 +291,21 @@ impl ElementLike for VarElement {
     }
 }
 
-pub fn gen_thing(element: &SvgElement) -> Rc<RefCell<dyn ElementLike>> {
-    match element.name.as_str() {
-        "loop" => Rc::new(RefCell::new(LoopElement(element.clone()))), //LoopDef::try_from(element).unwrap())),
-        "config" => Rc::new(RefCell::new(ConfigElement {})),
-        "reuse" => Rc::new(RefCell::new(ReuseElement(element.clone()))),
-        "svg" => Rc::new(RefCell::new(RootSvgElement(element.clone()))),
-        "specs" => Rc::new(RefCell::new(SpecsElement {})),
-        "var" => Rc::new(RefCell::new(VarElement {})),
-        "g" => Rc::new(RefCell::new(GroupElement {
-            el: element.clone(),
-            bbox: None,
-        })),
-        _ => Rc::new(RefCell::new(element.clone())),
+impl SvgElement {
+    pub fn to_ell(&self) -> Rc<RefCell<dyn ElementLike>> {
+        match self.name.as_str() {
+            "loop" => Rc::new(RefCell::new(LoopElement(self.clone()))), //LoopDef::try_from(element).unwrap())),
+            "config" => Rc::new(RefCell::new(ConfigElement {})),
+            "reuse" => Rc::new(RefCell::new(ReuseElement(self.clone()))),
+            "svg" => Rc::new(RefCell::new(RootSvgElement(self.clone()))),
+            "specs" => Rc::new(RefCell::new(SpecsElement {})),
+            "var" => Rc::new(RefCell::new(VarElement {})),
+            "g" => Rc::new(RefCell::new(GroupElement {
+                el: self.clone(),
+                bbox: None,
+            })),
+            _ => Rc::new(RefCell::new(self.clone())),
+        }
     }
 }
 
@@ -363,7 +365,7 @@ fn process_seq(
                 }
                 last_element = Some(event_element.clone());
 
-                let mut ell = gen_thing(&event_element);
+                let mut ell = event_element.to_ell();
                 ell.borrow_mut()
                     .handle_element_start(&event_element, context)?;
 
@@ -379,7 +381,7 @@ fn process_seq(
                     match crate::reuse::handle_reuse_element(context, event_element, idx_output) {
                         Ok(ev_el) => {
                             event_element = ev_el;
-                            ell = gen_thing(&event_element);
+                            ell = event_element.to_ell();
                             context.push_element(ell);
                             pop_needed = true;
                         }

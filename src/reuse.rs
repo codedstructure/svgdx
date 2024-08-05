@@ -75,7 +75,7 @@ pub fn handle_reuse_element(
             let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
             // ...but we do want to include it for attribute-variable lookups, so push the
             // referenced element onto the element stack (just while we run process_events)
-            context.push_element(referenced_element.as_element_like());
+            context.push_element(referenced_element.to_ell());
             let g_events = process_events(inner_events, context)?;
             context.pop_element();
 

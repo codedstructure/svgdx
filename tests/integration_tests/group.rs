@@ -90,3 +90,21 @@ fn test_group_bbox() {
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 }
+
+#[test]
+fn test_group_nested_bbox() {
+    let rel_h_input = r##"
+<g id="a">
+ <rect wh="10"/>
+ <rect xy="^:h" wh="10"/>
+ <g id="b">
+  <rect x="10" wh="10"/>
+  <rect xy="^:v" wh="10"/>
+ </g>
+</g>
+<rect xy="#a:h 5" wh="10" id="z"/>
+"##;
+    let expected_rect = r#"<rect id="z" x="25" y="0" width="10" height="10"/>"#;
+    let output = transform_str_default(rel_h_input).unwrap();
+    assert_contains!(output, expected_rect);
+}

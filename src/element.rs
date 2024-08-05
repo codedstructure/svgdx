@@ -7,13 +7,10 @@ use crate::position::{
     strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
-use crate::transform::ElementLike;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::{regex, Captures};
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -117,10 +114,6 @@ impl SvgElement {
             event_range: None,
             computed_bbox: None,
         }
-    }
-
-    pub fn as_element_like(&self) -> Rc<RefCell<dyn ElementLike>> {
-        Rc::new(RefCell::new(self.clone()))
     }
 
     pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
@@ -256,6 +249,9 @@ impl SvgElement {
 
     pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
+        // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
+        // moved out of this function and called once per element (or this function
+        // should be called once per element...)
         self.eval_attributes(ctx);
 
         self.handle_containment(ctx)?;
@@ -266,7 +262,7 @@ impl SvgElement {
         self.resolve_size_delta();
 
         self.eval_rel_position(ctx)?;
-        // Compound attributes, self.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
         self.expand_compound_pos();
         self.eval_rel_attributes(ctx)?;
 
