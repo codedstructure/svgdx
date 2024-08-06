@@ -200,3 +200,18 @@ fn test_loop_count_loop_start_step() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_loop_limit() {
+    let input = r#"
+<config loop-limit="100"/>
+<loop count="1000"><rect wh="1" xy="0"/></loop>
+"#;
+    assert!(transform_str_default(input).is_err());
+
+    let input = r#"
+<config loop-limit="2000"/>
+<loop count="1000"><rect wh="1" xy="0"/></loop>
+"#;
+    assert!(transform_str_default(input).is_ok());
+}

@@ -225,6 +225,7 @@ impl ElementLike for ConfigElement {
                 "add-auto-styles" => context.config.add_auto_defs = value.parse()?,
                 "border" => context.config.border = value.parse()?,
                 "background" => context.config.background.clone_from(value),
+                "loop-limit" => context.config.loop_limit = value.parse()?,
                 "seed" => {
                     context.config.seed = value.parse()?;
                     context.seed_rng(context.config.seed);
@@ -478,8 +479,12 @@ fn process_seq(
                                 gen_events.push((idx, EventList::from(ev.clone())));
                             }
                         }
-                    } else {
+                    } else if event_element.name == "loop" && context.loop_depth == 0 {
                         // TODO - handle 'retriable' errors separately for better error reporting
+                        // currently we only handle loop separately, to ensure loop-limit works.
+                        // (though potential false-positive bail on other errors inside loops...)
+                        bail!("Error processing element: {events:?}");
+                    } else {
                         remain.push(input_ev.clone());
                     }
                     last_element = Some(event_element);

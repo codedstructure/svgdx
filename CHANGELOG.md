@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   * Internal: use of traits to define element behaviour, allowing different classes of
     element to behave differently.
 
+- Fixed: `loop-limit` can be set in `<config>` elements, as documented.
+
 - Fixed: variable expansion now works in `class` attributes.
 
 - svgdx-editor: initial support for browser-local transforms using WASM
