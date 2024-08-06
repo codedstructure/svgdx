@@ -173,10 +173,13 @@ struct GroupElement {
 
 impl ElementLike for GroupElement {
     fn get_element(&self) -> Option<SvgElement> {
-        Some(self.el.clone())
+        let mut el = self.el.clone();
+        el.computed_bbox = self.bbox;
+        Some(el)
     }
 
     fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
+        self.el.computed_bbox = self.bbox;
         Some(&mut self.el)
     }
 
@@ -187,9 +190,15 @@ impl ElementLike for GroupElement {
     fn handle_element_end(
         &mut self,
         element: &mut SvgElement,
-        _context: &mut TransformerContext,
+        context: &mut TransformerContext,
     ) -> Result<()> {
         element.computed_bbox = self.bbox;
+        // TODO: this is inconsistent - SvgElement::handle_element_end() uses get_parent_element,
+        // and this uses get_current_element. There should be a clear order of push/pop on the
+        // element stack aligned with start/end events.
+        if let (Some(this_el), Some(parent)) = (self.get_element(), context.get_current_element()) {
+            parent.borrow_mut().on_child_element(&this_el, context)?;
+        }
         Ok(())
     }
 
