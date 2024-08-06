@@ -457,7 +457,7 @@ fn process_seq(
                         );
                     }
 
-                    let mut events = if !context.in_specs {
+                    let mut events = if !context.in_specs && context.loop_depth == 0 {
                         ell.borrow_mut().generate_events(context)
                     } else {
                         Ok(EventList::new())
