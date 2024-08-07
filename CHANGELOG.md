@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0 - 2024-08-07]
+
+- svgdx-editor: now uses WASM for browser-local transforms, and server transforms when
+  using svgdx-server. See [svgdx.net](https://svgdx.net) hosted using GitHub Pages.
+
 - More refactoring to support bounding boxes for `<g>` elements, with the following changes:
   * Added: `<g>` groups now have bounding boxes and can be used as the target of a relspec.
   * Removed: the `repeat` attribute is no more; use `<loop>` instead. While `<loop>` is
@@ -17,8 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: `loop-limit` can be set in `<config>` elements, as documented.
 
 - Fixed: variable expansion now works in `class` attributes.
-
-- svgdx-editor: initial support for browser-local transforms using WASM
 
 ## [0.10.0 - 2024-07-04]
 

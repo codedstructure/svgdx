@@ -6,6 +6,15 @@
 >
 > In particular, the input format is **not stable** at this point. Check the [CHANGELOG](CHANGELOG.md) for info.
 
+## Online Editor
+
+**[svgdx.net](https://svgdx.net)** hosts a WASM-based svgdx playground, where you can explore
+svgdx without installing anything.
+
+Note documents are entirely stored in your local browser using the localStorage API.
+The editor is currently updated from the `main` branch of this repository, so be aware
+that breaking changes may affect your diagrams.
+
 ## Installation
 
 For now installation requires a working Rust toolchain, e.g. installed from [rustup.rs](https://rustup.rs).
