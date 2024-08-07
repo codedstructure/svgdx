@@ -1,5 +1,6 @@
 <svg>
   <config seed="1234567" />
-  <circle repeat="50" cxy="{{randint(0, 100)}} {{randint(0, 100)}}" r="5"
+  <loop count="50"><circle cxy="{{randint(0, 100)}} {{randint(0, 100)}}" r="5"
           style="fill:rgb({{randint(0,255)}}, {{randint(0,255)}}, {{randint(0,255)}})"/>
+  </loop>
 </svg>

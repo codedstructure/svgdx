@@ -9,11 +9,15 @@
     ]]>
   </style>
   <rect xy="0" wh="5" class="red"/>
-  <rect xy="^@bl 0 2" wh="5" class="red" repeat="9"/>
+  <loop count="9"><rect xy="^@bl 0 2" wh="5" class="red"/>
+  </loop>
   <rect xy="7 0" wh="5" class="amber"/>
-  <rect xy="^@bl 0 2" wh="5" class="amber" repeat="6"/>
+  <loop count="6"><rect xy="^@bl 0 2" wh="5" class="amber"/>
+  </loop>
   <rect xy="14 0" wh="5" class="yellow"/>
-  <rect xy="^@bl 0 2" wh="5" class="yellow" repeat="7"/>
+  <loop count="7"><rect xy="^@bl 0 2" wh="5" class="yellow"/>
+  </loop>
   <rect xy="21 0" wh="5" class="green"/>
-  <rect xy="^@bl 0 2" wh="5" class="green" repeat="10"/>
+  <loop count="10"><rect xy="^@bl 0 2" wh="5" class="green"/>
+  </loop>
 </svg>

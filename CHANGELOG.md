@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- More refactoring to support bounding boxes for `<g>` elements, with the following changes:
+  * Added: `<g>` groups now have bounding boxes and can be used as the target of a relspec.
+  * Removed: the `repeat` attribute is no more; use `<loop>` instead. While `<loop>` is
+    more verbose, it more cleanly separates 'control' elements from 'graphic' elements.
+  * Internal: use of traits to define element behaviour, allowing different classes of
+    element to behave differently.
+
+- Fixed: `loop-limit` can be set in `<config>` elements, as documented.
+
 - Fixed: variable expansion now works in `class` attributes.
 
 - svgdx-editor: initial support for browser-local transforms using WASM

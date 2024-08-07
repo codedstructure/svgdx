@@ -54,17 +54,17 @@ fn test_reuse_group() {
 <reuse id="third" href="#a" h="20" class="test-class"/>
 "##;
     let expected = r#"
-<g id="first">
+<g id="first" class="a">
 <rect x="0" y="0" width="50" height="40"/>
 <text x="1" y="39" class="d-tbox d-text-bottom d-text-left">40</text>
 <circle cx="0" cy="40" r="0.5"/>
 </g>
-<g>
+<g class="a">
 <rect x="0" y="0" width="40" height="30"/>
 <text x="1" y="29" class="d-tbox d-text-bottom d-text-left">30</text>
 <circle cx="0" cy="30" r="0.5"/>
 </g>
-<g id="third" class="test-class">
+<g id="third" class="test-class a">
 <rect x="0" y="0" width="30" height="20"/>
 <text x="1" y="19" class="d-tbox d-text-bottom d-text-left">20</text>
 <circle cx="0" cy="20" r="0.5"/>
@@ -76,18 +76,16 @@ fn test_reuse_group() {
 }
 
 #[test]
-fn test_reuse_repeat() {
+fn test_reuse_group_svg() {
+    // At one point this failed because <reuse> remained on the element_stack
+    // at the time '</svg>' was processed.
     let input = r##"
-<specs>
-<rect id="register" xy="0" wh="5" repeat="$reg_size"/>
-</specs>
-<reuse href="#register" reg_size="3"/>
+<svg>
+  <specs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </specs>
+  <reuse id="b" href="#a"/>
+</svg>
 "##;
-    let expected = r#"
-<rect x="0" y="0" width="5" height="5" class="register"/>
-<rect x="0" y="0" width="5" height="5" class="register"/>
-<rect x="0" y="0" width="5" height="5" class="register"/>
-"#;
-    let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert!(transform_str_default(input).is_ok());
 }
