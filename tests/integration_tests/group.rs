@@ -24,6 +24,20 @@ fn test_group_simple() {
 }
 
 #[test]
+fn test_group_empty() {
+    // Not useful, but valid. Should be passed through and closed.
+    // At one point this failed as it generated a bare (unclosed) <g> element.
+    let input = r##"
+<g id="a"/>
+"##;
+    let expected = r#"
+<g id="a"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output, expected);
+}
+
+#[test]
 fn test_group_nested() {
     let input = r##"
 <g id="a">

@@ -74,3 +74,18 @@ fn test_reuse_group() {
     // exact equality check: ensure that <specs> doesn't appear in the output.
     assert_eq!(output, expected);
 }
+
+#[test]
+fn test_reuse_group_svg() {
+    // At one point this failed because <reuse> remained on the element_stack
+    // at the time '</svg>' was processed.
+    let input = r##"
+<svg>
+  <specs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </specs>
+  <reuse id="b" href="#a"/>
+</svg>
+"##;
+    assert!(transform_str_default(input).is_ok());
+}

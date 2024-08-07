@@ -15,7 +15,10 @@ pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     // Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    // Stack of elements currently being processed
+    // Stack of elements which have been started but not yet ended
+    // Note empty elements are normally not pushed onto the stack,
+    // but `<reuse>` elements are an exception during processing of
+    // the referenced element.
     element_stack: Vec<Rc<RefCell<dyn ElementLike>>>,
     // The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
@@ -79,11 +82,11 @@ impl VariableMap for TransformerContext {
     /// Lookup variable in either parent attribute values or global variables
     /// set using the `<var>` element.
     fn get_var(&self, name: &str) -> Option<String> {
-        // Note we skip the element we're currently processing so we can access
-        // variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
+        // Note the element we're currently processing should not be on the stack
+        // so we can access variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
         // requires that when evaluating `x="$x"` we don't look up `x` in the
         // `rect` element itself.
-        for element_scope in self.element_stack.iter().rev().skip(1) {
+        for element_scope in self.element_stack.iter().rev() {
             if let Some(Some(value)) = element_scope
                 .borrow()
                 .get_element()
@@ -132,16 +135,8 @@ impl TransformerContext {
         self.element_stack.pop()
     }
 
-    pub fn get_current_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+    pub fn get_top_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
         self.element_stack.last().cloned()
-    }
-
-    pub fn get_parent_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
-        let len = self.element_stack.len();
-        if len < 2 {
-            return None;
-        }
-        self.element_stack.get(len - 2).cloned()
     }
 
     pub fn set_prev_element(&mut self, el: SvgElement) {

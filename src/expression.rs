@@ -719,10 +719,6 @@ mod tests {
         ctx.push_element(SvgElement::new("g", &[("level".to_string(), "1".to_string())]).to_ell());
         ctx.push_element(SvgElement::new("g", &[("level".to_string(), "2".to_string())]).to_ell());
         ctx.push_element(SvgElement::new("g", &[("level".to_string(), "3".to_string())]).to_ell());
-        // The 'inner' element, where attributes should be ignored in variable lookup
-        ctx.push_element(
-            SvgElement::new("rect", &[("level".to_string(), "inside!!".to_string())]).to_ell(),
-        );
         assert_eq!(eval_vars("$level", &ctx), "3");
         ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "2");

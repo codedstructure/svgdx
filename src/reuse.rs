@@ -13,33 +13,31 @@ pub struct ReuseElement(pub SvgElement);
 impl ElementLike for ReuseElement {
     fn handle_element_start(
         &mut self,
-        _element: &SvgElement,
-        _context: &mut TransformerContext,
+        element: &SvgElement,
+        context: &mut TransformerContext,
     ) -> Result<()> {
+        // Even though `<reuse>`` is (typically) an Empty element, it acts as a
+        // container element around the referenced element for variable lookup.
+        context.push_element(element.to_ell());
+        Ok(())
+    }
+
+    fn handle_element_end(
+        &mut self,
+        _element: &mut SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        context.pop_element();
         Ok(())
     }
 
     fn get_element(&self) -> Option<SvgElement> {
         Some(self.0.clone())
     }
-
-    // fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
-    //     match handle_reuse_element(context, self.0, idx_output) {
-    //         Ok(ev_el) => {
-    //             event_element = ev_el;
-    //             context.push_current_element(&element);
-    //             pop_needed = true;
-    //         }
-    //         Err(err) => {
-    //             context.pop_current_element();
-    //             bail!(err);
-    //         }
-    //     }
-    // }
 }
 
-// TODO: this should be a method on ReuseElement, not a special-cased
-// call from process_seq.
+// TODO: this should really be called from ReuseElement::generate_events(),
+// not special-cased from process_seq().
 pub fn handle_reuse_element(
     context: &mut TransformerContext,
     mut event_element: SvgElement,
