@@ -133,3 +133,44 @@ Should probably prioritise consistency with SVG, and have `<reuse>` be as simila
 possible to `<use>`, so it's main benefit is in templating where context-dependent
 expressions make a difference. Downside: `x` / `y` are special cased, where other
 attributes are effectively local variables for the re-used target.
+
+### Auto-numeric Expression Handling
+
+In general, expressions evaluated in `{{..}}` contexts are converted to numbers,
+and function calls are evaluated in place. However in some conditions (e.g. `while`
+conditions on loops) the value must always be a number, so the brace pairs may be
+omitted.
+
+Should this be extended to every attribute which requires a numeric value? Or remove
+the shortcut on the existing evaluations using this? Consistency doesn't have to be
+absolute, but where it is lacking there needs to be a principled / documented reason
+for it, which currently isn't the case.
+
+Motivation: should `<loop count="$expr">` be changed to automatically use numeric
+evaluation for `$expr`?
+
+### String lists
+
+Numeric data lists can be provided with a comma separated list of values; strings
+cannot be similarly specified. For a short list, using a dynamic id variable is
+a reasonable workaround, but this is more inconsistency.
+
+```
+<var num_list="1, 2, 3, 4, 5"/>
+<var s0="Monday" s1="Tuesday" s2="Wednesday" s3="Thursday" s4="Friday"/>
+
+<rect xy="0" wh="0"/>
+<loop count="5" loop-var="i">
+<rect xy="^:v" wh="10 5" text="{{select($i, $num_list)}}"/>
+<rect xy="^:v" wh="10 5" text="$s${i}"/>
+</loop>
+```
+
+### Previous N reference
+
+It's often useful to refer to the 'last-but-one' element, which isn't currently
+possible without using an `id`.
+
+Perhaps something like `^^`, with reasonable extension (e.g. no more than 10)
+to earlier elements. This would allow nicer grids which need to alternate `:h`
+and `:v` type relative positions.

@@ -240,6 +240,7 @@ impl ElementLike for ConfigElement {
                 "border" => context.config.border = value.parse()?,
                 "background" => context.config.background.clone_from(value),
                 "loop-limit" => context.config.loop_limit = value.parse()?,
+                "var-limit" => context.config.var_limit = value.parse()?,
                 "seed" => {
                     context.config.seed = value.parse()?;
                     context.seed_rng(context.config.seed);
@@ -298,6 +299,15 @@ impl ElementLike for VarElement {
             // in the input, but not propagated to the output.
             if key != "_" && key != "__" {
                 let value = eval_attr(&value, context);
+                // Detect / prevent uncontrolled expansion of variable values
+                if value.len() > context.config.var_limit as usize {
+                    bail!(
+                        "Variable `{}` value too long: {} (var-limit: {})",
+                        key,
+                        value.len(),
+                        context.config.var_limit
+                    );
+                }
                 new_vars.insert(key, value);
             }
         }

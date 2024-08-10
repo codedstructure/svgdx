@@ -214,4 +214,17 @@ fn test_loop_limit() {
 <loop count="1000"><rect wh="1" xy="0"/></loop>
 "#;
     assert!(transform_str_default(input).is_ok());
+
+    // test loop-limit boundary condition
+    let input = r#"
+<config loop-limit="100"/>
+<loop count="100"><rect wh="1" xy="0"/></loop>
+"#;
+    assert!(transform_str_default(input).is_ok());
+
+    let input = r#"
+<config loop-limit="100"/>
+<loop count="101"><rect wh="1" xy="0"/></loop>
+"#;
+    assert!(transform_str_default(input).is_err());
 }

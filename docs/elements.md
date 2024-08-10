@@ -25,6 +25,7 @@ The following configuration settings can be applied using this element. These co
 | scale | float | `scale="2.5"` |
 | border | integer | `border="20"` |
 | loop-limit | integer | `loop-limit="9999"` |
+| var-limit | integer | `var-limit="4096"` |
 
 ### `var`
 
@@ -33,6 +34,12 @@ This element allows one or more variables to be set. These values can be referen
 Variables are set using a `varname="value"` attribute pair, and multiple variables can be set in a single `<var>` element.
 
 Note the `value` is considered to be an expressions, so variables can be set based on the value of other (or the same) variable.
+
+Be careful when updating variable values; an element such as `<var thing="$thing + 1"/>` may appear to do the right thing in a document,
+but internally if this is in a loop it will expand to a string of "... + 1 + 1 + 1 + 1 + 1 ...", which may work, but probably isn't
+the intended effect, and will slow down document processing. (The likely correct approach here is to use `<var thing="{{$thing + 1}}"/>`.)
+In order to help detect this string expansion, the config value `var-limit` (default 1024) limits the maximum length of string values
+being assigned to variables.
 
 ### `specs`
 

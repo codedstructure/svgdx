@@ -55,6 +55,10 @@ struct Arguments {
     /// Limit on number of iterations for loop elements
     #[arg(long, default_value = "1000")]
     loop_limit: u32,
+
+    /// Limit on length of variable values
+    #[arg(long, default_value = "1024")]
+    var_limit: u32,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -112,6 +116,7 @@ impl Config {
                 seed: args.seed,
                 add_metadata: args.add_metadata,
                 loop_limit: args.loop_limit,
+                var_limit: args.var_limit,
             },
         })
     }

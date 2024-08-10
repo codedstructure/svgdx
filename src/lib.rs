@@ -83,6 +83,8 @@ pub struct TransformConfig {
     pub seed: u64,
     /// Maximum loop iterations
     pub loop_limit: u32,
+    /// Max length of variable
+    pub var_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
 }
@@ -97,6 +99,7 @@ impl Default for TransformConfig {
             background: "none".to_owned(),
             seed: 0,
             loop_limit: 1000,
+            var_limit: 1024,
             add_metadata: false,
         }
     }

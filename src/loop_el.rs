@@ -123,7 +123,7 @@ impl ElementLike for LoopElement {
                 }
                 iteration += 1;
                 loop_var_value += loop_step;
-                if iteration == context.config.loop_limit {
+                if iteration > context.config.loop_limit {
                     bail!("Excessive looping detected");
                 }
             }

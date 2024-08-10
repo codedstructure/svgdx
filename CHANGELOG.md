@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `var-limit` config variable (can be set by `--var-limit N` with CLI or the
+  `<config var-limit="N"/>` element within a document). This defaults to 1024, and is
+  the maximum length of a value assigned to a variable. This is intended to identify
+  the an incorrect 'string expansion' rather than expression evaluation, e.g. when
+  `<var thing="$thing + 1"/>` is used rather than `<var thing="{{$thing + 1}}"/>`.
+
+- Changed: `loop-limit` (and the new `var-limit`) are 'maximum valid' values, rather
+  than the point at which things break (as previously).
+
 ## [0.11.0 - 2024-08-07]
 
 - svgdx-editor: now uses WASM for browser-local transforms, and server transforms when

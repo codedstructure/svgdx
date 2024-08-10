@@ -116,3 +116,52 @@ fn test_var_classes() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, expected);
 }
+
+#[test]
+fn test_var_limit() {
+    // 'Normal' case, using {{..}} for numeric evaluation
+    let input = r#"
+<var thing="1"/>
+<loop count="10"><var thing="{{$thing + $thing}}"/></loop>
+<rect wh="10" text="$thing"/>
+"#;
+    let expected = r#">1024</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // Same thing without {{..}}, which will cause string concatenation
+    // and consequent var-limit error
+    let input = r#"
+<var thing="1"/>
+<loop count="10"><var thing="$thing + $thing"/></loop>
+<rect wh="10" text="$thing"/>
+"#;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+
+    // Raising the var-limit should allow this to be transformed
+    // with '1 + ' repeated 1024 times, 5000 should be plenty
+    let input = r#"
+<config var-limit="5000"/>
+<var thing="1"/>
+<loop count="10"><var thing="$thing + $thing"/></loop>
+<rect wh="10" text="$thing"/>
+"#;
+    let output = transform_str_default(input);
+    assert!(output.is_ok());
+
+    // Test var-limit boundary condition
+    let input = r#"
+<config var-limit="10"/>
+<var thing="0123456789"/>
+"#;
+    let output = transform_str_default(input);
+    assert!(output.is_ok());
+
+    let input = r#"
+<config var-limit="10"/>
+<var thing="01234567890"/>
+"#;
+    let output = transform_str_default(input);
+    assert!(output.is_err());
+}
