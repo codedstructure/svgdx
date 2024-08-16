@@ -259,12 +259,22 @@ pub fn build_styles(
             "text { font-family: sans-serif; font-size: 3px; }",
         ));
     }
-    if classes.contains("d-thin") {
-        result.push(String::from(".d-thin { stroke-width: 0.25; }"));
+
+    // stroke-widths
+    {
+        let line_style = vec![
+            ("d-thinner", "0.125"),
+            ("d-thin", "0.25"),
+            ("d-thick", "1"),
+            ("d-thicker", "2"),
+        ];
+        for (class, width) in line_style {
+            if classes.contains(class) {
+                result.push(format!(".{class} {{ stroke-width: {width}; }}"));
+            }
+        }
     }
-    if classes.contains("d-thick") {
-        result.push(String::from(".d-thick { stroke-width: 1; }"));
-    }
+
     if classes.contains("d-tbox") {
         result.push(String::from(
             r#"text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }"#,
@@ -351,22 +361,62 @@ pub fn build_styles(
             ".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }",
         ));
     }
-    if classes.contains("d-arrow") {
-        result.push(String::from(
-            "line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }",
-        ));
+
+    {
+        let mut has_arrow = false;
+        if classes.contains("d-arrow") {
+            result.push(String::from(
+                "line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }",
+            ));
+            has_arrow = true;
+        }
+        if classes.contains("d-biarrow") {
+            result.push(String::from(
+                "line.d-biarrow, polyline.d-biarrow, path.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
+            ));
+            has_arrow = true;
+        }
+        if has_arrow {
+            // override the default 'fill:none' for markers.
+            result.push(String::from("marker path { fill: inherit; }"));
+        }
     }
-    if classes.contains("d-biarrow") {
-        result.push(String::from(
-            "line.d-biarrow, polyline.d-biarrow, path.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
-        ));
+
+    {
+        // Dash / dot / flow: stroke-dasharray should have an even number of entries and the 'from'
+        // keyframe stroke-dashoffset should be (a multiple of) the sum of the dasharray values.
+        let flow_style = vec![
+            ("d-flow-slower", "4"),
+            ("d-flow-slow", "2"),
+            ("d-flow", "1"),
+            ("d-flow-fast", "0.5"),
+            ("d-flow-faster", "0.25"),
+        ];
+        let mut has_flow = false;
+        for (class, speed) in flow_style {
+            if classes.contains(class) {
+                // d-flow defaults to equivalent of d-dash, but also works with d-dot.
+                result.push(format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }}"));
+                has_flow = true;
+            }
+        }
+        if has_flow {
+            result.push(String::from("@keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }"));
+        }
+        if classes.contains("d-flow-rev") {
+            result.push(String::from(
+                ".d-flow-rev { animation-direction: reverse; }",
+            ));
+        }
+        // NOTE: these are after the d-flow-* classes, as they provide a default dasharray these may override.
+        if classes.contains("d-dash") {
+            result.push(String::from(".d-dash { stroke-dasharray: 1.5 0.5; }"));
+        }
+        if classes.contains("d-dot") {
+            result.push(String::from(".d-dot { stroke-dasharray: 0.5 0.5; }"));
+        }
     }
-    if classes.contains("d-dash") {
-        result.push(String::from(".d-dash { stroke-dasharray: 1.5 0.75; }"));
-    }
-    if classes.contains("d-dot") {
-        result.push(String::from(".d-dot { stroke-dasharray: 0.5 0.5; }"));
-    }
+
     if classes.contains("d-surround") {
         result.push(String::from(".d-surround:not(text,tspan) { fill: none; }"));
     }
@@ -427,10 +477,16 @@ pub fn build_defs(
     let mut result = Vec::new();
 
     if classes.contains("d-arrow") || classes.contains("d-biarrow") {
-        // Note use of context-stroke for both stroke and fill;
-        // typically lines/paths with markers have `fill: none`
-        result.push(String::from(r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-  <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2; stroke: context-stroke; fill: context-stroke;"/>
+        // Note use of context-stroke for fill, and setting stroke:none to prevent
+        // the marker size extending beyond the path boundary.
+        // NOTE: the arrow marker butts up against the end of the line so doesn't have
+        // a 'point'. This means the line and arrow both end together and the line is
+        // never thicker than the arrow, but isn't ideal visually.
+        // A more sophisticated system would have the marker 'after' the line, and
+        // reduce the line length by the marker width - but that would be complex
+        // in this program. Maybe in the future.
+        result.push(String::from(r#"<marker id="d-arrow" refX="0.8" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 0.4 1">
+  <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: context-stroke;"/>
 </marker>"#));
     }
 

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: a touch of animation comes to svgdx with the new `d-flow` auto-styles.
+  Typically used on lines to indicate directionality without relying on arrows,
+  this animates the stroke-dashoffset parameter where the SVG viewer supports CSS3
+  animations. Suffixes `-slower`, `-slow`, `-fast` and `-faster` may be appended
+  to `d-flow` to change the speed of 'flow', and the direction can be reversed
+  with `d-flow-rev`. These styles automatically add a `d-dash` type appearance,
+  but can also be combined with `d-dot`.
+
+- Enhanced: `d-arrow` / `d-biarrow` styling is changed to show filled arrowheads,
+  which butt-up against shapes at exactly the end of the line. This may change
+  again in the future, as it's a compromise between simplicity and presentation.
+
+- Enhanced: stroke-width auto-styles `d-thin` and `d-thick` are now joined by `d-thinner`
+  and `d-thicker`. Each increment is by a factor of 2.
+
 - Added: `var-limit` config variable (can be set by `--var-limit N` with CLI or the
   `<config var-limit="N"/>` element within a document). This defaults to 1024, and is
   the maximum length of a value assigned to a variable. This is intended to identify

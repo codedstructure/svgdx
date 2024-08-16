@@ -66,7 +66,7 @@ This will render a grey square with green outline and dark blue text.
 
 These styles control the size of text. The default text size is `d-text-medium`, but providing
 this style as an option allows the various relative size styles to be used if global font-size
-is overriden.
+is overridden.
 
 ### `d-text-monospace` / `d-text-italic` / `d-text-bold`
 
@@ -78,13 +78,25 @@ These styles provide basic styling of text elements, and may be combined as requ
 Renders an element outline (stroke) with a 'dotted' or 'dashed' line style respectively.
 Implemented with `stroke-dasharray`.
 
-### `d-thin` / `d-thick`
+### `d-thinner` / `d-thin` / `d-thick` / `d-thicker`
 These respectively reduce or increase the stroke width from the default by a factor of 2.
 
 ### `d-arrow`
 Renders an arrowhead at the 'end' of a `line` or `polyline` element. When used on a
 connector element (line or polyline with `start` and `end` attributes) the arrowhead
 appears at the point pointing toward the `end` point.
+
+### `d-flow`
+Animates (using CSS) the `stroke-dashoffset` property, to provide the appearance of
+flowing lines. The simple `d-flow` property adds the equivalent of `d-dash` by default,
+but providing the `d-dot` property will override this.
+
+Different speeds can be provided by using the suffixes `slower`, `slow`, `fast` or
+`faster`, and the direction can be reversed by providing the *additional* class
+`d-flow-rev`. For a 'dotted fast reverse flow', use `class="d-dot d-flow-fast d-flow-rev"`.
+
+This style provides interesting effects beyond lines - try on circles with radius a
+multiple of pi.
 
 ## Shadows and gradients
 

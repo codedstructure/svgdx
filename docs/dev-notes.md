@@ -174,3 +174,24 @@ possible without using an `id`.
 Perhaps something like `^^`, with reasonable extension (e.g. no more than 10)
 to earlier elements. This would allow nicer grids which need to alternate `:h`
 and `:v` type relative positions.
+
+### Auto-style class combinations
+
+Is it better to have combination class names for auto-styles, or require multiple
+classes to implement this?
+
+e.g. is it better to have `class="d-flow-rev-fast"` or `class="d-flow d-flow-rev d-flow-fast"`,
+or some combination where only one parameter (e.g. flow speed) is allowed as part of
+the 'base' class name? (so `d-flow-rev` is a separate 'boolean' flag, but speed can
+be included as e.g. `d-flow-faster`). If a 'simple' reverse flow is needed, this does
+require `class="d-flow d-flow-rev"`, which feels verbose, as though `d-flow-rev` should
+imply `d-flow`?
+
+The first is clearly more concise, but it's not obvious which order the various aspects
+should be. Maybe they could be entirely dynamic, including use of numbers in class
+names? e.g. `d-text-size-12` or similar.
+
+The existing text attributes tend to use the 'separate classes' approach, e.g.
+`class="d-text-bigger d-text-mono"`
+
+Note ergonomics should drive this rather than ease of implementation.

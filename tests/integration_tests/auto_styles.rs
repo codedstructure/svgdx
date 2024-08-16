@@ -131,3 +131,19 @@ fn test_style_shadow() {
     let expected_defs = r#"<feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>"#;
     assert_contains!(output, expected_defs);
 }
+
+#[test]
+fn test_style_flow() {
+    let input = r#"<svg><line xy1="0" xy2="0 10"/></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_not_contains!(output, "animation");
+
+    let input = r#"<svg><line xy1="0" xy2="0 10" class="d-flow"/></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, "animation");
+    assert_not_contains!(output, "animation-direction: reverse");
+
+    let input = r#"<svg><line xy1="0" xy2="0 10" class="d-flow d-flow-rev"/></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, "animation-direction: reverse");
+}
