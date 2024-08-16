@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1 - 2024-08-16]
+
 - Added: a touch of animation comes to svgdx with the new `d-flow` auto-styles.
   Typically used on lines to indicate directionality without relying on arrows,
   this animates the stroke-dashoffset parameter where the SVG viewer supports CSS3
