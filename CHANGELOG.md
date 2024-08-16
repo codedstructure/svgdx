@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed: `loop-limit` (and the new `var-limit`) are 'maximum valid' values, rather
   than the point at which things break (as previously).
 
+- svgdx-editor: limited zoom speed from `wheel` events to make scrolling with a
+  trackpad more controllable (and less CPU intensive!)
+
 ## [0.11.0 - 2024-08-07]
 
 - svgdx-editor: now uses WASM for browser-local transforms, and server transforms when

@@ -462,9 +462,20 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
 /** Scroll wheel: zoom SVG */
 (function () {
+    // Trackpads and some mice can create many scroll events in a short space
+    // of time. This can make zooming difficult, and is also hard on the CPU
+    // due to recalculating the SVG image due to viewBox changes. Limit the
+    // number of zoom operations done each second by ignoring new events for
+    // 50ms after a change in scale.
+    let busy = false;
+    const zoomDelayMs = 50;
+
     svg_container.addEventListener('wheel', (e) => {
         // Prevent default scrolling behavior
         e.preventDefault();
+
+        // We've done this too recently; ignore this event
+        if (busy) { return; }
 
         // zoom multiplier per wheel click
         const ZOOM_SPEED = 0.15;
@@ -486,6 +497,10 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const newY = y - (newHeight - height) * ((eventPos.y - y) / height);
 
         svg.setAttribute('viewBox', `${newX} ${newY} ${newWidth} ${newHeight}`);
+
+        // flag that we've just done a zoom operation and should hold off for a moment
+        busy = true;
+        setTimeout(() => { busy = false; }, zoomDelayMs);
     });
 })();
 
