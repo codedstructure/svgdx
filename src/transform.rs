@@ -187,11 +187,15 @@ impl ElementLike for GroupElement {
         Some(&mut self.el)
     }
 
-    fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+        // since we synthesize the opening element event here rather than in process_seq, we need to
+        // do any required transformations on the <g> itself here.
+        let mut new_el = self.el.clone();
+        new_el.eval_attributes(context);
         Ok(EventList::from(if self.el.is_empty_element() {
-            SvgEvent::Empty(self.el.clone())
+            SvgEvent::Empty(new_el)
         } else {
-            SvgEvent::Start(self.el.clone())
+            SvgEvent::Start(new_el)
         }))
     }
 
@@ -445,6 +449,9 @@ fn process_seq(
                 let mut ev_events = EventList::new();
                 // support reuse element
                 if context.loop_depth == 0 && event_element.name == "reuse" {
+                    // Evaluate any attrs using current context before potentially using these
+                    // as variables for the rendered element.
+                    event_element.eval_attributes(context);
                     match crate::reuse::handle_reuse_element(context, event_element, idx_output) {
                         Ok(ev_el) => {
                             replaced_ell = Some(ell.clone());
