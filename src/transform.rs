@@ -1,7 +1,7 @@
 use crate::context::TransformerContext;
 use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
-use crate::expression::eval_attr;
+use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, LocSpec, Position};
 use crate::svg_defs::{build_defs, build_styles};
 use crate::types::{fstr, OrderIndex};
@@ -316,6 +316,51 @@ impl ElementLike for VarElement {
     }
 }
 
+#[derive(Debug, Clone)]
+struct IfElement(SvgElement);
+
+impl ElementLike for IfElement {
+    fn handle_element_start(
+        &mut self,
+        _element: &SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        context.loop_depth += 1;
+        Ok(())
+    }
+
+    fn handle_element_end(
+        &mut self,
+        _element: &mut SvgElement,
+        context: &mut TransformerContext,
+    ) -> Result<()> {
+        context.loop_depth -= 1;
+        Ok(())
+    }
+
+    fn get_element(&self) -> Option<SvgElement> {
+        Some(self.0.clone())
+    }
+
+    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
+        Some(&mut self.0)
+    }
+
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+        if let (Some(range), Some(cond)) = (self.0.event_range, self.0.get_attr("test")) {
+            if eval_condition(&cond, context)? {
+                // opening if element is not included in the processed inner events to avoid
+                // infinite recursion...
+                let (start, end) = range;
+                let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
+                return process_events(inner_events.clone(), context);
+            }
+        }
+
+        Ok(EventList::new())
+    }
+}
+
 impl SvgElement {
     pub fn to_ell(&self) -> Rc<RefCell<dyn ElementLike>> {
         match self.name.as_str() {
@@ -325,6 +370,7 @@ impl SvgElement {
             "svg" => Rc::new(RefCell::new(RootSvgElement(self.clone()))),
             "specs" => Rc::new(RefCell::new(SpecsElement {})),
             "var" => Rc::new(RefCell::new(VarElement {})),
+            "if" => Rc::new(RefCell::new(IfElement(self.clone()))),
             "g" => Rc::new(RefCell::new(GroupElement {
                 el: self.clone(),
                 bbox: None,
@@ -379,7 +425,7 @@ fn process_seq(
                     ContentType::Pending
                 };
                 // This is copied from source element to any generated elements in transform_element()
-                if context.config.add_metadata && event_element.is_graphics_element() {
+                if context.config.add_metadata && !event_element.is_phantom_element() {
                     event_element
                         .attrs
                         .insert("data-source-line".to_string(), input_ev.line.to_string());
@@ -492,7 +538,10 @@ fn process_seq(
                             }
                             gen_events.push((event_element.order_index.clone(), events.clone()));
                             // TODO: this is about 'self_closing' elements include loop, g.
-                            if !(event_element.is_content_text() || event_element.name == "loop") {
+                            if !(event_element.is_content_text()
+                                || event_element.name == "loop"
+                                || event_element.name == "if")
+                            {
                                 // Similarly, `is_content_text` elements should close themselves in the returned
                                 // event list if needed.
                                 gen_events.push((idx, EventList::from(ev.clone())));
