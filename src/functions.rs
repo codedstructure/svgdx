@@ -1,5 +1,6 @@
 use crate::expression::{EvalState, ExprValue};
 use anyhow::{bail, Context, Result};
+use itertools::Itertools;
 use rand::Rng;
 use std::str::FromStr;
 
@@ -97,6 +98,8 @@ pub enum Function {
     Empty,
     /// count(a, ...) - number of elements in list
     Count,
+    /// in(x, a, ...) - 1 if x is in list, 0 otherwise
+    In,
 }
 
 impl FromStr for Function {
@@ -150,6 +153,7 @@ impl FromStr for Function {
             "tail" => Self::Tail,
             "empty" => Self::Empty,
             "count" => Self::Count,
+            "in" => Self::In,
             _ => bail!("Unknown function"),
         })
     }
@@ -242,6 +246,19 @@ pub fn eval_function(
                 rest[n]
             } else {
                 bail!("select() index out of range");
+            }
+        }
+        Function::In => {
+            let args = args.number_list()?;
+            if args.is_empty() {
+                bail!("in() requires at least one argument");
+            }
+            let value = args[0];
+            let rest = &args[1..];
+            if rest.iter().contains(&value) {
+                1.
+            } else {
+                0.
             }
         }
         Function::Abs => args.get_only()?.abs(),
