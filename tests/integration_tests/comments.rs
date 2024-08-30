@@ -4,12 +4,12 @@ use svgdx::transform_str_default;
 #[test]
 fn test_comment() {
     let input = r#"<rect xy="0" wh="5" _="A comment"/>"#;
-    let expected = r#"<!--A comment-->
+    let expected = r#"<!-- A comment -->
 <rect x="0" y="0" width="5" height="5"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<rect xy="0" wh="5" _="5 + 2 = {{5+2}}"/>"#;
-    let expected = r#"<!--5 + 2 = 7-->
+    let expected = r#"<!-- 5 + 2 = 7 -->
 <rect x="0" y="0" width="5" height="5"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
@@ -18,12 +18,12 @@ fn test_comment() {
 #[test]
 fn test_raw_comment() {
     let input = r#"<rect xy="0" wh="5" __="A comment"/>"#;
-    let expected = r#"<!--A comment-->
+    let expected = r#"<!-- A comment -->
 <rect x="0" y="0" width="5" height="5"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<rect xy="0" wh="5" __="5 + 2 = {{5+2}}"/>"#;
-    let expected = r#"<!--5 + 2 = {{5+2}}-->
+    let expected = r#"<!-- 5 + 2 = {{5+2}} -->
 <rect x="0" y="0" width="5" height="5"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }

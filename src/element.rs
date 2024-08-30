@@ -188,13 +188,13 @@ impl SvgElement {
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
             let value = eval_attr(&comment, ctx);
-            events.push(SvgEvent::Comment(value));
+            events.push(SvgEvent::Comment(format!(" {value} ")));
             events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // 'Raw' comment: no evaluation of expressions occurs here
         if let Some(comment) = self.get_attr("__") {
-            events.push(SvgEvent::Comment(comment));
+            events.push(SvgEvent::Comment(format!(" {comment} ")));
             events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
