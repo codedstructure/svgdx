@@ -82,6 +82,20 @@ will result in the following rendered output:
 
 Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).
 
+### `if`
+
+The `<if>` element allows conditional inclusion of blocks of elements. A single attribute - `test` - provides the condition.
+If the condition expression evaluates to non-zero, the contained block is processed as usual; if the condition evalates to zero then it is omitted.
+
+Note the `test` expression is always evaluated in a numeric context - there is no need to surround the conditional expression with `{{..}}`.
+
+Example:
+
+```xml
+<if test="eq($n, 7)">
+  <text>Seven</text>
+</if>
+```
 
 ### `loop`
 

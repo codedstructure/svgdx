@@ -89,3 +89,43 @@ fn test_reuse_group_svg() {
 "##;
     assert!(transform_str_default(input).is_ok());
 }
+
+#[test]
+fn test_reuse_transform() {
+    // TODO: once x/y/transform are implemented for non-<g> elements, test those too.
+    let input = r##"
+<specs>
+<g id="square">
+<rect x="0" y="0" width="$size" height="$size"/>
+</g>
+</specs>
+<reuse id="this" href="#square" x="3" y="5" size="10" transform="rotate(45)"/>
+"##;
+    let expected = r#"<g id="this" transform="rotate(45) translate(3, 5)" class="square">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<specs>
+<g id="square">
+<rect x="0" y="0" width="$size" height="$size"/>
+</g>
+</specs>
+<reuse id="this" href="#square" y="5" size="10"/>
+"##;
+    let expected = r#"<g id="this" transform="translate(0, 5)" class="square">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<specs>
+<g id="square">
+<rect x="0" y="0" width="$size" height="$size"/>
+</g>
+</specs>
+<reuse id="this" href="#square" size="10"/>
+"##;
+    let expected = r#"<g id="this" class="square">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

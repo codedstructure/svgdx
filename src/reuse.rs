@@ -98,6 +98,8 @@ pub fn handle_reuse_element(
             // and any x/y attrs become a new (final) entry in the `transform`.
 
             // TODO: ensure transform() is considered by bbox() / positioning.
+            // TODO: this should apply to non-<g> elements too, though perhaps <reuse> ~ <use>
+            // equivalence should cause non-g elements to be wrapped in a <g>?
             {
                 let reuse_x = event_element.get_attr("x");
                 let reuse_y = event_element.get_attr("y");

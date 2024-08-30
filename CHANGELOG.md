@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `if` element, used to selectively include a fragment. Previously this could
+  be emulated with a `while` loop, but now the simpler `<if test="condition">` element
+  is available.
+
+- Added: initial support for `x` / `y` / `transform` attributes on `<reuse>` elements
+  aligning with the [equivalent SVG attributes on `<use>` elements](https://www.w3.org/TR/SVG11/struct.html#UseElement).
+  This is only partial support; while they are carried through to a new `transform`
+  attribute, bounding box evaluation doesn't (yet) take this into account.
+
+- Added: `in(x, a1, a2, ...)` function, which returns if x is in the given list.
+
+- Change (minor): Comments generated from `_` / `__` attributes are now surrounded
+  by whitespace for readability.
+
 ## [0.11.1 - 2024-08-16]
 
 - Added: a touch of animation comes to svgdx with the new `d-flow` auto-styles.

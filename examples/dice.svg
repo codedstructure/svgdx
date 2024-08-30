@@ -1,0 +1,71 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="20mm" height="20mm" viewBox="-5 -5 20 20">
+  <style>
+  <![CDATA[
+    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
+    rect, circle, ellipse, polygon { fill: white; }
+    line, polyline, path { fill: none; }
+    .d-fill-crimson:not(text,tspan) { fill: crimson; }
+    text.d-fill-crimson, text.d-fill-crimson * { fill: white; }
+  ]]>
+  </style>
+  <style>svg * {stroke-width: 0.2px;}</style>
+
+    <g transform="translate(12, 0)" class="dice">
+      <!-- dice value: 3 -->
+      <rect id="base" x="0" y="0" width="10" rx="1" height="10" class="d-fill-crimson"/>
+
+        <circle cx="5" cy="5" r="1"/>
+
+        <circle cx="2.5" cy="2.5" r="1"/>
+        <circle cx="7.5" cy="7.5" r="1"/>
+      </g>
+
+    <g transform="translate(24, 0)" class="dice">
+      <!-- dice value: 3 -->
+      <rect id="base" x="0" y="0" width="10" rx="1" height="10" class="d-fill-crimson"/>
+
+        <circle cx="5" cy="5" r="1"/>
+
+        <circle cx="2.5" cy="2.5" r="1"/>
+        <circle cx="7.5" cy="7.5" r="1"/>
+      </g>
+
+    <g transform="translate(36, 0)" class="dice">
+      <!-- dice value: 6 -->
+      <rect id="base" x="0" y="0" width="10" rx="1" height="10" class="d-fill-crimson"/>
+
+        <circle cx="2.5" cy="2.5" r="1"/>
+        <circle cx="7.5" cy="7.5" r="1"/>
+
+        <circle cx="2.5" cy="7.5" r="1"/>
+        <circle cx="7.5" cy="2.5" r="1"/>
+
+        <circle cx="2.5" cy="5" r="1"/>
+        <circle cx="7.5" cy="5" r="1"/>
+      </g>
+
+    <g transform="translate(48, 0)" class="dice">
+      <!-- dice value: 6 -->
+      <rect id="base" x="0" y="0" width="10" rx="1" height="10" class="d-fill-crimson"/>
+
+        <circle cx="2.5" cy="2.5" r="1"/>
+        <circle cx="7.5" cy="7.5" r="1"/>
+
+        <circle cx="2.5" cy="7.5" r="1"/>
+        <circle cx="7.5" cy="2.5" r="1"/>
+
+        <circle cx="2.5" cy="5" r="1"/>
+        <circle cx="7.5" cy="5" r="1"/>
+      </g>
+
+    <g transform="translate(60, 0)" class="dice">
+      <!-- dice value: 4 -->
+      <rect id="base" x="0" y="0" width="10" rx="1" height="10" class="d-fill-crimson"/>
+
+        <circle cx="2.5" cy="2.5" r="1"/>
+        <circle cx="7.5" cy="7.5" r="1"/>
+
+        <circle cx="2.5" cy="7.5" r="1"/>
+        <circle cx="7.5" cy="2.5" r="1"/>
+      </g>
+  </svg>
