@@ -11,6 +11,7 @@ use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList,
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::{regex, Captures};
+use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -484,7 +485,12 @@ impl SvgElement {
                 .get_element(ref_id)
                 .context("Ref lookup failed at this time")?;
             {
-                if let Ok(Some(el_bb)) = el.bbox() {
+                let bb = if is_surround {
+                    el.bbox()
+                } else {
+                    el.inscribe(self)
+                };
+                if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
                 } else {
                     bail!("Element #{elref} has no bounding box at this time");
@@ -508,12 +514,53 @@ impl SvgElement {
                 }
             }
         }
-        if let Some(bb) = bbox {
-            self.position_from_bbox(&bb);
+        if let Some(mut bb) = bbox {
+            // TODO: not quite right yet: rect/ellipse/rect/ellipse things work OK, but
+            // ellipse/ellipse/ellipse etc shouldn't keep shrinking even with 'inside'.
+            // I think all this is really about the transition from one shape to another,
+            // which isn't handled yet. Ideally want this to work for both single 'inside' /
+            // 'surround' things but also lists of them, in an intuitive / consistent way.
+            if let ("circle" | "ellipse", false) = (self.name.as_str(), is_surround) {
+                bb.scale(core::f32::consts::FRAC_1_SQRT_2);
+            }
+            self.position_from_bbox(&bb, !is_surround);
         }
         self.add_class(&format!("d-{contain_str}"));
         self.remove_attrs(&["surround", "inside", "margin"]);
         Ok(())
+    }
+
+    // Return bounding box
+    pub fn inscribe(&self, other: &SvgElement) -> Result<Option<BoundingBox>> {
+        let zstr = "0".to_owned();
+        match self.name.as_str() {
+            "circle" => {
+                if let Some(r) = self.attrs.get("r") {
+                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
+                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
+                    let r = strp(r)? * core::f32::consts::FRAC_1_SQRT_2;
+                    Ok(Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r)))
+                } else {
+                    Ok(None)
+                }
+            }
+            "ellipse" => {
+                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
+                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
+                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                    let cx = strp(cx)?;
+                    let cy = strp(cy)?;
+                    let rx = strp(rx)? * core::f32::consts::FRAC_1_SQRT_2;
+                    let ry = strp(ry)? * core::f32::consts::FRAC_1_SQRT_2;
+                    Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => self.bbox(),
+        }
     }
 
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
@@ -712,7 +759,7 @@ impl SvgElement {
         Ok(new_elem)
     }
 
-    pub fn position_from_bbox(&mut self, bb: &BoundingBox) {
+    pub fn position_from_bbox(&mut self, bb: &BoundingBox, inscribe: bool) {
         let width = bb.width();
         let height = bb.height();
         let (cx, cy) = bb.center();
@@ -727,14 +774,28 @@ impl SvgElement {
             "circle" => {
                 self.attrs.insert("cx", fstr(cx));
                 self.attrs.insert("cy", fstr(cy));
-                self.attrs
-                    .insert("r", fstr(0.5 * width.max(height) * 1.414));
+                let r = if inscribe {
+                    0.5 * width.min(height)
+                } else {
+                    0.5 * width.max(height) * SQRT_2
+                };
+                self.attrs.insert("r", fstr(r));
             }
             "ellipse" => {
                 self.attrs.insert("cx", fstr(cx));
                 self.attrs.insert("cy", fstr(cy));
-                self.attrs.insert("rx", fstr(0.5 * width * 1.414));
-                self.attrs.insert("ry", fstr(0.5 * height * 1.414));
+                let rx = if inscribe {
+                    0.5 * width
+                } else {
+                    0.5 * width * SQRT_2
+                };
+                let ry = if inscribe {
+                    0.5 * height
+                } else {
+                    0.5 * height * SQRT_2
+                };
+                self.attrs.insert("rx", fstr(rx));
+                self.attrs.insert("ry", fstr(ry));
             }
             _ => {}
         }
