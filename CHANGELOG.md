@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Change (minor): Comments generated from `_` / `__` attributes are now surrounded
   by whitespace for readability.
 
+- Change: The PRNG used for the `random()` and `randint()` functions is now `Pcg32`
+  rather than `SmallRng`. This change ensures repeatability between native and WASM
+  builds; `SmallRng` has a (documented) limitation that it is not portable.
+  Any document using these functions will be change, but will become consistent between
+  the WASM-based [svgdx editor](https://svgdx.net) and the command line `svgdx` binary.
+
 ## [0.11.1 - 2024-08-16]
 
 - Added: a touch of animation comes to svgdx with the new `d-flow` auto-styles.

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use rand::prelude::*;
+use rand_pcg::Pcg32;
 
 pub struct TransformerContext {
     // Current state of given element; may be updated as processing continues
@@ -24,8 +25,8 @@ pub struct TransformerContext {
     prev_element: Option<SvgElement>,
     // Current variable values
     pub variables: HashMap<String, String>,
-    // SmallRng is used as it is seedable.
-    rng: RefCell<SmallRng>,
+    // Pcg32 is used as it is both seedable and portable.
+    rng: RefCell<Pcg32>,
     // Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
     // Are we in a <specs> block?
@@ -46,7 +47,7 @@ impl Default for TransformerContext {
             element_stack: Vec::new(),
             prev_element: None,
             variables: HashMap::new(),
-            rng: RefCell::new(SmallRng::seed_from_u64(0)),
+            rng: RefCell::new(Pcg32::seed_from_u64(0)),
             real_svg: false,
             in_specs: false,
             loop_depth: 0,
@@ -63,7 +64,7 @@ pub trait ElementMap {
 
 pub trait VariableMap {
     fn get_var(&self, name: &str) -> Option<String>;
-    fn get_rng(&self) -> &RefCell<SmallRng>;
+    fn get_rng(&self) -> &RefCell<Pcg32>;
 }
 
 pub trait ContextView: ElementMap + VariableMap {}
@@ -98,7 +99,7 @@ impl VariableMap for TransformerContext {
         return self.variables.get(name).cloned();
     }
 
-    fn get_rng(&self) -> &RefCell<SmallRng> {
+    fn get_rng(&self) -> &RefCell<Pcg32> {
         &self.rng
     }
 }
@@ -119,7 +120,7 @@ impl TransformerContext {
     }
 
     pub fn seed_rng(&mut self, seed: u64) {
-        self.rng = RefCell::new(SmallRng::seed_from_u64(seed));
+        self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }
 
     #[cfg(test)]

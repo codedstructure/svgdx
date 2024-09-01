@@ -556,20 +556,21 @@ mod tests {
     use crate::element::SvgElement;
     use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
     use rand::prelude::*;
+    use rand_pcg::Pcg32;
     use std::cell::RefCell;
 
     use super::*;
 
     struct TestContext {
         vars: HashMap<String, String>,
-        rng: RefCell<SmallRng>,
+        rng: RefCell<Pcg32>,
     }
 
     impl TestContext {
         fn new() -> Self {
             Self {
                 vars: HashMap::new(),
-                rng: RefCell::new(SmallRng::seed_from_u64(0)),
+                rng: RefCell::new(Pcg32::seed_from_u64(0)),
             }
         }
 
@@ -579,7 +580,7 @@ mod tests {
                     .iter()
                     .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect(),
-                rng: RefCell::new(SmallRng::seed_from_u64(0)),
+                rng: RefCell::new(Pcg32::seed_from_u64(0)),
             }
         }
     }
@@ -599,7 +600,7 @@ mod tests {
             self.vars.get(name).cloned()
         }
 
-        fn get_rng(&self) -> &std::cell::RefCell<rand::prelude::SmallRng> {
+        fn get_rng(&self) -> &RefCell<Pcg32> {
             &self.rng
         }
     }
