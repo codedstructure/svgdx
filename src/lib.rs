@@ -26,6 +26,7 @@
 //! println!("{output}");
 //! ```
 
+use themes::ThemeType;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -43,6 +44,7 @@ use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
 pub mod cli;
+mod colours;
 mod connector;
 mod context;
 mod element;
@@ -57,6 +59,7 @@ mod reuse;
 pub mod server;
 mod svg_defs;
 mod text;
+mod themes;
 mod transform;
 mod types;
 
@@ -87,6 +90,8 @@ pub struct TransformConfig {
     pub var_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
+    /// Theme to use (default "default")
+    pub theme: ThemeType,
 }
 
 impl Default for TransformConfig {
@@ -101,6 +106,7 @@ impl Default for TransformConfig {
             loop_limit: 1000,
             var_limit: 1024,
             add_metadata: false,
+            theme: ThemeType::default(),
         }
     }
 }

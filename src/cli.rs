@@ -59,6 +59,10 @@ struct Arguments {
     /// Limit on length of variable values
     #[arg(long, default_value = "1024")]
     var_limit: u32,
+
+    /// Theme to use
+    #[arg(long, default_value = "default")]
+    theme: String,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -117,6 +121,7 @@ impl Config {
                 add_metadata: args.add_metadata,
                 loop_limit: args.loop_limit,
                 var_limit: args.var_limit,
+                theme: args.theme.parse().context("Invalid theme")?,
             },
         })
     }

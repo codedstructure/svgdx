@@ -3,7 +3,7 @@ use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, LocSpec, Position};
-use crate::svg_defs::{build_defs, build_styles};
+use crate::themes::Theme;
 use crate::types::{fstr, OrderIndex};
 use crate::TransformConfig;
 
@@ -248,6 +248,9 @@ impl ElementLike for ConfigElement {
                 "seed" => {
                     context.config.seed = value.parse()?;
                     context.seed_rng(context.config.seed);
+                }
+                "theme" => {
+                    context.config.theme = value.parse()?;
                 }
                 _ => bail!("Unknown config setting {key}"),
             }
@@ -807,8 +810,9 @@ impl Transformer {
         // i.e. this is a full SVG document rather than a fragment.
         if has_svg_element && !self.context.real_svg && self.context.config.add_auto_defs {
             let indent = 2;
-            let auto_defs = build_defs(&element_set, &class_set, &self.context.config);
-            let auto_styles = build_styles(&element_set, &class_set, &self.context.config);
+            let theme = &self.context.config.theme;
+            let auto_defs = theme.build_defs(&element_set, &class_set, &self.context.config);
+            let auto_styles = theme.build_styles(&element_set, &class_set, &self.context.config);
             if !auto_defs.is_empty() {
                 let indent_line = format!("\n{}", " ".repeat(indent));
                 let mut event_vec = vec![
