@@ -115,7 +115,7 @@ impl Config {
                 debug: args.debug,
                 scale: args.scale,
                 border: args.border,
-                add_auto_defs: !args.no_auto_style,
+                add_auto_styles: !args.no_auto_style,
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,

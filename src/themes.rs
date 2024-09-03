@@ -1,32 +1,21 @@
+// themes for svgdx
+//
+// themes provide two outputs: a set of `defs` elements (patterns, markers, gradients etc)
+// and a set of `styles` entries (typically CSS rules).
+
 use crate::types::fstr;
 use crate::TransformConfig;
 use std::{collections::HashSet, str::FromStr};
 
 use crate::colours::{COLOUR_LIST, DARK_COLOURS};
-use crate::svg_defs::{build_defs, build_styles};
 use anyhow::bail;
-
-pub trait Theme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String>;
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String>;
-}
 
 #[derive(Debug, Clone)]
 pub enum ThemeType {
     Default(DefaultTheme),
     Bold(BoldTheme),
     Fine(FineTheme),
-    Tranlucent(TranslucentTheme),
+    Glass(GlassTheme),
     Dark(DarkTheme),
 }
 
@@ -38,10 +27,10 @@ impl FromStr for ThemeType {
             "default" => Ok(Self::default()),
             "bold" => Ok(Self::Bold(BoldTheme)),
             "fine" => Ok(Self::Fine(FineTheme)),
-            "translucent" => Ok(Self::Tranlucent(TranslucentTheme)),
+            "glass" => Ok(Self::Glass(GlassTheme)),
             "dark" => Ok(Self::Dark(DarkTheme)),
             _ => bail!(
-                "Unknown theme '{}' (available themes: default, bold, fine)",
+                "Unknown theme '{}' (available themes: default, bold, fine, glass, dark)",
                 s
             ),
         }
@@ -54,116 +43,45 @@ impl Default for ThemeType {
     }
 }
 
-impl Theme for ThemeType {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        match self {
-            ThemeType::Default(t) => t.build_styles(elements, classes, config),
-            ThemeType::Bold(t) => t.build_styles(elements, classes, config),
-            ThemeType::Fine(t) => t.build_styles(elements, classes, config),
-            ThemeType::Tranlucent(t) => t.build_styles(elements, classes, config),
-            ThemeType::Dark(t) => t.build_styles(elements, classes, config),
-        }
-    }
-
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        match self {
-            ThemeType::Default(t) => t.build_defs(elements, classes, config),
-            ThemeType::Bold(t) => t.build_defs(elements, classes, config),
-            ThemeType::Fine(t) => t.build_defs(elements, classes, config),
-            ThemeType::Tranlucent(t) => t.build_defs(elements, classes, config),
-            ThemeType::Dark(t) => t.build_defs(elements, classes, config),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct DefaultTheme;
 
-impl Theme for DefaultTheme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_styles(elements, classes, config)
-    }
-
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_defs(elements, classes, config)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct BoldTheme;
-
-impl Theme for BoldTheme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        let mut styles = Vec::new();
-        styles
-    }
-
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_defs(elements, classes, config)
-    }
-}
-
-fn append_common_styles(result: &mut Vec<String>, fill: &str, stroke: &str) {
+fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_width: f32) {
     // Default styles suitable for box-and-line diagrams
-    result.extend(
-        [
-            format!("rect, circle, ellipse, polygon {{ fill: {fill}; stroke: {stroke}; }}"),
-            format!("line, polyline, path {{ fill: none; stroke: {stroke}; }}"),
-            format!("text, tspan {{ fill: {stroke}; }}"),
-        ]
-        .to_vec(),
-    )
+    for s in [
+        format!("rect, circle, ellipse, polygon {{ stroke-width: {stroke_width}; fill: {fill}; stroke: {stroke}; }}"),
+        format!("line, polyline, path {{ stroke-width: {stroke_width}; fill: none; stroke: {stroke}; }}"),
+    ] {
+        tb.add_style(&s);
+    }
 }
 
-fn append_text_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
-    result.extend([
-        "text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; }",
+fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
+    if !tb.has_element("text") {
+        return;
+    }
+    tb.add_style(&format!("text, tspan {{ stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: {text_colour} }}"));
+    for (class, rule) in [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
-        "text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }",
-        "text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }",
-        "text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }",
-        "text.d-text-left, text.d-text-left * { text-anchor: start; }",
-        "text.d-text-right, text.d-text-right * { text-anchor: end; }",
-        "text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }",
-        "text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }",
-        "text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }",
-        "text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }",
+        ("d-tbox", "text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }"),
+        ("d-text-top", "text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }"),
+        ("d-text-bottom", "text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }"),
+        ("d-text-left", "text.d-text-left, text.d-text-left * { text-anchor: start; }"),
+        ("d-text-right", "text.d-text-right, text.d-text-right * { text-anchor: end; }"),
+        ("d-text-top-vertical", "text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }"),
+        ("d-text-bottom-vertical", "text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }"),
+        ("d-text-left-vertical", "text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }"),
+        ("d-text-right-vertical", "text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }"),
         // Default is sans-serif 'normal' text.
-        "text.d-text-bold, text.d-text-bold * { font-weight: bold; }",
-        "text.d-text-italic, text.d-text-italic * { font-style: italic; }",
-        "text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }",
-    ].map(|s| s.to_string()).to_vec());
+        ("d-text-bold", "text.d-text-bold, text.d-text-bold * { font-weight: bold; }"),
+        ("d-text-italic", "text.d-text-italic, text.d-text-italic * { font-style: italic; }"),
+        ("d-text-monospace", "text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
+    ] {
+        if tb.has_class(class) {
+            tb.add_style(rule);
+        }
+    }
 
     let text_sizes = vec![
         ("d-text-smallest", 1.),
@@ -175,8 +93,8 @@ fn append_text_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
         ("d-text-largest", 10.),
     ];
     for (class, size) in text_sizes {
-        if classes.contains(class) {
-            result.push(format!(
+        if tb.has_class(class) {
+            tb.add_style(&format!(
                 "text.{0}, text.{0} * {{ font-size: {1}px; }}",
                 class, size
             ));
@@ -184,19 +102,21 @@ fn append_text_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
     }
 }
 
-fn append_stroke_width_styles(result: &mut Vec<String>, base: f32) {
-    result.push(format!("* {{ stroke-width: {}; }}", fstr(base)));
+fn append_stroke_width_styles(tb: &mut ThemeBuilder, base: f32) {
     for (class, width) in [
         ("d-thinner", base * 0.25),
         ("d-thin", base * 0.5),
         ("d-thick", base * 2.),
         ("d-thicker", base * 4.),
     ] {
-        result.push(format!(".{class} {{ stroke-width: {}; }}", fstr(width)));
+        if tb.has_class(class) {
+            tb.add_style(&format!(".{class} {{ stroke-width: {}; }}", fstr(width)));
+        }
     }
 }
 
-fn append_colour_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
+fn append_colour_styles(tb: &mut ThemeBuilder) {
+    //, classes: &HashSet<String>) {
     // Colours
     // - d-colour sets a 'default' colour for shape outlines and text
     // - d-fill-colour sets the colour for shape fills, and sets a text colour
@@ -204,8 +124,8 @@ fn append_colour_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
     // - d-text-colour sets the colour for text elements, which overrides any
     //   colours set by d-colour or d-fill-colour.
     for colour in COLOUR_LIST {
-        if classes.contains(&format!("d-fill-{colour}")) {
-            result.push(format!(
+        if tb.has_class(&format!("d-fill-{colour}")) {
+            tb.add_style(&format!(
                 ".d-fill-{colour}:not(text,tspan) {{ fill: {colour}; }}"
             ));
             let text_colour = if DARK_COLOURS.contains(colour) {
@@ -213,14 +133,14 @@ fn append_colour_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
             } else {
                 "black"
             };
-            result.push(format!(
+            tb.add_style(&format!(
                 "text.d-fill-{colour}, text.d-fill-{colour} * {{ fill: {text_colour}; }}"
             ));
         }
     }
     for colour in COLOUR_LIST {
-        if classes.contains(&format!("d-{colour}")) {
-            result.push(format!(
+        if tb.has_class(&format!("d-{colour}")) {
+            tb.add_style(&format!(
                 ".d-{colour}:not(text,tspan) {{ stroke: {colour}; }}"
             ));
             // By default text is the same colour as shape stroke, but may be
@@ -228,42 +148,53 @@ fn append_colour_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
             // Also special-case 'none'; there are many use-cases for not having
             // a stroke colour (using `d-none`), but text should always have a colour.
             if *colour != "none" {
-                result.push(format!(
+                tb.add_style(&format!(
                     "text.d-{colour}, text.d-{colour} * {{ fill: {colour}; }}"
                 ));
             }
         }
     }
     for colour in COLOUR_LIST {
-        if classes.contains(&format!("d-text-{colour}")) {
+        if tb.has_class(&format!("d-text-{colour}")) {
             // Must be at least as specific as d-fill-colour
-            result.push(format!(
+            tb.add_style(&format!(
                 "text.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; }}"
             ));
         }
     }
 }
-fn append_arrow_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
+
+fn append_arrow_styles(tb: &mut ThemeBuilder) {
     let mut has_arrow = false;
-    if classes.contains("d-arrow") {
-        result.push(String::from(
-            "line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }",
-        ));
+    if tb.has_class("d-arrow") {
+        tb.add_style("line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }");
         has_arrow = true;
     }
-    if classes.contains("d-biarrow") {
-        result.push(String::from(
+    if tb.has_class("d-biarrow") {
+        tb.add_style(
                 "line.d-biarrow, polyline.d-biarrow, path.d-biarrow { marker-start: url(#d-arrow); marker-end: url(#d-arrow); }",
-            ));
+            );
         has_arrow = true;
     }
     if has_arrow {
         // override the default 'fill:none' for markers.
-        result.push(String::from("marker path { fill: inherit; }"));
+        tb.add_style("marker path { fill: inherit; }");
+        // Note use of context-stroke for fill, and setting stroke:none to prevent
+        // the marker size extending beyond the path boundary.
+        // NOTE: the arrow marker butts up against the end of the line so doesn't have
+        // a 'point'. This means the line and arrow both end together and the line is
+        // never thicker than the arrow, but isn't ideal visually.
+        // A more sophisticated system would have the marker 'after' the line, and
+        // reduce the line length by the marker width - but that would be complex
+        // in this program. Maybe in the future.
+        tb.add_defs(
+            r#"<marker id="d-arrow" refX="0.8" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 0.4 1">
+  <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: context-stroke;"/>
+</marker>"#);
     }
 }
 
-fn append_dash_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
+fn append_dash_styles(tb: &mut ThemeBuilder) {
     // Dash / dot / flow: stroke-dasharray should have an even number of entries and the 'from'
     // keyframe stroke-dashoffset should be (a multiple of) the sum of the dasharray values.
     let flow_style = vec![
@@ -275,232 +206,230 @@ fn append_dash_styles(result: &mut Vec<String>, classes: &HashSet<String>) {
     ];
     let mut has_flow = false;
     for (class, speed) in flow_style {
-        if classes.contains(class) {
+        if tb.has_class(class) {
             // d-flow defaults to equivalent of d-dash, but also works with d-dot.
-            result.push(format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }}"));
+            tb.add_style(&format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }}"));
             has_flow = true;
         }
     }
     if has_flow {
-        result.push(String::from("@keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }"));
+        tb.add_style("@keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }");
     }
-    if classes.contains("d-flow-rev") {
-        result.push(String::from(
-            ".d-flow-rev { animation-direction: reverse; }",
-        ));
+    if tb.has_class("d-flow-rev") {
+        tb.add_style(".d-flow-rev { animation-direction: reverse; }");
     }
     // NOTE: these are after the d-flow-* classes, as they provide a default dasharray these may override.
-    if classes.contains("d-dash") {
-        result.push(String::from(".d-dash { stroke-dasharray: 1.5 0.5; }"));
+    if tb.has_class("d-dash") {
+        tb.add_style(".d-dash { stroke-dasharray: 1.5 0.5; }");
     }
-    if classes.contains("d-dot") {
-        result.push(String::from(".d-dot { stroke-dasharray: 0.5 0.5; }"));
+    if tb.has_class("d-dot") {
+        tb.add_style(".d-dot { stroke-dasharray: 0.5 0.5; }");
     }
 }
 
-fn append_defs(result: &mut Vec<String>, classes: &HashSet<String>) {
-    let mut result = Vec::new();
+fn d_stipple(tb: &mut ThemeBuilder) {
+    tb.add_style(".d-stipple:not(text,tspan) {fill: url(#stipple)}");
+    tb.add_defs(
+r#"<pattern id="stipple" x="0" y="0" width="1" height="1" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
+  <circle cx="0.5" cy="0.5" r="0.1" style="fill: black"/>
+</pattern>"#,
+    );
+}
 
-    if classes.contains("d-arrow") || classes.contains("d-biarrow") {
-        // Note use of context-stroke for fill, and setting stroke:none to prevent
-        // the marker size extending beyond the path boundary.
-        // NOTE: the arrow marker butts up against the end of the line so doesn't have
-        // a 'point'. This means the line and arrow both end together and the line is
-        // never thicker than the arrow, but isn't ideal visually.
-        // A more sophisticated system would have the marker 'after' the line, and
-        // reduce the line length by the marker width - but that would be complex
-        // in this program. Maybe in the future.
-        result.push(String::from(r#"<marker id="d-arrow" refX="0.8" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 0.4 1">
-  <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: context-stroke;"/>
-</marker>"#));
-    }
+fn d_crosshatch(tb: &mut ThemeBuilder) {
+    tb.add_style(".d-crosshatch:not(text,tspan) {fill: url(#crosshatch)}");
+    tb.add_defs(
+r#"<pattern id="crosshatch" x="0" y="0" width="2" height="2" patternTransform="rotate(75)" patternUnits="userSpaceOnUse" >
+  <line x1="0" y1="0" x2="2" y2="0" style="stroke-width: 0.1; stroke: black"/>
+  <line x1="0" y1="0" x2="0" y2="2" style="stroke-width: 0.1; stroke: black"/>
+</pattern>"#,
+    );
+}
 
-    if classes.contains("d-softshadow") {
-        result.push(String::from(
-            r#"<filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
+fn d_hatch(tb: &mut ThemeBuilder) {
+    tb.add_style(".d-hatch:not(text,tspan) {fill: url(#hatch)}");
+    tb.add_defs(
+r#"<pattern id="hatch" x="0" y="0" width="2" height="2" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
+  <line x1="0" y1="0" x2="2" y2="0" style="stroke-width: 0.1; stroke: black"/>
+</pattern>"#,
+    );
+}
+
+fn d_softshadow(tb: &mut ThemeBuilder) {
+    tb.add_style(".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }");
+    tb.add_defs(
+        r#"<filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
   <feOffset dx="1" dy="1"/>
   <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
 </filter>"#,
-        ));
-    }
-    if classes.contains("d-hardshadow") {
-        result.push(String::from(
-            r#"<filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
+    );
+}
+
+fn d_hardshadow(tb: &mut ThemeBuilder) {
+    tb.add_style(".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }");
+    tb.add_defs(
+        r#"<filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
   <feOffset dx="1" dy="1"/>
   <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
 </filter>"#,
-        ));
-    }
+    );
 }
 
+#[derive(Debug, Clone)]
+pub struct BoldTheme;
 #[derive(Debug, Clone)]
 pub struct FineTheme;
-
-impl Theme for FineTheme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        let mut result = Vec::new();
-        if config.background != "none" {
-            result.push(format!("svg {{ background: {}; }}", config.background));
-        } else {
-            result.push("svg { background: #eee8d5; }".to_string());
-        }
-        append_common_styles(&mut result, "#fdf6e3", "#657b83");
-        append_stroke_width_styles(&mut result, 0.2);
-        if elements.contains("text") {
-            append_text_styles(&mut result, classes);
-        }
-        result.push(
-            "text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; }".to_string(),
-        );
-
-        if classes.contains("d-softshadow") {
-            result.push(String::from(
-                ".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }",
-            ));
-        }
-        if classes.contains("d-hardshadow") {
-            result.push(String::from(
-                ".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }",
-            ));
-        }
-
-        append_arrow_styles(&mut result, classes);
-        append_dash_styles(&mut result, classes);
-
-        if classes.contains("d-surround") {
-            result.push(String::from(".d-surround:not(text,tspan) { fill: none; }"));
-        }
-
-        append_colour_styles(&mut result, classes);
-
-        result
-    }
-
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_defs(elements, classes, config)
-    }
-}
-
 #[derive(Debug, Clone)]
-pub struct TranslucentTheme;
-
-impl Theme for TranslucentTheme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        let mut result = Vec::new();
-        if config.background != "none" {
-            result.push(format!("svg {{ background: {}; }}", config.background));
-        }
-        append_common_styles(&mut result, "rgba(0,30,50, 0.15)", "black");
-        append_stroke_width_styles(&mut result, 0.5);
-        if elements.contains("text") {
-            append_text_styles(&mut result, classes);
-        }
-        result.push(
-            "text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; }".to_string(),
-        );
-
-        if classes.contains("d-softshadow") {
-            result.push(String::from(
-                ".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }",
-            ));
-        }
-        if classes.contains("d-hardshadow") {
-            result.push(String::from(
-                ".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }",
-            ));
-        }
-
-        append_arrow_styles(&mut result, classes);
-        append_dash_styles(&mut result, classes);
-
-        if classes.contains("d-surround") {
-            //result.push(String::from(".d-surround:not(text,tspan) { fill: none; }"));
-        }
-
-        append_colour_styles(&mut result, classes);
-
-        result
-    }
-
-    fn build_defs(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_defs(elements, classes, config)
-    }
-}
-
+pub struct GlassTheme;
 #[derive(Debug, Clone)]
 pub struct DarkTheme;
 
-impl Theme for DarkTheme {
-    fn build_styles(
-        &self,
-        elements: &HashSet<String>,
-        classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        let mut result = Vec::new();
-        if config.background != "none" {
-            result.push(format!("svg {{ background: {}; }}", config.background));
+pub trait Theme: Clone {
+    fn build(&self, tb: &mut ThemeBuilder) {
+        if tb.background != "none" {
+            tb.add_style(&format!("svg {{ background: {}; }}", tb.background));
+        } else {
+            tb.add_style(&format!(
+                "svg {{ background: {}; }}",
+                self.default_background()
+            ));
         }
-        append_common_styles(&mut result, "#444", "#eee");
-        append_stroke_width_styles(&mut result, 0.5);
-        if elements.contains("text") {
-            append_text_styles(&mut result, classes);
-        }
-        result.push(
-            "text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; }".to_string(),
+        append_common_styles(
+            tb,
+            &self.default_fill(),
+            &self.default_stroke(),
+            self.default_stroke_width(),
         );
-
-        if classes.contains("d-softshadow") {
-            result.push(String::from(
-                ".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }",
-            ));
-        }
-        if classes.contains("d-hardshadow") {
-            result.push(String::from(
-                ".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }",
-            ));
+        append_stroke_width_styles(tb, self.default_stroke_width());
+        if tb.elements.contains("text") {
+            append_text_styles(tb, &self.default_stroke());
         }
 
-        append_arrow_styles(&mut result, classes);
-        append_dash_styles(&mut result, classes);
+        append_arrow_styles(tb);
+        append_dash_styles(tb);
 
-        if classes.contains("d-surround") {
-            //result.push(String::from(".d-surround:not(text,tspan) { fill: none; }"));
+        if tb.has_class("d-surround") {
+            tb.add_style(".d-surround:not(text,tspan) { fill: none; }");
         }
 
-        append_colour_styles(&mut result, classes);
+        append_colour_styles(tb);
 
-        result
+        type Tfn = dyn Fn(&mut ThemeBuilder);
+        for (class, build_fn) in [
+            ("d-softshadow", &d_softshadow as &Tfn),
+            ("d-hardshadow", &d_hardshadow as &Tfn),
+            ("d-stipple", &d_stipple as &Tfn),
+            ("d-hatch", &d_hatch as &Tfn),
+            ("d-crosshatch", &d_crosshatch as &Tfn),
+        ] {
+            if tb.has_class(class) {
+                build_fn(tb);
+            }
+        }
     }
+    fn default_fill(&self) -> String {
+        String::from("white")
+    }
+    fn default_stroke(&self) -> String {
+        String::from("black")
+    }
+    fn default_background(&self) -> String {
+        String::from("none")
+    }
+    fn default_stroke_width(&self) -> f32 {
+        0.5
+    }
+}
 
-    fn build_defs(
-        &self,
+pub struct ThemeBuilder {
+    styles: Vec<String>,
+    defs: Vec<String>,
+
+    background: String,
+    theme: ThemeType,
+    classes: HashSet<String>,
+    elements: HashSet<String>,
+}
+
+impl Theme for DefaultTheme {}
+impl Theme for FineTheme {
+    fn default_stroke(&self) -> String {
+        String::from("#657b83")
+    }
+    fn default_fill(&self) -> String {
+        String::from("#fdf6e3")
+    }
+    fn default_background(&self) -> String {
+        String::from("#eee8d5")
+    }
+    fn default_stroke_width(&self) -> f32 {
+        0.2
+    }
+}
+impl Theme for BoldTheme {
+    fn default_stroke_width(&self) -> f32 {
+        1.
+    }
+}
+impl Theme for GlassTheme {
+    fn default_fill(&self) -> String {
+        String::from("rgba(0, 30, 50, 0.15)")
+    }
+}
+impl Theme for DarkTheme {
+    fn default_stroke(&self) -> String {
+        String::from("#eee")
+    }
+    fn default_fill(&self) -> String {
+        String::from("#555")
+    }
+    fn default_background(&self) -> String {
+        String::from("#222")
+    }
+}
+
+impl ThemeBuilder {
+    pub fn new(
+        config: &TransformConfig,
         elements: &HashSet<String>,
         classes: &HashSet<String>,
-        config: &TransformConfig,
-    ) -> Vec<String> {
-        build_defs(elements, classes, config)
+    ) -> Self {
+        Self {
+            styles: Vec::new(),
+            defs: Vec::new(),
+            background: config.background.clone(),
+            theme: config.theme.clone(),
+            classes: classes.to_owned(),
+            elements: elements.to_owned(),
+        }
+    }
+    pub fn build(&mut self) {
+        match self.theme {
+            ThemeType::Default(_) => DefaultTheme {}.build(self),
+            ThemeType::Bold(_) => BoldTheme {}.build(self),
+            ThemeType::Fine(_) => FineTheme {}.build(self),
+            ThemeType::Glass(_) => GlassTheme {}.build(self),
+            ThemeType::Dark(_) => DarkTheme {}.build(self),
+        }
+    }
+    fn has_class(&self, s: &str) -> bool {
+        self.classes.iter().any(|x| x == s)
+    }
+    fn has_element(&self, s: &str) -> bool {
+        self.elements.iter().any(|x| x == s)
+    }
+    fn add_defs(&mut self, s: &str) {
+        self.defs.push(s.to_owned());
+    }
+    fn add_style(&mut self, s: &str) {
+        self.styles.push(s.to_owned());
+    }
+    pub fn get_defs(&self) -> Vec<String> {
+        self.defs.clone()
+    }
+    pub fn get_styles(&self) -> Vec<String> {
+        self.styles.clone()
     }
 }
