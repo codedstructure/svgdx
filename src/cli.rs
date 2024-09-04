@@ -41,7 +41,7 @@ struct Arguments {
     no_auto_style: bool,
 
     /// Default background colour if auto-styles are active
-    #[arg(long, default_value = "none")]
+    #[arg(long, default_value = "default")]
     background: String,
 
     /// Seed for RNG functions, default 0

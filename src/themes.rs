@@ -16,6 +16,7 @@ pub enum ThemeType {
     Bold(BoldTheme),
     Fine(FineTheme),
     Glass(GlassTheme),
+    Light(LightTheme),
     Dark(DarkTheme),
 }
 
@@ -28,9 +29,10 @@ impl FromStr for ThemeType {
             "bold" => Ok(Self::Bold(BoldTheme)),
             "fine" => Ok(Self::Fine(FineTheme)),
             "glass" => Ok(Self::Glass(GlassTheme)),
+            "light" => Ok(Self::Light(LightTheme)),
             "dark" => Ok(Self::Dark(DarkTheme)),
             _ => bail!(
-                "Unknown theme '{}' (available themes: default, bold, fine, glass, dark)",
+                "Unknown theme '{}' (available themes: default, bold, fine, glass, light, dark)",
                 s
             ),
         }
@@ -42,9 +44,6 @@ impl Default for ThemeType {
         ThemeType::Default(DefaultTheme)
     }
 }
-
-#[derive(Debug, Clone, Default)]
-pub struct DefaultTheme;
 
 fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_width: f32) {
     // Default styles suitable for box-and-line diagrams
@@ -75,6 +74,9 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
         ("d-text-right-vertical", "text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }"),
         // Default is sans-serif 'normal' text.
         ("d-text-bold", "text.d-text-bold, text.d-text-bold * { font-weight: bold; }"),
+        // Allow explicitly setting 'normal' font-weight, as themes may set a non-normal default.
+        ("d-text-normal", "text.d-text-normal, text.d-text-normal * { font-weight: normal; }"),
+        ("d-text-light", "text.d-text-light, text.d-text-light * { font-weight: 100; }"),
         ("d-text-italic", "text.d-text-italic, text.d-text-italic * { font-style: italic; }"),
         ("d-text-monospace", "text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
     ] {
@@ -227,35 +229,38 @@ fn append_dash_styles(tb: &mut ThemeBuilder) {
     }
 }
 
-fn d_stipple(tb: &mut ThemeBuilder) {
+fn d_stipple(tb: &mut ThemeBuilder, t_stroke: &str) {
     tb.add_style(".d-stipple:not(text,tspan) {fill: url(#stipple)}");
-    tb.add_defs(
+    tb.add_defs(&format!(
 r#"<pattern id="stipple" x="0" y="0" width="1" height="1" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
-  <circle cx="0.5" cy="0.5" r="0.1" style="fill: black"/>
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <circle cx="0.5" cy="0.5" r="0.1" style="stroke: none; fill: {t_stroke}"/>
 </pattern>"#,
-    );
+    ));
 }
 
-fn d_crosshatch(tb: &mut ThemeBuilder) {
+fn d_crosshatch(tb: &mut ThemeBuilder, t_stroke: &str) {
     tb.add_style(".d-crosshatch:not(text,tspan) {fill: url(#crosshatch)}");
-    tb.add_defs(
-r#"<pattern id="crosshatch" x="0" y="0" width="2" height="2" patternTransform="rotate(75)" patternUnits="userSpaceOnUse" >
-  <line x1="0" y1="0" x2="2" y2="0" style="stroke-width: 0.1; stroke: black"/>
-  <line x1="0" y1="0" x2="0" y2="2" style="stroke-width: 0.1; stroke: black"/>
+    tb.add_defs(&format!(
+r#"<pattern id="crosshatch" x="0" y="0" width="1" height="1" patternTransform="rotate(75)" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
+  <line x1="0" y1="0" x2="0" y2="1" style="stroke-width: 0.1; stroke: {t_stroke}"/>
 </pattern>"#,
-    );
+    ));
 }
 
-fn d_hatch(tb: &mut ThemeBuilder) {
+fn d_hatch(tb: &mut ThemeBuilder, t_stroke: &str) {
     tb.add_style(".d-hatch:not(text,tspan) {fill: url(#hatch)}");
-    tb.add_defs(
-r#"<pattern id="hatch" x="0" y="0" width="2" height="2" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
-  <line x1="0" y1="0" x2="2" y2="0" style="stroke-width: 0.1; stroke: black"/>
+    tb.add_defs(&format!(
+r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate(120)" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
 </pattern>"#,
-    );
+    ));
 }
 
-fn d_softshadow(tb: &mut ThemeBuilder) {
+fn d_softshadow(tb: &mut ThemeBuilder, _: &str) {
     tb.add_style(".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }");
     tb.add_defs(
         r#"<filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -266,7 +271,7 @@ fn d_softshadow(tb: &mut ThemeBuilder) {
     );
 }
 
-fn d_hardshadow(tb: &mut ThemeBuilder) {
+fn d_hardshadow(tb: &mut ThemeBuilder, _: &str) {
     tb.add_style(".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }");
     tb.add_defs(
         r#"<filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
@@ -277,18 +282,9 @@ fn d_hardshadow(tb: &mut ThemeBuilder) {
     );
 }
 
-#[derive(Debug, Clone)]
-pub struct BoldTheme;
-#[derive(Debug, Clone)]
-pub struct FineTheme;
-#[derive(Debug, Clone)]
-pub struct GlassTheme;
-#[derive(Debug, Clone)]
-pub struct DarkTheme;
-
-pub trait Theme: Clone {
+trait Theme: Clone {
     fn build(&self, tb: &mut ThemeBuilder) {
-        if tb.background != "none" {
+        if tb.background != "default" {
             tb.add_style(&format!("svg {{ background: {}; }}", tb.background));
         } else {
             tb.add_style(&format!(
@@ -296,6 +292,7 @@ pub trait Theme: Clone {
                 self.default_background()
             ));
         }
+        self.append_early_styles(tb);
         append_common_styles(
             tb,
             &self.default_fill(),
@@ -316,7 +313,7 @@ pub trait Theme: Clone {
 
         append_colour_styles(tb);
 
-        type Tfn = dyn Fn(&mut ThemeBuilder);
+        type Tfn = dyn Fn(&mut ThemeBuilder, &str);
         for (class, build_fn) in [
             ("d-softshadow", &d_softshadow as &Tfn),
             ("d-hardshadow", &d_hardshadow as &Tfn),
@@ -325,9 +322,10 @@ pub trait Theme: Clone {
             ("d-crosshatch", &d_crosshatch as &Tfn),
         ] {
             if tb.has_class(class) {
-                build_fn(tb);
+                build_fn(tb, &self.default_stroke());
             }
         }
+        self.append_late_styles(tb);
     }
     fn default_fill(&self) -> String {
         String::from("white")
@@ -341,6 +339,8 @@ pub trait Theme: Clone {
     fn default_stroke_width(&self) -> f32 {
         0.5
     }
+    fn append_early_styles(&self, _tb: &mut ThemeBuilder) {}
+    fn append_late_styles(&self, _tb: &mut ThemeBuilder) {}
 }
 
 pub struct ThemeBuilder {
@@ -351,43 +351,6 @@ pub struct ThemeBuilder {
     theme: ThemeType,
     classes: HashSet<String>,
     elements: HashSet<String>,
-}
-
-impl Theme for DefaultTheme {}
-impl Theme for FineTheme {
-    fn default_stroke(&self) -> String {
-        String::from("#657b83")
-    }
-    fn default_fill(&self) -> String {
-        String::from("#fdf6e3")
-    }
-    fn default_background(&self) -> String {
-        String::from("#eee8d5")
-    }
-    fn default_stroke_width(&self) -> f32 {
-        0.2
-    }
-}
-impl Theme for BoldTheme {
-    fn default_stroke_width(&self) -> f32 {
-        1.
-    }
-}
-impl Theme for GlassTheme {
-    fn default_fill(&self) -> String {
-        String::from("rgba(0, 30, 50, 0.15)")
-    }
-}
-impl Theme for DarkTheme {
-    fn default_stroke(&self) -> String {
-        String::from("#eee")
-    }
-    fn default_fill(&self) -> String {
-        String::from("#555")
-    }
-    fn default_background(&self) -> String {
-        String::from("#222")
-    }
 }
 
 impl ThemeBuilder {
@@ -411,6 +374,7 @@ impl ThemeBuilder {
             ThemeType::Bold(_) => BoldTheme {}.build(self),
             ThemeType::Fine(_) => FineTheme {}.build(self),
             ThemeType::Glass(_) => GlassTheme {}.build(self),
+            ThemeType::Light(_) => LightTheme {}.build(self),
             ThemeType::Dark(_) => DarkTheme {}.build(self),
         }
     }
@@ -431,5 +395,75 @@ impl ThemeBuilder {
     }
     pub fn get_styles(&self) -> Vec<String> {
         self.styles.clone()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DefaultTheme;
+
+impl Theme for DefaultTheme {}
+
+#[derive(Debug, Clone)]
+pub struct FineTheme;
+
+impl Theme for FineTheme {
+    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
+        tb.add_style("text,tspan {font-weight: 100}");
+    }
+    fn default_stroke_width(&self) -> f32 {
+        0.2
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct BoldTheme;
+impl Theme for BoldTheme {
+    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
+        tb.add_style("text,tspan {font-weight: 900}");
+    }
+    fn default_stroke_width(&self) -> f32 {
+        1.
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct GlassTheme;
+impl Theme for GlassTheme {
+    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
+        tb.add_style("rect, circle, ellipse, polygon { opacity: 0.7; }");
+    }
+    fn default_fill(&self) -> String {
+        String::from("rgba(0, 30, 50, 0.15)")
+    }
+    fn default_background(&self) -> String {
+        String::from("rgba(200, 230, 220, 0.5)")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LightTheme;
+impl Theme for LightTheme {
+    fn default_stroke(&self) -> String {
+        String::from("#657b83")
+    }
+    fn default_fill(&self) -> String {
+        String::from("#fdf6e3")
+    }
+    fn default_background(&self) -> String {
+        String::from("#eee8d5")
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DarkTheme;
+impl Theme for DarkTheme {
+    fn default_stroke(&self) -> String {
+        String::from("#93a1a1")
+    }
+    fn default_fill(&self) -> String {
+        String::from("#002b36")
+    }
+    fn default_background(&self) -> String {
+        String::from("#073642")
     }
 }

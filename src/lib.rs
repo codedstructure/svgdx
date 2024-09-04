@@ -79,8 +79,8 @@ pub struct TransformConfig {
     pub border: u16,
     /// Add style & defs entries based on class usage
     pub add_auto_styles: bool,
-    /// Background colour (default "none")
-    pub background: String,
+    /// Background colour (default "default" - use theme default or none)
+    pub background: String, // TODO: sanitize this with a `Colour: FromStr + Display` type
     /// Random seed
     pub seed: u64,
     /// Maximum loop iterations
@@ -100,7 +100,7 @@ impl Default for TransformConfig {
             scale: 1.0,
             border: 5,
             add_auto_styles: true,
-            background: "none".to_owned(),
+            background: "default".to_owned(),
             seed: 0,
             loop_limit: 1000,
             var_limit: 1024,
