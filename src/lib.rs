@@ -26,6 +26,7 @@
 //! println!("{output}");
 //! ```
 
+use themes::ThemeType;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -43,6 +44,7 @@ use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
 pub mod cli;
+mod colours;
 mod connector;
 mod context;
 mod element;
@@ -55,8 +57,8 @@ mod position;
 mod reuse;
 #[cfg(feature = "server")]
 pub mod server;
-mod svg_defs;
 mod text;
+mod themes;
 mod transform;
 mod types;
 
@@ -76,9 +78,9 @@ pub struct TransformConfig {
     /// Border width (user-units, default 5)
     pub border: u16,
     /// Add style & defs entries based on class usage
-    pub add_auto_defs: bool,
-    /// Background colour (default "none")
-    pub background: String,
+    pub add_auto_styles: bool,
+    /// Background colour (default "default" - use theme default or none)
+    pub background: String, // TODO: sanitize this with a `Colour: FromStr + Display` type
     /// Random seed
     pub seed: u64,
     /// Maximum loop iterations
@@ -87,6 +89,8 @@ pub struct TransformConfig {
     pub var_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
+    /// Theme to use (default "default")
+    pub theme: ThemeType,
 }
 
 impl Default for TransformConfig {
@@ -95,12 +99,13 @@ impl Default for TransformConfig {
             debug: false,
             scale: 1.0,
             border: 5,
-            add_auto_defs: true,
-            background: "none".to_owned(),
+            add_auto_styles: true,
+            background: "default".to_owned(),
             seed: 0,
             loop_limit: 1000,
             var_limit: 1024,
             add_metadata: false,
+            theme: ThemeType::default(),
         }
     }
 }

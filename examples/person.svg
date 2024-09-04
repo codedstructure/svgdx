@@ -6,9 +6,9 @@
   </defs>
   <style>
   <![CDATA[
-    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
-    rect, circle, ellipse, polygon { fill: white; }
-    line, polyline, path { fill: none; }
+    svg { background: none; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     marker path { fill: inherit; }
   ]]>

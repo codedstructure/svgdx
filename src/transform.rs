@@ -3,7 +3,7 @@ use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, LocSpec, Position};
-use crate::svg_defs::{build_defs, build_styles};
+use crate::themes::ThemeBuilder;
 use crate::types::{fstr, OrderIndex};
 use crate::TransformConfig;
 
@@ -240,7 +240,7 @@ impl ElementLike for ConfigElement {
             match key.as_str() {
                 "scale" => context.config.scale = value.parse()?,
                 "debug" => context.config.debug = value.parse()?,
-                "add-auto-styles" => context.config.add_auto_defs = value.parse()?,
+                "add-auto-styles" => context.config.add_auto_styles = value.parse()?,
                 "border" => context.config.border = value.parse()?,
                 "background" => context.config.background.clone_from(value),
                 "loop-limit" => context.config.loop_limit = value.parse()?,
@@ -248,6 +248,9 @@ impl ElementLike for ConfigElement {
                 "seed" => {
                     context.config.seed = value.parse()?;
                     context.seed_rng(context.config.seed);
+                }
+                "theme" => {
+                    context.config.theme = value.parse()?;
                 }
                 _ => bail!("Unknown config setting {key}"),
             }
@@ -805,10 +808,12 @@ impl Transformer {
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && !self.context.real_svg && self.context.config.add_auto_defs {
+        if has_svg_element && !self.context.real_svg && self.context.config.add_auto_styles {
             let indent = 2;
-            let auto_defs = build_defs(&element_set, &class_set, &self.context.config);
-            let auto_styles = build_styles(&element_set, &class_set, &self.context.config);
+            let mut tb = ThemeBuilder::new(&self.context.config, &element_set, &class_set);
+            tb.build();
+            let auto_defs = tb.get_defs();
+            let auto_styles = tb.get_styles();
             if !auto_defs.is_empty() {
                 let indent_line = format!("\n{}", " ".repeat(indent));
                 let mut event_vec = vec![

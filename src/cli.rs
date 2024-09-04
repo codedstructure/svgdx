@@ -41,7 +41,7 @@ struct Arguments {
     no_auto_style: bool,
 
     /// Default background colour if auto-styles are active
-    #[arg(long, default_value = "none")]
+    #[arg(long, default_value = "default")]
     background: String,
 
     /// Seed for RNG functions, default 0
@@ -59,6 +59,10 @@ struct Arguments {
     /// Limit on length of variable values
     #[arg(long, default_value = "1024")]
     var_limit: u32,
+
+    /// Theme to use
+    #[arg(long, default_value = "default")]
+    theme: String,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -111,12 +115,13 @@ impl Config {
                 debug: args.debug,
                 scale: args.scale,
                 border: args.border,
-                add_auto_defs: !args.no_auto_style,
+                add_auto_styles: !args.no_auto_style,
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,
                 loop_limit: args.loop_limit,
                 var_limit: args.var_limit,
+                theme: args.theme.parse().context("Invalid theme")?,
             },
         })
     }

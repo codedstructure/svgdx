@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be emulated with a `while` loop, but now the simpler `<if test="condition">` element
   is available.
 
+- Added: initial support for themes. These are an extension of auto-styles, where
+  some styles are parameterized by a theme. Current themes are `fine`, `bold`,
+  `glass`, `light`, and `dark`, as well as the `default` theme which acts as previous.
+  There are minor changes to the generated style rules even for the `default` theme,
+  but these shouldn't change the visual display of rendered SVG images.
+  One minor change is that the `background` setting now defaults to `default` rather
+  than `none`; the new setting applies the theme default. This allows the value `none`
+  to be explicitly provided to generate a transparent background when this is *not* the
+  theme default.
+
+- Added: new auto-styles `d-hatch`, `d-crosshatch`, and `d-stipple` for various patterned
+  fill effects. NOTE: this overrides any specified colour fill (setting the theme default).
+
 - Added: initial support for `x` / `y` / `transform` attributes on `<reuse>` elements
   aligning with the [equivalent SVG attributes on `<use>` elements](https://www.w3.org/TR/SVG11/struct.html#UseElement).
   This is only partial support; while they are carried through to a new `transform`
