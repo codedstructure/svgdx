@@ -1,9 +1,9 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="-5 -5 40 30">
   <style>
   <![CDATA[
-    rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; }
-    rect, circle, ellipse, polygon { fill: white; }
-    line, polyline, path { fill: none; }
+    svg { background: none; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
   ]]>
   </style>
     <rect id="base" x="10" y="10" width="10" height="10" margin="3 1"/>
