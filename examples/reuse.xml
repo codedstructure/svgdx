@@ -11,11 +11,19 @@
       v {{$pipe_h - $pipe_w / 2}}
       a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
       v {{-$pipe_h - $pipe_w / 2}}" />
+
+    <path id="box3d" d="M $target@tl l 2 -2 h $target.w l -2 2 z M $target@tr v $target.h l 2 -2 v -$target.h z"/>
   </specs>
 
   <reuse href="#pipeline" pipe_w="10" pipe_h="40" pipe_x="10" pipe_y="10" style="fill:red"/>
 
-  <reuse href="#pipeline" pipe_w="20" pipe_h="13" pipe_x="30" pipe_y="10" class="coin"/>
+  <reuse id="p1" href="#pipeline" pipe_w="20" pipe_h="13" pipe_x="30" pipe_y="10" class="coin"/>
 
-  <reuse href="#pipeline" pipe_w="20" pipe_h="20" pipe_x="30" pipe_y="25" style="stroke-width: 0.1; fill: limegreen;"/>
+  <reuse id="p2" href="#pipeline" pipe_w="20" pipe_h="20" pipe_x="30" pipe_y="25" style="stroke-width: 0.1; fill: limegreen;"/>
+
+  <rect id="border" surround="#p1 #p2" margin="7 4"/>
+  <reuse href="#box3d" target="#border" style="fill:lightgrey"/>
+
+  <rect id="box" xy="10 60" wh="40 10"/>
+  <reuse href="#box3d" target="#box" style="fill:lightgrey"/>
 </svg>

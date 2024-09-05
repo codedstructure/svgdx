@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   be emulated with a `while` loop, but now the simpler `<if test="condition">` element
   is available.
 
+- Added: scalarspec support in `d` and `points` attributes (for path/polyline/polygon
+  elements). This is useful for `<path>` fragments such as `h #abc.w` to draw a horizontal
+  line from the current position for a distance corresponding to the width of `#abc`.
+
 - Added: initial support for themes. These are an extension of auto-styles, where
   some styles are parameterized by a theme. Current themes are `fine`, `bold`,
   `glass`, `light`, and `dark`, as well as the `default` theme which acts as previous.

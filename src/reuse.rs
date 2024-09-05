@@ -54,7 +54,7 @@ pub fn handle_reuse_element(
                 .strip_prefix('#')
                 .context("href value should begin with '#'")?,
         )
-        .context("unknown reference")?
+        .with_context(|| format!("unknown reference '{}'", elref))?
         .clone();
 
     // the referenced element will have an `id` attribute (which it was

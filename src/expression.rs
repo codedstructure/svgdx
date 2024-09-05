@@ -495,8 +495,7 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
         }
     });
     // Following that, replace any escaped "\$" back into "$"" characters
-    let re = regex!(r"\\\$");
-    re.replace_all(&value, r"$").into_owned()
+    value.replace("\\$", "$")
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}

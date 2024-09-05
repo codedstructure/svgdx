@@ -27,8 +27,7 @@ fn get_text_value(element: &mut SvgElement) -> String {
         }
     });
     // Following that, replace any escaped "\\n" into literal '\'+'n' characters
-    let re = regex!(r"\\\\n");
-    re.replace_all(&text_value, "\\n").into_owned()
+    text_value.replace("\\\\n", "\\n")
 }
 
 fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec, Vec<&'a str>)> {

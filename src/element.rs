@@ -62,29 +62,69 @@ impl Display for SvgElement {
     }
 }
 
+/// Split a possible relspec into the reference element (if it exists) and remainder
+///
+/// `input`: the relspec string
+///
+/// If the input is not a relspec, the reference element is `None` and the remainder
+/// is the entire input string.
+fn split_relspec<'a, 'b>(
+    input: &'b str,
+    ctx: &'a impl ElementMap,
+) -> Result<(Option<&'a SvgElement>, &'b str)> {
+    if input.starts_with('^') {
+        let skip_prev = input.strip_prefix('^').unwrap_or(input);
+        Ok((ctx.get_prev_element(), skip_prev.trim_start()))
+    } else if input.starts_with('#') {
+        let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
+        let (id, remain) = extract_ref_id_re
+            .captures(input)
+            .map(|caps| {
+                (
+                    caps.name("id").expect("Regex Match").as_str(),
+                    caps.name("remain").expect("Regex Match").as_str(),
+                )
+            })
+            .unwrap_or(("INVALID ELEMENT ID", input));
+        if let Some(el) = ctx.get_element(id) {
+            Ok((Some(el), remain))
+        } else {
+            bail!("Reference to unknown element '{}'", id);
+        }
+    } else {
+        Ok((None, input))
+    }
+}
+
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
 /// which may contain many such entries.
 ///
-/// Infallible; any invalid refspec will be left unchanged.
+/// Infallible; any invalid refspec will be left unchanged (other
+/// than whitespace)
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let locspec = regex!(r"#(?<id>[[:word:]]+)@(?<loc>[[:word:]]+)");
+    let locspec = regex!(r"([#^][[:word:]]+)[.@]([[:word:]]+)");
 
-    let result = locspec.replace_all(value, |caps: &Captures| {
-        let elref = caps.name("id").expect("Regex Match").as_str();
-        let loc = caps.name("loc").expect("Regex Match").as_str();
-        if let Some(elem) = ctx.get_element(elref) {
+    locspec
+        .replace_all(value, |caps: &Captures| {
+            expand_single_relspec(caps.get(0).expect("match").into(), ctx)
+        })
+        .to_string()
+}
+
+fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
+    if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
+        if let Some(loc) = rest.strip_prefix('@') {
             if let Ok(Some(pos)) = elem.coord(loc) {
-                format!("{} {}", fstr(pos.0), fstr(pos.1))
-            } else {
-                value.to_string()
+                return format!("{} {}", fstr(pos.0), fstr(pos.1));
             }
-        } else {
-            value.to_string()
+        } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
+            if let Ok(Some(pos)) = elem.bbox().map(|bb| bb.map(|bb| bb.scalarspec(scalar))) {
+                return fstr(pos);
+            }
         }
-    });
-
-    result.to_string()
+    }
+    value.to_string()
 }
 
 impl SvgElement {
@@ -740,44 +780,9 @@ impl SvgElement {
         }
     }
 
-    /// Split a possible relspec into the reference element (if it exists) and remainder
-    ///
-    /// `input`: the relspec string
-    ///
-    /// If the input is not a relspec, the reference element is `None` and the remainder
-    /// is the entire input string.
-    fn split_relspec<'a, 'b>(
-        &self,
-        input: &'b str,
-        ctx: &'a impl ElementMap,
-    ) -> Result<(Option<&'a SvgElement>, &'b str)> {
-        if input.starts_with('^') {
-            let skip_prev = input.strip_prefix('^').unwrap_or(input);
-            Ok((ctx.get_prev_element(), skip_prev.trim_start()))
-        } else if input.starts_with('#') {
-            let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
-            let (id, remain) = extract_ref_id_re
-                .captures(input)
-                .map(|caps| {
-                    (
-                        caps.name("id").expect("Regex Match").as_str(),
-                        caps.name("remain").expect("Regex Match").as_str(),
-                    )
-                })
-                .unwrap_or(("INVALID ELEMENT ID", input));
-            if let Some(el) = ctx.get_element(id) {
-                Ok((Some(el), remain))
-            } else {
-                bail!("Reference to unknown element '{}'", id);
-            }
-        } else {
-            Ok((None, input))
-        }
-    }
-
     fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
         if let Ok(ss) = ScalarSpec::from_str(name) {
-            if let (Some(el), remain) = self.split_relspec(value, ctx)? {
+            if let (Some(el), remain) = split_relspec(value, ctx)? {
                 if let Ok(Some(bbox)) = el.bbox() {
                     // default value - same 'type' as attr name, e.g. y2 => ymax
                     let mut v = bbox.scalarspec(ss);
@@ -905,7 +910,7 @@ impl SvgElement {
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
         if let Some(input) = input {
-            let (ref_el, remain) = self.split_relspec(input, ctx)?;
+            let (ref_el, remain) = split_relspec(input, ctx)?;
             let ref_el = match ref_el {
                 Some(el) => el,
                 None => return Ok(()),
@@ -1064,6 +1069,8 @@ impl SvgElement {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
 
     #[test]
@@ -1158,5 +1165,51 @@ mod tests {
         let result = element.eval_pos_helper("30 20", &bbox, LocSpec::TopLeft);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some((30., 20.)));
+    }
+
+    #[derive(Default)]
+    struct TestContext {
+        elements: HashMap<String, SvgElement>,
+    }
+
+    impl ElementMap for TestContext {
+        fn get_element(&self, id: &str) -> Option<&SvgElement> {
+            self.elements.get(id)
+        }
+
+        fn get_prev_element(&self) -> Option<&SvgElement> {
+            None
+        }
+    }
+
+    impl TestContext {
+        fn add(&mut self, id: &str, element: SvgElement) {
+            self.elements.insert(id.to_owned(), element);
+        }
+    }
+
+    #[test]
+    fn test_expand_relspec() {
+        let mut ctx = TestContext::default();
+
+        ctx.add(
+            "abc",
+            SvgElement::new(
+                "rect",
+                &[
+                    (String::from("x"), String::from("0")),
+                    (String::from("y"), String::from("0")),
+                    (String::from("width"), String::from("10")),
+                    (String::from("height"), String::from("20")),
+                ],
+            ),
+        );
+
+        let out = expand_relspec("#abc.w", &ctx);
+        assert_eq!(out, "10");
+        let out = expand_relspec("#abc@br", &ctx);
+        assert_eq!(out, "10 20");
+        let out = expand_relspec("1 2 #abc@t 3 4 #abc.h 5 6 #abc@c", &ctx);
+        assert_eq!(out, "1 2 5 0 3 4 20 5 6 5 10");
     }
 }
