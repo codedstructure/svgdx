@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0 - 2024-09-05]
+
 - Added: `if` element, used to selectively include a fragment. Previously this could
   be emulated with a `while` loop, but now the simpler `<if test="condition">` element
   is available.
