@@ -119,7 +119,10 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
                 return format!("{} {}", fstr(pos.0), fstr(pos.1));
             }
         } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
-            if let Ok(Some(pos)) = elem.bbox().map(|bb| bb.map(|bb| bb.scalarspec(scalar))) {
+            if let Ok(Some(pos)) = ctx
+                .get_element_bbox(elem)
+                .map(|bb| bb.map(|bb| bb.scalarspec(scalar)))
+            {
                 return fstr(pos);
             }
         }
@@ -524,7 +527,7 @@ impl SvgElement {
                 .get_element(ref_id)
                 .context("Ref lookup failed at this time")?;
             {
-                if let Ok(Some(el_bb)) = el.bbox() {
+                if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
                     bbox_list.push(el_bb);
                 } else {
                     bail!("Element #{elref} has no bounding box at this time");
@@ -783,7 +786,7 @@ impl SvgElement {
     fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
         if let Ok(ss) = ScalarSpec::from_str(name) {
             if let (Some(el), remain) = split_relspec(value, ctx)? {
-                if let Ok(Some(bbox)) = el.bbox() {
+                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
                     // default value - same 'type' as attr name, e.g. y2 => ymax
                     let mut v = bbox.scalarspec(ss);
 
@@ -915,11 +918,13 @@ impl SvgElement {
                 Some(el) => el,
                 None => return Ok(()),
             };
-            if let (Some(bbox), Some(caps)) = (ref_el.bbox()?, rel_re.captures(remain)) {
+            if let (Some(bbox), Some(caps)) =
+                (ctx.get_element_bbox(ref_el)?, rel_re.captures(remain))
+            {
                 let rel: DirSpec = caps.name("rel").expect("Regex Match").as_str().parse()?;
                 // this relies on x / y defaulting to 0 if not present, so we can get a bbox
                 // from only having a defined width / height.
-                let this_bbox = self.bbox()?;
+                let this_bbox = ctx.get_element_bbox(self)?;
                 let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
                 let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
                 let gap = if let Some(remain) = caps.name("remain") {
@@ -1179,6 +1184,10 @@ mod tests {
 
         fn get_prev_element(&self) -> Option<&SvgElement> {
             None
+        }
+
+        fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
+            el.bbox()
         }
     }
 

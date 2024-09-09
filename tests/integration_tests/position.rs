@@ -1,3 +1,4 @@
+use assertables::{assert_contains, assert_contains_as_result};
 use svgdx::transform_str_default;
 
 #[test]
@@ -284,4 +285,42 @@ fn test_position_dxy_polyline() {
     let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dxy="-1 3"/>"#;
     let expected = r#"<polyline points="0 4 1 4 1 5 2 5 2 4 3 4"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_use_bbox() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </defs>
+  <use id="b" x="0" y="0" href="#a"/>
+  <circle cxy="#b@br" r="1"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    let expected1 = r#"viewBox="0 0 11 11""#;
+    let expected2 = r#"circle cx="10" cy="10" r="1""#;
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_reuse_bbox() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </defs>
+  <reuse id="b" href="#a"/>
+  <circle xy="#b:h" r="2"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    let expected1 = r#"viewBox="0 0 14 10""#;
+    let expected2 = r#"circle cx="12" cy="5" r="2""#;
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
 }

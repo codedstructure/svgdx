@@ -326,7 +326,7 @@ impl<'a> EvalState<'a> {
             let val = caps.name("val").expect("must match if here").as_str();
             let val: ScalarSpec = val.parse()?;
             if let Some(elem) = self.context.get_element(id) {
-                if let Some(bb) = elem.bbox()? {
+                if let Some(bb) = self.context.get_element_bbox(elem)? {
                     Ok(bb.scalarspec(val).into())
                 } else {
                     bail!("No bounding box for #{}", id);
@@ -553,6 +553,7 @@ mod tests {
 
     use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
+    use crate::position::BoundingBox;
     use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
     use rand::prelude::*;
     use rand_pcg::Pcg32;
@@ -591,6 +592,10 @@ mod tests {
 
         fn get_prev_element(&self) -> Option<&SvgElement> {
             None
+        }
+
+        fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
+            el.bbox()
         }
     }
 

@@ -1,4 +1,4 @@
-use crate::context::TransformerContext;
+use crate::context::{ElementMap, TransformerContext};
 use crate::element::{ContentType, SvgElement};
 use crate::events::{EventList, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
@@ -88,7 +88,7 @@ impl ElementLike for SvgElement {
         e.resolve_position(context)?;
         let events = e.element_events(context)?;
         context.update_element(&e);
-        if !events.is_empty() && e.bbox()?.is_some() {
+        if !events.is_empty() && context.get_element_bbox(&e)?.is_some() {
             context.set_prev_element(e.clone());
         }
         for svg_ev in events {
@@ -214,9 +214,9 @@ impl ElementLike for GroupElement {
     fn on_child_element(
         &mut self,
         element: &SvgElement,
-        _context: &mut TransformerContext,
+        context: &mut TransformerContext,
     ) -> Result<()> {
-        if let Ok(Some(el_bbox)) = element.bbox() {
+        if let Ok(Some(el_bbox)) = context.get_element_bbox(element) {
             if let Some(bbox) = self.bbox {
                 self.bbox = Some(bbox.combine(&el_bbox));
             } else {
@@ -708,7 +708,7 @@ impl Transformer {
                     if !(elem_path.contains(&"defs".to_string())
                         || elem_path.contains(&"symbol".to_string()))
                     {
-                        if let Some(bb) = event_element.bbox()? {
+                        if let Some(bb) = self.context.get_element_bbox(&event_element)? {
                             bbox_list.push(bb);
                         }
                     }

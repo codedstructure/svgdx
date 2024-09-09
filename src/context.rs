@@ -1,6 +1,7 @@
 use crate::element::SvgElement;
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
+use crate::position::BoundingBox;
 use crate::transform::ElementLike;
 use crate::TransformConfig;
 
@@ -10,6 +11,8 @@ use std::rc::Rc;
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
+
+use anyhow::{bail, Result};
 
 pub struct TransformerContext {
     // Current state of given element; may be updated as processing continues
@@ -60,6 +63,7 @@ impl Default for TransformerContext {
 pub trait ElementMap {
     fn get_element(&self, id: &str) -> Option<&SvgElement>;
     fn get_prev_element(&self) -> Option<&SvgElement>;
+    fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
 }
 
 pub trait VariableMap {
@@ -76,6 +80,22 @@ impl ElementMap for TransformerContext {
 
     fn get_prev_element(&self) -> Option<&SvgElement> {
         self.prev_element.as_ref()
+    }
+
+    fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
+        if el.name == "use" || el.name == "reuse" {
+            // use and reuse elements reference another element - get the bbox of the target
+            if let Some(target) = el
+                .get_attr("href")
+                .and_then(|href| href.strip_prefix("#").map(|href| href.to_string()))
+                .and_then(|id| self.get_element(&id))
+            {
+                return self.get_element_bbox(target);
+            } else {
+                bail!("Could not determine bbox for element: {}", el);
+            }
+        }
+        el.bbox()
     }
 }
 
