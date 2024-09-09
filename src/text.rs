@@ -156,6 +156,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     if let Some(style) = orig_elem.pop_attr("text-style") {
         text_elem.set_attr("style", &style);
     }
+    // Generated text elements inherit any transform from the original element.
+    if let Some(transform) = orig_elem.get_attr("transform") {
+        text_elem.set_attr("transform", &transform);
+    }
     text_elem.classes = orig_elem.classes.clone();
     for class in text_classes {
         text_elem.add_class(class);

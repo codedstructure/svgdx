@@ -586,7 +586,7 @@ impl SvgElement {
                 let y = strp(y)?;
                 Ok(Some(BoundingBox::new(x, y, x, y)))
             }
-            "rect" | "use" | "image" | "svg" | "foreignObject" => {
+            "rect" | "image" | "svg" | "foreignObject" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
                     let x = self.attrs.get("x").unwrap_or(&zstr);
                     let y = self.attrs.get("y").unwrap_or(&zstr);

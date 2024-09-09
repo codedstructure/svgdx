@@ -7,6 +7,7 @@ use crate::types::OrderIndex;
 use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
+use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
@@ -80,7 +81,39 @@ pub fn handle_reuse_element(
     instance_element.add_classes(&event_element.classes);
     instance_element.add_class(&ref_id);
 
-    // TODO: or "symbol", needs testing.
+    // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
+    // and any x/y attrs become a new (final) entry in the `transform`.
+    // TODO: ensure transform() is considered by bbox() / positioning.
+    {
+        let reuse_x = event_element.get_attr("x");
+        let reuse_y = event_element.get_attr("y");
+        let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
+            let reuse_x = eval_attr(&reuse_x.unwrap_or("0".to_string()), context);
+            let reuse_y = eval_attr(&reuse_y.unwrap_or("0".to_string()), context);
+            Some(format!("translate({reuse_x}, {reuse_y})"))
+        } else {
+            None
+        };
+
+        // Resulting order: instance transform, reuse transform, x/y transform
+        let inst_xfrm = instance_element.get_attr("transform");
+        let reuse_xfrm = event_element.get_attr("transform");
+        let xfrm: Vec<_> = [inst_xfrm, reuse_xfrm, xy_xfrm]
+            .into_iter()
+            .flatten()
+            .collect();
+
+        if !xfrm.is_empty() {
+            let xfrm = xfrm.iter().join(" ");
+            instance_element.set_attr("transform", &xfrm);
+        }
+    }
+
+    // reuse of a symbol element wraps the resulting content in a new <g> element
+    if instance_element.name == "symbol" {
+        instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
+    }
+
     if instance_element.name == "g" {
         if let Some((start, end)) = instance_element.event_range {
             // opening g element is not included in the processed inner events to avoid
@@ -93,37 +126,6 @@ pub fn handle_reuse_element(
             let g_events = process_events(inner_events, context)?;
             context.pop_element();
             context.pop_element();
-
-            // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
-            // and any x/y attrs become a new (final) entry in the `transform`.
-
-            // TODO: ensure transform() is considered by bbox() / positioning.
-            // TODO: this should apply to non-<g> elements too, though perhaps <reuse> ~ <use>
-            // equivalence should cause non-g elements to be wrapped in a <g>?
-            {
-                let reuse_x = event_element.get_attr("x");
-                let reuse_y = event_element.get_attr("y");
-                let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
-                    let reuse_x = eval_attr(&reuse_x.unwrap_or("0".to_string()), context);
-                    let reuse_y = eval_attr(&reuse_y.unwrap_or("0".to_string()), context);
-                    Some(format!("translate({reuse_x}, {reuse_y})"))
-                } else {
-                    None
-                };
-
-                let orig_xfrm = event_element.get_attr("transform");
-                let xfrm = if let (Some(xfrm), Some(xy_xfrm)) = (&orig_xfrm, &xy_xfrm) {
-                    let xfrm = eval_attr(xfrm, context);
-                    Some(format!("{xfrm} {xy_xfrm}"))
-                } else if let Some(xfrm) = orig_xfrm {
-                    Some(xfrm)
-                } else {
-                    xy_xfrm
-                };
-                if let Some(xfrm) = xfrm {
-                    instance_element.set_attr("transform", &xfrm);
-                }
-            }
 
             let group_open = EventList::from(SvgEvent::Start(instance_element));
             let group_close = EventList::from(SvgEvent::End("g".to_string()));

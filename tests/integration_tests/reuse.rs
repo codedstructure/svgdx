@@ -21,21 +21,21 @@ fn test_reuse_simple() {
 fn test_reuse_attr_locals() {
     let input = r##"
 <specs>
- <rect id="square" width="$size" height="$size" xy="$x $y"/>
+ <rect id="square" width="$size" height="$size"/>
 </specs>
 <reuse href="#square" size="10" x="3" y="4"/>
 "##;
-    let expected = r#"<rect x="3" y="4" width="10" height="10" class="square"/>"#;
+    let expected = r#"<rect width="10" height="10" transform="translate(3, 4)" class="square"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     let input = r##"
 <specs>
-  <rect id="square" x="$x" y="$y" width="$size" height="$size"/>
+  <rect id="square" rx="$rx" width="$size" height="$size"/>
 </specs>
-<reuse id="base" href="#square" x="0" y="0" size="10" class="thing"/>
+<reuse id="base" href="#square" rx="2" size="10" class="thing"/>
 "##;
-    let expected = r#"<rect id="base" x="0" y="0" width="10" height="10" class="thing square"/>"#;
+    let expected = r#"<rect id="base" width="10" height="10" rx="2" class="thing square"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -91,8 +91,34 @@ fn test_reuse_group_svg() {
 }
 
 #[test]
-fn test_reuse_transform() {
-    // TODO: once x/y/transform are implemented for non-<g> elements, test those too.
+fn test_reuse_xy_transform() {
+    let input = r##"
+<specs>
+  <rect id="tb" wh="20 10"/>
+</specs>
+<reuse href="#tb" x="123"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    let expected = r#"<rect width="20" height="10" transform="translate(123, 0)" class="tb"/>"#;
+
+    assert_contains!(output, expected);
+
+    let input = r##"
+<specs>
+  <rect id="tb" text="$text" wh="20 10" transform="translate(10)"/>
+</specs>
+<reuse href="#tb" text="thing" y="1" transform="translate(11)"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    let expected1 = r#"<rect width="20" height="10" transform="translate(10) translate(11) translate(0, 1)" class="tb"/>"#;
+    let expected2 = r#"<text x="10" y="5" transform="translate(10) translate(11) translate(0, 1)" class="tb d-tbox">thing</text>"#;
+
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_reuse_group_transform() {
     let input = r##"
 <specs>
 <g id="square">
@@ -126,6 +152,19 @@ fn test_reuse_transform() {
 <reuse id="this" href="#square" size="10"/>
 "##;
     let expected = r#"<g id="this" class="square">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_reuse_symbol() {
+    let input = r##"
+<defs>
+  <symbol id="sym"><circle r="1"/></symbol>
+</defs>
+<reuse href="#sym"/>
+  "##;
+    let expected = r#"<g class="sym"><circle r="1"/></g>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
