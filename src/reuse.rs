@@ -3,8 +3,6 @@ use crate::element::SvgElement;
 use crate::events::{EventList, SvgEvent};
 use crate::expression::eval_attr;
 use crate::transform::{process_events, ElementLike};
-use crate::types::OrderIndex;
-use std::collections::BTreeMap;
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
@@ -36,15 +34,16 @@ impl ElementLike for ReuseElement {
     fn get_element(&self) -> Option<SvgElement> {
         Some(self.0.clone())
     }
+
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+        handle_reuse_element(context, self.0.clone())
+    }
 }
 
-// TODO: this should really be called from ReuseElement::generate_events(),
-// not special-cased from process_seq().
 pub fn handle_reuse_element(
     context: &mut TransformerContext,
     event_element: SvgElement,
-    idx_output: &mut BTreeMap<OrderIndex, EventList>,
-) -> Result<SvgElement> {
+) -> Result<EventList> {
     let elref = event_element
         .get_attr("href")
         .context("reuse element should have an href attribute")?;
@@ -114,7 +113,7 @@ pub fn handle_reuse_element(
         instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
     }
 
-    if instance_element.name == "g" {
+    if !instance_element.is_empty_element() {
         if let Some((start, end)) = instance_element.event_range {
             // opening g element is not included in the processed inner events to avoid
             // infinite recursion...
@@ -127,15 +126,15 @@ pub fn handle_reuse_element(
             context.pop_element();
             context.pop_element();
 
-            let group_open = EventList::from(SvgEvent::Start(instance_element));
-            let group_close = EventList::from(SvgEvent::End("g".to_string()));
-            idx_output.insert(event_element.order_index.with_index(0), group_open);
-            idx_output.insert(event_element.order_index.with_index(1), g_events);
-            idx_output.insert(event_element.order_index.with_index(2), group_close);
+            let mut new_events = EventList::new();
+            let tag_name = instance_element.name.clone();
+            new_events.push(SvgEvent::Start(instance_element));
+            new_events.extend(&g_events);
+            new_events.push(SvgEvent::End(tag_name));
 
-            return Ok(SvgElement::new("phantom", &[]));
+            return Ok(new_events);
         }
     }
 
-    Ok(instance_element)
+    instance_element.to_ell().borrow().generate_events(context)
 }
