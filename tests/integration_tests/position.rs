@@ -324,3 +324,23 @@ fn test_reuse_bbox() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_reuse_specs_bbox() {
+    // Same again but <specs> rather than <def>
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <specs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </specs>
+  <reuse id="b" href="#a"/>
+  <circle xy="#b:h" r="2"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    let expected1 = r#"viewBox="0 0 14 10""#;
+    let expected2 = r#"circle cx="12" cy="5" r="2""#;
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

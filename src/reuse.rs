@@ -115,24 +115,24 @@ pub fn handle_reuse_element(
 
     if !instance_element.is_empty_element() {
         if let Some((start, end)) = instance_element.event_range {
-            // opening g element is not included in the processed inner events to avoid
-            // infinite recursion...
-            let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
-            // ...but we do want to include it for attribute-variable lookups, so push the
-            // referenced element onto the element stack (just while we run process_events)
-            context.push_element(event_element.to_ell());
-            context.push_element(instance_element.to_ell());
-            let g_events = process_events(inner_events, context)?;
-            context.pop_element();
-            context.pop_element();
+            let tag_name = instance_element.name.clone();
 
             let mut new_events = EventList::new();
-            let tag_name = instance_element.name.clone();
             new_events.push(SvgEvent::Start(instance_element));
-            new_events.extend(&g_events);
+            new_events.extend(&EventList::from(context.events.clone()).slice(start + 1, end));
             new_events.push(SvgEvent::End(tag_name));
+            for (idx, ev) in new_events.iter_mut().enumerate() {
+                // Hack: the index of each event is used in by process_seq to update
+                // the resulting BTreeMap, so needs to be different/increasing.
+                // TODO: warning if existing entry is overwritten, and a better way of
+                // doing this.
+                ev.index = idx;
+            }
+            context.push_element(event_element.to_ell());
+            let g_events = process_events(new_events, context);
+            context.pop_element();
 
-            return Ok(new_events);
+            return g_events;
         }
     }
 

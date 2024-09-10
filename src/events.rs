@@ -154,6 +154,10 @@ impl EventList {
         self.events.iter()
     }
 
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut InputEvent> + '_ {
+        self.events.iter_mut()
+    }
+
     pub fn len(&self) -> usize {
         self.events.len()
     }
