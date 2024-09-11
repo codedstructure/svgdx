@@ -154,10 +154,6 @@ impl EventList {
         self.events.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut InputEvent> + '_ {
-        self.events.iter_mut()
-    }
-
     pub fn len(&self) -> usize {
         self.events.len()
     }
@@ -170,6 +166,15 @@ impl EventList {
     pub fn extend(&mut self, other: &EventList) {
         for ev in other.iter() {
             self.push(ev.event.clone());
+        }
+    }
+
+    /// Overwrite all event indices with list position.
+    /// This should be used after creating a new list from various sources which may have
+    /// conflicting (or absent, i.e. all zero) indices.
+    pub fn reindex(&mut self) {
+        for (idx, ev) in self.events.iter_mut().enumerate() {
+            ev.index = idx;
         }
     }
 
