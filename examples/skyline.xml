@@ -1,0 +1,16 @@
+<svg>
+  <config theme="light"/>
+  <specs>
+    <g id="shade">
+      <var sh="{{$target.h / 4}}"/>
+      <path d="M $target@bl l $sh $sh h $target.w l -$sh -$sh z" style="fill:grey; stroke:none"/>
+    </g>
+  </specs>
+
+  <g id="skyline">
+   <loop count="10" loop-var="ii">
+    <rect id="b${ii}" y2="0" x="{{10 * $ii}}" width="10" height="{{randint(4, 50)}}" class="d-fill-lightgrey"/>
+    <reuse href="#shade" target="#b${ii}"/>
+   </loop>
+  </g>
+</svg>

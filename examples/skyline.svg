@@ -1,0 +1,63 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="112mm" height="73mm" viewBox="-5 -55 112 73">
+  <style>
+  <![CDATA[
+    svg { background: #eee8d5; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: #fdf6e3; stroke: #657b83; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: #657b83; }
+    .d-fill-lightgrey:not(text,tspan) { fill: lightgrey; }
+    text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; }
+  ]]>
+  </style>
+  <g id="skyline">
+
+    <rect id="b0" x="0" y="-7" width="10" height="7" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 0 0 l 1.75 1.75 h 10 l -1.75 -1.75 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b1" x="10" y="-50" width="10" height="50" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 10 0 l 12.5 12.5 h 10 l -12.5 -12.5 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b2" x="20" y="-7" width="10" height="7" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 20 0 l 1.75 1.75 h 10 l -1.75 -1.75 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b3" x="30" y="-15" width="10" height="15" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 30 0 l 3.75 3.75 h 10 l -3.75 -3.75 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b4" x="40" y="-15" width="10" height="15" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 40 0 l 3.75 3.75 h 10 l -3.75 -3.75 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b5" x="50" y="-21" width="10" height="21" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 50 0 l 5.25 5.25 h 10 l -5.25 -5.25 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b6" x="60" y="-9" width="10" height="9" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 60 0 l 2.25 2.25 h 10 l -2.25 -2.25 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b7" x="70" y="-35" width="10" height="35" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 70 0 l 8.75 8.75 h 10 l -8.75 -8.75 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b8" x="80" y="-4" width="10" height="4" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 80 0 l 1 1 h 10 l -1 -1 z" style="fill:grey; stroke:none"/>
+    </g>
+
+    <rect id="b9" x="90" y="-5" width="10" height="5" class="d-fill-lightgrey"/>
+    <g class="shade">
+      <path d="M 90 0 l 1.25 1.25 h 10 l -1.25 -1.25 z" style="fill:grey; stroke:none"/>
+    </g>
+   </g>
+</svg>

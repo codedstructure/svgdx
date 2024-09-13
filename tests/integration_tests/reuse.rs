@@ -185,3 +185,24 @@ fn test_reuse_recursive() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_attr_eval() {
+    // Check reuse attributes are evaluated prior to instancing.
+    let input = r##"
+<specs>
+<g id="a"><rect xy="0" wh="10" text="{{$target.w}}"/></g>
+</specs>
+<loop count="3" start="1" loop-var="ii">
+  <rect id="r${ii}" height="2" width="{{$ii * 5}}"/>
+  <reuse href="#a" target="#r${ii}"/>
+</loop>
+"##;
+    let expected1 = r#">5</text>"#;
+    let expected2 = r#">10</text>"#;
+    let expected3 = r#">15</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
