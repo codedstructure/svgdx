@@ -195,3 +195,113 @@ The existing text attributes tend to use the 'separate classes' approach, e.g.
 `class="d-text-bigger d-text-mono"`
 
 Note ergonomics should drive this rather than ease of implementation.
+
+### Auto-style rules - inherited in nested elements?
+
+If a class such as `d-red` is applied to a `<g>` element, should it apply to all the
+contained elements (which don't override it)?
+
+Applying to `.d-red, .d-red *` or similar would do, or even `.d-red g.d-red *`, but
+will this allow override be a more local application of a class?
+
+The following is an example of how this could work. Note that if the second rule of
+each pair is `g.b-xyz *` rather than `.b-xyz *`, the specifity exceeds the bare `b-blue`
+of rect 'd', so that's not feasible. With CSS, being more precise results in increasing
+priority, when it would be nice if these could be independent...
+
+```xml
+<svg>
+  <style>
+    .b-red:not(text), .b-red *:not(text) {fill:red;}
+    .b-blue:not(text), .b-blue *:not(text) {fill:blue;}
+  </style>
+  <rect wh="3" text="a"/>
+  <rect wh="^" xy="^:v 2" class="b-red" text="b"/>
+  <g class="b-red">
+    <rect wh="^" xy="5 0" text="c"/>
+    <rect wh="^" xy="^:v 2" class="b-blue" text="d"/>
+  </g>
+</svg>
+```
+
+Should probably change most of the rules to include the `.class` to be `.class, .class *`.
+
+### Local attribute ordering.
+
+Consider the following two use-cases of local attributes:
+
+* **group / scope** level - here the _closer_ the definition of the variable is to the actual
+  instance, the higher the priority it has.
+
+* **reuse** scope - here the _further away_ the definition of the variable is, the higher
+  priority it has. Closer definitions may act as defaults, but they can always be overridden
+  by the "call site" of the instancing.
+
+Both these cases assume that there are multiple levels of hierarchy, i.e. nested `<g>` elements
+or `<reuse>` elements which refer to other `<reuse>` elements. In either case, the actually
+'instantiation' place is the most important and most local, but the cases differ in where that
+is relative to the actual elements which represent rendered shapes.
+
+The group scope approach works fine as is, but the reuse scope only works 'one level deep' -
+if a top-level `<reuse>` defines an attribute-variable, this will be used in the final render.
+
+But 'multi-level' reuse doesn't currently follow this naturally, i.e. the following doesn't
+work, when it seems a reasonable use-case to have 'defaults' (and potentially multiple layers
+of specialisation):
+
+```xml
+<specs>
+  <g id="a"><rect xy="0" wh="5" text="$t"/></g>
+  <reuse id="t1" href="#a" t="1"/>
+  <reuse id="t2" href="#a" t="2"/>
+  <reuse id="t3" href="#a" t="3"/>
+</specs>
+<reuse href="#t2"/>
+
+<!-- ideally this would render the text '2', but currently just renders '$t' -->
+```
+
+### Variable lookup in expressions
+
+When should variable lookup happen?
+
+It seems useful to have element references which may be parameterized by a variable,
+e.g. `xy="$el:h"`, and then define `el="#blob"` elsewhere. This is catered for fine;
+prior to any positioning, attributes are evaluated, and at that point it will be
+replaced with `xy="#blob:h"`, which later feeds in to positioning logic.
+
+Note this implies a further sequencing operation: 'compound' attributes such as `xy`
+already have an implicit 'splitting' action, such that `xy` will be split into `x`, `y`
+attribute pairs if there isn't a relative position (e.g. ':h') involved. But this is
+still reasonable: first expand variables, then check for relative positioning, then
+finally split (as appropriate) into different target attributes.
+
+Where this gets more complex is when a variable defines another variable.
+
+```xml
+<var v1="1" v2="2"/>
+<var select="v1"/>
+<var target="$$select"/>
+<text text="$target"/>
+```
+
+### Empty entries in variable lists
+
+What should the following return?
+
+```xml
+<text text="{{count(,,,,)}}"/>
+```
+
+There are three reasonable alternatives:
+
+* It should return 0, having first filtered out any empty entries (in `expr_list()` or
+  similar).
+* It should return 5; a comma implies entries on either side, so should be n+1 where n
+  is the number of commas present. There should probably be an additional 'Null' variant
+  of `ExprValue` to account for this.
+* It is an error, and therefore is unchanged. This is the current behaviour. This aligns
+  with expressions (including all current functions) taking only numeric values.
+
+This should probably (only) be revisited once `ExprValue` is extended to take string values
+(both lists and single values).

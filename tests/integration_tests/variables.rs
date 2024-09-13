@@ -63,6 +63,45 @@ fn test_var_nested() {
     assert_contains!(output, expected4);
 }
 
+/// Test the inner-most variable definition takes precedence
+#[test]
+fn test_var_priority() {
+    let input = r##"
+<g z="1">
+ <g z="2">
+  <g z="3">
+   <text text="$z"/>
+  </g>
+ </g>
+</g>
+"##;
+    let expected = r#">3</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+/// check that a variable can contain the name of another variable to be used
+#[test]
+fn test_var_indirect() {
+    let input = r##"
+<var v1="37" v2="42"/>
+<var select="v1"/>
+<text text="$$select"/>
+"##;
+    let expected = r#">37</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<var v1="37" v2="42"/>
+<var select="v2"/>
+<text text="$$select"/>
+"##;
+    let expected = r#">42</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
 #[test]
 fn test_var_reuse() {
     let input = r##"
@@ -77,6 +116,21 @@ fn test_var_reuse() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_var_reuse_recursive() {
+    let input = r##"
+<specs>
+ <text id="txt" text="$k"/>
+ <reuse id="a" href="#txt" k="3"/>
+ <reuse id="b" href="#a" k="4"/>
+</specs>
+<reuse id="c" href="#b" k="5"/>
+"##;
+    let expected = r#">5</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
 }
 
 #[test]

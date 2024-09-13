@@ -168,3 +168,20 @@ fn test_reuse_symbol() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_recursive() {
+    let input = r##"
+<specs>
+<g id="a"><rect xy="0" wh="5" text="$t"/></g>
+<reuse id="b" href="#a" t="2"/>
+<reuse id="c" href="#b" t="3"/>
+<reuse id="d" href="#c" t="4"/>
+</specs>
+<reuse href="#d" t="5"/>
+"##;
+    let expected = r#"<g class="d c b a"><rect x="0" y="0" width="5" height="5"/>
+<text x="2.5" y="2.5" class="d-tbox">5</text></g>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

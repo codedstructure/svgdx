@@ -527,11 +527,12 @@ fn eval_str(value: &str, context: &impl ContextView) -> String {
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
 pub fn eval_attr(value: &str, context: &impl ContextView) -> String {
-    // Step 1: Evaluate arithmetic expressions. All variables referenced within
-    // {{...}} blocks are assumed to resolve to a numeric expression.
-    let value = eval_expr(value, context);
-    // Step 2: Replace other variables (e.g. for string values)
-    eval_vars(&value, context)
+    // Step 1: Replace variables (which may contain element references, for example).
+    // Note this is only a single pass, so variables could potentially reference other
+    // variables which are resolved in eval_expr - provided they hold numeric values.
+    let value = eval_vars(value, context);
+    // Step 2: Evaluate arithmetic expressions.
+    eval_expr(&value, context)
 }
 
 /// Evaluate a condition expression, returning true iff the result is non-zero
@@ -1197,7 +1198,7 @@ mod tests {
 
     #[test]
     fn test_eval_head_tail() {
-        let ctx = TestContext::with_vars(&[("blank", "")]);
+        let ctx = TestContext::new();
         for (expr, expected) in [
             ("{{head(1, 2, 3, 4, 5)}}", "1"),
             ("{{head()}}", ""),
@@ -1213,21 +1214,41 @@ mod tests {
             ("{{empty(1, 2, 3)}}", "0"),
             ("{{empty()}}", "1"),
             ("{{empty(tail(1))}}", "1"),
-            ("{{empty($blank)}}", "1"),
-            ("{{head($blank)}}", ""),
-            ("{{tail($blank)}}", ""),
-            ("{{head($blank, 4)}}", "4"),
-            ("{{head(4, $blank)}}", "4"),
             ("{{count()}}", "0"),
             ("{{count(1)}}", "1"),
             ("{{count(1, 2, 3, 4, 5)}}", "5"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+        }
+    }
+
+    #[test]
+    fn test_eval_var_indirect() {
+        // A single level of variable lookup is done prior to evaluation,
+        // which also performs a variable lookup which must result in a numeric value
+        // or the empty string.
+        let ctx = TestContext::with_vars(&[
+            ("blank", "$null"),
+            ("null", ""),
+            ("one", "1"),
+            ("two", "2"),
+            ("choice", "$two"),
+        ]);
+        for (expr, expected) in [
+            ("{{empty($blank)}}", "1"),
+            ("{{head($blank)}}", ""),
+            ("{{tail($blank)}}", ""),
+            ("{{head(4, $blank)}}", "4"),
+            ("{{head($blank, 4)}}", "4"),
             ("{{count($blank)}}", "0"),
             ("{{count($blank, $blank)}}", "0"),
             ("{{count($blank, 4)}}", "1"),
             ("{{count(4, $blank)}}", "1"),
             ("{{count($blank, 4, $blank)}}", "1"),
+            ("{{$choice}}", "2"),
+            ("{{$choice + 1}}", "3"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected);
+            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
         }
     }
 }
