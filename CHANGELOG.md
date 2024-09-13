@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: new fill pattern classes `d-grid`, `d-grid5`, `d-grid10`. These render an
+  axis-aligned grid of fine lines in the themes default stroke colour at the appropriate
+  scale (1, 5, or 10 user-coordinate units), and can be useful when building a diagram.
+  See [examples/grid.xml](examples/grid.xml).
+
 ## [0.12.0 - 2024-09-05]
 
 - Added: `if` element, used to selectively include a fragment. Previously this could
