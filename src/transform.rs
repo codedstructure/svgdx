@@ -11,7 +11,7 @@ use crate::loop_el::LoopElement;
 use crate::reuse::ReuseElement;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::io::{BufRead, Write};
 use std::rc::Rc;
 
@@ -300,7 +300,7 @@ impl ElementLike for VarElement {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
-        let mut new_vars = HashMap::new();
+        let mut new_vars = Vec::new();
         for (key, value) in element.attrs.clone() {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
@@ -315,10 +315,12 @@ impl ElementLike for VarElement {
                         context.config.var_limit
                     );
                 }
-                new_vars.insert(key, value);
+                new_vars.push((key, value));
             }
         }
-        context.variables.extend(new_vars);
+        for (k, v) in new_vars.into_iter() {
+            context.set_var(&k, &v);
+        }
         Ok(())
     }
 }
@@ -843,7 +845,7 @@ impl Transformer {
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
                     Event::Start(BytesStart::new("style")),
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::CData(BytesCData::new(&format!(
+                    Event::CData(BytesCData::new(format!(
                         "\n{}\n{}",
                         indent_all(auto_styles, indent + 2).join("\n"),
                         " ".repeat(indent)

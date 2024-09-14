@@ -23,8 +23,8 @@ pub struct TransformerContext {
     element_stack: Vec<Rc<RefCell<dyn ElementLike>>>,
     // The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
-    // Current variable values
-    pub variables: HashMap<String, String>,
+    // Stack of scoped variable mappings
+    var_stack: Vec<HashMap<String, String>>,
     // Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
     // Is this a 'real' SVG doc, or just a fragment?
@@ -46,7 +46,7 @@ impl Default for TransformerContext {
             original_map: HashMap::new(),
             element_stack: Vec::new(),
             prev_element: None,
-            variables: HashMap::new(),
+            var_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             real_svg: false,
             in_specs: false,
@@ -87,16 +87,12 @@ impl VariableMap for TransformerContext {
         // so we can access variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
         // requires that when evaluating `x="$x"` we don't look up `x` in the
         // `rect` element itself.
-        for element_scope in self.element_stack.iter().rev() {
-            if let Some(Some(value)) = element_scope
-                .borrow()
-                .get_element()
-                .map(|el| el.get_attr(name))
-            {
+        for var_scope in self.var_stack.iter().rev() {
+            if let Some(value) = var_scope.get(name) {
                 return Some(value.to_string());
             }
         }
-        return self.variables.get(name).cloned();
+        None
     }
 
     fn get_rng(&self) -> &RefCell<Pcg32> {
@@ -123,16 +119,29 @@ impl TransformerContext {
         self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }
 
-    #[cfg(test)]
     pub fn set_var(&mut self, name: &str, value: &str) {
-        self.variables.insert(name.into(), value.into());
+        if let Some(scope) = self.var_stack.last_mut() {
+            // There's no scope yet; create one
+            scope.insert(name.into(), value.into());
+        } else {
+            let mut scope = HashMap::new();
+            scope.insert(name.into(), value.into());
+            self.var_stack.push(scope);
+        }
     }
 
     pub fn push_element(&mut self, ell: Rc<RefCell<dyn ElementLike>>) {
+        let attrs = if let Some(element) = ell.borrow().get_element() {
+            element.get_attrs()
+        } else {
+            HashMap::new()
+        };
         self.element_stack.push(ell);
+        self.var_stack.push(attrs);
     }
 
     pub fn pop_element(&mut self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+        self.var_stack.pop();
         self.element_stack.pop()
     }
 

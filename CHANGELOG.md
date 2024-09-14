@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: variables are now locally scoped to the nesting level they are defined in.
+  Previously a `<var n="2"/>` inside a `<g>` element would set it permanently for the
+  rest of the document (until later overridden, either by an attribute or another `var`
+  element). Now variable definitions cease once their 'scope' finishes, aligning `var`
+  definitions and attribute values.
+
 - Added: new fill pattern classes `d-grid`, `d-grid5`, `d-grid10`. These render an
   axis-aligned grid of fine lines in the themes default stroke colour at the appropriate
   scale (1, 5, or 10 user-coordinate units), and can be useful when building a diagram.
