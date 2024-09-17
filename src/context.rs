@@ -145,6 +145,24 @@ impl TransformerContext {
         self.element_stack.pop()
     }
 
+    pub fn get_closure(&self) -> HashMap<String, String> {
+        let mut closure = HashMap::new();
+        for var_scope in &self.var_stack {
+            for (k, v) in var_scope {
+                closure.insert(k.clone(), v.clone());
+            }
+        }
+        closure
+    }
+
+    pub fn set_closure(&mut self, c: HashMap<String, String>) {
+        self.var_stack.push(c.clone());
+    }
+
+    pub fn pop_closure(&mut self) {
+        self.var_stack.pop();
+    }
+
     pub fn get_top_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
         self.element_stack.last().cloned()
     }

@@ -471,6 +471,11 @@ fn process_seq(
                 if is_empty {
                     let ell_ref = event_element.to_ell();
                     if context.loop_depth == 0 && !context.in_specs {
+                        let mut reset_closure = false;
+                        if let Some(closure) = &input_ev.closure {
+                            context.set_closure(closure.clone());
+                            reset_closure = true;
+                        }
                         // TODO: for group bbox extension, we need element to have 'resolved'
                         // attributes, if possible. This is done in generate_events, but only
                         // to a local cloned object, so it doesn't get reflected here. Ideally
@@ -481,6 +486,9 @@ fn process_seq(
                             ok = el.resolve_position(context).is_ok();
                         }
                         let events = ell_ref.borrow_mut().generate_events(context);
+                        if reset_closure {
+                            context.pop_closure();
+                        }
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
@@ -490,7 +498,9 @@ fn process_seq(
                             ok = false;
                         }
                         if !ok {
-                            remain.push(input_ev.clone());
+                            let mut defer_ev = input_ev.clone();
+                            defer_ev.closure = Some(context.get_closure());
+                            remain.push(defer_ev);
                         }
                     }
 
@@ -535,7 +545,16 @@ fn process_seq(
                     }
 
                     let mut events = if !context.in_specs && context.loop_depth == 0 {
-                        ell.borrow_mut().generate_events(context)
+                        let mut reset_closure = false;
+                        if let Some(closure) = &input_ev.closure {
+                            context.set_closure(closure.clone());
+                            reset_closure = true;
+                        }
+                        let events = ell.borrow_mut().generate_events(context);
+                        if reset_closure {
+                            context.pop_closure();
+                        }
+                        events
                     } else {
                         Ok(EventList::new())
                     };
@@ -565,7 +584,9 @@ fn process_seq(
                         // (though potential false-positive bail on other errors inside loops...)
                         bail!("Error processing element: {events:?}");
                     } else {
-                        remain.push(input_ev.clone());
+                        let mut defer_ev = input_ev.clone();
+                        defer_ev.closure = Some(context.get_closure());
+                        remain.push(defer_ev);
                     }
                     last_element = Some(event_element);
                 }

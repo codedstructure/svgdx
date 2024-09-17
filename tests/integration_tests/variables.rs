@@ -194,3 +194,32 @@ fn test_var_scopes() {
     assert_contains!(output, expected4);
     assert_contains!(output, expected5);
 }
+
+#[test]
+fn test_var_closure() {
+    // Check that deferred elements carry closure info
+    let input = r##"
+<svg>
+<var k="word"/>
+<rect xy="#later:h" wh="10" text="$k"/>
+<rect id="later" xy="0" wh="10"/>
+</svg>
+"##;
+    let expected = r#">word</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // Check closures contain info which can be evaluated
+    let input = r##"
+<svg>
+  <g>
+    <var k="12"/>
+    <rect xy="#later:h" wh="10" text="{{$k / 3}}"/>
+  </g>
+  <rect id="later" xy="0" wh="10"/>
+</svg>
+"##;
+    let expected = r#">4</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
