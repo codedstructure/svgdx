@@ -11,6 +11,7 @@ use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList,
 use anyhow::{bail, Context, Result};
 use core::fmt::Display;
 use lazy_regex::{regex, Captures};
+use std::collections::HashMap;
 use std::str::FromStr;
 
 #[derive(Debug, Clone)]
@@ -416,6 +417,10 @@ impl SvgElement {
 
     pub fn set_attr(&mut self, key: &str, value: &str) {
         self.attrs.insert(key, value);
+    }
+
+    pub fn get_attrs(&self) -> HashMap<String, String> {
+        self.attrs.to_vec().into_iter().collect()
     }
 
     /// Resolve any expressions in attributes. Note attributes are unchanged on failure.

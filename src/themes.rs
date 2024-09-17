@@ -260,6 +260,41 @@ r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate
     ));
 }
 
+// TODO: would be good to parameterise the various d-grid* patterns, but the current
+// generic interface just has stroke colour passed in.
+fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str) {
+    tb.add_style(".d-grid:not(text,tspan) {fill: url(#grid)}");
+    tb.add_defs(&format!(
+        r#"<pattern id="grid" x="0" y="0" width="1" height="1" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
+  <line x1="0" y1="0" x2="0" y2="1" style="stroke-width: 0.1; stroke: {t_stroke}"/>
+</pattern>"#,
+    ));
+}
+
+fn d_grid5(tb: &mut ThemeBuilder, t_stroke: &str) {
+    tb.add_style(".d-grid5:not(text,tspan) {fill: url(#grid5)}");
+    tb.add_defs(&format!(
+        r#"<pattern id="grid5" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <line x1="0" y1="0" x2="5" y2="0" style="stroke-width: 0.2; stroke: {t_stroke}"/>
+  <line x1="0" y1="0" x2="0" y2="5" style="stroke-width: 0.2; stroke: {t_stroke}"/>
+</pattern>"#,
+    ));
+}
+
+fn d_grid10(tb: &mut ThemeBuilder, t_stroke: &str) {
+    tb.add_style(".d-grid10:not(text,tspan) {fill: url(#grid10)}");
+    tb.add_defs(&format!(
+        r#"<pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none"/>
+  <line x1="0" y1="0" x2="10" y2="0" style="stroke-width: 0.4; stroke: {t_stroke}"/>
+  <line x1="0" y1="0" x2="0" y2="10" style="stroke-width: 0.4; stroke: {t_stroke}"/>
+</pattern>"#,
+    ));
+}
+
 fn d_softshadow(tb: &mut ThemeBuilder, _: &str) {
     tb.add_style(".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }");
     tb.add_defs(
@@ -320,6 +355,9 @@ trait Theme: Clone {
             ("d-stipple", &d_stipple as &Tfn),
             ("d-hatch", &d_hatch as &Tfn),
             ("d-crosshatch", &d_crosshatch as &Tfn),
+            ("d-grid", &d_grid as &Tfn),
+            ("d-grid5", &d_grid5 as &Tfn),
+            ("d-grid10", &d_grid10 as &Tfn),
         ] {
             if tb.has_class(class) {
                 build_fn(tb, &self.default_stroke());

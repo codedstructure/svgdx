@@ -219,3 +219,61 @@ fn test_var_limit() {
     let output = transform_str_default(input);
     assert!(output.is_err());
 }
+
+#[test]
+fn test_var_scopes() {
+    // Check that variables are scoped to the element they're defined within
+    let input = r#"
+<var k="1"/>
+<g k="2">
+  <text text="1:$k"/>
+  <g k="3">
+    <text text="2:$k"/>
+    <var k="4"/>
+    <text text="3:$k"/>
+  </g>
+  <text text="4:$k"/>
+</g>
+<text text="5:$k"/>
+"#;
+    let expected1 = r#">1:2</text>"#;
+    let expected2 = r#">2:3</text>"#;
+    let expected3 = r#">3:4</text>"#;
+    let expected4 = r#">4:2</text>"#;
+    let expected5 = r#">5:1</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+    assert_contains!(output, expected4);
+    assert_contains!(output, expected5);
+}
+
+#[test]
+fn test_var_closure() {
+    // Check that deferred elements carry closure info
+    let input = r##"
+<svg>
+<var k="word"/>
+<rect xy="#later:h" wh="10" text="$k"/>
+<rect id="later" xy="0" wh="10"/>
+</svg>
+"##;
+    let expected = r#">word</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // Check closures contain info which can be evaluated
+    let input = r##"
+<svg>
+  <g>
+    <var k="12"/>
+    <rect xy="#later:h" wh="10" text="{{$k / 3}}"/>
+  </g>
+  <rect id="later" xy="0" wh="10"/>
+</svg>
+"##;
+    let expected = r#">4</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

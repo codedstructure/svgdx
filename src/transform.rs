@@ -11,7 +11,7 @@ use crate::loop_el::LoopElement;
 use crate::reuse::ReuseElement;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::io::{BufRead, Write};
 use std::rc::Rc;
 
@@ -300,7 +300,7 @@ impl ElementLike for VarElement {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
-        let mut new_vars = HashMap::new();
+        let mut new_vars = Vec::new();
         for (key, value) in element.attrs.clone() {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
@@ -315,10 +315,12 @@ impl ElementLike for VarElement {
                         context.config.var_limit
                     );
                 }
-                new_vars.insert(key, value);
+                new_vars.push((key, value));
             }
         }
-        context.variables.extend(new_vars);
+        for (k, v) in new_vars.into_iter() {
+            context.set_var(&k, &v);
+        }
         Ok(())
     }
 }
@@ -452,6 +454,11 @@ fn process_seq(
                 if is_empty {
                     let ell_ref = event_element.to_ell();
                     if context.loop_depth == 0 && !context.in_specs {
+                        let mut reset_closure = false;
+                        if let Some(closure) = &input_ev.closure {
+                            context.set_closure(closure.clone());
+                            reset_closure = true;
+                        }
                         // TODO: for group bbox extension, we need element to have 'resolved'
                         // attributes, if possible. This is done in generate_events, but only
                         // to a local cloned object, so it doesn't get reflected here. Ideally
@@ -462,6 +469,9 @@ fn process_seq(
                             ok = el.resolve_position(context).is_ok();
                         }
                         let events = ell_ref.borrow_mut().generate_events(context);
+                        if reset_closure {
+                            context.pop_closure();
+                        }
                         if let Ok(ref events) = events {
                             if !events.is_empty() {
                                 ev_events.extend(events);
@@ -471,7 +481,9 @@ fn process_seq(
                             ok = false;
                         }
                         if !ok {
-                            remain.push(input_ev.clone());
+                            let mut defer_ev = input_ev.clone();
+                            defer_ev.closure = Some(context.get_closure());
+                            remain.push(defer_ev);
                         }
                     }
 
@@ -510,7 +522,16 @@ fn process_seq(
                     }
 
                     let mut events = if !context.in_specs && context.loop_depth == 0 {
-                        ell.borrow_mut().generate_events(context)
+                        let mut reset_closure = false;
+                        if let Some(closure) = &input_ev.closure {
+                            context.set_closure(closure.clone());
+                            reset_closure = true;
+                        }
+                        let events = ell.borrow_mut().generate_events(context);
+                        if reset_closure {
+                            context.pop_closure();
+                        }
+                        events
                     } else {
                         Ok(EventList::new())
                     };
@@ -540,7 +561,9 @@ fn process_seq(
                         // (though potential false-positive bail on other errors inside loops...)
                         bail!("Error processing element: {events:?}");
                     } else {
-                        remain.push(input_ev.clone());
+                        let mut defer_ev = input_ev.clone();
+                        defer_ev.closure = Some(context.get_closure());
+                        remain.push(defer_ev);
                     }
                     last_element = Some(event_element);
                 }
@@ -820,7 +843,7 @@ impl Transformer {
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
                     Event::Start(BytesStart::new("style")),
                     Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::CData(BytesCData::new(&format!(
+                    Event::CData(BytesCData::new(format!(
                         "\n{}\n{}",
                         indent_all(auto_styles, indent + 2).join("\n"),
                         " ".repeat(indent)

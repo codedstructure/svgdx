@@ -305,3 +305,25 @@ There are three reasonable alternatives:
 
 This should probably (only) be revisited once `ExprValue` is extended to take string values
 (both lists and single values).
+
+### Variable types: const and global
+
+Variables are 'local' to the scope they are defined (through attributes on a container
+element) or set (via the `<var>` element). Once any nested element closes, the variable
+values set in that scope disappear / revert to any previously set values.
+
+This is probably the expected behaviour and seems a sensible default.
+
+However there may be cases where 'global' variables which ignore scope are useful. One
+example would be to count the number of times a particular fragment is `reuse`d; this
+could be done with something along the lines of `<global reuse_count="{{$reuse_count + 1}}"/>`
+
+Whether `global` is the right element name, or it should be done through some other
+convention (e.g. variables beginning with a certain character?) is an open question.
+
+A separate use-case would be for 'constant' values, where they are frozen when first set
+(and possibly generate errors if a subsequent set - at least to a different value - is
+attempted).
+
+This could be useful for 'constants' such as $PI, $SQRT2 and similar, and might be implemented
+using something like `<const PI="3.1415927"/>`.

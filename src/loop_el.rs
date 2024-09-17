@@ -109,9 +109,7 @@ impl ElementLike for LoopElement {
                 }
 
                 if !loop_var_name.is_empty() {
-                    context
-                        .variables
-                        .insert(loop_var_name.clone(), loop_var_value.to_string());
+                    context.set_var(&loop_var_name, &loop_var_value.to_string());
                 }
 
                 gen_events.extend(&process_events(inner_events.clone(), context)?);

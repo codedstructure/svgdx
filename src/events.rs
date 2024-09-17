@@ -1,5 +1,6 @@
 use crate::element::SvgElement;
 
+use std::collections::HashMap;
 use std::io::{BufRead, Write};
 
 use lazy_regex::regex;
@@ -23,6 +24,7 @@ pub struct InputEvent {
     pub index: usize,
     pub line: usize,
     pub indent: usize,
+    pub closure: Option<HashMap<String, String>>,
 }
 
 impl Clone for InputEvent {
@@ -32,6 +34,7 @@ impl Clone for InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
+            closure: self.closure.clone(),
         }
     }
 }
@@ -43,6 +46,7 @@ impl InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
+            closure: self.closure,
         }
     }
 }
@@ -66,6 +70,7 @@ impl From<Event<'_>> for EventList {
                 index: 0,
                 line: 0,
                 indent: 0,
+                closure: None,
             }],
         }
     }
@@ -93,6 +98,7 @@ impl From<Vec<InputEvent>> for EventList {
                     index: v.index,
                     line: v.line,
                     indent: v.indent,
+                    closure: v.closure.clone(),
                 })
                 .collect(),
         }
@@ -109,6 +115,7 @@ impl From<Vec<Event<'_>>> for EventList {
                     index: 0,
                     line: 0,
                     indent: 0,
+                    closure: None,
                 })
                 .collect(),
         }
@@ -131,6 +138,7 @@ impl From<Event<'_>> for InputEvent {
             index: 0,
             line: 0,
             indent: 0,
+            closure: None,
         }
     }
 }
@@ -206,6 +214,7 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
+                        closure: None,
                     });
                 }
                 Ok(e) => events.push(InputEvent {
@@ -213,6 +222,7 @@ impl EventList {
                     index,
                     line: line_count,
                     indent,
+                    closure: None,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             };
@@ -251,6 +261,7 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
+                        closure: None,
                     });
                 }
                 Ok(e) => events.push(InputEvent {
@@ -258,6 +269,7 @@ impl EventList {
                     index,
                     line: line_count,
                     indent,
+                    closure: None,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
             }
