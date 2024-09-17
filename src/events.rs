@@ -172,17 +172,8 @@ impl EventList {
     }
 
     pub fn extend(&mut self, other: &EventList) {
-        for ev in other.iter() {
-            self.push(ev.event.clone());
-        }
-    }
-
-    /// Overwrite all event indices with list position.
-    /// This should be used after creating a new list from various sources which may have
-    /// conflicting (or absent, i.e. all zero) indices.
-    pub fn reindex(&mut self) {
-        for (idx, ev) in self.events.iter_mut().enumerate() {
-            ev.index = idx;
+        for ev in other.iter().cloned() {
+            self.events.push(ev);
         }
     }
 

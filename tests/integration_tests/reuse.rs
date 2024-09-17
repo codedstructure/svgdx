@@ -1,4 +1,6 @@
-use assertables::{assert_contains, assert_contains_as_result};
+use assertables::{
+    assert_contains, assert_contains_as_result, assert_not_contains, assert_not_contains_as_result,
+};
 use svgdx::transform_str_default;
 
 #[test]
@@ -205,4 +207,31 @@ fn test_reuse_attr_eval() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
     assert_contains!(output, expected3);
+}
+
+#[test]
+fn test_reuse_if() {
+    // Check reuse target containing 'if' works
+    let base_xml = r##"
+<specs>
+<g id="a">
+ <if test="eq($sel, 1)"><text text="one"/></if>
+ <if test="eq($sel, 2)"><text text="two"/></if>
+</g>
+</specs>
+"##
+    .to_string();
+    let input = base_xml.clone() + r##"<reuse href="#a" sel="1"/>"##;
+    let expected = r#">one</text>"#;
+    let unexpected = r#">two</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+    assert_not_contains!(output, unexpected);
+
+    let input = base_xml + r##"<reuse href="#a" sel="2"/>"##;
+    let expected = r#">two</text>"#;
+    let unexpected = r#">one</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+    assert_not_contains!(output, unexpected);
 }

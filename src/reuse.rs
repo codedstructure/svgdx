@@ -1,6 +1,6 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
-use crate::events::{EventList, SvgEvent};
+use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::eval_attr;
 use crate::transform::{process_events, ElementLike};
 
@@ -119,12 +119,13 @@ impl ElementLike for ReuseElement {
             // so we create a new list including that and process it.
             let mut new_events = EventList::new();
             let tag_name = instance_element.name.clone();
-            new_events.push(SvgEvent::Start(instance_element));
+            let mut start_ev = InputEvent::from(SvgEvent::Start(instance_element));
+            start_ev.index = start;
+            new_events.push(start_ev);
             new_events.extend(&EventList::from(context.events.clone()).slice(start + 1, end));
-            new_events.push(SvgEvent::End(tag_name));
-            // the newly generated events may have repeating indices (e.g. 0), which this fixes
-            new_events.reindex();
-
+            let mut end_ev = InputEvent::from(SvgEvent::End(tag_name));
+            end_ev.index = end;
+            new_events.push(end_ev);
             process_events(new_events, context)
         } else {
             instance_element.to_ell().borrow().generate_events(context)
