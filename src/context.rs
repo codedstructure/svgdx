@@ -3,6 +3,8 @@ use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::ElementLike;
+use crate::transform_attr::TransformAttr;
+use crate::types::strp;
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -83,19 +85,40 @@ impl ElementMap for TransformerContext {
     }
 
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
-        if el.name == "use" || el.name == "reuse" {
+        let mut el_bbox = if el.name == "use" || el.name == "reuse" {
             // use and reuse elements reference another element - get the bbox of the target
+            // (which could be another (re)use element)
             if let Some(target) = el
                 .get_attr("href")
                 .and_then(|href| href.strip_prefix("#").map(|href| href.to_string()))
                 .and_then(|id| self.get_element(&id))
             {
-                return self.get_element_bbox(target);
+                self.get_element_bbox(target)?
             } else {
                 bail!("Could not determine bbox for element: {}", el);
             }
+        } else {
+            el.bbox()?
+        };
+        if el.name == "use" || el.name == "reuse" {
+            let translate_x = el.get_attr("x").map(|x| eval_attr(&x, self));
+            let translate_y = el.get_attr("y").map(|y| eval_attr(&y, self));
+            if translate_x.is_some() || translate_y.is_some() {
+                if let Some(ref mut bbox) = &mut el_bbox {
+                    el_bbox = Some(bbox.translated(
+                        translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
+                        translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
+                    ));
+                }
+            }
         }
-        el.bbox()
+        if let Some(transform) = el.get_attr("transform") {
+            let transform: TransformAttr = transform.parse()?;
+            if let Some(ref mut bbox) = &mut el_bbox {
+                el_bbox = Some(transform.apply(bbox));
+            }
+        }
+        Ok(el_bbox)
     }
 }
 

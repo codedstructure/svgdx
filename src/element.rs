@@ -174,7 +174,7 @@ impl SvgElement {
                 },
             ) {
                 // replace with rendered connection element
-                *self = conn.render()?.without_attr("edge-type");
+                *self = conn.render(ctx)?.without_attr("edge-type");
             } else {
                 bail!("Cannot create connector {self}");
             }

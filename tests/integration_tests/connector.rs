@@ -186,3 +186,60 @@ fn test_connector_relpos() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_rect);
 }
+
+#[test]
+fn test_connector_reuse() {
+    let input = r##"
+<specs>
+  <rect id="tt" wh="10"/>
+</specs>
+<reuse id="a" href="#tt" x="10" y="0"/>
+<reuse id="b" href="#tt" x="10" y="30"/>
+<line start="#a" end="#b"/>
+"##;
+    let expected = r#"<line x1="15" y1="10" x2="15" y2="30"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // And with explicit locspecs
+    let input = r##"
+<specs>
+  <rect id="tt" wh="10"/>
+</specs>
+<reuse id="a" href="#tt" x="10" y="0"/>
+<reuse id="b" href="#tt" x="10" y="30"/>
+<line start="#a@tl" end="#b@br"/>
+"##;
+    let expected = r#"<line x1="10" y1="0" x2="20" y2="40"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_connector_use() {
+    // Same as test_connector_reuse, but with `<use>`
+    let input = r##"
+<defs>
+  <rect id="tt" wh="10"/>
+</defs>
+<use id="a" href="#tt" x="10" y="0"/>
+<use id="b" href="#tt" x="10" y="30"/>
+<line start="#a" end="#b"/>
+"##;
+    let expected = r#"<line x1="15" y1="10" x2="15" y2="30"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // And with explicit locspecs
+    let input = r##"
+<defs>
+  <rect id="tt" wh="10"/>
+</defs>
+<use id="a" href="#tt" x="10" y="0"/>
+<use id="b" href="#tt" x="10" y="30"/>
+<line start="#a@tr" end="#b@bl"/>
+"##;
+    let expected = r#"<line x1="20" y1="0" x2="10" y2="40"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

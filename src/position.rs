@@ -371,15 +371,25 @@ impl Length {
     }
 }
 
-/// Parse a ratio (float or %age) to an f32
-/// Note this deliberately does not clamp to 0..1
 pub fn strp_length(s: &str) -> anyhow::Result<Length> {
-    if let Some(s) = s.strip_suffix('%') {
-        Ok(Length::Ratio(strp(s)? * 0.01))
-    } else {
-        Ok(Length::Absolute(strp(s)?))
+    s.parse::<Length>()
+}
+
+impl FromStr for Length {
+    type Err = anyhow::Error;
+
+    /// Parse a ratio (float or %age) to an f32
+    /// Note this deliberately does not clamp to 0..1
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let value = value.trim();
+        if let Some(pc) = value.strip_suffix('%') {
+            Ok(Length::Ratio(strp(pc)? * 0.01))
+        } else {
+            Ok(Length::Absolute(strp(value)?))
+        }
     }
 }
+
 /// `DirSpec` defines a location relative to an element's `BoundingBox`
 #[derive(Clone, Copy, Debug)]
 pub enum DirSpec {
@@ -606,6 +616,18 @@ impl BoundingBox {
         }
     }
 
+    pub fn get_point(&self, s: &str) -> Result<(f32, f32)> {
+        if let Some((es, ls)) = s.split_once(':') {
+            let es = es.parse::<EdgeSpec>()?;
+            let ls = ls.parse::<Length>()?;
+            Ok(self.edgespec(es, ls))
+        } else if let Ok(ls) = s.parse::<LocSpec>() {
+            Ok(self.locspec(ls))
+        } else {
+            bail!("Invalid refspec {s}")
+        }
+    }
+
     pub fn union(bb_iter: impl IntoIterator<Item = Self>) -> Option<Self> {
         let bb_iter = bb_iter.into_iter();
         bb_iter.reduce(|bb1, bb2| bb1.combine(&bb2))
@@ -696,6 +718,15 @@ impl BoundingBox {
             y2: self.y2 - trbl.bottom.evaluate(base),
         };
         self
+    }
+
+    pub fn translated(&self, dx: f32, dy: f32) -> Self {
+        Self {
+            x1: self.x1 + dx,
+            y1: self.y1 + dy,
+            x2: self.x2 + dx,
+            y2: self.y2 + dy,
+        }
     }
 
     pub fn width(&self) -> f32 {

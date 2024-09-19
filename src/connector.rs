@@ -68,18 +68,26 @@ pub struct Connector {
     offset: Option<Length>,
 }
 
-fn closest_loc(this: &SvgElement, point: (f32, f32), conn_type: ConnectionType) -> Result<String> {
+fn closest_loc(
+    this: &SvgElement,
+    point: (f32, f32),
+    conn_type: ConnectionType,
+    context: &impl ElementMap,
+) -> Result<String> {
     let mut min_dist_sq = f32::MAX;
     let mut min_loc = "c";
 
+    let this_bb = context
+        .get_element_bbox(this)?
+        .context("no bbox for element")?;
+
     for loc in edge_locations(this, conn_type) {
-        let this_coord = this.coord(loc)?;
-        if let (Some((x1, y1)), (x2, y2)) = (this_coord, point) {
-            let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-            if dist_sq < min_dist_sq {
-                min_dist_sq = dist_sq;
-                min_loc = loc;
-            }
+        let this_coord = this_bb.get_point(loc)?;
+        let ((x1, y1), (x2, y2)) = (this_coord, point);
+        let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+        if dist_sq < min_dist_sq {
+            min_dist_sq = dist_sq;
+            min_loc = loc;
         }
     }
     Ok(min_loc.to_string())
@@ -89,21 +97,29 @@ fn shortest_link(
     this: &SvgElement,
     that: &SvgElement,
     conn_type: ConnectionType,
+    context: &impl ElementMap,
 ) -> Result<(String, String)> {
     let mut min_dist_sq = f32::MAX;
     let mut this_min_loc = "c";
     let mut that_min_loc = "c";
+
+    let this_bb = context
+        .get_element_bbox(this)?
+        .context("no bbox for element")?;
+    let that_bb = context
+        .get_element_bbox(that)?
+        .context("no bbox for element")?;
+
     for this_loc in edge_locations(this, conn_type) {
         for that_loc in edge_locations(that, conn_type) {
-            let this_coord = this.coord(this_loc)?;
-            let that_coord = that.coord(that_loc)?;
-            if let (Some((x1, y1)), Some((x2, y2))) = (this_coord, that_coord) {
-                let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-                if dist_sq < min_dist_sq {
-                    min_dist_sq = dist_sq;
-                    this_min_loc = this_loc;
-                    that_min_loc = that_loc;
-                }
+            let this_coord = this_bb.get_point(this_loc)?;
+            let that_coord = that_bb.get_point(that_loc)?;
+            let ((x1, y1), (x2, y2)) = (this_coord, that_coord);
+            let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+            if dist_sq < min_dist_sq {
+                min_dist_sq = dist_sq;
+                this_min_loc = this_loc;
+                that_min_loc = that_loc;
             }
         }
     }
@@ -186,30 +202,30 @@ impl Connector {
             (Some(start_point), None) => {
                 let end_el = end_el.context("no end_el")?;
                 if end_loc.is_empty() {
-                    end_loc = closest_loc(end_el, start_point, conn_type)?;
+                    end_loc = closest_loc(end_el, start_point, conn_type, elem_map)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
+                let end_coord = elem_map
+                    .get_element_bbox(end_el)?
+                    .context("x")?
+                    .get_point(&end_loc)?;
                 (
                     Endpoint::new(start_point, start_dir),
-                    Endpoint::new(
-                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
-                        end_dir,
-                    ),
+                    Endpoint::new(end_coord, end_dir),
                 )
             }
             (None, Some(end_point)) => {
                 let start_el = start_el.context("no start_el")?;
                 if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_point, conn_type)?;
+                    start_loc = closest_loc(start_el, end_point, conn_type, elem_map)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 }
+                let start_coord = elem_map
+                    .get_element_bbox(start_el)?
+                    .context("x")?
+                    .get_point(&start_loc)?;
                 (
-                    Endpoint::new(
-                        start_el
-                            .coord(&start_loc)?
-                            .context("no coord for start_loc")?,
-                        start_dir,
-                    ),
+                    Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_point, end_dir),
                 )
             }
@@ -219,37 +235,35 @@ impl Connector {
                     end_el.context("no end_el")?,
                 );
                 if start_loc.is_empty() && end_loc.is_empty() {
-                    (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type)?;
+                    (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                     end_dir = Self::loc_to_dir(&end_loc);
                 } else if start_loc.is_empty() {
-                    start_loc = closest_loc(
-                        start_el,
-                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
-                        conn_type,
-                    )?;
+                    let end_coord = elem_map
+                        .get_element_bbox(end_el)?
+                        .context("no bbox for end_coord")?
+                        .get_point(&end_loc)?;
+                    start_loc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
-                    end_loc = closest_loc(
-                        end_el,
-                        start_el
-                            .coord(&start_loc)?
-                            .context("no coord for start_loc")?,
-                        conn_type,
-                    )?;
+                    let start_coord = elem_map
+                        .get_element_bbox(start_el)?
+                        .context("no bbox for start_coord")?
+                        .get_point(&start_loc)?;
+                    end_loc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
+                let start_coord = elem_map
+                    .get_element_bbox(start_el)?
+                    .context("no bbox for start_coord")?
+                    .get_point(&start_loc)?;
+                let end_coord = elem_map
+                    .get_element_bbox(end_el)?
+                    .context("no bbox for end_coord")?
+                    .get_point(&end_loc)?;
                 (
-                    Endpoint::new(
-                        start_el
-                            .coord(&start_loc)?
-                            .context("no coord for start_loc")?,
-                        start_dir,
-                    ),
-                    Endpoint::new(
-                        end_el.coord(&end_loc)?.context("no coord for end_loc")?,
-                        end_dir,
-                    ),
+                    Endpoint::new(start_coord, start_dir),
+                    Endpoint::new(end_coord, end_dir),
                 )
             }
         };
@@ -264,7 +278,7 @@ impl Connector {
         })
     }
 
-    pub fn render(&self) -> Result<SvgElement> {
+    pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
         let default_ratio_offset = Length::Ratio(0.5);
         let default_abs_offset = Length::Absolute(3.);
 
@@ -307,8 +321,10 @@ impl Connector {
                 // If we have start and end elements, use midpoint of overlapping region
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = start_el.bbox()?.context("start element bbox")?;
-                        let end_bb = end_el.bbox()?.context("end element bbox")?;
+                        let start_bb = ctx
+                            .get_element_bbox(start_el)?
+                            .context("start element bbox")?;
+                        let end_bb = ctx.get_element_bbox(end_el)?.context("end element bbox")?;
                         let overlap_left = start_bb
                             .scalarspec(ScalarSpec::Minx)
                             .max(end_bb.scalarspec(ScalarSpec::Minx));

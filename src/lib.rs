@@ -60,6 +60,7 @@ pub mod server;
 mod text;
 mod themes;
 mod transform;
+mod transform_attr;
 mod types;
 
 use transform::Transformer;

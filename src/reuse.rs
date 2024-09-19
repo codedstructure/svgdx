@@ -20,8 +20,12 @@ impl ElementLike for ReuseElement {
         // container element around the referenced element for variable lookup.
         let mut element = element.clone();
         // Since attributes attached to the `<reuse>` element become part of the
-        // variable lookup context, evaluate them so indirection can be used.
-        element.eval_attributes(context);
+        // variable lookup context, evaluate them so indirection can be used -
+        // but avoid evaluation (which may have side-effects, e.g. on PRNG state)
+        // if not active at this point
+        if context.loop_depth == 0 && !context.in_specs {
+            element.eval_attributes(context);
+        }
         context.push_element(element.to_ell());
         Ok(())
     }
