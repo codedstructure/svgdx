@@ -39,14 +39,14 @@
     </style>
 
     <specs>
-        <path id="pipeline_v" d="M $x {{$y + $width / 4}}
+        <path id="pipeline_v" d="M 0 {{$width / 4}}
         a {{$width / 2}} {{$width / 4}} 0 0 0 $width 0
         a {{$width / 2}} {{$width / 4}} 0 0 0 {{-$width}} 0
         v {{$height - $width / 2}}
         a {{$width / 2}} {{$width / 4}} 0 0 0 $width 0
         v {{-$height - $width / 2}}" />
 
-        <path id="pipeline_h" d="M {{$x + $height / 4}} $y
+        <path id="pipeline_h" d="M {{$height / 4}} 0
         a {{$height / 4}} {{$height / 2}} 0 0 0 0 $height
         a {{$height / 4}} {{$height / 2}} 0 0 0 0 {{-$height}}
         h {{$width - $height / 2}}

@@ -41,5 +41,5 @@
     <rect x="110" y="50" width="9" height="50"/>
 
     <rect x="120" y="60" width="9" height="40"/>
-    <text x="65" y="-5" class="d-tbox">Data: 1, 0, 2, 4, 8, 10, 8, 4, 5, 6, 7, 5, 4</text>
+  <text x="65" y="-5" class="d-tbox">Data: 1, 0, 2, 4, 8, 10, 8, 4, 5, 6, 7, 5, 4</text>
 </svg>

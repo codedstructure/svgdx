@@ -9,7 +9,7 @@
 
   <var i="0" cube_wh="20 20"/>
   <loop while="lt($i, 10)">
-    <var i="$i + 1"/>
+    <var i="{{$i + 1}}"/>
     <loop count="5" loop-var="j">
       <use href="#cube" wh="$cube_wh" xy="{{$i * 20}} {{$j * 30 + 40}}" />
       <use href="#cube" wh="$cube_wh" xy="{{$i * 20 + 10}} {{$j * 30 + 55}}" />

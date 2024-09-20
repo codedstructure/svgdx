@@ -64,37 +64,37 @@
     <rect x="2" y="136" width="36" height="10"/>
     <text x="20" y="141" class="d-tbox">Check hypothesis</text>
 
-    <path d="M 49 20
+    <path d="M 4 0
         a 4 8 0 0 0 0 16
         a 4 8 0 0 0 0 -16
         h 22
         a 4 8 0 0 1 0 16
-        h -22" class="pipeline_h"/>
+        h -22" transform="translate(45, 20)" class="pipeline_h"/>
     <rect x="43" y="18" width="34" height="19" style="fill:none"/>
 
-    <path d="M 45 62.5
+    <path d="M 0 2.5
         a 5 2.5 0 0 0 10 0
         a 5 2.5 0 0 0 -10 0
         v 60
         a 5 2.5 0 0 0 10 0
-        v -60" class="pipeline_v"/>
-    <path d="M 57 62
+        v -60" transform="translate(45, 60)" class="pipeline_v"/>
+    <path d="M 0 2
         a 4 2 0 0 0 8 0
         a 4 2 0 0 0 -8 0
         v 61
         a 4 2 0 0 0 8 0
-        v -61" class="pipeline_v"/>
-    <path d="M 67 61.25
+        v -61" transform="translate(57, 60)" class="pipeline_v"/>
+    <path d="M 0 1.25
         a 2.5 1.25 0 0 0 5 0
         a 2.5 1.25 0 0 0 -5 0
         v 62.5
         a 2.5 1.25 0 0 0 5 0
-        v -62.5" class="pipeline_v"/>
-    <path d="M 74 60.75
+        v -62.5" transform="translate(67, 60)" class="pipeline_v"/>
+    <path d="M 0 0.75
         a 1.5 0.75 0 0 0 3 0
         a 1.5 0.75 0 0 0 -3 0
         v 63.5
         a 1.5 0.75 0 0 0 3 0
-        v -63.5" class="pipeline_v"/>
+        v -63.5" transform="translate(74, 60)" class="pipeline_v"/>
 
 </svg>

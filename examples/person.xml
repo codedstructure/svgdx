@@ -1,11 +1,11 @@
 <svg>
   <specs>
-    <path id="person" d="M $x {{$y + $height / 2.25}} h $width
-    M {{$x + $width / 2}} {{$y + $height / 3}} v {{$height / 3}}
-    M $x {{$y + $height}} l {{$width / 2}} {{-$height / 3}} {{$width / 2}} {{$height / 3}}
-    M {{$x + $width / 2}} $y
-    A {{$width / 2}} {{$height / 6}} 0 1 0 {{$x + $width / 2}} {{$y + $height / 3}}
-    A {{$width / 2}} {{$height / 6}} 0 1 0 {{$x + $width / 2}} $y
+    <path id="person" d="M 0 {{$height / 2.25}} h $width
+    M {{$width / 2}} {{$height / 3}} v {{$height / 3}}
+    M 0 $height l {{$width / 2}} {{-$height / 3}} {{$width / 2}} {{$height / 3}}
+    M {{$width / 2}} 0
+    A {{$width / 2}} {{$height / 6}} 0 1 0 {{$width / 2}} {{$height / 3}}
+    A {{$width / 2}} {{$height / 6}} 0 1 0 {{$width / 2}} 0
     "/>
   </specs>
   <style>

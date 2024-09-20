@@ -32,9 +32,9 @@
     <rect x="-4" y="-3" width="78" height="18" opacity="0.5" class="d-dot d-fill-green d-surround"/>
     <rect id="svgdx" width="30" height="10" class="d-fill-orange"/>
     <text x="15" y="5" class="d-fill-orange d-tbox">svgdx</text>
-    <rect id="input" x="-40" y="0" width="30" rx="3" height="10" class="d-fill-red"/>
+    <rect id="input" x="-40" y="0" width="30" height="10" rx="3" class="d-fill-red"/>
     <text x="-25" y="5" class="d-fill-red d-tbox">svgdx.xml</text>
-    <rect id="output" x="40" y="0" width="30" rx="3" height="10" class="d-fill-green"/>
+    <rect id="output" x="40" y="0" width="30" height="10" rx="3" class="d-fill-green"/>
     <text x="55" y="5" class="d-fill-green d-tbox">svgdx.svg</text>
     <line x1="-10" y1="5" x2="0" y2="5" class="d-arrow"/>
     <line x1="30" y1="5" x2="40" y2="5" class="d-arrow"/>
