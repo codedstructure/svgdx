@@ -4,7 +4,7 @@ use crate::events::SvgEvent;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
-    strp_length, BoundingBox, DirSpec, EdgeSpec, Length, LocSpec, Position, ScalarSpec, TrblLength,
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
@@ -116,8 +116,11 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if let Some(loc) = rest.strip_prefix('@') {
-            if let Ok(Some(pos)) = elem.coord(loc) {
-                return format!("{} {}", fstr(pos.0), fstr(pos.1));
+            if let Ok(Some(Ok(point))) = ctx
+                .get_element_bbox(elem)
+                .map(|bb| bb.map(|bb| bb.get_point(loc)))
+            {
+                return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
             if let Ok(Some(pos)) = ctx
@@ -508,7 +511,7 @@ impl SvgElement {
             && (self.name == "line" || self.name == "polyline")
     }
 
-    pub fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
+    fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
@@ -705,39 +708,7 @@ impl SvgElement {
         }
     }
 
-    /// Get point from a string such as 'tl' (top-left of this element) or
-    /// 'r:30%' (30% down the right edge).
-    ///
-    /// TODO: should also support e.g. `start:10%` for a line etc
-    ///
-    /// TODO: support per-shape locs - e.g. "in" / "out" for pipeline
-    ///
-    /// Return `Err` if invalid string format, `Ok(None)` if no bounding box,
-    /// else `Ok(Some(coord))`
-    pub fn coord(&self, loc: &str) -> Result<Option<(f32, f32)>> {
-        let mut loc = loc;
-        let mut len = Length::Ratio(0.5);
-        let re = regex!(r"(?<loc>[^:\s]+)(:(?<len>[-0-9\.]+%?))?$");
-        if let Some(caps) = re.captures(loc) {
-            loc = caps.name("loc").expect("Regex Match").as_str();
-            len = caps
-                .name("len")
-                .map_or(len, |v| strp_length(v.as_str()).expect("Invalid length"));
-        }
-        if let Some(bb) = self.bbox()? {
-            if let Ok(edge) = loc.parse() {
-                Ok(Some(bb.edgespec(edge, len)))
-            } else if let Ok(loc) = loc.parse() {
-                Ok(Some(bb.locspec(loc)))
-            } else {
-                bail!("Invalid locspec in coord")
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    pub fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
+    fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
         for (key, value) in &self.attrs {
             match key.as_str() {
@@ -760,7 +731,7 @@ impl SvgElement {
         Ok(new_elem)
     }
 
-    pub fn position_from_bbox(&mut self, bb: &BoundingBox) {
+    fn position_from_bbox(&mut self, bb: &BoundingBox) {
         let width = bb.width();
         let height = bb.height();
         let (cx, cy) = bb.center();
@@ -840,27 +811,17 @@ impl SvgElement {
         bbox: &BoundingBox,
         anchor: LocSpec,
     ) -> Result<Option<(f32, f32)>> {
-        let loc_re = regex!(r"^@(?<loc>[trblc]+)(\s+(?<remain>.*))?$");
-        let edge_re = regex!(r"^@(?<edge>[trbl]):(?<len>[-0-9\.]+%?)(\s+(?<remain>.*))?$");
-        if let Some((x, y)) = if let Some(caps) = edge_re.captures(remain) {
-            let edge: EdgeSpec = caps.name("edge").expect("Regex Match").as_str().parse()?;
-            let length = strp_length(caps.name("len").expect("Regex Match").as_str())?;
-            let (dx, dy) = if let Some(remain) = caps.name("remain") {
-                self.extract_dx_dy(remain.as_str())?
+        if let Some((x, y)) = if remain.starts_with('@') {
+            let (loc, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+
+            if let Some(Ok((x, y))) = loc.strip_prefix('@').map(|loc| bbox.get_point(loc)) {
+                let (dx, dy) = self.extract_dx_dy(dxy)?;
+                {
+                    Some((x + dx, y + dy))
+                }
             } else {
-                (0., 0.)
-            };
-            let (x, y) = bbox.edgespec(edge, length);
-            Some((x + dx, y + dy))
-        } else if let Some(caps) = loc_re.captures(remain) {
-            let loc: LocSpec = caps.name("loc").expect("Regex Match").as_str().parse()?;
-            let (dx, dy) = if let Some(remain) = caps.name("remain") {
-                self.extract_dx_dy(remain.as_str())?
-            } else {
-                (0., 0.)
-            };
-            let (x, y) = bbox.locspec(loc);
-            Some((x + dx, y + dy))
+                bail!("Could not determine location from {loc}");
+            }
         } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
             let (x, y) = bbox.locspec(anchor);
             Some((x + dx, y + dy))
@@ -873,7 +834,7 @@ impl SvgElement {
         }
     }
 
-    pub fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
+    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
             if matches!(
                 (self.name.as_str(), key.as_str()),
@@ -913,7 +874,7 @@ impl SvgElement {
     /// ```text
     /// (^|#id)(:(h|H|v|V) [gap])
     /// ```
-    pub fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
+    fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
@@ -979,7 +940,7 @@ impl SvgElement {
         }
     }
 
-    pub fn expand_compound_size(&mut self) {
+    fn expand_compound_size(&mut self) {
         if let Some(wh) = self.attrs.pop("wh") {
             // Split value into width and height
             let (w, h) = Self::split_compound_attr(&wh);
@@ -1000,7 +961,7 @@ impl SvgElement {
         }
     }
 
-    pub fn resolve_size_delta(&mut self) {
+    fn resolve_size_delta(&mut self) {
         // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
         let (w, h) = match self.name.as_str() {
             "circle" => {
@@ -1037,7 +998,9 @@ impl SvgElement {
     // xy="#o" -> x="#o", y="#o"
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
-    pub fn expand_compound_pos(&mut self) {
+    fn expand_compound_pos(&mut self) {
+        // NOTE: must have already done any relative positioning (e.g. `xy="#abc:h"`)
+        // before this point as xy is not considered a compound attribute in that case.
         if let Some(xy) = self.pop_attr("xy") {
             let (x, y) = Self::split_compound_attr(&xy);
             let (x_attr, y_attr) = match self.pop_attr("xy-loc").as_deref() {

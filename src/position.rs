@@ -616,6 +616,8 @@ impl BoundingBox {
         }
     }
 
+    /// Get point from a string such as 'tl' (top-left of this bbox) or
+    /// 'r:30%' (30% down the right edge).
     pub fn get_point(&self, s: &str) -> Result<(f32, f32)> {
         if let Some((es, ls)) = s.split_once(':') {
             let es = es.parse::<EdgeSpec>()?;
