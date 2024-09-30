@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: public `VERSION` constant for the library version.
+
+- Changed / Added: if `width` or `height` are provided in the SVG root element,
+  a `viewBox` will still be generated if missing. In addition, if only one of `width`
+  or `height` are provided, the other will be generated automatically based on the
+  aspect ratio of the calculated viewBox, including any units. For example on a 4:3
+  aspect ratio diagram (after adding the border), if `<svg width="10cm">` is given,
+  an additional `height="7.5cm"` attribute will be generated.
+
 - Changed: variables are now locally scoped to the nesting level they are defined in.
   Previously a `<var n="2"/>` inside a `<g>` element would set it permanently for the
   rest of the document (until later overridden, either by an attribute or another `var`

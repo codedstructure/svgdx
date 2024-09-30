@@ -64,6 +64,9 @@ mod types;
 
 use transform::Transformer;
 
+// Allow users of this as a library to easily retrieve the version of svgdx being used
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// Settings to configure a single transformation.
 ///
 /// Note the settings here are specific to a single transformation; alternate front-ends

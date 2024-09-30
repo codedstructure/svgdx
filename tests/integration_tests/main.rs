@@ -16,6 +16,7 @@ mod position;
 mod rel_pos;
 mod rel_size;
 mod reuse;
+mod root_svg;
 mod roundtrip;
 mod text_attr;
 mod transform_svg;

@@ -4,14 +4,14 @@ use crate::events::{EventList, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, LocSpec, Position};
 use crate::themes::ThemeBuilder;
-use crate::types::{fstr, OrderIndex};
+use crate::types::{fstr, split_unit, OrderIndex};
 use crate::TransformConfig;
 
 use crate::loop_el::LoopElement;
 use crate::reuse::ReuseElement;
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
 use std::rc::Rc;
 
@@ -758,51 +758,60 @@ impl Transformer {
             pre_svg.write_to(writer)?;
 
             let mut new_svg_bs = BytesStart::new("svg");
-            let mut orig_svg_attrs = vec![];
+            let mut orig_svg_attrs = HashMap::new();
             if let Event::Start(orig_svg) = first_svg.event {
                 new_svg_bs = orig_svg;
                 orig_svg_attrs = new_svg_bs
                     .attributes()
-                    .map(|v| {
-                        String::from_utf8(v.unwrap().key.into_inner().to_owned()).expect("Non-UTF8")
+                    .map(|attr| {
+                        let attr = attr.expect("Invalid SVG attribute");
+                        (
+                            String::from_utf8(attr.key.into_inner().to_owned()).expect("Non-UTF8"),
+                            String::from_utf8(attr.value.to_vec()).expect("Non-UTF8"),
+                        )
                     })
                     .collect();
             }
-            if !orig_svg_attrs.contains(&"version".to_owned()) {
+            if !orig_svg_attrs.contains_key("version") {
                 new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
             }
-            if !orig_svg_attrs.contains(&"xmlns".to_owned()) {
+            if !orig_svg_attrs.contains_key("xmlns") {
                 new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
             }
             // If width or height are provided, leave width/height/viewBox alone.
-            if !orig_svg_attrs.contains(&"width".to_owned())
-                && !orig_svg_attrs.contains(&"height".to_owned())
-            {
-                if let Some(bb) = extent {
-                    let view_width = fstr(bb.width());
-                    let view_height = fstr(bb.height());
+            let orig_width = orig_svg_attrs.get("width");
+            let orig_height = orig_svg_attrs.get("height");
+            if let Some(bb) = extent {
+                let aspect_ratio = bb.width() / bb.height();
+                let view_width = fstr(bb.width());
+                let view_height = fstr(bb.height());
+
+                // Populate any missing width/height attributes
+                if orig_width.is_none() && orig_height.is_none() {
+                    // if neither present, assume user units are mm, scaled by config.scale
                     let width = fstr(bb.width() * self.context.config.scale);
                     let height = fstr(bb.height() * self.context.config.scale);
-                    if !orig_svg_attrs.contains(&"width".to_owned()) {
-                        new_svg_bs.push_attribute(Attribute::from((
-                            "width",
-                            format!("{width}mm").as_str(),
-                        )));
-                    }
-                    if !orig_svg_attrs.contains(&"height".to_owned()) {
-                        new_svg_bs.push_attribute(Attribute::from((
-                            "height",
-                            format!("{height}mm").as_str(),
-                        )));
-                    }
-                    if !orig_svg_attrs.contains(&"viewBox".to_owned()) {
-                        let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-                        new_svg_bs.push_attribute(Attribute::from((
-                            "viewBox",
-                            format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
-                                .as_str(),
-                        )));
-                    }
+                    let new_width = format!("{}mm", width);
+                    let new_height = format!("{}mm", height);
+                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+                } else if orig_height.is_none() {
+                    let (width, unit) = split_unit(orig_width.expect("logic"))?;
+                    let new_height = format!("{}{}", fstr(width / aspect_ratio), unit);
+                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+                } else if orig_width.is_none() {
+                    let (height, unit) = split_unit(orig_height.expect("logic"))?;
+                    let new_width = format!("{}{}", fstr(height * aspect_ratio), unit);
+                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+                }
+
+                if !orig_svg_attrs.contains_key("viewBox") {
+                    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+                    new_svg_bs.push_attribute(Attribute::from((
+                        "viewBox",
+                        format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
+                            .as_str(),
+                    )));
                 }
             }
 
