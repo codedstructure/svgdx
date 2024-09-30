@@ -2,6 +2,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
 use std::num::ParseFloatError;
 
+use anyhow::{bail, Result};
+
 /// Return a 'minimal' representation of the given number
 pub fn fstr(x: f32) -> String {
     if x.abs() < 0.0001 {
@@ -19,8 +21,30 @@ pub fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-pub fn strp(s: &str) -> anyhow::Result<f32> {
+pub fn strp(s: &str) -> Result<f32> {
     s.trim().parse().map_err(|e: ParseFloatError| e.into())
+}
+
+/// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
+pub fn split_unit(s: &str) -> Result<(f32, String)> {
+    let mut value = String::new();
+    let mut unit = String::new();
+    let mut got_value = false;
+    for ch in s.trim().chars() {
+        if ch.is_ascii_digit() || ch == '.' || ch == '-' {
+            if got_value {
+                bail!("Invalid character in numeric value: {}", ch);
+            }
+            value.push(ch);
+        } else {
+            if value.is_empty() {
+                bail!("'{}' does not start with numeric value", s);
+            }
+            got_value = true;
+            unit.push(ch);
+        }
+    }
+    Ok((strp(&value)?, unit))
 }
 
 /// Returns iterator over whitespace-or-comma separated values
@@ -325,6 +349,17 @@ impl<'s> IntoIterator for &'s ClassList {
 mod test {
     use super::*;
     use assertables::{assert_lt, assert_lt_as_result};
+
+    #[test]
+    fn test_split_unit() {
+        assert_eq!(split_unit("1.5mm").unwrap(), (1.5, "mm".to_string()));
+        assert_eq!(split_unit("123in").unwrap(), (123., "in".to_string()));
+        assert_eq!(split_unit("123.5").unwrap(), (123.5, "".to_string()));
+        assert!(split_unit("123.5.1").is_err());
+        assert!(split_unit("in").is_err());
+        assert!(split_unit("123in0").is_err());
+        assert!(split_unit("in0").is_err());
+    }
 
     #[test]
     fn test_attrmap() {
