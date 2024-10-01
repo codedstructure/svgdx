@@ -2,7 +2,7 @@ use crate::element::{ContentType, SvgElement};
 use crate::types::OrderIndex;
 
 use std::collections::HashMap;
-use std::io::{BufRead, Write};
+use std::io::{BufRead, BufReader, Cursor, Write};
 
 use lazy_regex::regex;
 use quick_xml::events::attributes::Attribute;
@@ -26,6 +26,7 @@ pub struct InputEvent {
     pub line: usize,
     pub indent: usize,
     pub closure: Option<HashMap<String, String>>,
+    pub alt_idx: Option<usize>,
 }
 
 impl Clone for InputEvent {
@@ -36,6 +37,7 @@ impl Clone for InputEvent {
             line: self.line,
             indent: self.indent,
             closure: self.closure.clone(),
+            alt_idx: self.alt_idx,
         }
     }
 }
@@ -48,6 +50,7 @@ impl InputEvent {
             line: self.line,
             indent: self.indent,
             closure: self.closure,
+            alt_idx: self.alt_idx,
         }
     }
 }
@@ -72,6 +75,7 @@ impl From<Event<'_>> for EventList {
                 line: 0,
                 indent: 0,
                 closure: None,
+                alt_idx: None,
             }],
         }
     }
@@ -100,6 +104,7 @@ impl From<Vec<InputEvent>> for EventList {
                     line: v.line,
                     indent: v.indent,
                     closure: v.closure.clone(),
+                    alt_idx: v.alt_idx,
                 })
                 .collect(),
         }
@@ -117,6 +122,7 @@ impl From<Vec<Event<'_>>> for EventList {
                     line: 0,
                     indent: 0,
                     closure: None,
+                    alt_idx: None,
                 })
                 .collect(),
         }
@@ -140,6 +146,7 @@ impl From<Event<'_>> for InputEvent {
             line: 0,
             indent: 0,
             closure: None,
+            alt_idx: None,
         }
     }
 }
@@ -184,6 +191,9 @@ impl EventList {
         let mut events = Vec::new();
         let mut buf = Vec::new();
 
+        // Stack of indices of open tags
+        let mut event_idx_stack = Vec::new();
+
         let mut line_count = 1;
         let mut indent = 0;
         let mut index = 0;
@@ -207,6 +217,32 @@ impl EventList {
                         line: line_count,
                         indent,
                         closure: None,
+                        alt_idx: None,
+                    });
+                }
+                Ok(Event::Start(_)) => {
+                    events.push(InputEvent {
+                        event: ev.expect("match").into_owned(),
+                        index,
+                        line: line_count,
+                        indent,
+                        closure: None,
+                        alt_idx: None,
+                    });
+                    event_idx_stack.push(index);
+                }
+                Ok(Event::End(_)) => {
+                    let start_idx = event_idx_stack.pop();
+                    if let Some(start_idx) = start_idx {
+                        events[start_idx].alt_idx = Some(index);
+                    }
+                    events.push(InputEvent {
+                        event: ev.expect("match").into_owned(),
+                        index,
+                        line: line_count,
+                        indent,
+                        closure: None,
+                        alt_idx: start_idx,
                     });
                 }
                 Ok(e) => events.push(InputEvent {
@@ -215,9 +251,10 @@ impl EventList {
                     line: line_count,
                     indent,
                     closure: None,
+                    alt_idx: None,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
-            };
+            }
 
             index += 1;
             buf.clear();
@@ -227,48 +264,7 @@ impl EventList {
     }
 
     pub fn from_str(s: impl Into<String>) -> Result<Self> {
-        let s: String = s.into();
-        let mut reader = Reader::from_str(&s);
-        let mut events = Vec::new();
-
-        // TODO: remove duplication between this and `from_reader`
-        let mut line_count = 1;
-        let mut indent = 0;
-        let mut index = 0;
-        loop {
-            let ev = reader.read_event();
-            if let Ok(ok_ev) = ev.clone() {
-                line_count += &ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count();
-            }
-            match &ev {
-                Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(Event::Text(t)) => {
-                    let t_str = String::from_utf8(t.to_vec())?;
-                    if let Some((_, rest)) = t_str.rsplit_once('\n') {
-                        indent = rest.len() - rest.trim_end_matches(' ').len();
-                    }
-
-                    events.push(InputEvent {
-                        event: ev.expect("match").clone().into_owned(),
-                        index,
-                        line: line_count,
-                        indent,
-                        closure: None,
-                    });
-                }
-                Ok(e) => events.push(InputEvent {
-                    event: e.clone().into_owned(),
-                    index,
-                    line: line_count,
-                    indent,
-                    closure: None,
-                }),
-                Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
-            }
-
-            index += 1;
-        }
-        Ok(Self { events })
+        Self::from_reader(&mut BufReader::new(Cursor::new(s.into().as_bytes())))
     }
 
     pub fn slice(&self, start: usize, end: usize) -> Self {

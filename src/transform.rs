@@ -78,9 +78,6 @@ impl ElementLike for SvgElement {
     }
 
     fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
-        if self.name == "phantom" {
-            return Ok(EventList::new());
-        }
         let mut output = EventList::new();
         let source_line = self.get_attr("data-source-line");
         let mut e = self.clone();
@@ -403,8 +400,6 @@ fn process_seq(
     let mut last_event = None;
     let mut last_element = None;
     let mut gen_events: Vec<(OrderIndex, EventList)>;
-    // Stack of event indices of open elements.
-    let mut idx_stack = Vec::new();
 
     let init_seq_len = seq.len();
 
@@ -475,7 +470,6 @@ fn process_seq(
                     .handle_element_end(&mut event_element, context)?;
             }
             Event::Start(_) => {
-                idx_stack.push(input_ev.index);
                 let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
                     "could not extract element at line {}",
                     input_ev.line
@@ -508,7 +502,7 @@ fn process_seq(
                 ell.borrow_mut()
                     .handle_element_end(&mut event_element, context)?;
 
-                let start_idx = idx_stack.pop().expect("unreachable");
+                let start_idx = input_ev.alt_idx.expect("unreachable");
                 event_element.set_event_range((start_idx, input_ev.index));
                 if let Some(eee) = ell.borrow_mut().get_element_mut() {
                     eee.set_event_range((start_idx, input_ev.index));

@@ -125,10 +125,12 @@ impl ElementLike for ReuseElement {
             let tag_name = instance_element.name.clone();
             let mut start_ev = InputEvent::from(SvgEvent::Start(instance_element));
             start_ev.index = start;
+            start_ev.alt_idx = Some(end);
             new_events.push(start_ev);
             new_events.extend(&EventList::from(context.events.clone()).slice(start + 1, end));
             let mut end_ev = InputEvent::from(SvgEvent::End(tag_name));
             end_ev.index = end;
+            end_ev.alt_idx = Some(start);
             new_events.push(end_ev);
             process_events(new_events, context)
         } else {
