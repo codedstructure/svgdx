@@ -207,7 +207,7 @@ impl Connector {
                 }
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
-                    .context("x")?
+                    .context("no bounding box")?
                     .get_point(&end_loc)?;
                 (
                     Endpoint::new(start_point, start_dir),
@@ -222,7 +222,7 @@ impl Connector {
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
-                    .context("x")?
+                    .context("no bounding box")?
                     .get_point(&start_loc)?;
                 (
                     Endpoint::new(start_coord, start_dir),

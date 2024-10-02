@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved / changed: better positioning support for `<use>` and `<reuse>` elements.
+  This includes use as relative positioning targets, as well as support for the SVG
+  standard `x` and `y` attributes to translate where an instantiated element will be
+  placed. NOTE: this implies that `x` and `y` (as well as `translate`) are acted on
+  at the `<reuse>` element level, and do not become 'attribute variables' available
+  in the context of the target.
+
+- Fixed: `<symbol>` as a `<reuse>` target no longer generates invalid SVG output.
+  (The `<symbol>` is translated to `<g>` element in the instantiated output, as the
+  SVG spec states is the *behaviour* when a `<use>` of a `<symbol>` element occurs)
+
+- Added: improved support for the `transform` attribute, for example generated `<text>`
+  elements now inherit any `transform` from the source element, and *basic* transform
+  changes in position / size (particular `translate` and `scale`) are honoured when
+  constructing a bounding box. KNOWN ISSUES: interactions between `transform`,
+  `<reuse>`, and `<g>` elements have various failing edge cases which will be addressed
+  in a future release.
+
+- Changed: variable substitution now occurs *prior* to evaluting numeric expressions.
+  Previously an expression such as `{{count($e, $e, $e)}}` with `e=""` would evaluate
+  to `0`, as each variable lookup would be done as part of the expression evaluation,
+  and empty values would be implicitly filtered out. Following this change, the variable
+  lookup happens first, resulting in `count(,,)`, which will fail to parse and be the
+  output. The advantage to early substitution is being able to do `{{$target.h / 4}}`
+  (see [examples/skyline.xml](examples/skyline.xml)) with (e.g.) `target="#abc"`.
+  Without early substitution, tokenisation will fail trying to parse `$target.h`.
+
+- Changed: variables are now locally scoped to the nesting level they are defined in.
+  Previously a `<var n="2"/>` inside a `<g>` element would set it permanently for the
+  rest of the document (until later overridden, either by an attribute or another `var`
+  element). Now variable definitions cease once their 'scope' finishes, aligning `var`
+  definitions and attribute values.
+
+- Change (minor): order of generated position attributes improved so `width` / `height`
+  aren't separated by any `rx` on rectangles.
+
 - Added: public `VERSION` constant for the library version.
 
 - Changed / Added: if `width` or `height` are provided in the SVG root element,
@@ -15,12 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   aspect ratio of the calculated viewBox, including any units. For example on a 4:3
   aspect ratio diagram (after adding the border), if `<svg width="10cm">` is given,
   an additional `height="7.5cm"` attribute will be generated.
-
-- Changed: variables are now locally scoped to the nesting level they are defined in.
-  Previously a `<var n="2"/>` inside a `<g>` element would set it permanently for the
-  rest of the document (until later overridden, either by an attribute or another `var`
-  element). Now variable definitions cease once their 'scope' finishes, aligning `var`
-  definitions and attribute values.
 
 - Added: new fill pattern classes `d-grid`, `d-grid5`, `d-grid10`. These render an
   axis-aligned grid of fine lines in the themes default stroke colour at the appropriate
