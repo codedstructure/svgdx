@@ -1,4 +1,4 @@
-use assertables::{assert_contains, assert_contains_as_result};
+use assertables::assert_contains;
 use itertools::Itertools;
 use svgdx::transform_str_default;
 

@@ -348,7 +348,7 @@ impl<'s> IntoIterator for &'s ClassList {
 #[cfg(test)]
 mod test {
     use super::*;
-    use assertables::{assert_lt, assert_lt_as_result};
+    use assertables::assert_lt;
 
     #[test]
     fn test_split_unit() {

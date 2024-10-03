@@ -1,5 +1,5 @@
 use assert_cmd::{crate_name, Command};
-use assertables::{assert_contains, assert_contains_as_result};
+use assertables::assert_contains;
 use std::io::Write;
 use svgdx::cli::Config;
 use tempfile::NamedTempFile;

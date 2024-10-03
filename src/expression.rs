@@ -555,7 +555,7 @@ mod tests {
     use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
     use crate::position::BoundingBox;
-    use assertables::{assert_in_delta, assert_in_delta_as_result, assert_lt, assert_lt_as_result};
+    use assertables::{assert_in_delta, assert_lt};
     use rand::prelude::*;
     use rand_pcg::Pcg32;
     use std::cell::RefCell;

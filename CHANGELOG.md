@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0 - 2024-10-03]
+
 - Improved / changed: better positioning support for `<use>` and `<reuse>` elements.
   This includes use as relative positioning targets, as well as support for the SVG
   standard `x` and `y` attributes to translate where an instantiated element will be

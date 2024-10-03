@@ -1,6 +1,4 @@
-use assertables::{
-    assert_contains, assert_contains_as_result, assert_not_contains, assert_not_contains_as_result,
-};
+use assertables::{assert_contains, assert_not_contains};
 use svgdx::transform_str_default;
 
 #[test]
