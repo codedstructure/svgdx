@@ -82,6 +82,16 @@ will result in the following rendered output:
 
 Any additional attributes on the `<reuse>` element are available in the target element's context as [local attribute variables](expressions#variable-references).
 
+### `point`
+
+The point element is used to define a position, via the `xy` - or separate `x` and `y` - attributes. It does not appear in the rendered output, and
+is simply used to define a point which may later be referred to by other refspec attributes.
+
+In general `<point>` elements will only be useful if they are given an `id` value.
+
+Note that `<point>` elements differ from alternatives - such as a zero-width `<rect>` or zero-radius `<circle>` - by being ignored when composite
+bounding boxes are being established, including the top-level SVG `viewBox`.
+
 ### `if`
 
 The `<if>` element allows conditional inclusion of blocks of elements. A single attribute - `test` - provides the condition.

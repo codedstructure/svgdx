@@ -86,6 +86,15 @@ impl Position {
         let y_ext = self.y_def();
         if let (Some((x1, x2)), Some((y1, y2))) = (x_ext, y_ext) {
             Some(BoundingBox::new(x1, y1, x2, y2))
+        } else if self.shape == "point" {
+            // For points, we don't need extent at all, just at least one x and at least one y
+            let px = self.xmin.or(self.xmax.or(self.cx));
+            let py = self.ymin.or(self.ymax.or(self.cy));
+            if let (Some(x), Some(y)) = (px, py) {
+                Some(BoundingBox::new(x, y, x, y))
+            } else {
+                None
+            }
         } else if self.shape == "circle" {
             // For circles, width and height are the same, so we only need one plus a single
             // other value to define the circle. The same logic would apply for squares,

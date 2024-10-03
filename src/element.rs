@@ -104,7 +104,9 @@ fn split_relspec<'a, 'b>(
 /// Infallible; any invalid refspec will be left unchanged (other
 /// than whitespace)
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let locspec = regex!(r"([#^][[:word:]]+)[.@]([[:word:]]+)");
+    // For most elements either a `#elem.X` or `#elem@X` form is required,
+    // but for `<point>` elements a standalone `#elem` suffices.
+    let locspec = regex!(r"([#^][[:word:]]+)([.@]([[:word:]]+)|\b)");
 
     locspec
         .replace_all(value, |caps: &Captures| {
@@ -114,12 +116,17 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
 }
 
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
+    let elem_loc = |elem: &SvgElement, loc: &str| {
+        ctx.get_element_bbox(elem)
+            .map(|bb| bb.map(|bb| bb.get_point(loc)))
+    };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
-        if let Some(loc) = rest.strip_prefix('@') {
-            if let Ok(Some(Ok(point))) = ctx
-                .get_element_bbox(elem)
-                .map(|bb| bb.map(|bb| bb.get_point(loc)))
-            {
+        if rest.is_empty() && elem.name == "point" {
+            if let Ok(Some(Ok(point))) = elem_loc(elem, "c") {
+                return format!("{} {}", fstr(point.0), fstr(point.1));
+            }
+        } else if let Some(loc) = rest.strip_prefix('@') {
+            if let Ok(Some(Ok(point))) = elem_loc(elem, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
@@ -443,10 +450,11 @@ impl SvgElement {
         }
     }
 
+    /// 'phantom' elements in the input do not (directly) generate any output events
     pub fn is_phantom_element(&self) -> bool {
         matches!(
             self.name.as_str(),
-            "config" | "specs" | "var" | "loop" | "if"
+            "config" | "specs" | "var" | "loop" | "if" | "point"
         )
     }
 
@@ -587,7 +595,7 @@ impl SvgElement {
                 && !(value.contains('$') || value.contains('#') || value.contains('^'))
         }
         match self.name.as_str() {
-            "text" => {
+            "point" | "text" => {
                 let x = self.attrs.get("x").unwrap_or(&zstr);
                 let y = self.attrs.get("y").unwrap_or(&zstr);
                 if passthrough(x) || passthrough(y) {
@@ -858,7 +866,7 @@ impl SvgElement {
                         | "r"
                         | "rx"
                         | "ry",
-                )
+                ) | ("point", "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2",)
             ) {
                 let computed = self.eval_rel_attr(&key, &value, ctx)?;
                 if strp(&computed).is_ok() {

@@ -1,0 +1,16 @@
+<svg>
+  <loop count="3" loop-var="i">
+   <loop count="3" loop-var="j">
+     <circle id="dot$i$j" cx="{{$i * 10}}" cy="{{$j * 10}}" r="1" class="d-fill-black"/>
+   </loop>
+  </loop>
+
+  <point id="p1" xy="#dot20@c" dx="10"/>
+  <point id="p2" xy="#dot02@c" dy="10"/>
+  <point id="p3" xy="#dot22@c" dxy="10"/>
+
+  <line start="#dot00" end="#p1" class="d-flow"/>
+  <line start="#p1" end="#p2" class="d-flow d-dimgrey"/>
+  <line start="#p2" end="#dot00@c" class="d-flow d-darkgrey" />
+  <line start="#dot00@c" end="#p3" class="d-flow d-silver"/>
+</svg>

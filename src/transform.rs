@@ -85,6 +85,11 @@ impl ElementLike for SvgElement {
         e.resolve_position(context)?;
         let events = e.element_events(context)?;
         context.update_element(&e);
+        if self.name == "point" {
+            // "point" elements don't generate any events in the final output,
+            // but *do* need to register themselves with update_element()
+            return Ok(EventList::new());
+        }
         if !events.is_empty() && context.get_element_bbox(&e)?.is_some() {
             context.set_prev_element(e.clone());
         }

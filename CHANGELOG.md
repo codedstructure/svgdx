@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<reuse>`, and `<g>` elements have various failing edge cases which will be addressed
   in a future release.
 
+- Added: `<point>` element, used to define positions which may be referred to in
+  refspec values, but (unlike a zero-radius circle) do not appear in the output.
+  See the [ninedots.xml](examples/ninedots.xml) example.
+
 - Changed: variable substitution now occurs *prior* to evaluting numeric expressions.
   Previously an expression such as `{{count($e, $e, $e)}}` with `e=""` would evaluate
   to `0`, as each variable lookup would be done as part of the expression evaluation,

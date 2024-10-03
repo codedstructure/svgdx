@@ -1,0 +1,44 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="41mm" height="41mm" viewBox="-6 -6 41 41">
+  <style>
+  <![CDATA[
+    svg { background: none; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    .d-flow { animation: 1s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }
+    @keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }
+    .d-fill-black:not(text,tspan) { fill: black; }
+    text.d-fill-black, text.d-fill-black * { fill: white; }
+    .d-darkgrey:not(text,tspan) { stroke: darkgrey; }
+    text.d-darkgrey, text.d-darkgrey * { fill: darkgrey; }
+    .d-dimgrey:not(text,tspan) { stroke: dimgrey; }
+    text.d-dimgrey, text.d-dimgrey * { fill: dimgrey; }
+    .d-silver:not(text,tspan) { stroke: silver; }
+    text.d-silver, text.d-silver * { fill: silver; }
+  ]]>
+  </style>
+
+
+     <circle id="dot00" cx="0" cy="0" r="1" class="d-fill-black"/>
+
+     <circle id="dot01" cx="0" cy="10" r="1" class="d-fill-black"/>
+
+     <circle id="dot02" cx="0" cy="20" r="1" class="d-fill-black"/>
+
+
+     <circle id="dot10" cx="10" cy="0" r="1" class="d-fill-black"/>
+
+     <circle id="dot11" cx="10" cy="10" r="1" class="d-fill-black"/>
+
+     <circle id="dot12" cx="10" cy="20" r="1" class="d-fill-black"/>
+
+
+     <circle id="dot20" cx="20" cy="0" r="1" class="d-fill-black"/>
+
+     <circle id="dot21" cx="20" cy="10" r="1" class="d-fill-black"/>
+
+     <circle id="dot22" cx="20" cy="20" r="1" class="d-fill-black"/>
+   <line x1="1" y1="0" x2="30" y2="0" class="d-flow"/>
+  <line x1="30" y1="0" x2="0" y2="30" class="d-flow d-dimgrey"/>
+  <line x1="0" y1="30" x2="0" y2="0" class="d-flow d-darkgrey"/>
+  <line x1="0" y1="0" x2="30" y2="30" class="d-flow d-silver"/>
+</svg>

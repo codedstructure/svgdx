@@ -12,6 +12,7 @@ mod group;
 mod if_element;
 mod indent;
 mod loops;
+mod point;
 mod position;
 mod rel_pos;
 mod rel_size;
