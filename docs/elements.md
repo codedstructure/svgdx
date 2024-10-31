@@ -24,6 +24,8 @@ The following configuration settings can be applied using this element. These co
 | background | [colour name](https://www.w3.org/TR/SVG11/types.html#ColorKeywords) | `background="lightgrey"` |
 | scale | float | `scale="2.5"` |
 | border | integer | `border="20"` |
+| font-size | float | `font-size="5"` |
+| font-family | string | `font-family="Ubuntu Mono"` |
 | loop-limit | integer | `loop-limit="9999"` |
 | var-limit | integer | `var-limit="4096"` |
 

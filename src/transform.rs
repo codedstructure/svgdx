@@ -247,6 +247,8 @@ impl ElementLike for ConfigElement {
                 "background" => context.config.background.clone_from(value),
                 "loop-limit" => context.config.loop_limit = value.parse()?,
                 "var-limit" => context.config.var_limit = value.parse()?,
+                "font-size" => context.config.font_size = value.parse()?,
+                "font-family" => context.config.font_family.clone_from(value),
                 "seed" => {
                     context.config.seed = value.parse()?;
                     context.seed_rng(context.config.seed);

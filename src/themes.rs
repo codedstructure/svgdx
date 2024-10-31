@@ -59,7 +59,9 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
     if !tb.has_element("text") {
         return;
     }
-    tb.add_style(&format!("text, tspan {{ stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: {text_colour} }}"));
+    let font_family = &tb.font_family;
+    let font_size = tb.font_size;
+    tb.add_style(&format!("text, tspan {{ stroke-width: 0; font-family: {font_family}; font-size: {font_size}px; fill: {text_colour} }}"));
     for (class, rule) in [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
@@ -86,13 +88,13 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
     }
 
     let text_sizes = vec![
-        ("d-text-smallest", 1.),
-        ("d-text-smaller", 1.5),
-        ("d-text-small", 2.),
-        ("d-text-medium", 3.), // Default, but include explicitly for completeness
-        ("d-text-large", 4.5),
-        ("d-text-larger", 7.),
-        ("d-text-largest", 10.),
+        ("d-text-smallest", tb.font_size * 0.333333),
+        ("d-text-smaller", tb.font_size * 0.5),
+        ("d-text-small", tb.font_size * 0.666666),
+        ("d-text-medium", tb.font_size), // Default, but include explicitly for completeness
+        ("d-text-large", tb.font_size * 1.5),
+        ("d-text-larger", tb.font_size * 2.),
+        ("d-text-largest", tb.font_size * 3.),
     ];
     for (class, size) in text_sizes {
         if tb.has_class(class) {
@@ -386,6 +388,8 @@ pub struct ThemeBuilder {
     defs: Vec<String>,
 
     background: String,
+    font_size: f32,
+    font_family: String,
     theme: ThemeType,
     classes: HashSet<String>,
     elements: HashSet<String>,
@@ -401,6 +405,8 @@ impl ThemeBuilder {
             styles: Vec::new(),
             defs: Vec::new(),
             background: config.background.clone(),
+            font_size: config.font_size,
+            font_family: config.font_family.clone(),
             theme: config.theme.clone(),
             classes: classes.to_owned(),
             elements: elements.to_owned(),

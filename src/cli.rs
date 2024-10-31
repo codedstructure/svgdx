@@ -60,6 +60,14 @@ struct Arguments {
     #[arg(long, default_value = "1024")]
     var_limit: u32,
 
+    /// Default font-size (in user-units)
+    #[arg(long, default_value = "3.0")]
+    font_size: f32,
+
+    /// Default font-family
+    #[arg(long, default_value = "sans-serif")]
+    font_family: String,
+
     /// Theme to use
     #[arg(long, default_value = "default")]
     theme: String,
@@ -121,6 +129,8 @@ impl Config {
                 add_metadata: args.add_metadata,
                 loop_limit: args.loop_limit,
                 var_limit: args.var_limit,
+                font_size: args.font_size,
+                font_family: args.font_family,
                 theme: args.theme.parse().context("Invalid theme")?,
             },
         })

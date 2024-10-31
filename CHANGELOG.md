@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added `font-size` and `font-family` config options, available in the `<config>` element
+  or via command line options; defaults remain 3.0 and sans-serif respectively, but now
+  text classes such as `d-text-smaller` can scale together based on the base font size.
+
 ## [0.13.0 - 2024-10-03]
 
 - Improved / changed: better positioning support for `<use>` and `<reuse>` elements.

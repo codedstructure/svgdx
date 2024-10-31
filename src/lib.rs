@@ -93,6 +93,10 @@ pub struct TransformConfig {
     pub var_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
+    /// Default font-size (in user-units)
+    pub font_size: f32,
+    /// Default font-family
+    pub font_family: String,
     /// Theme to use (default "default")
     pub theme: ThemeType,
 }
@@ -109,6 +113,8 @@ impl Default for TransformConfig {
             loop_limit: 1000,
             var_limit: 1024,
             add_metadata: false,
+            font_size: 3.0,
+            font_family: "sans-serif".to_owned(),
             theme: ThemeType::default(),
         }
     }
