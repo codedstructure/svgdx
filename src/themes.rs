@@ -100,7 +100,8 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
         if tb.has_class(class) {
             tb.add_style(&format!(
                 "text.{0}, text.{0} * {{ font-size: {1}px; }}",
-                class, size
+                class,
+                fstr(size)
             ));
         }
     }

@@ -80,8 +80,8 @@ fn test_style_text_attributes() {
         ("d-text-small", 2.),
         ("d-text-medium", 3.), // Default, but include explicitly for completeness
         ("d-text-large", 4.5),
-        ("d-text-larger", 7.),
-        ("d-text-largest", 10.),
+        ("d-text-larger", 6.),
+        ("d-text-largest", 9.),
     ];
     for (class, size) in text_sizes {
         let input = format!(r#"<svg><text xy="0" class="{}">Hello!</text></svg>"#, class);
