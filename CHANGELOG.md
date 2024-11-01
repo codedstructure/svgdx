@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or via command line options; defaults remain 3.0 and sans-serif respectively, but now
   text classes such as `d-text-smaller` can scale together based on the base font size.
 
+- svgdx-server: vendored the CodeMirror5 editor source used for the online editor.
+  This allows totally local use of svgdx-server without relying on any internet
+  connectivity.
+
 ## [0.13.0 - 2024-10-03]
 
 - Improved / changed: better positioning support for `<use>` and `<reuse>` elements.

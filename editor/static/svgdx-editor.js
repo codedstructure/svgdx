@@ -125,7 +125,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     async function svgdx_transform_server(svgdx_input) {
         try {
             statusbar.style.opacity = "0.3";
-            const response = await fetch('transform', {
+            const response = await fetch('api/transform', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml'
