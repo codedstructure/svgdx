@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 # For (size) profiling use `--profiling` here and `cargo install twiggy`,
-# then `twiggy top pkg/svgdx_bg.wasm`
+# then `twiggy top editor/pkg/svgdx_bg.wasm`
 PROFILE_ARG="--release"  # One of `--dev`, `--profiling`, `--release`
-OUT_DIR="static/pkg"
+OUT_DIR="editor/pkg"
 
 echo "Ensuring wasm-pack is installed..."
 cargo install wasm-pack
