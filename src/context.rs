@@ -10,6 +10,7 @@ use crate::TransformConfig;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
@@ -17,30 +18,33 @@ use rand_pcg::Pcg32;
 use anyhow::{bail, Result};
 
 pub struct TransformerContext {
-    // Current state of given element; may be updated as processing continues
+    /// Current state of given element; may be updated as processing continues
     elem_map: HashMap<String, SvgElement>,
-    // Original state of given element; used for `reuse` elements
+    /// Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    // Stack of elements which have been started but not yet ended
-    // Note empty elements are normally not pushed onto the stack,
-    // but `<reuse>` elements are an exception during processing of
-    // the referenced element.
+    /// Stack of elements which have been started but not yet ended
+    ///
+    /// Note empty elements are normally not pushed onto the stack,
+    /// but `<reuse>` elements are an exception during processing of
+    /// the referenced element.
     element_stack: Vec<Rc<RefCell<dyn ElementLike>>>,
-    // The element which `^` refers to; some elements are ignored as 'previous'
+    /// The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
-    // Stack of scoped variable mappings
+    /// Stack of scoped variable mappings
     var_stack: Vec<HashMap<String, String>>,
-    // Pcg32 is used as it is both seedable and portable.
+    /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
-    // Is this a 'real' SVG doc, or just a fragment?
+    /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
-    // Are we in a <specs> block?
+    /// Are we in a <specs> block?
     pub in_specs: bool,
-    // How many <loop> elements deep are we?
+    /// How many <loop> elements deep are we?
     pub loop_depth: usize,
-    // The event-representation of the entire input SVG
+    /// The event-representation of the entire input SVG
     pub events: Vec<InputEvent>,
-    // Config of transformer processing; updated by <config> elements
+    /// id used by top-level SVG element if local_styles is true
+    pub local_style_id: Option<String>,
+    /// Config of transformer processing; updated by <config> elements
     pub config: TransformConfig,
 }
 
@@ -53,6 +57,7 @@ impl Default for TransformerContext {
             prev_element: None,
             var_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
+            local_style_id: None,
             real_svg: false,
             in_specs: false,
             loop_depth: 0,
@@ -148,6 +153,32 @@ impl ContextView for TransformerContext {}
 impl TransformerContext {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Create a new `TransformerContext` from a given config object.
+    ///
+    /// Note the config object is cloned and stored in the context.
+    pub fn from_config(config: &TransformConfig) -> Self {
+        let mut ctx = Self::default();
+        ctx.set_config(config.clone());
+        ctx
+    }
+
+    pub fn set_config(&mut self, config: TransformConfig) {
+        self.seed_rng(config.seed);
+        if config.use_local_styles {
+            // randomise the local id to avoid conflicts with other SVG
+            // elements in the same (e.g. HTML) document.
+            let now_seed = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as u64;
+            let mut rng = Pcg32::seed_from_u64(now_seed);
+            self.local_style_id = Some(format!("svgdx-{:08x}", rng.gen::<u32>()))
+        } else {
+            self.local_style_id = None;
+        }
+        self.config = config;
     }
 
     pub fn set_events(&mut self, events: Vec<InputEvent>) {

@@ -6,6 +6,7 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 
+use crate::themes::ThemeType;
 use crate::{transform_file, TransformConfig};
 
 /// Command line arguments
@@ -38,7 +39,15 @@ struct Arguments {
 
     /// Don't add referenced styles automatically
     #[arg(long)]
-    no_auto_style: bool,
+    no_auto_styles: bool,
+
+    /// Make styles local to this document using CSS nesting.
+    ///
+    /// Useful when embedding multiple SVGs in a single document,
+    /// especially if they use different themes.
+    /// May not work in all SVG applications.
+    #[arg(long)]
+    use_local_styles: bool,
 
     /// Default background colour if auto-styles are active
     #[arg(long, default_value = "default")]
@@ -53,6 +62,8 @@ struct Arguments {
     add_metadata: bool,
 
     /// Limit on number of iterations for loop elements
+    ///
+    /// This helps prevent infinite loops when rendering <loop> elements.
     #[arg(long, default_value = "1000")]
     loop_limit: u32,
 
@@ -61,16 +72,18 @@ struct Arguments {
     var_limit: u32,
 
     /// Default font-size (in user-units)
+    ///
+    /// Text size classes (such as d-text-smaller) are based on this value.
     #[arg(long, default_value = "3.0")]
     font_size: f32,
 
-    /// Default font-family
+    /// Default font-family to use for text elements
     #[arg(long, default_value = "sans-serif")]
     font_family: String,
 
     /// Theme to use
     #[arg(long, default_value = "default")]
-    theme: String,
+    theme: ThemeType,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -123,7 +136,8 @@ impl Config {
                 debug: args.debug,
                 scale: args.scale,
                 border: args.border,
-                add_auto_styles: !args.no_auto_style,
+                add_auto_styles: !args.no_auto_styles,
+                use_local_styles: args.use_local_styles,
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,
@@ -131,7 +145,7 @@ impl Config {
                 var_limit: args.var_limit,
                 font_size: args.font_size,
                 font_family: args.font_family,
-                theme: args.theme.parse().context("Invalid theme")?,
+                theme: args.theme,
             },
         })
     }

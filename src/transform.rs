@@ -238,27 +238,25 @@ impl ElementLike for ConfigElement {
         element: &SvgElement,
         context: &mut TransformerContext,
     ) -> Result<()> {
+        let mut new_config = context.config.clone();
         for (key, value) in &element.attrs {
             match key.as_str() {
-                "scale" => context.config.scale = value.parse()?,
-                "debug" => context.config.debug = value.parse()?,
-                "add-auto-styles" => context.config.add_auto_styles = value.parse()?,
-                "border" => context.config.border = value.parse()?,
-                "background" => context.config.background.clone_from(value),
-                "loop-limit" => context.config.loop_limit = value.parse()?,
-                "var-limit" => context.config.var_limit = value.parse()?,
-                "font-size" => context.config.font_size = value.parse()?,
-                "font-family" => context.config.font_family.clone_from(value),
-                "seed" => {
-                    context.config.seed = value.parse()?;
-                    context.seed_rng(context.config.seed);
-                }
-                "theme" => {
-                    context.config.theme = value.parse()?;
-                }
+                "scale" => new_config.scale = value.parse()?,
+                "debug" => new_config.debug = value.parse()?,
+                "add-auto-styles" => new_config.add_auto_styles = value.parse()?,
+                "use-local-styles" => new_config.use_local_styles = value.parse()?,
+                "border" => new_config.border = value.parse()?,
+                "background" => new_config.background.clone_from(value),
+                "loop-limit" => new_config.loop_limit = value.parse()?,
+                "var-limit" => new_config.var_limit = value.parse()?,
+                "font-size" => new_config.font_size = value.parse()?,
+                "font-family" => new_config.font_family.clone_from(value),
+                "seed" => new_config.seed = value.parse()?,
+                "theme" => new_config.theme = value.parse()?,
                 _ => bail!("Unknown config setting {key}"),
             }
         }
+        context.set_config(new_config);
         Ok(())
     }
 }
@@ -667,10 +665,9 @@ pub struct Transformer {
 
 impl Transformer {
     pub fn from_config(config: &TransformConfig) -> Self {
-        let mut context = TransformerContext::new();
-        context.seed_rng(config.seed);
-        context.config = config.clone();
-        Self { context }
+        Self {
+            context: TransformerContext::from_config(config),
+        }
     }
 
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
@@ -756,6 +753,11 @@ impl Transformer {
             if !orig_svg_attrs.contains_key("xmlns") {
                 new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
             }
+            if !orig_svg_attrs.contains_key("id") {
+                if let Some(local_id) = &self.context.local_style_id {
+                    new_svg_bs.push_attribute(Attribute::from(("id", local_id.as_str())));
+                }
+            }
             // If width or height are provided, leave width/height/viewBox alone.
             let orig_width = orig_svg_attrs.get("width");
             let orig_height = orig_svg_attrs.get("height");
@@ -820,7 +822,7 @@ impl Transformer {
         // i.e. this is a full SVG document rather than a fragment.
         if has_svg_element && !self.context.real_svg && self.context.config.add_auto_styles {
             let indent = 2;
-            let mut tb = ThemeBuilder::new(&self.context.config, &element_set, &class_set);
+            let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
             tb.build();
             let auto_defs = tb.get_defs();
             let auto_styles = tb.get_styles();

@@ -99,6 +99,8 @@ pub struct TransformConfig {
     pub font_family: String,
     /// Theme to use (default "default")
     pub theme: ThemeType,
+    /// Make styles local to this document
+    pub use_local_styles: bool,
 }
 
 impl Default for TransformConfig {
@@ -116,6 +118,7 @@ impl Default for TransformConfig {
             font_size: 3.0,
             font_family: "sans-serif".to_owned(),
             theme: ThemeType::default(),
+            use_local_styles: false,
         }
     }
 }

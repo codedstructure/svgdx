@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Added `use-local-styles` CLI and `<config>` element option. If active, this adds a
+  random `id` attribute to the top-level `<svg>` output element, and uses that with
+  CSS nesting to keep all styles tied to the immediate document. This is useful when
+  embedding svgdx output documents in another e.g. HTML document (as done by
+  [mdbook-svgdx](https://crates.io/crates/mdbook-svgdx), for example), but may not
+  function correctly in non-browser applications.
+
 ## [0.13.1 - 2024-01-01]
 
 - Added `font-size` and `font-family` config options, available in the `<config>` element

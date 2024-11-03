@@ -3,21 +3,23 @@
 // themes provide two outputs: a set of `defs` elements (patterns, markers, gradients etc)
 // and a set of `styles` entries (typically CSS rules).
 
+use crate::context::TransformerContext;
 use crate::types::fstr;
-use crate::TransformConfig;
 use std::{collections::HashSet, str::FromStr};
 
 use crate::colours::{COLOUR_LIST, DARK_COLOURS};
 use anyhow::bail;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ThemeType {
-    Default(DefaultTheme),
-    Bold(BoldTheme),
-    Fine(FineTheme),
-    Glass(GlassTheme),
-    Light(LightTheme),
-    Dark(DarkTheme),
+    #[default]
+    Default,
+    Bold,
+    Fine,
+    Glass,
+    Light,
+    Dark,
 }
 
 impl FromStr for ThemeType {
@@ -26,22 +28,16 @@ impl FromStr for ThemeType {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "default" => Ok(Self::default()),
-            "bold" => Ok(Self::Bold(BoldTheme)),
-            "fine" => Ok(Self::Fine(FineTheme)),
-            "glass" => Ok(Self::Glass(GlassTheme)),
-            "light" => Ok(Self::Light(LightTheme)),
-            "dark" => Ok(Self::Dark(DarkTheme)),
+            "bold" => Ok(Self::Bold),
+            "fine" => Ok(Self::Fine),
+            "glass" => Ok(Self::Glass),
+            "light" => Ok(Self::Light),
+            "dark" => Ok(Self::Dark),
             _ => bail!(
                 "Unknown theme '{}' (available themes: default, bold, fine, glass, light, dark)",
                 s
             ),
         }
-    }
-}
-
-impl Default for ThemeType {
-    fn default() -> Self {
-        ThemeType::Default(DefaultTheme)
     }
 }
 
@@ -322,13 +318,28 @@ fn d_hardshadow(tb: &mut ThemeBuilder, _: &str) {
 
 trait Theme: Clone {
     fn build(&self, tb: &mut ThemeBuilder) {
+        let mut outer_svg = String::from("svg");
+        if let Some(id) = &tb.local_style_id {
+            outer_svg = format!("svg#{}", id);
+        }
+        // Any background style needs to be prior to potential CSS nesting from local_id
+        // - it isn't a descendant of the local_id element, but that element itself.
         if tb.background != "default" {
-            tb.add_style(&format!("svg {{ background: {}; }}", tb.background));
+            tb.add_style(&format!(
+                "{} {{ background: {}; }}",
+                outer_svg, tb.background
+            ));
         } else {
             tb.add_style(&format!(
-                "svg {{ background: {}; }}",
+                "{} {{ background: {}; }}",
+                outer_svg,
                 self.default_background()
             ));
+        }
+        if let Some(id) = &tb.local_style_id {
+            // Start a nested CSS block for styles to ensure they don't leak
+            // to surrounding document.
+            tb.add_style(&format!("#{} {{", id));
         }
         self.append_early_styles(tb);
         append_common_styles(
@@ -367,6 +378,10 @@ trait Theme: Clone {
             }
         }
         self.append_late_styles(tb);
+        // Close the nested CSS block if we opened one.
+        if tb.local_style_id.is_some() {
+            tb.add_style("}");
+        }
     }
     fn default_fill(&self) -> String {
         String::from("white")
@@ -385,6 +400,7 @@ trait Theme: Clone {
 }
 
 pub struct ThemeBuilder {
+    local_style_id: Option<String>,
     styles: Vec<String>,
     defs: Vec<String>,
 
@@ -398,29 +414,30 @@ pub struct ThemeBuilder {
 
 impl ThemeBuilder {
     pub fn new(
-        config: &TransformConfig,
+        context: &TransformerContext,
         elements: &HashSet<String>,
         classes: &HashSet<String>,
     ) -> Self {
         Self {
+            local_style_id: context.local_style_id.clone(),
             styles: Vec::new(),
             defs: Vec::new(),
-            background: config.background.clone(),
-            font_size: config.font_size,
-            font_family: config.font_family.clone(),
-            theme: config.theme.clone(),
+            background: context.config.background.clone(),
+            font_size: context.config.font_size,
+            font_family: context.config.font_family.clone(),
+            theme: context.config.theme.clone(),
             classes: classes.to_owned(),
             elements: elements.to_owned(),
         }
     }
     pub fn build(&mut self) {
         match self.theme {
-            ThemeType::Default(_) => DefaultTheme {}.build(self),
-            ThemeType::Bold(_) => BoldTheme {}.build(self),
-            ThemeType::Fine(_) => FineTheme {}.build(self),
-            ThemeType::Glass(_) => GlassTheme {}.build(self),
-            ThemeType::Light(_) => LightTheme {}.build(self),
-            ThemeType::Dark(_) => DarkTheme {}.build(self),
+            ThemeType::Default => DefaultTheme {}.build(self),
+            ThemeType::Bold => BoldTheme {}.build(self),
+            ThemeType::Fine => FineTheme {}.build(self),
+            ThemeType::Glass => GlassTheme {}.build(self),
+            ThemeType::Light => LightTheme {}.build(self),
+            ThemeType::Dark => DarkTheme {}.build(self),
         }
     }
     fn has_class(&self, s: &str) -> bool {

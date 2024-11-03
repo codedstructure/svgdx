@@ -20,7 +20,8 @@ The following configuration settings can be applied using this element. These co
 | Name | Type | Example | Notes |
 | --- | --- | --- | --- |
 | debug | bool | `debug="true"` |
-| add-auto-styles | bool | `auto-add-styles="false"` | Inverse of `--no-auto-style` CLI option |
+| add-auto-styles | bool | `auto-add-styles="false"` | Inverse of `--no-auto-styles` CLI option |
+| use-local-styles | bool | `use-local-styles="true"` |
 | background | [colour name](https://www.w3.org/TR/SVG11/types.html#ColorKeywords) | `background="lightgrey"` |
 | scale | float | `scale="2.5"` |
 | border | integer | `border="20"` |
