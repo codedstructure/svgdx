@@ -377,6 +377,11 @@ impl SvgElement {
         self.classes.contains(class)
     }
 
+    /// Remove a class from the element, returning `true` if the class was present
+    pub fn pop_class(&mut self, class: &str) -> bool {
+        self.classes.remove(class)
+    }
+
     pub fn has_attr(&self, key: &str) -> bool {
         self.attrs.contains_key(key)
     }

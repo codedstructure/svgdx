@@ -1,0 +1,32 @@
+<svg>
+  <config font-size="2" border="12"/>
+  <rect id="ic1" wh="10 15" text="555" class="d-text-bold d-text-large d-text-vertical"/>
+  <circle xy="^@tl 1" r="1"/>
+  <loop count="4" start="20" step="20" loop-var="i">
+    <rect x2="#ic1@l" cy="#ic1@l:${i}%" wh="1 2"/>
+    <rect x1="#ic1@r" cy="#ic1@r:${i}%" wh="1 2"/>
+  </loop>
+  <text xy="#ic1@l:20%" text-offset="2" text="GND"/>
+  <text xy="#ic1@l:40%" text-offset="2" text="TRIG"/>
+  <text xy="#ic1@l:60%" text-offset="2" text="OUT"/>
+  <text xy="#ic1@l:80%" text-offset="2" text="RESET"/>
+  <text xy="#ic1@r:20%" text-offset="2" text="VCC"/>
+  <text xy="#ic1@r:40%" text-offset="2" text="DIS"/>
+  <text xy="#ic1@r:60%" text-offset="2" text="THR"/>
+  <text xy="#ic1@r:80%" text-offset="2" text="CTRL"/>
+
+  <rect id="ic2" xy="20" wh="10 15" text="TL081" class="d-text-bold d-text-large d-text-vertical"/>
+  <circle xy="^@tl 1" r="1"/>
+  <loop count="4" start="20" step="20" loop-var="i">
+    <rect x2="#ic2@l" cy="#ic2@l:${i}%" wh="1 2"/>
+    <rect x1="#ic2@r" cy="#ic2@r:${i}%" wh="1 2"/>
+  </loop>
+  <text xy="#ic2@l:20%" text-offset="2" text="OFFSET N1"/>
+  <text xy="#ic2@l:40%" text-offset="2" text="IN -"/>
+  <text xy="#ic2@l:60%" text-offset="2" text="IN +"/>
+  <text xy="#ic2@l:80%" text-offset="2" text="Vcc -"/>
+  <text xy="#ic2@r:20%" text-offset="2" text="NC"/>
+  <text xy="#ic2@r:40%" text-offset="2" text="Vcc +"/>
+  <text xy="#ic2@r:60%" text-offset="2" text="OUT"/>
+  <text xy="#ic2@r:80%" text-offset="2" text="OFFSET N2"/>
+</svg>

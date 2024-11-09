@@ -68,9 +68,9 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     // for other shapes it's pulled 'inside'. This can be overridden with
     // the 'd-text-inside' and 'd-text-outside' classes. Anchor classes and
     // text_offset direction are affected by the value of 'outside'.
-    let outside = if element.has_class("d-text-outside") {
+    let outside = if element.pop_class("d-text-outside") {
         true
-    } else if element.has_class("d-text-inside") {
+    } else if element.pop_class("d-text-inside") {
         false
     } else {
         matches!(element.name.as_str(), "line" | "point" | "text")

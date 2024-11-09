@@ -395,3 +395,108 @@ fn test_text_style() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_element() {
+    let input = r#"
+<text xy="0" text="thing"/>
+"#;
+    let expected = r#"
+<text x="0" y="0" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<text xy="0">thing</text>
+"#;
+    let expected = r#"
+<text x="0" y="0" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@c">thing</text>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@c" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_anchor() {
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z:h 3" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="14" y="5" class="d-tbox d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@bl" text-offset="2" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="-2" y="12" class="d-tbox d-text-top d-text-right">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@bl" text-offset="2" class="d-text-inside" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="2" y="8" class="d-tbox d-text-bottom d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10" text="thing" text-loc="r" class="d-text-outside"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="11" y="5" class="d-tbox d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
