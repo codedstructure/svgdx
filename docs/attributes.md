@@ -195,9 +195,9 @@ Type: [Location](#location)
 
 Applies to: Basic shapes
 
-### `text-inset`
+### `text-offset`
 When `text-loc` is used to place text at the corner or edge of a shape, it can become unreadable if pushed all the way to the edge.
-The `text-inset` attribute - which defaults to '1' if omitted - controls how much the text string is 'pulled in' from the edge or corner.
+The `text-offset` attribute - which defaults to '1' if omitted - controls how much the text string is 'pulled in' from the edge or corner.
 
 For centered text this has no effect.
 

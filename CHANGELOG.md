@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved text positioning, useful when needing multiple text labels inside or
+  around another shape (though it's still only possible to provide a single label
+  via the `text` attribute within a single element)
+
+  * `<text>` elements positioned relative to another element using the `xy` attribute
+    gain automatic `text-loc` anchoring depending on the relative position.
+    For example if positioned above (e.g. `xy="#id:V"`) an element, the anchor
+    will be bottom-center of the text.
+  * `text-loc` attributes can now use edgespec (e.g. "b:30%")
+  * New `d-text-inside` and `d-text-outside` classes can override the default
+    text placement of 'inside' basic shapes / 'outside' lines & points.
+
+- Changed: renamed `text-inset` attribute to `text-offset`, since this is equally
+  usable outside shapes as inside them. Any use of this attribute will need to be
+  renamed in your svgdx documents.
+
 - Added `use-local-styles` CLI and `<config>` element option. If active, this adds a
   random `id` attribute to the top-level `<svg>` output element, and uses that with
   CSS nesting to keep all styles tied to the immediate document. This is useful when

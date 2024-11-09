@@ -309,9 +309,9 @@ fn test_text_cdata_pre() {
 }
 
 #[test]
-fn test_text_inset() {
+fn test_text_offset() {
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3"/>
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-offset="3"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -324,7 +324,7 @@ fn test_text_inset() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="bl" text-inset="3"/>
+<rect cxy="20" wh="20" text="thing" text-loc="bl" text-offset="3"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -339,7 +339,7 @@ fn test_text_inset() {
 
 #[test]
 fn test_text_inset_dxy() {
-    // text-dxy should be applied after text-inset (which defaults to 1)
+    // text-dxy should be applied after text-offset (which defaults to 1)
     let input = r#"
 <rect cxy="20" wh="20" text="thing" text-loc="t" text-dx="1" text-dy="2"/>
 "#;
@@ -354,7 +354,7 @@ fn test_text_inset_dxy() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3" text-dxy="0.5"/>
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-offset="3" text-dxy="0.5"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -367,7 +367,7 @@ fn test_text_inset_dxy() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="tr" text-inset="3" text-dxy="-0.5"/>
+<rect cxy="20" wh="20" text="thing" text-loc="tr" text-offset="3" text-dxy="-0.5"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
