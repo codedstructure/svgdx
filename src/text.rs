@@ -149,7 +149,8 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let (tdx, tdy, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
     text_classes.push("d-tbox");
 
-    let text_attrs = vec![("x".into(), fstr(tdx)), ("y".into(), fstr(tdy))];
+    let x_str = fstr(tdx);
+    let y_str = fstr(tdy);
     let mut text_elements = Vec::new();
     let mut lines: Vec<_> = text_value.lines().collect();
     let line_count = lines.len();
@@ -158,7 +159,13 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let vertical = orig_elem.has_class("d-text-vertical");
 
     // There will always be a text element; if not multiline this is the only element.
-    let mut text_elem = SvgElement::new("text", &text_attrs);
+    let mut text_elem = if orig_elem.name == "text" {
+        orig_elem.clone()
+    } else {
+        SvgElement::new("text", &[])
+    };
+    text_elem.set_attr("x", &x_str);
+    text_elem.set_attr("y", &y_str);
     // line spacing (in 'em').
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
     // Whether text is pre-formatted (i.e. spaces are not collapsed)
@@ -231,10 +238,12 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             (_, _, _) => WRAP_MID,
         };
 
-        let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
-        tspan_elem.attrs.pop(if vertical { "x" } else { "y" });
+        let mut tspan_elem = SvgElement::new("tspan", &[]);
         if vertical {
+            tspan_elem.set_attr("y", &y_str);
             lines = lines.into_iter().rev().collect();
+        } else {
+            tspan_elem.set_attr("x", &x_str);
         }
         for (idx, text_fragment) in lines.into_iter().enumerate() {
             let mut text_fragment = text_fragment.to_string();
