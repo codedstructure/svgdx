@@ -139,39 +139,6 @@ impl ElementLike for SvgElement {
 }
 
 #[derive(Debug, Clone)]
-struct RootSvgElement(SvgElement);
-
-impl ElementLike for RootSvgElement {
-    fn handle_element_start(
-        &mut self,
-        element: &SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        // The outer <svg> element is a special case.
-        // "Real" SVG documents will have an `xmlns` attribute.
-        if context.get_top_element().is_none()
-            && element.get_attr("xmlns") == Some("http://www.w3.org/2000/svg".to_owned())
-        {
-            context.real_svg = true;
-        }
-
-        Ok(())
-    }
-
-    fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
-        Ok(EventList::from(if self.0.is_empty_element() {
-            SvgEvent::Empty(self.0.clone())
-        } else {
-            SvgEvent::Start(self.0.clone())
-        }))
-    }
-
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-}
-
-#[derive(Debug, Clone)]
 struct GroupElement {
     el: SvgElement,
     bbox: Option<BoundingBox>,
@@ -378,7 +345,6 @@ impl SvgElement {
             "loop" => Rc::new(RefCell::new(LoopElement(self.clone()))), //LoopDef::try_from(element).unwrap())),
             "config" => Rc::new(RefCell::new(ConfigElement {})),
             "reuse" => Rc::new(RefCell::new(ReuseElement(self.clone()))),
-            "svg" => Rc::new(RefCell::new(RootSvgElement(self.clone()))),
             "specs" => Rc::new(RefCell::new(SpecsElement {})),
             "var" => Rc::new(RefCell::new(VarElement {})),
             "if" => Rc::new(RefCell::new(IfElement(self.clone()))),
@@ -389,6 +355,32 @@ impl SvgElement {
             _ => Rc::new(RefCell::new(self.clone())),
         }
     }
+}
+
+/// Check if the input events represent a "real" SVG document
+///
+/// This is determined by checking for the first Start event being `<svg>`
+/// with a valid SVG 'xmlns' attribute. Note there may be *events* such as
+/// processing instructions or comments before the first Start event.
+///
+/// This does *not* check that the entire doc is valid, and is intended
+/// to be fast in common cases.
+fn is_real_svg(events: &EventList) -> bool {
+    for ev in events.iter() {
+        if matches!(ev.event, Event::Start(_) | Event::Empty(_)) {
+            if let Ok(el) = SvgElement::try_from(ev.clone()) {
+                // "Real" SVG documents will have an `xmlns` attribute with
+                // the value "http://www.w3.org/2000/svg"
+                if el.name == "svg" {
+                    if let Some(val) = el.get_attr("xmlns") {
+                        return val == "http://www.w3.org/2000/svg";
+                    }
+                }
+            }
+            return false;
+        }
+    }
+    false
 }
 
 fn process_seq(
@@ -496,7 +488,10 @@ fn process_seq(
                 let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
 
                 let ell = context.pop_element().with_context(|| {
-                    format!("no matching element to close at line {}", input_ev.line)
+                    format!(
+                        "no matching '{}' element to close at line {}",
+                        ee_name, input_ev.line
+                    )
                 })?;
                 let mut event_element = ell
                     .borrow_mut()
@@ -537,16 +532,16 @@ fn process_seq(
                 };
                 if let Ok(ref mut events) = events {
                     if !events.is_empty() {
-                        // `is_content_text` elements have responsibility for handling their own text content,
+                        // graphics elements have responsibility for handling their own text content,
                         // otherwise include the text element immediately after the opening element.
-                        if !event_element.is_content_text() {
+                        if !event_element.is_graphics_element() {
                             if let ContentType::Ready(content) = event_element.content.clone() {
                                 events.push(Event::Text(BytesText::new(&content)));
                             }
                         }
                         gen_events.push((event_element.order_index.clone(), events.clone()));
                         // TODO: this is about 'self_closing' elements include loop, g.
-                        if !(event_element.is_content_text()
+                        if !(event_element.is_graphics_element()
                             || event_element.name == "loop"
                             || event_element.name == "if")
                         {
@@ -589,7 +584,7 @@ fn process_seq(
                         // preserve whitespace in the content text).
                         want_text |= last_element.content.is_ready();
                     }
-                    set_element_content_text = last_element.is_content_text() && want_text;
+                    set_element_content_text = last_element.is_graphics_element() && want_text;
                 }
 
                 let mut processed = false;
@@ -647,6 +642,13 @@ fn process_seq(
 }
 
 pub fn process_events(input: EventList, context: &mut TransformerContext) -> Result<EventList> {
+    if is_real_svg(&input) {
+        if context.get_top_element().is_none() {
+            // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document
+            context.real_svg = true;
+        }
+        return Ok(input);
+    }
     let mut output = EventList { events: vec![] };
     let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
@@ -678,6 +680,11 @@ impl Transformer {
     }
 
     fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {
+        if self.context.real_svg {
+            // We don't do any post-processing on 'real' SVG documents
+            return output.write_to(writer);
+        }
+
         let mut elem_path = Vec::new();
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
@@ -820,7 +827,7 @@ impl Transformer {
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && !self.context.real_svg && self.context.config.add_auto_styles {
+        if has_svg_element && self.context.config.add_auto_styles {
             let indent = 2;
             let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
             tb.build();
@@ -899,6 +906,47 @@ fn indent_all(s: Vec<String>, indent: usize) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_is_real_svg() {
+        let real_inputs = [
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <svg xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" />
+            </svg>"#,
+            r#"<!-- Comment!! -->
+            <!-- Another comment -->
+            <svg xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" />
+            </svg>"#,
+            r#"<svg xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" />
+            </svg>"#,
+        ];
+        for input in real_inputs {
+            assert!(is_real_svg(&EventList::from(input)), "{:?}", input);
+        }
+
+        let unreal_inputs = [
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <svg>
+                <rect width="100" height="100" />
+            </svg>"#,
+            r#"<svg>
+                <rect width="100" height="100" />
+            </svg>"#,
+            r#"<!-- Comment!! -->
+            <!-- Not 'real SVG' - has a non-svg first element -->
+            <rect width="100" height="100"/>
+            <svg xmlns="http://www.w3.org/2000/svg">
+                <rect width="100" height="100" />
+            </svg>"#,
+            r#"<rect width="100" height="100"/>"#,
+        ];
+        for input in unreal_inputs {
+            assert!(!is_real_svg(&EventList::from(input)), "{:?}", input);
+        }
+    }
 
     #[test]
     fn test_process_seq() {

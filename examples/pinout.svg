@@ -1,0 +1,62 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="58mm" height="59mm" viewBox="-14 -12 58 59">
+  <style>
+  <![CDATA[
+    svg { background: none; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 2px; fill: black }
+    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-left, text.d-text-left * { text-anchor: start; }
+    text.d-text-right, text.d-text-right * { text-anchor: end; }
+    text.d-text-bold, text.d-text-bold * { font-weight: bold; }
+    text.d-text-large, text.d-text-large * { font-size: 3px; }
+  ]]>
+  </style>
+  <rect id="ic1" width="10" height="15" class="d-text-bold d-text-large d-text-vertical"/>
+  <text x="5" y="7.5" writing-mode="tb" class="d-text-bold d-text-large d-text-vertical d-tbox">555</text>
+  <circle cx="2" cy="2" r="1"/>
+
+    <rect x="-1" y="2" width="1" height="2"/>
+    <rect x="10" y="2" width="1" height="2"/>
+
+    <rect x="-1" y="5" width="1" height="2"/>
+    <rect x="10" y="5" width="1" height="2"/>
+
+    <rect x="-1" y="8" width="1" height="2"/>
+    <rect x="10" y="8" width="1" height="2"/>
+
+    <rect x="-1" y="11" width="1" height="2"/>
+    <rect x="10" y="11" width="1" height="2"/>
+  <text x="-2" y="3" class="d-tbox d-text-right">GND</text>
+  <text x="-2" y="6" class="d-tbox d-text-right">TRIG</text>
+  <text x="-2" y="9" class="d-tbox d-text-right">OUT</text>
+  <text x="-2" y="12" class="d-tbox d-text-right">RESET</text>
+  <text x="12" y="3" class="d-tbox d-text-left">VCC</text>
+  <text x="12" y="6" class="d-tbox d-text-left">DIS</text>
+  <text x="12" y="9" class="d-tbox d-text-left">THR</text>
+  <text x="12" y="12" class="d-tbox d-text-left">CTRL</text>
+
+  <rect id="ic2" x="20" y="20" width="10" height="15" class="d-text-bold d-text-large d-text-vertical"/>
+  <text x="25" y="27.5" writing-mode="tb" class="d-text-bold d-text-large d-text-vertical d-tbox">TL081</text>
+  <circle cx="22" cy="22" r="1"/>
+
+    <rect x="19" y="22" width="1" height="2"/>
+    <rect x="30" y="22" width="1" height="2"/>
+
+    <rect x="19" y="25" width="1" height="2"/>
+    <rect x="30" y="25" width="1" height="2"/>
+
+    <rect x="19" y="28" width="1" height="2"/>
+    <rect x="30" y="28" width="1" height="2"/>
+
+    <rect x="19" y="31" width="1" height="2"/>
+    <rect x="30" y="31" width="1" height="2"/>
+  <text x="18" y="23" class="d-tbox d-text-right">OFFSET N1</text>
+  <text x="18" y="26" class="d-tbox d-text-right">IN -</text>
+  <text x="18" y="29" class="d-tbox d-text-right">IN +</text>
+  <text x="18" y="32" class="d-tbox d-text-right">Vcc -</text>
+  <text x="32" y="23" class="d-tbox d-text-left">NC</text>
+  <text x="32" y="26" class="d-tbox d-text-left">Vcc +</text>
+  <text x="32" y="29" class="d-tbox d-text-left">OUT</text>
+  <text x="32" y="32" class="d-tbox d-text-left">OFFSET N2</text>
+</svg>

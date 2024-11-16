@@ -309,9 +309,9 @@ fn test_text_cdata_pre() {
 }
 
 #[test]
-fn test_text_inset() {
+fn test_text_offset() {
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3"/>
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-offset="3"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -324,7 +324,7 @@ fn test_text_inset() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="bl" text-inset="3"/>
+<rect cxy="20" wh="20" text="thing" text-loc="bl" text-offset="3"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -339,7 +339,7 @@ fn test_text_inset() {
 
 #[test]
 fn test_text_inset_dxy() {
-    // text-dxy should be applied after text-inset (which defaults to 1)
+    // text-dxy should be applied after text-offset (which defaults to 1)
     let input = r#"
 <rect cxy="20" wh="20" text="thing" text-loc="t" text-dx="1" text-dy="2"/>
 "#;
@@ -354,7 +354,7 @@ fn test_text_inset_dxy() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="t" text-inset="3" text-dxy="0.5"/>
+<rect cxy="20" wh="20" text="thing" text-loc="t" text-offset="3" text-dxy="0.5"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -367,7 +367,7 @@ fn test_text_inset_dxy() {
     );
 
     let input = r#"
-<rect cxy="20" wh="20" text="thing" text-loc="tr" text-inset="3" text-dxy="-0.5"/>
+<rect cxy="20" wh="20" text="thing" text-loc="tr" text-offset="3" text-dxy="-0.5"/>
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
@@ -392,6 +392,132 @@ fn test_text_style() {
 
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_element() {
+    let input = r#"
+<text xy="0" text="thing"/>
+"#;
+    let expected = r#"
+<text x="0" y="0" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<text xy="0">thing</text>
+"#;
+    let expected = r#"
+<text x="0" y="0" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@c">thing</text>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@c" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_anchor() {
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z:h 3" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="14" y="5" class="d-tbox d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@bl" text-offset="2" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="-2" y="12" class="d-tbox d-text-top d-text-right">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z@bl" text-offset="2" class="d-text-inside" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="2" y="8" class="d-tbox d-text-bottom d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<rect id="z" xy="0" wh="10" text="thing" text-loc="r" class="d-text-outside"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="11" y="5" class="d-tbox d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_element_attrs() {
+    let input1 = r#"
+<text xy="0" text="thing" font-size="2em" font-weight="bold"/>
+"#;
+    let input2 = r#"
+<text xy="0" font-size="2em" font-weight="bold">thing</text>
+"#;
+    let expected = r#"
+<text x="0" y="0" font-size="2em" font-weight="bold" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input1).unwrap().trim(),
+        expected.trim()
+    );
+    assert_eq!(
+        transform_str_default(input2).unwrap().trim(),
         expected.trim()
     );
 }

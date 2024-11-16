@@ -4,7 +4,7 @@ use crate::events::SvgEvent;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
-    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
+    strp_length, BoundingBox, DirSpec, EdgeSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
@@ -211,7 +211,8 @@ impl SvgElement {
             }
         }
 
-        if self.is_content_text() && !self.has_attr("text") {
+        // Should inner text content of this element be treated as element text?
+        if self.is_graphics_element() && !self.has_attr("text") {
             if let ContentType::Ready(ref value) = self.clone().content {
                 self.set_attr("text", value);
             }
@@ -315,6 +316,11 @@ impl SvgElement {
         self.eval_rel_attributes(ctx)?;
         self.resolve_size_delta();
 
+        // ensure relatively-positioned text elements have appropriate anchors
+        if self.name == "text" && self.has_attr("text") {
+            self.eval_text_anchor(ctx)?;
+        }
+
         self.eval_rel_position(ctx)?;
         // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
         self.expand_compound_pos();
@@ -372,6 +378,11 @@ impl SvgElement {
         self.classes.contains(class)
     }
 
+    /// Remove a class from the element, returning `true` if the class was present
+    pub fn pop_class(&mut self, class: &str) -> bool {
+        self.classes.remove(class)
+    }
+
     pub fn has_attr(&self, key: &str) -> bool {
         self.attrs.contains_key(key)
     }
@@ -427,6 +438,13 @@ impl SvgElement {
 
     pub fn set_attr(&mut self, key: &str, value: &str) {
         self.attrs.insert(key, value);
+    }
+
+    /// set an attribute key/value if the key does not already exist
+    pub fn set_default_attr(&mut self, key: &str, value: &str) {
+        if !self.has_attr(key) {
+            self.set_attr(key, value);
+        }
     }
 
     pub fn get_attrs(&self) -> HashMap<String, String> {
@@ -499,14 +517,6 @@ impl SvgElement {
                 // Following are non-standard.
                 | "specs"
         )
-    }
-
-    /// Should text content of this element be treated as element text?
-    pub fn is_content_text(&self) -> bool {
-        // This is present for graphics elements except for text,
-        // where we need to be transparent.
-        // TODO: except where we don't....
-        self.is_graphics_element() && self.name != "text"
     }
 
     pub fn is_empty_element(&self) -> bool {
@@ -866,11 +876,54 @@ impl SvgElement {
                         | "r"
                         | "rx"
                         | "ry",
-                ) | ("point", "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2",)
+                ) | (
+                    "text" | "point",
+                    "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2",
+                )
             ) {
                 let computed = self.eval_rel_attr(&key, &value, ctx)?;
                 if strp(&computed).is_ok() {
                     self.attrs.insert(key.clone(), computed);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn eval_text_anchor(&mut self, ctx: &impl ContextView) -> Result<()> {
+        // we do some of this processing as part of positioning, but don't want
+        // to be tightly coupled to that.
+        let input = self.attrs.get("xy");
+        if let Some(input) = input {
+            let (_, rel_loc) = split_relspec(input, ctx)?;
+            let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
+            if let Some(rel) = rel_loc.strip_prefix(':') {
+                match rel.parse()? {
+                    DirSpec::Above => self.set_default_attr("text-loc", "t"),
+                    DirSpec::Below => self.set_default_attr("text-loc", "b"),
+                    DirSpec::InFront => self.set_default_attr("text-loc", "r"),
+                    DirSpec::Behind => self.set_default_attr("text-loc", "l"),
+                }
+            } else if let Some(edge_loc) = rel_loc.strip_prefix('@') {
+                if let Ok(edge_spec) = edge_loc.parse::<EdgeSpec>() {
+                    match edge_spec {
+                        EdgeSpec::Top(_) => self.set_default_attr("text-loc", "t"),
+                        EdgeSpec::Bottom(_) => self.set_default_attr("text-loc", "b"),
+                        EdgeSpec::Left(_) => self.set_default_attr("text-loc", "l"),
+                        EdgeSpec::Right(_) => self.set_default_attr("text-loc", "r"),
+                    }
+                } else if let Ok(loc_spec) = edge_loc.parse::<LocSpec>() {
+                    match loc_spec {
+                        LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
+                        LocSpec::Top => self.set_default_attr("text-loc", "t"),
+                        LocSpec::TopRight => self.set_default_attr("text-loc", "tr"),
+                        LocSpec::Right => self.set_default_attr("text-loc", "r"),
+                        LocSpec::BottomRight => self.set_default_attr("text-loc", "br"),
+                        LocSpec::Bottom => self.set_default_attr("text-loc", "b"),
+                        LocSpec::BottomLeft => self.set_default_attr("text-loc", "bl"),
+                        LocSpec::Left => self.set_default_attr("text-loc", "l"),
+                        LocSpec::Center => self.set_default_attr("text-loc", "c"),
+                    }
                 }
             }
         }

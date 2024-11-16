@@ -1,5 +1,5 @@
 use crate::element::{ContentType, SvgElement};
-use crate::position::LocSpec;
+use crate::position::{EdgeSpec, LocSpec};
 use crate::types::{attr_split_cycle, fstr, strp};
 
 use anyhow::{Context, Result};
@@ -51,58 +51,70 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     }
 
     let mut text_classes = vec!["d-tbox"];
-    let text_loc: LocSpec = element.pop_attr("text-loc").unwrap_or("c".into()).parse()?;
+    let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
+    let text_anchor = if let Ok(edge) = text_loc_str.parse::<EdgeSpec>() {
+        edge.as_loc()
+    } else {
+        text_loc_str.parse::<LocSpec>()?
+    };
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
-    // Without inset text squishes to the edge and can be unreadable
+    // Without offset text squishes to the edge and can be unreadable
     // Any specified dx/dy override this behaviour.
-    let text_inset = strp(&element.pop_attr("text-inset").unwrap_or("1".to_string()))?;
+    let text_offset = strp(&element.pop_attr("text-offset").unwrap_or("1".to_string()))?;
 
     let vertical = element.has_class("d-text-vertical");
-    let is_line = element.name == "line";
-    // text associated with a line is pushed 'outside' the line,
-    // where with other shapes it's pulled 'inside'. The classes
-    // and dx/dy values are opposite.
-    match text_loc {
+    // text associated with a line, point or text element is pushed 'outside';
+    // for other shapes it's pulled 'inside'. This can be overridden with
+    // the 'd-text-inside' and 'd-text-outside' classes. Anchor classes and
+    // text_offset direction are affected by the value of 'outside'.
+    let outside = if element.pop_class("d-text-outside") {
+        true
+    } else if element.pop_class("d-text-inside") {
+        false
+    } else {
+        matches!(element.name.as_str(), "line" | "point" | "text")
+    };
+    match text_anchor {
         LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => {
-            text_classes.push(match (is_line, vertical) {
+            text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-top",
                 (true, false) => "d-text-bottom",
                 (false, true) => "d-text-top-vertical",
                 (true, true) => "d-text-bottom-vertical",
             });
-            t_dy += if is_line { -text_inset } else { text_inset };
+            t_dy += if outside { -text_offset } else { text_offset };
         }
         LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
-            text_classes.push(match (is_line, vertical) {
+            text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-bottom",
                 (true, false) => "d-text-top",
                 (false, true) => "d-text-bottom-vertical",
                 (true, true) => "d-text-top-vertical",
             });
-            t_dy += if is_line { text_inset } else { -text_inset };
+            t_dy += if outside { text_offset } else { -text_offset };
         }
         _ => (),
     }
 
-    match text_loc {
+    match text_anchor {
         LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => {
-            text_classes.push(match (is_line, vertical) {
+            text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-left",
                 (true, false) => "d-text-right",
                 (false, true) => "d-text-left-vertical",
                 (true, true) => "d-text-right-vertical",
             });
-            t_dx += if is_line { -text_inset } else { text_inset };
+            t_dx += if outside { -text_offset } else { text_offset };
         }
         LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
-            text_classes.push(match (is_line, vertical) {
+            text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-right",
                 (true, false) => "d-text-left",
                 (false, true) => "d-text-right-vertical",
                 (true, true) => "d-text-left-vertical",
             });
-            t_dx += if is_line { text_inset } else { -text_inset };
+            t_dx += if outside { text_offset } else { -text_offset };
         }
         _ => (),
     }
@@ -110,11 +122,14 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = element.bbox()?.context("No BoundingBox")?.locspec(text_loc);
+    let (mut tdx, mut tdy) = element
+        .bbox()?
+        .context("No BoundingBox")?
+        .get_point(&text_loc_str)?;
     tdx += t_dx;
     tdy += t_dy;
 
-    Ok((tdx, tdy, text_loc, text_classes))
+    Ok((tdx, tdy, text_anchor, text_classes))
 }
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
@@ -134,7 +149,8 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let (tdx, tdy, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
     text_classes.push("d-tbox");
 
-    let text_attrs = vec![("x".into(), fstr(tdx)), ("y".into(), fstr(tdy))];
+    let x_str = fstr(tdx);
+    let y_str = fstr(tdy);
     let mut text_elements = Vec::new();
     let mut lines: Vec<_> = text_value.lines().collect();
     let line_count = lines.len();
@@ -143,7 +159,13 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let vertical = orig_elem.has_class("d-text-vertical");
 
     // There will always be a text element; if not multiline this is the only element.
-    let mut text_elem = SvgElement::new("text", &text_attrs);
+    let mut text_elem = if orig_elem.name == "text" {
+        orig_elem.clone()
+    } else {
+        SvgElement::new("text", &[])
+    };
+    text_elem.set_attr("x", &x_str);
+    text_elem.set_attr("y", &y_str);
     // line spacing (in 'em').
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
     // Whether text is pre-formatted (i.e. spaces are not collapsed)
@@ -216,10 +238,12 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             (_, _, _) => WRAP_MID,
         };
 
-        let mut tspan_elem = SvgElement::new("tspan", &text_attrs);
-        tspan_elem.attrs.pop(if vertical { "x" } else { "y" });
+        let mut tspan_elem = SvgElement::new("tspan", &[]);
         if vertical {
+            tspan_elem.set_attr("y", &y_str);
             lines = lines.into_iter().rev().collect();
+        } else {
+            tspan_elem.set_attr("x", &x_str);
         }
         for (idx, text_fragment) in lines.into_iter().enumerate() {
             let mut text_fragment = text_fragment.to_string();

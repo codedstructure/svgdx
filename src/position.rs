@@ -433,47 +433,47 @@ impl DirSpec {
     }
 }
 
-/// `EdgeSpec` defines one edge of a `BoundingBox`.
-///
-/// May be combined with a `Length` to refer to a point along an edge.
-#[derive(Clone, Copy)]
+/// `EdgeSpec` defines an offset along one edge of a `BoundingBox`.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum EdgeSpec {
-    Top,
-    Right,
-    Bottom,
-    Left,
+    Top(Length),
+    Right(Length),
+    Bottom(Length),
+    Left(Length),
 }
 
 impl FromStr for EdgeSpec {
     type Err = anyhow::Error;
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
-        match value {
-            "t" => Ok(Self::Top),
-            "r" => Ok(Self::Right),
-            "b" => Ok(Self::Bottom),
-            "l" => Ok(Self::Left),
-            _ => bail!("Invalid EdgeSpec format {value}"),
+        if let Some((edge, len)) = value.split_once(':') {
+            let len = len.parse::<Length>()?;
+            match edge {
+                "t" => Ok(Self::Top(len)),
+                "r" => Ok(Self::Right(len)),
+                "b" => Ok(Self::Bottom(len)),
+                "l" => Ok(Self::Left(len)),
+                _ => bail!("Invalid EdgeSpec format {value}"),
+            }
+        } else {
+            bail!("Invalid EdgeSpec format {value}")
         }
     }
 }
 
-impl TryFrom<LocSpec> for EdgeSpec {
-    type Error = anyhow::Error;
-
-    fn try_from(value: LocSpec) -> Result<Self, Self::Error> {
-        match value {
-            LocSpec::Top => Ok(Self::Top),
-            LocSpec::Right => Ok(Self::Right),
-            LocSpec::Bottom => Ok(Self::Bottom),
-            LocSpec::Left => Ok(Self::Left),
-            _ => bail!("Cannot convert LocSpec value into EdgeSpec"),
+impl EdgeSpec {
+    pub fn as_loc(&self) -> LocSpec {
+        match self {
+            Self::Top(_) => LocSpec::Top,
+            Self::Right(_) => LocSpec::Right,
+            Self::Bottom(_) => LocSpec::Bottom,
+            Self::Left(_) => LocSpec::Left,
         }
     }
 }
 
 /// `LocSpec` defines a location on a `BoundingBox`
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LocSpec {
     TopLeft,
     Top,
@@ -616,22 +616,20 @@ impl BoundingBox {
         }
     }
 
-    pub fn edgespec(&self, es: EdgeSpec, len: Length) -> (f32, f32) {
+    pub fn edgespec(&self, es: EdgeSpec) -> (f32, f32) {
         match es {
-            EdgeSpec::Top => (len.calc_offset(self.x1, self.x2), self.y1),
-            EdgeSpec::Right => (self.x2, len.calc_offset(self.y1, self.y2)),
-            EdgeSpec::Bottom => (len.calc_offset(self.x1, self.x2), self.y2),
-            EdgeSpec::Left => (self.x1, len.calc_offset(self.y1, self.y2)),
+            EdgeSpec::Top(len) => (len.calc_offset(self.x1, self.x2), self.y1),
+            EdgeSpec::Right(len) => (self.x2, len.calc_offset(self.y1, self.y2)),
+            EdgeSpec::Bottom(len) => (len.calc_offset(self.x1, self.x2), self.y2),
+            EdgeSpec::Left(len) => (self.x1, len.calc_offset(self.y1, self.y2)),
         }
     }
 
     /// Get point from a string such as 'tl' (top-left of this bbox) or
     /// 'r:30%' (30% down the right edge).
     pub fn get_point(&self, s: &str) -> Result<(f32, f32)> {
-        if let Some((es, ls)) = s.split_once(':') {
-            let es = es.parse::<EdgeSpec>()?;
-            let ls = ls.parse::<Length>()?;
-            Ok(self.edgespec(es, ls))
+        if let Ok(es) = s.parse::<EdgeSpec>() {
+            Ok(self.edgespec(es))
         } else if let Ok(ls) = s.parse::<LocSpec>() {
             Ok(self.locspec(ls))
         } else {
@@ -1002,5 +1000,56 @@ mod test {
         assert_eq!(strp_length("125%").expect("test").adjust(20.), 25.);
         assert_eq!(strp_length("1").expect("test").adjust(23.), 24.);
         assert_eq!(strp_length("-12").expect("test").adjust(123.), 111.);
+    }
+
+    #[test]
+    fn test_edgespec() {
+        assert_eq!(
+            "t:10".parse::<EdgeSpec>().expect("test"),
+            EdgeSpec::Top(Length::Absolute(10.))
+        );
+        assert_eq!(
+            "r:25%".parse::<EdgeSpec>().expect("test"),
+            EdgeSpec::Right(Length::Ratio(0.25))
+        );
+        assert_eq!(
+            "b:10".parse::<EdgeSpec>().expect("test"),
+            EdgeSpec::Bottom(Length::Absolute(10.))
+        );
+        assert_eq!(
+            "l:75%".parse::<EdgeSpec>().expect("test"),
+            EdgeSpec::Left(Length::Ratio(0.75))
+        );
+    }
+
+    #[test]
+    fn test_locspec() {
+        assert_eq!("tl".parse::<LocSpec>().expect("test"), LocSpec::TopLeft);
+        assert_eq!("t".parse::<LocSpec>().expect("test"), LocSpec::Top);
+        assert_eq!("tr".parse::<LocSpec>().expect("test"), LocSpec::TopRight);
+        assert_eq!("r".parse::<LocSpec>().expect("test"), LocSpec::Right);
+        assert_eq!("br".parse::<LocSpec>().expect("test"), LocSpec::BottomRight);
+        assert_eq!("b".parse::<LocSpec>().expect("test"), LocSpec::Bottom);
+        assert_eq!("bl".parse::<LocSpec>().expect("test"), LocSpec::BottomLeft);
+        assert_eq!("l".parse::<LocSpec>().expect("test"), LocSpec::Left);
+        assert_eq!("c".parse::<LocSpec>().expect("test"), LocSpec::Center);
+    }
+
+    #[test]
+    fn test_get_point() {
+        let bb = BoundingBox::new(10., 10., 20., 20.);
+        assert_eq!(bb.get_point("t:2").expect("test"), (12., 10.));
+        assert_eq!(bb.get_point("r:25%").expect("test"), (20., 12.5));
+        assert_eq!(bb.get_point("b:6").expect("test"), (16., 20.));
+        assert_eq!(bb.get_point("l:150%").expect("test"), (10., 25.));
+        assert_eq!(bb.get_point("tl").expect("test"), (10., 10.));
+        assert_eq!(bb.get_point("t").expect("test"), (15., 10.));
+        assert_eq!(bb.get_point("tr").expect("test"), (20., 10.));
+        assert_eq!(bb.get_point("r").expect("test"), (20., 15.));
+        assert_eq!(bb.get_point("br").expect("test"), (20., 20.));
+        assert_eq!(bb.get_point("b").expect("test"), (15., 20.));
+        assert_eq!(bb.get_point("bl").expect("test"), (10., 20.));
+        assert_eq!(bb.get_point("l").expect("test"), (10., 15.));
+        assert_eq!(bb.get_point("c").expect("test"), (15., 15.));
     }
 }
