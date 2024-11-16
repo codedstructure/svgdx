@@ -211,7 +211,8 @@ impl SvgElement {
             }
         }
 
-        if self.is_content_text() && !self.has_attr("text") {
+        // Should inner text content of this element be treated as element text?
+        if self.is_graphics_element() && !self.has_attr("text") {
             if let ContentType::Ready(ref value) = self.clone().content {
                 self.set_attr("text", value);
             }
@@ -516,14 +517,6 @@ impl SvgElement {
                 // Following are non-standard.
                 | "specs"
         )
-    }
-
-    /// Should text content of this element be treated as element text?
-    pub fn is_content_text(&self) -> bool {
-        // This is present for graphics elements except for text,
-        // where we need to be transparent.
-        // TODO: except where we don't....
-        self.is_graphics_element() && self.name != "text"
     }
 
     pub fn is_empty_element(&self) -> bool {

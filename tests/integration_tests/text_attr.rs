@@ -500,3 +500,24 @@ fn test_text_anchor() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_element_attrs() {
+    let input1 = r#"
+<text xy="0" text="thing" font-size="2em" font-weight="bold"/>
+"#;
+    let input2 = r#"
+<text xy="0" font-size="2em" font-weight="bold">thing</text>
+"#;
+    let expected = r#"
+<text x="0" y="0" font-size="2em" font-weight="bold" class="d-tbox">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input1).unwrap().trim(),
+        expected.trim()
+    );
+    assert_eq!(
+        transform_str_default(input2).unwrap().trim(),
+        expected.trim()
+    );
+}
