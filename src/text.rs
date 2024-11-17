@@ -30,7 +30,9 @@ fn get_text_value(element: &mut SvgElement) -> String {
     text_value.replace("\\\\n", "\\n")
 }
 
-fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec, Vec<&'a str>)> {
+fn get_text_position<'a>(
+    element: &mut SvgElement,
+) -> Result<(f32, f32, bool, LocSpec, Vec<&'a str>)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -129,7 +131,7 @@ fn get_text_position<'a>(element: &mut SvgElement) -> Result<(f32, f32, LocSpec,
     tdx += t_dx;
     tdy += t_dy;
 
-    Ok((tdx, tdy, text_anchor, text_classes))
+    Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
@@ -146,7 +148,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let text_value = get_text_value(&mut orig_elem);
 
-    let (tdx, tdy, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
+    let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
     text_classes.push("d-tbox");
 
     let x_str = fstr(tdx);
@@ -220,9 +222,8 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
     text_elements.push(text_elem);
     if multiline {
-        let is_line = element.name == "line";
         // Determine position of first text line; others follow this based on line spacing
-        let first_line_offset = match (is_line, vertical, text_loc) {
+        let first_line_offset = match (outside, vertical, text_loc) {
             // shapes - text 'inside'
             (false, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
             (false, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,

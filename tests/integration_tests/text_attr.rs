@@ -521,3 +521,35 @@ fn test_text_element_attrs() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_multiline_outside() {
+    let input = r#"
+<rect xy="0" wh="10" text="multi\nline" text-loc="br" class="d-text-outside"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="11" y="11" class="d-tbox d-text-top d-text-left">
+<tspan x="11" dy="0em">multi</tspan><tspan x="11" dy="1.05em">line</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect xy="0" wh="10"/>
+<text xy="^@tl">multi\nline</text>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="-1" y="-1" class="d-tbox d-text-bottom d-text-right">
+<tspan x="-1" dy="-1.05em">multi</tspan><tspan x="-1" dy="1.05em">line</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
