@@ -9,6 +9,12 @@ use axum::{
 
 use crate::{transform_str, TransformConfig};
 
+// Content-Security-Policy - allow inline CSS used for the generated SVG images,
+// but otherwise restrict to same-origin resources.
+// Includes 'wasm-unsafe-eval' for consistency even though is doing server-side
+// transforms rather than in-browser.
+const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
+
 async fn transform(input: String) -> impl IntoResponse {
     transform_str(
         input,
@@ -28,6 +34,7 @@ async fn transform(input: String) -> impl IntoResponse {
     .map(|output| {
         Response::builder()
             .header("Content-Type", "image/svg+xml")
+            .header("Content-Security-Policy", CSP)
             .body(Body::from(output))
             .unwrap()
     })
@@ -56,6 +63,7 @@ macro_rules! include_or_read {
 
         Response::builder()
             .header("Content-Type", $mime)
+            .header("Content-Security-Policy", CSP)
             .body(Body::from(content))
             .unwrap()
     }};
@@ -104,6 +112,9 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
     match path.as_str() {
         "svgdx-editor.js" => {
             include_js!("static/svgdx-editor.js")
+        }
+        "svgdx-editor.css" => {
+            include_css!("static/svgdx-editor.css")
         }
         "vendor/cm5/codemirror.min.css" => {
             include_css!("static/vendor/cm5/codemirror.min.css")

@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [mdbook-svgdx](https://crates.io/crates/mdbook-svgdx), for example), but may not
   function correctly in non-browser applications.
 
+- svgdx-server / editor: Added a Content-Security-Policy for improved web-security.
+
 ## [0.13.1 - 2024-01-01]
 
 - Added `font-size` and `font-family` config options, available in the `<config>` element
