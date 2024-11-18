@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0 - 2024-11-18]
+
 - Improved text positioning, useful when needing multiple text labels inside or
   around another shape (though it's still only possible to provide a single label
   via the `text` attribute within a single element)
@@ -32,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - svgdx-server / editor: Added a Content-Security-Policy for improved web-security.
 
-## [0.13.1 - 2024-01-01]
+## [0.13.1 - 2024-11-01]
 
 - Added `font-size` and `font-family` config options, available in the `<config>` element
   or via command line options; defaults remain 3.0 and sans-serif respectively, but now
