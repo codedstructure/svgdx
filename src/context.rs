@@ -15,7 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
 
 pub struct TransformerContext {
     /// Current state of given element; may be updated as processing continues
@@ -90,40 +90,56 @@ impl ElementMap for TransformerContext {
     }
 
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
-        let mut el_bbox = if el.name == "use" || el.name == "reuse" {
-            // use and reuse elements reference another element - get the bbox of the target
-            // (which could be another (re)use element)
-            if let Some(target) = el
-                .get_attr("href")
-                .and_then(|href| href.strip_prefix("#").map(|href| href.to_string()))
-                .and_then(|id| self.get_element(&id))
-            {
-                self.get_element_bbox(target)?
+        // This is recursive for use/reuse elements. We use an inner function and a vec of hrefs
+        // to detect circular references.
+        fn inner(
+            el: &SvgElement,
+            ctx: &TransformerContext,
+            already: &mut Vec<String>,
+        ) -> Result<Option<BoundingBox>> {
+            let mut el_bbox = if el.name == "use" || el.name == "reuse" {
+                // use and reuse elements reference another element - get the bbox of the target
+                // (which could be another (re)use element)
+                let href = el
+                    .get_attr("href")
+                    .and_then(|href| href.strip_prefix('#').map(|s| s.to_string()))
+                    .context("Could not determine href for element")?;
+
+                if already.contains(&href) {
+                    bail!("Circular reference: {}", href);
+                }
+                already.push(href.clone());
+
+                let target_el = ctx
+                    .get_element(&href)
+                    .context("Could not find element with id")?;
+                // recurse to get bbox of the target
+                inner(target_el, ctx, already)?
             } else {
-                bail!("Could not determine bbox for element: {}", el);
-            }
-        } else {
-            el.bbox()?
-        };
-        if el.name == "use" || el.name == "reuse" {
-            let translate_x = el.get_attr("x").map(|x| eval_attr(&x, self));
-            let translate_y = el.get_attr("y").map(|y| eval_attr(&y, self));
-            if translate_x.is_some() || translate_y.is_some() {
-                if let Some(ref mut bbox) = &mut el_bbox {
-                    el_bbox = Some(bbox.translated(
-                        translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
-                        translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
-                    ));
+                el.bbox()?
+            };
+            if el.name == "use" || el.name == "reuse" {
+                let translate_x = el.get_attr("x").map(|x| eval_attr(&x, ctx));
+                let translate_y = el.get_attr("y").map(|y| eval_attr(&y, ctx));
+                if translate_x.is_some() || translate_y.is_some() {
+                    if let Some(ref mut bbox) = &mut el_bbox {
+                        el_bbox = Some(bbox.translated(
+                            translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
+                            translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
+                        ));
+                    }
                 }
             }
-        }
-        if let Some(transform) = el.get_attr("transform") {
-            let transform: TransformAttr = transform.parse()?;
-            if let Some(ref mut bbox) = &mut el_bbox {
-                el_bbox = Some(transform.apply(bbox));
+            if let Some(transform) = el.get_attr("transform") {
+                let transform: TransformAttr = transform.parse()?;
+                if let Some(ref mut bbox) = &mut el_bbox {
+                    el_bbox = Some(transform.apply(bbox));
+                }
             }
+            Ok(el_bbox)
         }
-        Ok(el_bbox)
+        let mut already_seen = Vec::new();
+        inner(el, self, &mut already_seen)
     }
 }
 

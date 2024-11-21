@@ -233,3 +233,10 @@ fn test_reuse_if() {
     assert_contains!(output, expected);
     assert_not_contains!(output, unexpected);
 }
+
+#[test]
+fn test_reuse_circular() {
+    assert!(transform_str_default(r##"<use id="a" href="#a"/>"##).is_err());
+
+    assert!(transform_str_default(r##"<use id="a" href="#b"/><use id="b" href="#a"/>"##).is_err());
+}
