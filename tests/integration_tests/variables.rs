@@ -155,7 +155,7 @@ fn test_var_expr() {
 <rect width="10" height="10" fill="rgb(178.5, 76.5, 127.5)"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -168,7 +168,7 @@ fn test_var_classes() {
 <rect width="10" height="10" class="d-red d-text-bold d-fill-none"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]

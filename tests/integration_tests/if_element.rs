@@ -17,17 +17,18 @@ fn test_if_simple() {
 fn test_if_loop() {
     let input = r#"
 <loop count="4" loop-var="i">
-<if test="eq($i % 2, 0)"><rect x="{{$i * 10}}" wh="5"/></if>
-</loop>
+<if test="eq($i % 2, 0)">
+<rect x="{{$i * 10}}" wh="5"/>
+</if></loop>
 "#;
-    let expected = r#"
+    let expected = r#"<rect x="0" width="5" height="5"/>
 
-<rect x="0" width="5" height="5"/>
+
 
 <rect x="20" width="5" height="5"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]

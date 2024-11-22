@@ -14,33 +14,13 @@ use lazy_regex::{regex, Captures};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
-pub enum ContentType {
-    /// This element is empty, therefore *can't* have any content
-    Empty,
-    /// This element will have content but it isn't known yet
-    Pending,
-    /// This element has content and it's ready to be used
-    Ready(String),
-}
-
-impl ContentType {
-    pub fn is_pending(&self) -> bool {
-        matches!(self, ContentType::Pending)
-    }
-
-    pub fn is_ready(&self) -> bool {
-        matches!(self, ContentType::Ready(_))
-    }
-}
-
 #[derive(Clone, Debug)]
 pub struct SvgElement {
     pub name: String,
     pub original: String,
     pub attrs: AttrMap,
     pub classes: ClassList,
-    pub content: ContentType,
+    pub text_content: Option<String>,
     pub tail: Option<String>,
     pub order_index: OrderIndex,
     pub indent: usize,
@@ -160,7 +140,7 @@ impl SvgElement {
             original: format!("<{name} {}>", attr_map),
             attrs: attr_map.clone(),
             classes,
-            content: ContentType::Empty,
+            text_content: None,
             tail: None,
             order_index: OrderIndex::default(),
             indent: 0,
@@ -211,13 +191,6 @@ impl SvgElement {
             }
         }
 
-        // Should inner text content of this element be treated as element text?
-        if self.is_graphics_element() && !self.has_attr("text") {
-            if let ContentType::Ready(ref value) = self.clone().content {
-                self.set_attr("text", value);
-            }
-        }
-
         Ok(())
     }
 
@@ -265,7 +238,7 @@ impl SvgElement {
                 [] => {}
                 [elem] => {
                     events.push(SvgEvent::Start(elem.clone()));
-                    if let ContentType::Ready(value) = &elem.content {
+                    if let Some(value) = &elem.text_content {
                         events.push(SvgEvent::Text(value.clone()));
                     } else {
                         bail!("Text element should have content");
@@ -282,7 +255,7 @@ impl SvgElement {
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
                         events.push(SvgEvent::Start(elem.clone()));
-                        if let ContentType::Ready(value) = &elem.content {
+                        if let Some(value) = &elem.text_content {
                             events.push(SvgEvent::Text(value.clone()));
                         } else {
                             bail!("Text element should have content");
@@ -520,7 +493,11 @@ impl SvgElement {
     }
 
     pub fn is_empty_element(&self) -> bool {
-        matches!(self.content, ContentType::Empty)
+        if let Some((start, end)) = self.event_range {
+            start == end
+        } else {
+            true
+        }
     }
 
     pub fn is_connector(&self) -> bool {

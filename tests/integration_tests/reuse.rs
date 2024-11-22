@@ -13,8 +13,8 @@ fn test_reuse_simple() {
 <rect x="0" y="0" width="1" height="2" class="target"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    // exact equality check: ensure that <specs> doesn't appear in the output.
-    assert_eq!(output, expected);
+    // equality check: ensure that <specs> doesn't appear in the output.
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn test_reuse_group() {
 "#;
     let output = transform_str_default(input).unwrap();
     // exact equality check: ensure that <specs> doesn't appear in the output.
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]

@@ -1,4 +1,4 @@
-use crate::element::{ContentType, SvgElement};
+use crate::element::SvgElement;
 use crate::types::OrderIndex;
 
 use std::collections::HashMap;
@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Cursor, Write};
 
 use lazy_regex::regex;
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 
 use anyhow::{bail, Result};
@@ -14,6 +14,7 @@ use anyhow::{bail, Result};
 pub enum SvgEvent {
     Comment(String),
     Text(String),
+    CData(String),
     Start(SvgElement),
     Empty(SvgElement),
     End(String),
@@ -342,6 +343,7 @@ impl<'a> From<SvgEvent> for Event<'a> {
             SvgEvent::Start(e) => Event::Start(e.into()),
             SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
             SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            SvgEvent::CData(t) => Event::CData(BytesCData::new(t)),
             SvgEvent::End(name) => Event::End(BytesEnd::new(name)),
         }
     }
@@ -401,11 +403,11 @@ impl TryFrom<InputEvent> for SvgElement {
                 element.set_indent(ev.indent);
                 element.set_src_line(ev.line);
                 element.set_order_index(&OrderIndex::new(ev.index));
-                element.content = if matches!(ev.event, Event::Start(_)) {
-                    ContentType::Pending
-                } else {
-                    ContentType::Empty
-                };
+                // element.content = if matches!(ev.event, Event::Start(_)) {
+                //     ContentType::Pending
+                // } else {
+                //     ContentType::Empty
+                // };
                 Ok(element)
             }
             _ => bail!("Expected Start or Empty event, got {:?}", ev.event),

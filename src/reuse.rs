@@ -2,6 +2,7 @@ use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::eval_attr;
+use crate::position::BoundingBox;
 use crate::transform::{process_events, ElementLike};
 
 use anyhow::{Context, Result};
@@ -11,41 +12,18 @@ use itertools::Itertools;
 pub struct ReuseElement(pub SvgElement);
 
 impl ElementLike for ReuseElement {
-    fn handle_element_start(
-        &mut self,
-        element: &SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        // Even though `<reuse>`` is (typically) an Empty element, it acts as a
-        // container element around the referenced element for variable lookup.
-        let mut element = element.clone();
-        // Since attributes attached to the `<reuse>` element become part of the
-        // variable lookup context, evaluate them so indirection can be used -
-        // but avoid evaluation (which may have side-effects, e.g. on PRNG state)
-        // if not active at this point
-        if context.loop_depth == 0 && !context.in_specs {
-            element.eval_attributes(context);
-        }
-        context.push_element(element.to_ell());
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.pop_element();
-        Ok(())
-    }
-
     fn get_element(&self) -> Option<SvgElement> {
         Some(self.0.clone())
     }
 
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
-        let reuse_element = self.0.clone();
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        let mut reuse_element = self.0.clone();
 
+        context.push_element(reuse_element.to_ell());
+        reuse_element.eval_attributes(context);
         let elref = reuse_element
             .get_attr("href")
             .context("reuse element should have an href attribute")?;
@@ -115,7 +93,7 @@ impl ElementLike for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        if let (false, Some((start, end))) = (
+        let res = if let (false, Some((start, end))) = (
             instance_element.is_empty_element(),
             instance_element.event_range,
         ) {
@@ -135,6 +113,9 @@ impl ElementLike for ReuseElement {
             process_events(new_events, context)
         } else {
             instance_element.to_ell().borrow().generate_events(context)
-        }
+        };
+        // context.pop_element(); //ush_element(reuse_element.to_ell());
+        context.push_element(reuse_element.to_ell());
+        res
     }
 }

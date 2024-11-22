@@ -577,6 +577,31 @@ pub struct BoundingBox {
     pub y2: f32,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BoundingBoxBuilder {
+    // TODO: NewType?
+    bbox: Option<BoundingBox>,
+}
+
+impl BoundingBoxBuilder {
+    pub fn new() -> Self {
+        Self { bbox: None }
+    }
+
+    pub fn extend(&mut self, bbox: BoundingBox) -> &Self {
+        if let Some(ref mut b) = self.bbox {
+            *b = b.combine(&bbox);
+        } else {
+            self.bbox = Some(bbox);
+        }
+        self
+    }
+
+    pub fn build(self) -> Option<BoundingBox> {
+        self.bbox
+    }
+}
+
 impl BoundingBox {
     pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
         Self { x1, y1, x2, y2 }

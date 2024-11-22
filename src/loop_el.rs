@@ -2,6 +2,7 @@ use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::events::EventList;
 use crate::expression::{eval_attr, eval_condition};
+use crate::position::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, ElementLike};
 
 use anyhow::{bail, Result};
@@ -56,27 +57,13 @@ impl TryFrom<&SvgElement> for LoopDef {
 pub struct LoopElement(pub SvgElement); // LoopDef);
 
 impl ElementLike for LoopElement {
-    fn handle_element_start(
-        &mut self,
-        _element: &SvgElement,
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth += 1;
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth -= 1;
-        Ok(())
-    }
-
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         let event_element = &self.0;
         let mut gen_events = EventList::new();
+        let mut bbox = BoundingBoxBuilder::new();
         if let (Ok(loop_def), Some((start, end))) =
             (LoopDef::try_from(event_element), event_element.event_range)
         {
@@ -112,7 +99,11 @@ impl ElementLike for LoopElement {
                     context.set_var(&loop_var_name, &loop_var_value.to_string());
                 }
 
-                gen_events.extend(&process_events(inner_events.clone(), context)?);
+                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
+                gen_events.extend(&ev_list);
+                if let Some(bb) = ev_bbox {
+                    bbox.extend(bb);
+                }
 
                 if let LoopType::Until(expr) = &loop_def.loop_type {
                     if eval_condition(expr, context)? {
@@ -126,7 +117,7 @@ impl ElementLike for LoopElement {
                 }
             }
         }
-        Ok(gen_events)
+        Ok((gen_events, bbox.build()))
     }
 
     fn get_element(&self) -> Option<SvgElement> {
