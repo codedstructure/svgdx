@@ -3,7 +3,7 @@ use crate::element::SvgElement;
 use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
-use crate::transform::{process_events, ElementLike};
+use crate::transform::{process_events, EventGen};
 
 use anyhow::{Context, Result};
 use itertools::Itertools;
@@ -11,11 +11,7 @@ use itertools::Itertools;
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
 
-impl ElementLike for ReuseElement {
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-
+impl EventGen for ReuseElement {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -24,8 +20,7 @@ impl ElementLike for ReuseElement {
 
         reuse_element.eval_attributes(context);
 
-        context.push_element(reuse_element.to_ell());
-        // context.push_defaults(&reuse_element);
+        context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
             .context("reuse element should have an href attribute")?;
@@ -126,7 +121,7 @@ impl ElementLike for ReuseElement {
             new_events.push(end_ev);
             process_events(new_events, context)
         } else {
-            instance_element.to_ell().borrow().generate_events(context)
+            instance_element.generate_events(context)
         };
         context.pop_element();
         res

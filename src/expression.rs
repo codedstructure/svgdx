@@ -694,22 +694,19 @@ mod tests {
 
         // Check attributes as locals; this would be something like the attributes
         // of a surrounding <g> element, which can be referenced by child elements.
-        ctx.push_element(
-            SvgElement::new(
-                "g",
-                &[
-                    ("width".to_string(), "3".to_string()),
-                    ("height".to_string(), "4".to_string()),
-                    // Check this overrides the 'global' variables
-                    ("this_year".to_string(), "2024".to_string()),
-                ],
-            )
-            .to_ell(),
-        );
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[
+                ("width".to_string(), "3".to_string()),
+                ("height".to_string(), "4".to_string()),
+                // Check this overrides the 'global' variables
+                ("this_year".to_string(), "2024".to_string()),
+            ],
+        ));
         // push another element - the actual 'current' element containing this attribute.
         // This is skipped in variable lookup, so needed so the previous ('<g>') element
         // is used.
-        ctx.push_element(SvgElement::new("rect", &[]).to_ell());
+        ctx.push_element(&SvgElement::new("rect", &[]));
         assert_eq!(
             eval_vars("$this_year: $width.$one$height", &ctx),
             "2024: 3.14"
@@ -722,9 +719,18 @@ mod tests {
         assert_eq!(eval_vars("$this_year", &ctx), "2023");
 
         // Check multiple levels of override
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "1".to_string())]).to_ell());
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "2".to_string())]).to_ell());
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "3".to_string())]).to_ell());
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "1".to_string())],
+        ));
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "2".to_string())],
+        ));
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "3".to_string())],
+        ));
         assert_eq!(eval_vars("$level", &ctx), "3");
         ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "2");

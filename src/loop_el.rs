@@ -3,7 +3,7 @@ use crate::element::SvgElement;
 use crate::events::EventList;
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, BoundingBoxBuilder};
-use crate::transform::{process_events, ElementLike};
+use crate::transform::{process_events, EventGen};
 
 use anyhow::{bail, Result};
 
@@ -56,7 +56,7 @@ impl TryFrom<&SvgElement> for LoopDef {
 #[derive(Debug, Clone)]
 pub struct LoopElement(pub SvgElement); // LoopDef);
 
-impl ElementLike for LoopElement {
+impl EventGen for LoopElement {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -118,13 +118,5 @@ impl ElementLike for LoopElement {
             }
         }
         Ok((gen_events, bbox.build()))
-    }
-
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        Some(&mut self.0)
     }
 }
