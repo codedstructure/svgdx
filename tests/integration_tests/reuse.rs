@@ -183,7 +183,7 @@ fn test_reuse_recursive() {
     let expected = r#"<g class="d c b a"><rect x="0" y="0" width="5" height="5"/>
 <text x="2.5" y="2.5" class="d-tbox">5</text></g>"#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]

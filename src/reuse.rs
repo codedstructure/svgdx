@@ -22,8 +22,10 @@ impl ElementLike for ReuseElement {
     ) -> Result<(EventList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 
-        context.push_element(reuse_element.to_ell());
         reuse_element.eval_attributes(context);
+
+        context.push_element(reuse_element.to_ell());
+        // context.push_defaults(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
             .context("reuse element should have an href attribute")?;
@@ -36,6 +38,18 @@ impl ElementLike for ReuseElement {
             )
             .with_context(|| format!("unknown reference '{}'", elref))?
             .clone();
+
+        // Override 'default' attr values in the target
+        for (attr, value) in reuse_element.get_attrs() {
+            match attr.as_str() {
+                "href" | "id" | "x" | "y" | "transform" => continue,
+                _ => {
+                    if instance_element.has_attr(&attr) {
+                        instance_element.set_attr(&attr, &value);
+                    }
+                }
+            }
+        }
 
         // the referenced element will have an `id` attribute (which it was
         // referenced by) but the new instance should not have this to avoid
@@ -114,8 +128,7 @@ impl ElementLike for ReuseElement {
         } else {
             instance_element.to_ell().borrow().generate_events(context)
         };
-        // context.pop_element(); //ush_element(reuse_element.to_ell());
-        context.push_element(reuse_element.to_ell());
+        context.pop_element();
         res
     }
 }

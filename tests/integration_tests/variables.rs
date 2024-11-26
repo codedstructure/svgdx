@@ -105,11 +105,11 @@ fn test_var_indirect() {
 #[test]
 fn test_var_reuse() {
     let input = r##"
-<var x="4"/>
-<g id="group1" y="8" z="9">
-<rect wh="10" text="$x-$y-$z"/>
+<var p="4"/>
+<g id="group1" q="8" r="9">
+<rect wh="10" text="$p-$q-$r"/>
 </g>
-<reuse href="#group1" x="3"/>
+<reuse href="#group1" p="3"/>
 "##;
     let expected1 = r#">4-8-9</text>"#; // original group
     let expected2 = r#">3-8-9</text>"#; // reuse group

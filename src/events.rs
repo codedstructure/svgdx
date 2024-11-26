@@ -1,7 +1,6 @@
 use crate::element::SvgElement;
 use crate::types::OrderIndex;
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Cursor, Write};
 
 use lazy_regex::regex;
@@ -26,7 +25,7 @@ pub struct InputEvent {
     pub index: usize,
     pub line: usize,
     pub indent: usize,
-    pub closure: Option<HashMap<String, String>>,
+    // pub closure: Option<HashMap<String, String>>,
     pub alt_idx: Option<usize>,
 }
 
@@ -37,7 +36,7 @@ impl Clone for InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
-            closure: self.closure.clone(),
+            // closure: self.closure.clone(),
             alt_idx: self.alt_idx,
         }
     }
@@ -50,7 +49,7 @@ impl InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
-            closure: self.closure,
+            // closure: self.closure,
             alt_idx: self.alt_idx,
         }
     }
@@ -75,7 +74,7 @@ impl From<Event<'_>> for EventList {
                 index: 0,
                 line: 0,
                 indent: 0,
-                closure: None,
+                // closure: None,
                 alt_idx: None,
             }],
         }
@@ -104,7 +103,7 @@ impl From<Vec<InputEvent>> for EventList {
                     index: v.index,
                     line: v.line,
                     indent: v.indent,
-                    closure: v.closure.clone(),
+                    // closure: v.closure.clone(),
                     alt_idx: v.alt_idx,
                 })
                 .collect(),
@@ -122,7 +121,7 @@ impl From<Vec<Event<'_>>> for EventList {
                     index: 0,
                     line: 0,
                     indent: 0,
-                    closure: None,
+                    // closure: None,
                     alt_idx: None,
                 })
                 .collect(),
@@ -146,7 +145,7 @@ impl From<Event<'_>> for InputEvent {
             index: 0,
             line: 0,
             indent: 0,
-            closure: None,
+            // closure: None,
             alt_idx: None,
         }
     }
@@ -217,7 +216,7 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        closure: None,
+                        // closure: None,
                         alt_idx: None,
                     });
                 }
@@ -227,7 +226,7 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        closure: None,
+                        // closure: None,
                         alt_idx: None,
                     });
                     event_idx_stack.push(index);
@@ -242,7 +241,7 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        closure: None,
+                        // closure: None,
                         alt_idx: start_idx,
                     });
                 }
@@ -251,7 +250,7 @@ impl EventList {
                     index,
                     line: line_count,
                     indent,
-                    closure: None,
+                    // closure: None,
                     alt_idx: None,
                 }),
                 Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
