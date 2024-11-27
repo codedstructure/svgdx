@@ -25,7 +25,6 @@ pub struct InputEvent {
     pub index: usize,
     pub line: usize,
     pub indent: usize,
-    // pub closure: Option<HashMap<String, String>>,
     pub alt_idx: Option<usize>,
 }
 
@@ -402,11 +401,6 @@ impl TryFrom<InputEvent> for SvgElement {
                 element.set_indent(ev.indent);
                 element.set_src_line(ev.line);
                 element.set_order_index(&OrderIndex::new(ev.index));
-                // element.content = if matches!(ev.event, Event::Start(_)) {
-                //     ContentType::Pending
-                // } else {
-                //     ContentType::Empty
-                // };
                 Ok(element)
             }
             _ => bail!("Expected Start or Empty event, got {:?}", ev.event),

@@ -196,7 +196,7 @@ impl SvgElement {
 
     /// Process a given `SvgElement` into a list of `SvgEvent`s
     // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &TransformerContext) -> Result<Vec<SvgEvent>> {
+    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<SvgEvent>> {
         let mut events = vec![];
 
         if ctx.config.debug {

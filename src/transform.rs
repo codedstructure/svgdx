@@ -1,6 +1,6 @@
 use crate::context::{ElementMap, TransformerContext};
 use crate::element::SvgElement;
-use crate::events::{EventList, SvgEvent};
+use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::themes::ThemeBuilder;
@@ -21,7 +21,9 @@ use anyhow::{bail, Context, Result};
 
 pub trait EventGen {
     /// Determine the sequence of (XML-level) events to emit in response
-    /// to a given `SvgElement`
+    /// to a given item, as well as the corresponding bounding box.
+    ///
+    /// Note some implementations may mutate the context (e.g. `var` elements).
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -52,9 +54,6 @@ impl EventGen for SvgElement {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-struct OtherElement(SvgElement);
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
@@ -95,7 +94,7 @@ impl EventGen for Container {
                 new_el.eval_attributes(context);
                 let mut events = EventList::new();
                 events.push(SvgEvent::Start(new_el));
-                let (evlist, bbox) = if inner_text.is_some() {
+                let (evlist, mut bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events, None)
                 } else {
@@ -104,6 +103,10 @@ impl EventGen for Container {
                 events.extend(&evlist);
                 events.push(SvgEvent::End(self.0.name.clone()));
 
+                if self.0.name == "defs" || self.0.name == "symbol" {
+                    bbox = None;
+                }
+
                 Ok((events, bbox))
             }
         } else {
@@ -111,6 +114,9 @@ impl EventGen for Container {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+struct OtherElement(SvgElement);
 
 impl EventGen for OtherElement {
     fn generate_events(
@@ -186,7 +192,7 @@ impl EventGen for GroupElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(EventList, Option<BoundingBox>)> {
-        // since we synthesize the opening element event here rather than in process_seq, we need to
+        // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context);
@@ -201,6 +207,7 @@ impl EventGen for GroupElement {
         if self.0.is_empty_element() {
             events.push(SvgEvent::Empty(new_el));
         } else {
+            let el_name = new_el.name.clone();
             events.push(SvgEvent::Start(new_el));
 
             if let Some((start, end)) = self.0.event_range {
@@ -211,7 +218,7 @@ impl EventGen for GroupElement {
                 events.extend(&ev_list);
             }
 
-            events.push(SvgEvent::End(String::from("g")));
+            events.push(SvgEvent::End(el_name));
         }
 
         // pop variables off the stack
@@ -363,10 +370,10 @@ fn is_real_svg(events: &EventList) -> bool {
 
 #[derive(Debug, Clone)]
 enum Tag {
-    Start(SvgElement, Option<String>),
-    Empty(SvgElement, Option<String>),
-    #[allow(dead_code)]
-    End(SvgElement, Option<String>),
+    /// Represents a Start..End block and all events in between
+    Compound(SvgElement, Option<String>),
+    /// Represents a single Empty element
+    Leaf(SvgElement, Option<String>),
     Comment(String, Option<String>),
     Text(String),
     CData(String),
@@ -375,9 +382,8 @@ enum Tag {
 impl Tag {
     fn set_text(&mut self, text: String) {
         match self {
-            Tag::Start(_, tail) => *tail = Some(text),
-            Tag::Empty(_, tail) => *tail = Some(text),
-            Tag::End(_, tail) => *tail = Some(text),
+            Tag::Compound(_, tail) => *tail = Some(text),
+            Tag::Leaf(_, tail) => *tail = Some(text),
             Tag::Comment(_, tail) => *tail = Some(text),
             _ => {}
         }
@@ -385,9 +391,8 @@ impl Tag {
 
     fn get_element(&self) -> Option<SvgElement> {
         match self {
-            Tag::Start(el, _) => Some(el.clone()),
-            Tag::Empty(el, _) => Some(el.clone()),
-            Tag::End(el, _) => Some(el.clone()),
+            Tag::Compound(el, _) => Some(el.clone()),
+            Tag::Leaf(el, _) => Some(el.clone()),
             _ => None,
         }
     }
@@ -401,25 +406,17 @@ impl EventGen for Tag {
         let mut events = EventList::new();
         let mut bbox = None;
         match self {
-            Tag::Start(el, tail) => {
+            Tag::Compound(el, tail) => {
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
                     events.push(SvgEvent::Text(tail.to_owned()));
                 }
             }
-            Tag::Empty(el, tail) => {
+            Tag::Leaf(el, tail) => {
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(SvgEvent::Text(tail.to_owned()));
-                }
-            }
-            Tag::End(el, tail) => {
-                let (ev, bb) = el.generate_events(context)?;
-                (events, bbox) = (ev, bb);
-                if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(SvgEvent::End(el.name.to_owned()));
                     events.push(SvgEvent::Text(tail.to_owned()));
                 }
             }
@@ -441,15 +438,14 @@ impl EventGen for Tag {
 }
 
 // Provide a list of tags which can be processed in-order.
-fn process_events2(events: EventList) -> Result<Vec<Tag>> {
+fn tagify_events(events: EventList) -> Result<Vec<Tag>> {
     let mut tags = Vec::new();
-    let mut tag_stack = Vec::new();
     let mut ev_idx = 0;
 
+    // we use indexed iteration as we need to skip ahead in some cases
     while ev_idx < events.len() {
         let input_ev = &events.events[ev_idx];
         ev_idx += 1;
-        // for input_ev in events {
         let ev = &input_ev.event;
         match ev {
             Event::Start(_) => {
@@ -459,17 +455,18 @@ fn process_events2(events: EventList) -> Result<Vec<Tag>> {
                 ))?;
                 if let Some(alt_idx) = input_ev.alt_idx {
                     event_element.set_event_range((input_ev.index, alt_idx));
-                    // Skip ahead to the end of this element, matching alt_idx.
+                    // Scan ahead to the end of this element, matching alt_idx.
+                    // Note when called recursively on a subset of events, alt_idx
+                    // won't be the same as next_idx, so we need to scan rather than
+                    // just setting ev_idx = alt_idx + 1.
                     for next_idx in ev_idx..events.len() {
                         if events.events[next_idx].index == alt_idx {
-                            ev_idx = next_idx + 1;
+                            ev_idx = next_idx + 1; // skip the End event itself
                             break;
                         }
                     }
-                } else {
-                    tag_stack.push((input_ev.index, event_element.clone()));
-                }
-                tags.push(Tag::Start(event_element, None));
+                } // TODO: else warning message
+                tags.push(Tag::Compound(event_element, None));
             }
             Event::Empty(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
@@ -477,9 +474,8 @@ fn process_events2(events: EventList) -> Result<Vec<Tag>> {
                     input_ev.line
                 ))?;
                 event_element.set_event_range((input_ev.index, input_ev.index));
-                tags.push(Tag::Empty(event_element, None));
+                tags.push(Tag::Leaf(event_element, None));
             }
-            Event::End(_) => panic!("END SHOULD BE SKIPPED"),
             Event::Comment(c) => {
                 let text = String::from_utf8(c.to_vec())?;
                 tags.push(Tag::Comment(text, None));
@@ -500,83 +496,62 @@ fn process_events2(events: EventList) -> Result<Vec<Tag>> {
                     tags.push(Tag::CData(text));
                 }
             }
-            _ => {}
+            _ => {
+                // This would include Event::End, as well as PI, DocType, etc.
+                // Specifically End shouldn't be seen due to alt_idx scan-ahead.
+            }
         }
     }
     Ok(tags)
 }
 
-fn process_seq(
+fn process_tags(
+    tags: &mut [(OrderIndex, Tag)],
     context: &mut TransformerContext,
-    seq: EventList,
     idx_output: &mut BTreeMap<OrderIndex, EventList>,
+    bbb: &mut BoundingBoxBuilder,
 ) -> Result<Option<BoundingBox>> {
-    // Recursion base-case
-    if seq.is_empty() {
-        return Ok(None);
+    let init_seq_len = tags.len();
+    if init_seq_len == 0 {
+        return Ok(bbb.clone().build());
     }
-
-    if context.events.is_empty() {
-        // TODO: maybe this doesn't have to be done elsewhere if done here?
-        context.events = seq.events.clone();
-    }
-
-    let tags = process_events2(seq.clone())?;
-    let mut tags = tags
-        .iter()
-        .enumerate()
-        .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
-        .collect::<Vec<_>>();
-
-    fn process_tags(
-        tags: &mut [(OrderIndex, Tag)],
-        context: &mut TransformerContext,
-        idx_output: &mut BTreeMap<OrderIndex, EventList>,
-        bbox: &mut BoundingBoxBuilder,
-    ) -> Result<Option<BoundingBox>> {
-        let init_seq_len = tags.len();
-        if init_seq_len == 0 {
-            return Ok(bbox.clone().build());
+    let mut remain = Vec::new();
+    for (idx, t) in &mut tags.iter_mut() {
+        let idx = idx.clone();
+        if let Some(el) = t.get_element() {
+            // update early so reuse targets are available even if the element
+            // is not ready (e.g. within a specs block)
+            context.update_element(&el);
         }
-        let mut remain = Vec::new();
-        for (idx, t) in &mut tags.iter_mut() {
-            let idx = idx.clone();
-            if let Some(el) = t.get_element() {
-                // update early so reuse targets are available even if the element
-                // is not ready (e.g. within a specs block)
-                context.update_element(&el);
-            }
-            let gen_result = t.generate_events(context);
-            if !context.in_specs {
-                // if we *are* in a specs block, we don't care if there were errors;
-                // a specs entry may have insufficient context until reuse time.
-                if let Ok((events, bb)) = gen_result {
-                    if let Some(bb) = bb {
-                        bbox.extend(bb); // TODO: should this pattern take an Option?
-                    }
-                    if !events.is_empty() {
-                        idx_output.insert(idx, events);
-                    }
-                } else {
-                    remain.push((idx, t.clone()));
-                    continue;
+        let gen_result = t.generate_events(context);
+        if !context.in_specs {
+            // if we *are* in a specs block, we don't care if there were errors;
+            // a specs entry may have insufficient context until reuse time.
+            if let Ok((events, maybe_bbox)) = gen_result {
+                if let Some(bbox) = maybe_bbox {
+                    bbb.extend(bbox); // TODO: should this pattern take an Option?
                 }
+                if !events.is_empty() {
+                    idx_output.insert(idx, events);
+                }
+            } else {
+                remain.push((idx, t.clone()));
+                continue;
             }
         }
-        if init_seq_len == remain.len() {
-            bail!(
-                "Could not resolve the following elements:\n{}",
-                remain
-                    .iter()
-                    .map(|r| format!("{:?}", r))
-                    // .map(|r| format!("{:4}: {:?}", r.line, r.event))
-                    .join("\n")
-            );
-        }
-        process_tags(&mut remain, context, idx_output, bbox)
     }
-    let mut bb = BoundingBoxBuilder::new();
-    process_tags(&mut tags, context, idx_output, &mut bb)
+    if init_seq_len == remain.len() {
+        // TODO: warning logs
+        bail!(
+            "Could not resolve the following elements:\n{}",
+            remain
+                .iter()
+                .map(|r| (r.1.get_element().unwrap()))
+                .map(|el| format!("{:4}: {}", el.src_line, el.original))
+                .join("\n")
+        );
+    }
+    process_tags(&mut remain, context, idx_output, bbb)
 }
 
 pub fn process_events(
@@ -593,7 +568,13 @@ pub fn process_events(
     let mut output = EventList { events: vec![] };
     let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
-    let bbox = process_seq(context, input, &mut idx_output)?;
+    let mut bbb = BoundingBoxBuilder::new();
+    let mut tags = tagify_events(input)?
+        .iter()
+        .enumerate()
+        .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
+        .collect::<Vec<_>>();
+    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb)?;
 
     for (_idx, events) in idx_output {
         output.events.extend(events.events);
@@ -617,134 +598,185 @@ impl Transformer {
         let input = EventList::from_reader(reader)?;
         self.context.set_events(input.events.clone());
         let output = process_events(input, &mut self.context)?;
-        self.postprocess(output.0, writer)
+        self.postprocess(output, writer)
     }
 
-    fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {
-        if self.context.real_svg {
-            // We don't do any post-processing on 'real' SVG documents
-            return output.write_to(writer);
+    fn write_root_svg(
+        &self,
+        first_svg: InputEvent,
+        bbox: Option<BoundingBox>,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        let mut new_svg_bs = BytesStart::new("svg");
+        let mut orig_svg_attrs = HashMap::new();
+        if let Event::Start(orig_svg) = first_svg.event {
+            new_svg_bs = orig_svg;
+            orig_svg_attrs = new_svg_bs
+                .attributes()
+                .map(|attr| {
+                    let attr = attr.expect("Invalid SVG attribute");
+                    (
+                        String::from_utf8(attr.key.into_inner().to_owned()).expect("Non-UTF8"),
+                        String::from_utf8(attr.value.to_vec()).expect("Non-UTF8"),
+                    )
+                })
+                .collect();
+        }
+        if !orig_svg_attrs.contains_key("version") {
+            new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
+        }
+        if !orig_svg_attrs.contains_key("xmlns") {
+            new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
+        }
+        if !orig_svg_attrs.contains_key("id") {
+            if let Some(local_id) = &self.context.local_style_id {
+                new_svg_bs.push_attribute(Attribute::from(("id", local_id.as_str())));
+            }
+        }
+        // If width or height are provided, leave width/height/viewBox alone.
+        let orig_width = orig_svg_attrs.get("width");
+        let orig_height = orig_svg_attrs.get("height");
+        // Expand by given border width
+        let mut extent = bbox;
+        if let Some(bb) = &mut extent {
+            bb.expand(
+                self.context.config.border as f32,
+                self.context.config.border as f32,
+            );
+            bb.round();
+
+            let aspect_ratio = bb.width() / bb.height();
+            let view_width = fstr(bb.width());
+            let view_height = fstr(bb.height());
+
+            // Populate any missing width/height attributes
+            if orig_width.is_none() && orig_height.is_none() {
+                // if neither present, assume user units are mm, scaled by config.scale
+                let width = fstr(bb.width() * self.context.config.scale);
+                let height = fstr(bb.height() * self.context.config.scale);
+                let new_width = format!("{}mm", width);
+                let new_height = format!("{}mm", height);
+                new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+                new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+            } else if orig_height.is_none() {
+                let (width, unit) = split_unit(orig_width.expect("logic"))?;
+                let new_height = format!("{}{}", fstr(width / aspect_ratio), unit);
+                new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+            } else if orig_width.is_none() {
+                let (height, unit) = split_unit(orig_height.expect("logic"))?;
+                let new_width = format!("{}{}", fstr(height * aspect_ratio), unit);
+                new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+            }
+
+            if !orig_svg_attrs.contains_key("viewBox") {
+                let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+                new_svg_bs.push_attribute(Attribute::from((
+                    "viewBox",
+                    format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height).as_str(),
+                )));
+            }
         }
 
-        let mut elem_path = Vec::new();
+        EventList::from(Event::Start(new_svg_bs)).write_to(writer)
+    }
+
+    fn write_auto_styles(&self, events: &mut EventList, writer: &mut dyn Write) -> Result<()> {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
         let mut element_set = HashSet::new();
         let mut class_set = HashSet::new();
-        // Calculate bounding box of diagram and use as new viewBox for the image.
-        // This also allows just using `<svg>` as the root element.
-        let mut bbox_list = vec![];
-        for input_ev in output.iter() {
+        for input_ev in events.iter() {
             let ev = &input_ev.event;
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     element_set.insert(ee_name);
-                    let is_empty = matches!(ev, Event::Empty(_));
-                    let event_element = SvgElement::try_from(e)?;
-                    class_set.extend(event_element.classes.to_vec());
-                    if !is_empty {
-                        elem_path.push(event_element.name.clone());
-                    }
-                    if event_element.classes.contains("background-grid") {
-                        // special-case "background-grid" as an 'infinite' grid
-                        // sitting behind everything...
-                        continue;
-                    }
-                    if !(elem_path.contains(&"defs".to_string())
-                        || elem_path.contains(&"symbol".to_string()))
-                    {
-                        if let Some(bb) = self.context.get_element_bbox(&event_element)? {
-                            bbox_list.push(bb);
+                    for attr in e.attributes() {
+                        let attr = attr?;
+                        let key = String::from_utf8(attr.key.as_ref().to_vec())?;
+                        let value = String::from_utf8(attr.value.to_vec())?;
+                        if key == "class" {
+                            class_set.extend(value.split_whitespace().map(|s| s.to_owned()));
                         }
                     }
-                }
-                Event::End(_) => {
-                    elem_path.pop();
                 }
                 _ => {}
             }
         }
-        // Expand by given border width
-        let mut extent = BoundingBox::union(bbox_list);
-        if let Some(extent) = &mut extent {
-            extent.expand(
-                self.context.config.border as f32,
-                self.context.config.border as f32,
-            );
-            extent.round();
+
+        let indent = 2;
+        let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
+        tb.build();
+        let auto_defs = tb.get_defs();
+        let auto_styles = tb.get_styles();
+        if !auto_defs.is_empty() {
+            let indent_line = format!("\n{}", " ".repeat(indent));
+            let mut event_vec = vec![
+                Event::Text(BytesText::new(&indent_line)),
+                Event::Start(BytesStart::new("defs")),
+                Event::Text(BytesText::new("\n")),
+            ];
+            let eee = EventList::from_str(indent_all(auto_defs, indent + 2).join("\n"))?;
+            event_vec.extend(eee.events.iter().map(|e| e.event.clone()));
+            event_vec.extend(vec![
+                Event::Text(BytesText::new(&indent_line)),
+                Event::End(BytesEnd::new("defs")),
+            ]);
+            let auto_defs_events = EventList::from(event_vec);
+            let (before, defs_pivot, after) = events.partition("defs");
+            if let Some(existing_defs) = defs_pivot {
+                before.write_to(writer)?;
+                auto_defs_events.write_to(writer)?;
+                EventList::from(existing_defs.event).write_to(writer)?;
+                *events = after;
+            } else {
+                auto_defs_events.write_to(writer)?;
+            }
+        }
+        if !auto_styles.is_empty() {
+            let auto_styles_events = EventList::from(vec![
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::Start(BytesStart::new("style")),
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::CData(BytesCData::new(format!(
+                    "\n{}\n{}",
+                    indent_all(auto_styles, indent + 2).join("\n"),
+                    " ".repeat(indent)
+                ))),
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::End(BytesEnd::new("style")),
+            ]);
+            let (before, style_pivot, after) = events.partition("styles");
+            if let Some(existing_styles) = style_pivot {
+                before.write_to(writer)?;
+                auto_styles_events.write_to(writer)?;
+                EventList::from(existing_styles.event).write_to(writer)?;
+                *events = after;
+            } else {
+                auto_styles_events.write_to(writer)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn postprocess(
+        &self,
+        output: (EventList, Option<BoundingBox>),
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        let (mut events, bbox) = output;
+
+        if self.context.real_svg {
+            // We don't do any post-processing on 'real' SVG documents
+            return events.write_to(writer);
         }
 
         let mut has_svg_element = false;
-        if let (pre_svg, Some(first_svg), remain) = output.partition("svg") {
-            has_svg_element = true;
+        if let (pre_svg, Some(first_svg), remain) = events.partition("svg") {
             pre_svg.write_to(writer)?;
-
-            let mut new_svg_bs = BytesStart::new("svg");
-            let mut orig_svg_attrs = HashMap::new();
-            if let Event::Start(orig_svg) = first_svg.event {
-                new_svg_bs = orig_svg;
-                orig_svg_attrs = new_svg_bs
-                    .attributes()
-                    .map(|attr| {
-                        let attr = attr.expect("Invalid SVG attribute");
-                        (
-                            String::from_utf8(attr.key.into_inner().to_owned()).expect("Non-UTF8"),
-                            String::from_utf8(attr.value.to_vec()).expect("Non-UTF8"),
-                        )
-                    })
-                    .collect();
-            }
-            if !orig_svg_attrs.contains_key("version") {
-                new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
-            }
-            if !orig_svg_attrs.contains_key("xmlns") {
-                new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
-            }
-            if !orig_svg_attrs.contains_key("id") {
-                if let Some(local_id) = &self.context.local_style_id {
-                    new_svg_bs.push_attribute(Attribute::from(("id", local_id.as_str())));
-                }
-            }
-            // If width or height are provided, leave width/height/viewBox alone.
-            let orig_width = orig_svg_attrs.get("width");
-            let orig_height = orig_svg_attrs.get("height");
-            if let Some(bb) = extent {
-                let aspect_ratio = bb.width() / bb.height();
-                let view_width = fstr(bb.width());
-                let view_height = fstr(bb.height());
-
-                // Populate any missing width/height attributes
-                if orig_width.is_none() && orig_height.is_none() {
-                    // if neither present, assume user units are mm, scaled by config.scale
-                    let width = fstr(bb.width() * self.context.config.scale);
-                    let height = fstr(bb.height() * self.context.config.scale);
-                    let new_width = format!("{}mm", width);
-                    let new_height = format!("{}mm", height);
-                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
-                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
-                } else if orig_height.is_none() {
-                    let (width, unit) = split_unit(orig_width.expect("logic"))?;
-                    let new_height = format!("{}{}", fstr(width / aspect_ratio), unit);
-                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
-                } else if orig_width.is_none() {
-                    let (height, unit) = split_unit(orig_height.expect("logic"))?;
-                    let new_width = format!("{}{}", fstr(height * aspect_ratio), unit);
-                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
-                }
-
-                if !orig_svg_attrs.contains_key("viewBox") {
-                    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-                    new_svg_bs.push_attribute(Attribute::from((
-                        "viewBox",
-                        format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
-                            .as_str(),
-                    )));
-                }
-            }
-
-            EventList::from(Event::Start(new_svg_bs)).write_to(writer)?;
-            output = remain;
+            self.write_root_svg(first_svg, bbox, writer)?;
+            events = remain;
+            has_svg_element = true;
         }
 
         if self.context.config.debug {
@@ -769,61 +801,10 @@ impl Transformer {
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
         if has_svg_element && self.context.config.add_auto_styles {
-            let indent = 2;
-            let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
-            tb.build();
-            let auto_defs = tb.get_defs();
-            let auto_styles = tb.get_styles();
-            if !auto_defs.is_empty() {
-                let indent_line = format!("\n{}", " ".repeat(indent));
-                let mut event_vec = vec![
-                    Event::Text(BytesText::new(&indent_line)),
-                    Event::Start(BytesStart::new("defs")),
-                    Event::Text(BytesText::new("\n")),
-                ];
-                let eee = EventList::from_str(indent_all(auto_defs, indent + 2).join("\n"))?;
-                event_vec.extend(eee.events.iter().map(|e| e.event.clone()));
-                event_vec.extend(vec![
-                    Event::Text(BytesText::new(&indent_line)),
-                    Event::End(BytesEnd::new("defs")),
-                ]);
-                let auto_defs_events = EventList::from(event_vec);
-                let (before, defs_pivot, after) = output.partition("defs");
-                if let Some(existing_defs) = defs_pivot {
-                    before.write_to(writer)?;
-                    auto_defs_events.write_to(writer)?;
-                    EventList::from(existing_defs.event).write_to(writer)?;
-                    output = after;
-                } else {
-                    auto_defs_events.write_to(writer)?;
-                }
-            }
-            if !auto_styles.is_empty() {
-                let auto_styles_events = EventList::from(vec![
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::Start(BytesStart::new("style")),
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::CData(BytesCData::new(format!(
-                        "\n{}\n{}",
-                        indent_all(auto_styles, indent + 2).join("\n"),
-                        " ".repeat(indent)
-                    ))),
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::End(BytesEnd::new("style")),
-                ]);
-                let (before, style_pivot, after) = output.partition("styles");
-                if let Some(existing_styles) = style_pivot {
-                    before.write_to(writer)?;
-                    auto_styles_events.write_to(writer)?;
-                    EventList::from(existing_styles.event).write_to(writer)?;
-                    output = after;
-                } else {
-                    auto_styles_events.write_to(writer)?;
-                }
-            }
+            self.write_auto_styles(&mut events, writer)?;
         }
 
-        output.write_to(writer)
+        events.write_to(writer)
     }
 }
 
@@ -892,14 +873,13 @@ mod tests {
     #[test]
     fn test_process_seq() {
         let mut transformer = Transformer::from_config(&TransformConfig::default());
-        let mut idx_output = BTreeMap::new();
         let seq = EventList::new();
 
-        process_seq(&mut transformer.context, seq, &mut idx_output).unwrap();
+        process_events(seq, &mut transformer.context).unwrap();
     }
 
     #[test]
-    fn test_process_seq_multiple_elements() {
+    fn test_process_tags_multiple_elements() {
         let mut transformer = Transformer::from_config(&TransformConfig::default());
         let mut idx_output = BTreeMap::new();
 
@@ -910,7 +890,16 @@ mod tests {
         </svg>"##,
         );
 
-        let result = process_seq(&mut transformer.context, seq, &mut idx_output);
+        transformer.context.set_events(seq.events.clone());
+        let mut tags = tagify_events(seq)
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
+            .collect::<Vec<_>>();
+        let bbb = &mut BoundingBoxBuilder::new();
+
+        let result = process_tags(&mut tags, &mut transformer.context, &mut idx_output, bbb);
         assert!(result.is_ok());
 
         let ok_ev_count = idx_output
@@ -919,28 +908,6 @@ mod tests {
             .reduce(|a, b| a + b)
             .unwrap();
         assert_eq!(ok_ev_count, 7);
-    }
-
-    #[test]
-    fn test_process_seq_slice() {
-        let mut transformer = Transformer::from_config(&TransformConfig::default());
-        let mut idx_output = BTreeMap::new();
-
-        let seq = EventList::from(
-            r##"<svg>
-          <rect id="a" wh="10"/>
-          <rect xy="#a:h" wh="10"/>
-        </svg>"##,
-        );
-
-        process_seq(&mut transformer.context, seq.slice(2, 5), &mut idx_output).unwrap();
-
-        let ok_ev_count = idx_output
-            .iter()
-            .map(|entry| entry.1.events.len())
-            .reduce(|a, b| a + b)
-            .unwrap();
-        assert_eq!(ok_ev_count, 3);
     }
 
     #[test]
