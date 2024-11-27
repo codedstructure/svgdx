@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50mm" height="55mm" viewBox="-20 -5 50 55">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="80mm" height="80mm" viewBox="-35 -15 80 80">
   <style>
   <![CDATA[
     svg { background: none; }
@@ -45,7 +45,7 @@
         ]]>
     </style>
 
-    <rect x="-50" y="-50" width="200" height="200" class="background-grid"/>
+    <rect x="-30" y="-10" width="70" height="70" class="background-grid"/>
     <rect id="base" x="0" y="0" width="10" height="30"/>
     <text x="5" y="15" class="d-tbox">base</text>
     <rect id="a" x="15" y="0" width="10" height="5"/>

@@ -59,5 +59,6 @@
     <g class="shade">
       <path d="M 90 0 l 1.25 1.25 h 10 l -1.25 -1.25 z" style="fill:grey; stroke:none"/>
     </g>
-   </g>
+
+  </g>
 </svg>

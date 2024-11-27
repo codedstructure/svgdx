@@ -36,7 +36,7 @@
         ]]>
     </style>
 
-    <rect xy="-50" wh="200" class="background-grid"/>
+    <rect xy="-30 -10" wh="70" class="background-grid"/>
     <rect xy="0" wh="10 30" text="base" id="base"/>
     <rect xy="15 0" wh="10 5" text="a" id="a"/>
     <rect xy="15 10" wh="10 5" text="b" id="b"/>
