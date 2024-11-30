@@ -1,9 +1,9 @@
+use crate::errors::{Result, SvgdxError};
+
 use std::str::FromStr;
 
 use crate::position::BoundingBox;
 use crate::types::strp;
-
-use anyhow::{bail, Context, Result};
 
 impl BoundingBox {
     pub fn xfrm_scale(&self, sx: f32, sy: f32) -> Self {
@@ -37,20 +37,22 @@ enum TransformType {
 }
 
 impl FromStr for TransformType {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         let mut parts = value.splitn(2, '(');
-        let name = parts.next().context("No transform name")?;
+        let name = parts
+            .next()
+            .ok_or(SvgdxError::ParseError("No transform name".to_owned()))?;
         let args = parts
             .next()
-            .context("No transform args")?
+            .ok_or(SvgdxError::ParseError("No transform args".to_owned()))?
             .strip_suffix(')')
-            .context("No closing bracket")?
+            .ok_or(SvgdxError::ParseError("No closing bracket".to_owned()))?
             .split(&[',', ' ', '\t', '\n', '\r'])
             .filter(|&v| !v.is_empty())
             .map(strp)
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>>>()?;
         // See https://www.w3.org/TR/SVG11/coords.html#TransformAttribute
         Ok(match name.to_lowercase().as_str() {
             "translate" => {
@@ -60,7 +62,9 @@ impl FromStr for TransformType {
                 } else if args.len() == 2 {
                     TransformType::Translate(args[0], args[1])
                 } else {
-                    bail!("Invalid number of arguments for translate")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for translate".to_string(),
+                    ));
                 }
             }
             "scale" => {
@@ -70,7 +74,9 @@ impl FromStr for TransformType {
                 } else if args.len() == 2 {
                     TransformType::Scale(args[0], args[1])
                 } else {
-                    bail!("Invalid number of arguments for scale")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for scale".to_string(),
+                    ));
                 }
             }
             "rotate" => {
@@ -80,7 +86,9 @@ impl FromStr for TransformType {
                 } else if args.len() == 3 {
                     TransformType::Rotate(args[0], args[1], args[2])
                 } else {
-                    bail!("Invalid number of arguments for rotate")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for rotate".to_string(),
+                    ));
                 }
             }
             "skewx" => {
@@ -88,7 +96,9 @@ impl FromStr for TransformType {
                 if args.len() == 1 {
                     TransformType::SkewX(args[0])
                 } else {
-                    bail!("Invalid number of arguments for skewX")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for skewX".to_string(),
+                    ));
                 }
             }
             "skewy" => {
@@ -96,7 +106,9 @@ impl FromStr for TransformType {
                 if args.len() == 1 {
                     TransformType::SkewY(args[0])
                 } else {
-                    bail!("Invalid number of arguments for skewY")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for skewY".to_string(),
+                    ));
                 }
             }
             "matrix" => {
@@ -104,10 +116,15 @@ impl FromStr for TransformType {
                 if args.len() == 6 {
                     TransformType::Matrix(args[0], args[1], args[2], args[3], args[4], args[5])
                 } else {
-                    bail!("Invalid number of arguments for matrix")
+                    return Err(SvgdxError::ParseError(
+                        "Invalid number of arguments for matrix".to_string(),
+                    ));
                 }
             }
-            _ => bail!("Invalid transform type"),
+            _ => Err(SvgdxError::ParseError(format!(
+                "Unknown transform type: {}",
+                name
+            )))?,
         })
     }
 }
@@ -118,16 +135,16 @@ pub struct TransformAttr {
 }
 
 impl FromStr for TransformAttr {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         let parts = value.split_inclusive(')').map(|v| v.trim());
         Ok(Self {
             transforms: parts
                 .filter(|v| !v.is_empty())
                 .map(|v| v.trim_start_matches([',', ' ', '\t', '\n', '\r']))
                 .map(|v| v.parse())
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>>>()?,
         })
     }
 }

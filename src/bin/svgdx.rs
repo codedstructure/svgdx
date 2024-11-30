@@ -1,4 +1,4 @@
-use anyhow::Result;
+use svgdx::Result;
 
 use svgdx::cli::{get_config, run};
 

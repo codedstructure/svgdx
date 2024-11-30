@@ -1,8 +1,6 @@
+use crate::errors::{Result, SvgdxError};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
-use std::num::ParseFloatError;
-
-use anyhow::{bail, Result};
 
 /// Return a 'minimal' representation of the given number
 pub fn fstr(x: f32) -> String {
@@ -22,7 +20,7 @@ pub fn fstr(x: f32) -> String {
 
 /// Parse a string to an f32
 pub fn strp(s: &str) -> Result<f32> {
-    s.trim().parse().map_err(|e: ParseFloatError| e.into())
+    Ok(s.trim().parse::<f32>()?)
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
@@ -33,12 +31,18 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
     for ch in s.trim().chars() {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
-                bail!("Invalid character in numeric value: {}", ch);
+                return Err(SvgdxError::ParseError(format!(
+                    "Invalid character in numeric value: {}",
+                    ch
+                )));
             }
             value.push(ch);
         } else {
             if value.is_empty() {
-                bail!("'{}' does not start with numeric value", s);
+                return Err(SvgdxError::ParseError(format!(
+                    "'{}' does not start with numeric value",
+                    s
+                )));
             }
             got_value = true;
             unit.push(ch);
@@ -62,7 +66,7 @@ pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
     x.into_iter().cycle()
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OrderIndex(Vec<usize>);
 
 impl OrderIndex {

@@ -1,9 +1,8 @@
 use std::str::FromStr;
 
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::types::{attr_split, fstr, strp};
-
-use anyhow::{bail, Result};
 
 #[derive(Clone, Debug, Default)]
 pub struct Position {
@@ -380,16 +379,16 @@ impl Length {
     }
 }
 
-pub fn strp_length(s: &str) -> anyhow::Result<Length> {
+pub fn strp_length(s: &str) -> Result<Length> {
     s.parse::<Length>()
 }
 
 impl FromStr for Length {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
     /// Parse a ratio (float or %age) to an f32
     /// Note this deliberately does not clamp to 0..1
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         let value = value.trim();
         if let Some(pc) = value.strip_suffix('%') {
             Ok(Length::Ratio(strp(pc)? * 0.01))
@@ -409,15 +408,17 @@ pub enum DirSpec {
 }
 
 impl FromStr for DirSpec {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "h" => Ok(Self::InFront),
             "H" => Ok(Self::Behind),
             "v" => Ok(Self::Below),
             "V" => Ok(Self::Above),
-            _ => bail!("Invalid DirSpec format {value}"),
+            _ => Err(SvgdxError::InvalidData(format!(
+                "Invalid DirSpec format {value}"
+            ))),
         }
     }
 }
@@ -443,9 +444,9 @@ pub enum EdgeSpec {
 }
 
 impl FromStr for EdgeSpec {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         if let Some((edge, len)) = value.split_once(':') {
             let len = len.parse::<Length>()?;
             match edge {
@@ -453,10 +454,14 @@ impl FromStr for EdgeSpec {
                 "r" => Ok(Self::Right(len)),
                 "b" => Ok(Self::Bottom(len)),
                 "l" => Ok(Self::Left(len)),
-                _ => bail!("Invalid EdgeSpec format {value}"),
+                _ => Err(SvgdxError::InvalidData(format!(
+                    "Invalid EdgeSpec format {value}"
+                ))),
             }
         } else {
-            bail!("Invalid EdgeSpec format {value}")
+            Err(SvgdxError::InvalidData(format!(
+                "Invalid EdgeSpec format {value}"
+            )))
         }
     }
 }
@@ -487,9 +492,9 @@ pub enum LocSpec {
 }
 
 impl FromStr for LocSpec {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         match value {
             "tl" => Ok(Self::TopLeft),
             "t" => Ok(Self::Top),
@@ -500,7 +505,9 @@ impl FromStr for LocSpec {
             "bl" => Ok(Self::BottomLeft),
             "l" => Ok(Self::Left),
             "c" => Ok(Self::Center),
-            _ => bail!("Invalid LocSpec format {value}"),
+            _ => Err(SvgdxError::InvalidData(format!(
+                "Invalid LocSpec format {value}"
+            ))),
         }
     }
 }
@@ -540,9 +547,9 @@ pub enum ScalarSpec {
 }
 
 impl FromStr for ScalarSpec {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         // TODO: 'r' here is ambiguous vs circle's radius attribute.
         // Perhaps require uppercase 'T/R/B/L' for edge values.
         // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
@@ -559,7 +566,9 @@ impl FromStr for ScalarSpec {
             "rx" => Ok(Self::Rx),
             "h" | "height" => Ok(Self::Height),
             "ry" => Ok(Self::Ry),
-            _ => bail!("Invalid ScalarSpec format {value}"),
+            _ => Err(SvgdxError::InvalidData(format!(
+                "Invalid ScalarSpec format {value}"
+            ))),
         }
     }
 }
@@ -658,7 +667,7 @@ impl BoundingBox {
         } else if let Ok(ls) = s.parse::<LocSpec>() {
             Ok(self.locspec(ls))
         } else {
-            bail!("Invalid refspec {s}")
+            Err(SvgdxError::InvalidData(format!("Invalid point spec {s}")))
         }
     }
 
@@ -826,10 +835,10 @@ impl TrblLength {
 }
 
 impl FromStr for TrblLength {
-    type Err = anyhow::Error;
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    type Err = SvgdxError;
+    fn from_str(value: &str) -> Result<Self> {
         // convert parts to Length, fail if any conversion fails.
-        let parts: Result<Vec<_>, _> = attr_split(value).map(|v| strp_length(&v)).collect();
+        let parts: Result<Vec<_>> = attr_split(value).map(|v| strp_length(&v)).collect();
         let parts = parts?;
 
         Ok(match parts.len() {
@@ -837,7 +846,9 @@ impl FromStr for TrblLength {
             2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
             3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
             4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
-            _ => bail!("Invalid number of values"),
+            _ => Err(SvgdxError::InvalidData(
+                "Incorrect number of values".to_owned(),
+            ))?,
         })
     }
 }

@@ -1,4 +1,5 @@
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::types::OrderIndex;
 
 use std::io::{BufRead, BufReader, Cursor, Write};
@@ -7,8 +8,6 @@ use lazy_regex::regex;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
-
-use anyhow::{bail, Result};
 
 pub enum SvgEvent {
     Comment(String),
@@ -252,7 +251,12 @@ impl EventList {
                     // closure: None,
                     alt_idx: None,
                 }),
-                Err(e) => bail!("XML error near line {}: {:?}", line_count, e),
+                Err(e) => {
+                    return Err(SvgdxError::ParseError(format!(
+                        "XML error near line {}: {:?}",
+                        line_count, e
+                    )))
+                }
             }
 
             index += 1;
@@ -293,15 +297,19 @@ impl EventList {
                 let content = blank_line_remover.replace_all(&text_buf, "\n").to_string();
                 let text_event = Event::Text(BytesText::new(&content).into_owned());
                 text_buf.clear();
-                writer.write_event(text_event)?;
+                writer
+                    .write_event(text_event)
+                    .map_err(SvgdxError::from_err)?;
             }
-            writer.write_event(event)?;
+            writer.write_event(event).map_err(SvgdxError::from_err)?;
         }
         // re-add any trailing text
         if !text_buf.is_empty() {
             let content = blank_line_remover.replace_all(&text_buf, "\n").to_string();
             let text_event = Event::Text(BytesText::new(&content).into_owned());
-            writer.write_event(text_event)?;
+            writer
+                .write_event(text_event)
+                .map_err(SvgdxError::from_err)?;
         }
         Ok(())
     }
@@ -368,21 +376,24 @@ impl From<SvgElement> for BytesStart<'static> {
 }
 
 impl TryFrom<&BytesStart<'_>> for SvgElement {
-    type Error = anyhow::Error;
+    type Error = SvgdxError;
 
     /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
     /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
     /// semantic about svgdx / svg formats.
-    fn try_from(e: &BytesStart) -> Result<Self, Self::Error> {
+    fn try_from(e: &BytesStart) -> Result<Self> {
         let elem_name: String =
             String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
 
-        let attrs: Result<Vec<(String, String)>, Self::Error> = e
+        let attrs: Result<Vec<(String, String)>> = e
             .attributes()
             .map(move |a| {
-                let aa = a?;
+                let aa = a.map_err(SvgdxError::from_err)?;
                 let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let value = aa.unescape_value()?.into_owned();
+                let value = aa
+                    .unescape_value()
+                    .map_err(SvgdxError::from_err)?
+                    .into_owned();
                 Ok((key, value))
             })
             .collect();
@@ -391,9 +402,9 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
 }
 
 impl TryFrom<InputEvent> for SvgElement {
-    type Error = anyhow::Error;
+    type Error = SvgdxError;
 
-    fn try_from(ev: InputEvent) -> Result<Self, Self::Error> {
+    fn try_from(ev: InputEvent) -> Result<Self> {
         match ev.event {
             Event::Start(ref e) | Event::Empty(ref e) => {
                 let mut element = SvgElement::try_from(e)?;
@@ -403,7 +414,10 @@ impl TryFrom<InputEvent> for SvgElement {
                 element.set_order_index(&OrderIndex::new(ev.index));
                 Ok(element)
             }
-            _ => bail!("Expected Start or Empty event, got {:?}", ev.event),
+            _ => Err(SvgdxError::DocumentError(format!(
+                "Expected Start or Empty event, got {:?}",
+                ev.event
+            ))),
         }
     }
 }

@@ -2,7 +2,7 @@ use crate::element::SvgElement;
 use crate::position::{EdgeSpec, LocSpec};
 use crate::types::{attr_split_cycle, fstr, strp};
 
-use anyhow::{Context, Result};
+use crate::errors::{Result, SvgdxError};
 use lazy_regex::regex;
 use regex::Captures;
 
@@ -41,8 +41,12 @@ fn get_text_position<'a>(
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = parts.next().context("dx from text-dxy should be numeric")?;
-            t_dy = parts.next().context("dy from text-dxy should be numeric")?;
+            t_dx = parts.next().ok_or(SvgdxError::ParseError(
+                "dx from text-dxy should be numeric".to_owned(),
+            ))?;
+            t_dy = parts.next().ok_or(SvgdxError::ParseError(
+                "dy from text-dxy should be numeric".to_owned(),
+            ))?;
         }
         if let Some(dx) = dx {
             t_dx = strp(&dx)?;
@@ -126,7 +130,7 @@ fn get_text_position<'a>(
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element
         .bbox()?
-        .context("No BoundingBox")?
+        .ok_or(SvgdxError::GeometryError("No BoundingBox".to_owned()))?
         .get_point(&text_loc_str)?;
     tdx += t_dx;
     tdy += t_dy;

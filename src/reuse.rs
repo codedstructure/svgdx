@@ -1,11 +1,11 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::{process_events, EventGen};
 
-use anyhow::{Context, Result};
 use itertools::Itertools;
 
 #[derive(Debug, Clone)]
@@ -23,15 +23,15 @@ impl EventGen for ReuseElement {
         context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
-            .context("reuse element should have an href attribute")?;
+            .ok_or(SvgdxError::InvalidData(
+                "reuse element should have an href attribute".to_owned(),
+            ))?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
-            .get_original_element(
-                elref
-                    .strip_prefix('#')
-                    .context("href value should begin with '#'")?,
-            )
-            .with_context(|| format!("unknown reference '{}'", elref))?
+            .get_original_element(elref.strip_prefix('#').ok_or(SvgdxError::InvalidData(
+                "href value should begin with '#'".to_owned(),
+            ))?)
+            .ok_or_else(|| SvgdxError::ReferenceError(format!("unknown reference '{}'", elref)))?
             .clone();
 
         // Override 'default' attr values in the target
@@ -54,7 +54,9 @@ impl EventGen for ReuseElement {
         // was on the `reuse` element.
         let ref_id = instance_element
             .pop_attr("id")
-            .context("referenced element should have id")?;
+            .ok_or(SvgdxError::InvalidData(
+                "referenced element should have id".to_owned(),
+            ))?;
         if let Some(inst_id) = reuse_element.get_attr("id") {
             instance_element.set_attr("id", &inst_id);
             context.update_element(&reuse_element);

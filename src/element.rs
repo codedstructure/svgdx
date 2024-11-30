@@ -1,5 +1,6 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::errors::{Result, SvgdxError};
 use crate::events::SvgEvent;
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
@@ -8,7 +9,7 @@ use crate::position::{
 };
 use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
-use anyhow::{bail, Context, Result};
+
 use core::fmt::Display;
 use lazy_regex::{regex, Captures};
 use std::collections::HashMap;
@@ -70,7 +71,10 @@ fn split_relspec<'a, 'b>(
         if let Some(el) = ctx.get_element(id) {
             Ok((Some(el), remain))
         } else {
-            bail!("Reference to unknown element '{}'", id);
+            Err(SvgdxError::ReferenceError(format!(
+                "Reference to unknown element '{}'",
+                id
+            )))
         }
     } else {
         Ok((None, input))
@@ -166,7 +170,9 @@ impl SvgElement {
                 // replace with rendered connection element
                 *self = conn.render(ctx)?.without_attr("edge-type");
             } else {
-                bail!("Cannot create connector {self}");
+                return Err(SvgdxError::InvalidData(
+                    "Cannot create connector".to_owned(),
+                ));
             }
         }
 
@@ -241,7 +247,9 @@ impl SvgElement {
                     if let Some(value) = &elem.text_content {
                         events.push(SvgEvent::Text(value.clone()));
                     } else {
-                        bail!("Text element should have content");
+                        return Err(SvgdxError::InvalidData(
+                            "Text element should have content".to_owned(),
+                        ));
                     }
                     events.push(SvgEvent::End("text".to_string()));
                 }
@@ -258,7 +266,9 @@ impl SvgElement {
                         if let Some(value) = &elem.text_content {
                             events.push(SvgEvent::Text(value.clone()));
                         } else {
-                            bail!("Text element should have content");
+                            return Err(SvgdxError::InvalidData(
+                                "Text element should have content".to_owned(),
+                            ));
                         }
                         events.push(SvgEvent::End("tspan".to_string()));
                     }
@@ -510,7 +520,9 @@ impl SvgElement {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
-            bail!("Cannot have 'surround' and 'inside' on an element");
+            return Err(SvgdxError::InvalidData(
+                "Cannot have 'surround' and 'inside' on an element".to_owned(),
+            ));
         }
         if surround.is_none() && inside.is_none() {
             return Ok(());
@@ -525,15 +537,22 @@ impl SvgElement {
         for elref in attr_split(&ref_list) {
             let ref_id = elref
                 .strip_prefix('#')
-                .context(format!("Invalid {} value {elref}", contain_str))?;
+                .ok_or(SvgdxError::InvalidData(format!(
+                    "Invalid {} value {elref}",
+                    contain_str
+                )))?;
             let el = ctx
                 .get_element(ref_id)
-                .context("Ref lookup failed at this time")?;
+                .ok_or(SvgdxError::ReferenceError(format!(
+                    "Element {elref} not found at this time"
+                )))?;
             {
                 if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
                     bbox_list.push(el_bb);
                 } else {
-                    bail!("Element #{elref} has no bounding box at this time");
+                    return Err(SvgdxError::InvalidData(format!(
+                        "Element {elref} has no bounding box at this time"
+                    )));
                 }
             }
         }
@@ -661,7 +680,9 @@ impl SvgElement {
                     if has_x && has_y {
                         Ok(Some(BoundingBox::new(min_x, min_y, max_x, max_y)))
                     } else {
-                        bail!("Insufficient points for bbox")
+                        Err(SvgdxError::InvalidData(
+                            "Insufficient points for bbox".to_owned(),
+                        ))
                     }
                 } else {
                     Ok(None)
@@ -815,7 +836,9 @@ impl SvgElement {
                     Some((x + dx, y + dy))
                 }
             } else {
-                bail!("Could not determine location from {loc}");
+                return Err(SvgdxError::ReferenceError(format!(
+                    "Could not determine location from {loc}"
+                )));
             }
         } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
             let (x, y) = bbox.locspec(anchor);

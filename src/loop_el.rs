@@ -1,11 +1,10 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::EventList;
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, EventGen};
-
-use anyhow::{bail, Result};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -21,11 +20,13 @@ struct LoopDef {
 }
 
 impl TryFrom<&SvgElement> for LoopDef {
-    type Error = anyhow::Error;
+    type Error = SvgdxError;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name != "loop" {
-            bail!("LoopType can only be created from a loop element");
+            return Err(SvgdxError::InvalidData(
+                "LoopType can only be created from a loop element".to_string(),
+            ));
         }
         let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
             // Note we don't parse attributes here as they might be expressions,
@@ -44,7 +45,9 @@ impl TryFrom<&SvgElement> for LoopDef {
         } else if let Some(until_expr) = element.get_attr("until") {
             loop_type = LoopType::Until(until_expr);
         } else {
-            bail!("Loop element should have a count, while or until attribute");
+            return Err(SvgdxError::ParseError(
+                "Loop element should have a count, while or until attribute".to_string(),
+            ));
         }
         Ok(Self {
             loop_type,
@@ -113,7 +116,9 @@ impl EventGen for LoopElement {
                 iteration += 1;
                 loop_var_value += loop_step;
                 if iteration > context.config.loop_limit {
-                    bail!("Excessive looping detected");
+                    return Err(SvgdxError::LoopLimitError(
+                        "Excessive looping detected".to_string(),
+                    ));
                 }
             }
         }

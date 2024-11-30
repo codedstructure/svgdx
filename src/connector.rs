@@ -1,10 +1,9 @@
 use crate::context::ElementMap;
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::position::{strp_length, Length, ScalarSpec};
 use crate::types::{attr_split, fstr, strp};
 use lazy_regex::regex;
-
-use anyhow::{Context, Result};
 
 #[derive(Clone, Copy, Debug)]
 enum Direction {
@@ -79,7 +78,7 @@ fn closest_loc(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .context("no bbox for element")?;
+        .ok_or(SvgdxError::GeometryError("no bbox for element".to_owned()))?;
 
     for loc in edge_locations(this, conn_type) {
         let this_coord = this_bb.get_point(loc)?;
@@ -105,10 +104,10 @@ fn shortest_link(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .context("no bbox for element")?;
+        .ok_or(SvgdxError::GeometryError("no bbox for element".to_owned()))?;
     let that_bb = context
         .get_element_bbox(that)?
-        .context("no bbox for element")?;
+        .ok_or(SvgdxError::GeometryError("no bbox for element".to_owned()))?;
 
     for this_loc in edge_locations(this, conn_type) {
         for that_loc in edge_locations(that, conn_type) {
@@ -145,10 +144,17 @@ impl Connector {
         conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
-        let start_ref = element.pop_attr("start").context("No 'start' element")?;
-        let end_ref = element.pop_attr("end").context("No 'end' element")?;
+        let start_ref = element
+            .pop_attr("start")
+            .ok_or(SvgdxError::ElementError("No 'start' element".to_owned()))?;
+        let end_ref = element
+            .pop_attr("end")
+            .ok_or(SvgdxError::ElementError("No 'end' element".to_owned()))?;
         let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
-            Some(strp_length(&o_inner).context("Invalid corner-offset")?)
+            Some(
+                strp_length(&o_inner)
+                    .map_err(|_| SvgdxError::ParseError("Invalid corner-offset".to_owned()))?,
+            )
         } else {
             None
         };
@@ -177,8 +183,12 @@ impl Connector {
         } else {
             let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
             start_point = Some((
-                parts.next().context("start_ref x should be numeric")?,
-                parts.next().context("start_ref y should be numeric")?,
+                parts.next().ok_or(SvgdxError::InvalidData(
+                    "start_ref x should be numeric".to_owned(),
+                ))?,
+                parts.next().ok_or(SvgdxError::InvalidData(
+                    "start_ref y should be numeric".to_owned(),
+                ))?,
             ));
         }
         if let Some(caps) = re.captures(&end_ref) {
@@ -189,8 +199,12 @@ impl Connector {
         } else {
             let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
             end_point = Some((
-                parts.next().context("end_ref x should be numeric")?,
-                parts.next().context("end_ref y should be numeric")?,
+                parts.next().ok_or(SvgdxError::InvalidData(
+                    "end_ref x should be numeric".to_owned(),
+                ))?,
+                parts.next().ok_or(SvgdxError::InvalidData(
+                    "end_ref y should be numeric".to_owned(),
+                ))?,
             ));
         }
 
@@ -200,14 +214,14 @@ impl Connector {
                 Endpoint::new(end_point, end_dir),
             ),
             (Some(start_point), None) => {
-                let end_el = end_el.context("no end_el")?;
+                let end_el = end_el.ok_or(SvgdxError::ElementError("no end_el".to_owned()))?;
                 if end_loc.is_empty() {
                     end_loc = closest_loc(end_el, start_point, conn_type, elem_map)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
-                    .context("no bounding box")?
+                    .ok_or(SvgdxError::GeometryError("no bounding box".to_owned()))?
                     .get_point(&end_loc)?;
                 (
                     Endpoint::new(start_point, start_dir),
@@ -215,14 +229,15 @@ impl Connector {
                 )
             }
             (None, Some(end_point)) => {
-                let start_el = start_el.context("no start_el")?;
+                let start_el =
+                    start_el.ok_or(SvgdxError::ElementError("no start_el".to_owned()))?;
                 if start_loc.is_empty() {
                     start_loc = closest_loc(start_el, end_point, conn_type, elem_map)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
-                    .context("no bounding box")?
+                    .ok_or(SvgdxError::GeometryError("no bounding box".to_owned()))?
                     .get_point(&start_loc)?;
                 (
                     Endpoint::new(start_coord, start_dir),
@@ -231,8 +246,8 @@ impl Connector {
             }
             (None, None) => {
                 let (start_el, end_el) = (
-                    start_el.context("no start_el")?,
-                    end_el.context("no end_el")?,
+                    start_el.ok_or(SvgdxError::ElementError("no start_el".to_owned()))?,
+                    end_el.ok_or(SvgdxError::ElementError("no end_el".to_owned()))?,
                 );
                 if start_loc.is_empty() && end_loc.is_empty() {
                     (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
@@ -241,25 +256,33 @@ impl Connector {
                 } else if start_loc.is_empty() {
                     let end_coord = elem_map
                         .get_element_bbox(end_el)?
-                        .context("no bbox for end_coord")?
+                        .ok_or(SvgdxError::GeometryError(
+                            "no bbox for end_coord".to_owned(),
+                        ))?
                         .get_point(&end_loc)?;
                     start_loc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
                     start_dir = Self::loc_to_dir(&start_loc);
                 } else if end_loc.is_empty() {
                     let start_coord = elem_map
                         .get_element_bbox(start_el)?
-                        .context("no bbox for start_coord")?
+                        .ok_or(SvgdxError::GeometryError(
+                            "no bbox for start_coord".to_owned(),
+                        ))?
                         .get_point(&start_loc)?;
                     end_loc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
                     end_dir = Self::loc_to_dir(&end_loc);
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
-                    .context("no bbox for start_coord")?
+                    .ok_or(SvgdxError::GeometryError(
+                        "no bbox for start_coord".to_owned(),
+                    ))?
                     .get_point(&start_loc)?;
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
-                    .context("no bbox for end_coord")?
+                    .ok_or(SvgdxError::GeometryError(
+                        "no bbox for end_coord".to_owned(),
+                    ))?
                     .get_point(&end_loc)?;
                 (
                     Endpoint::new(start_coord, start_dir),
@@ -294,8 +317,12 @@ impl Connector {
                 // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = start_el.bbox()?.context("start element bbox")?;
-                        let end_bb = end_el.bbox()?.context("end element bbox")?;
+                        let start_bb = start_el
+                            .bbox()?
+                            .ok_or(SvgdxError::GeometryError("start element bbox".to_owned()))?;
+                        let end_bb = end_el
+                            .bbox()?
+                            .ok_or(SvgdxError::GeometryError("end element bbox".to_owned()))?;
                         let overlap_top = start_bb
                             .scalarspec(ScalarSpec::Miny)
                             .max(end_bb.scalarspec(ScalarSpec::Miny));
@@ -323,8 +350,10 @@ impl Connector {
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let start_bb = ctx
                             .get_element_bbox(start_el)?
-                            .context("start element bbox")?;
-                        let end_bb = ctx.get_element_bbox(end_el)?.context("end element bbox")?;
+                            .ok_or(SvgdxError::GeometryError("start element bbox".to_owned()))?;
+                        let end_bb = ctx
+                            .get_element_bbox(end_el)?
+                            .ok_or(SvgdxError::GeometryError("end element bbox".to_owned()))?;
                         let overlap_left = start_bb
                             .scalarspec(ScalarSpec::Minx)
                             .max(end_bb.scalarspec(ScalarSpec::Minx));
@@ -387,43 +416,43 @@ impl Connector {
                         (Direction::Left, Direction::Left) => {
                             let min_x = self.start.origin.0.min(self.end.origin.0);
                             let mid_x = min_x
-                                - self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .context("Corner type requires absolute offset")?;
+                                - self.offset.unwrap_or(default_abs_offset).absolute().ok_or(
+                                    SvgdxError::InvalidData(
+                                        "Corner type requires absolute offset".to_owned(),
+                                    ),
+                                )?;
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Right, Direction::Right) => {
                             let max_x = self.start.origin.0.max(self.end.origin.0);
                             let mid_x = max_x
-                                + self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .context("Corner type requires absolute offset")?;
+                                + self.offset.unwrap_or(default_abs_offset).absolute().ok_or(
+                                    SvgdxError::InvalidData(
+                                        "Corner type requires absolute offset".to_owned(),
+                                    ),
+                                )?;
 
                             vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
                         }
                         (Direction::Up, Direction::Up) => {
                             let min_y = self.start.origin.1.min(self.end.origin.1);
                             let mid_y = min_y
-                                - self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .context("Corner type requires absolute offset")?;
+                                - self.offset.unwrap_or(default_abs_offset).absolute().ok_or(
+                                    SvgdxError::InvalidData(
+                                        "Corner type requires absolute offset".to_owned(),
+                                    ),
+                                )?;
 
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }
                         (Direction::Down, Direction::Down) => {
                             let max_y = self.start.origin.1.max(self.end.origin.1);
                             let mid_y = max_y
-                                + self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .context("Corner type requires absolute offset")?;
+                                + self.offset.unwrap_or(default_abs_offset).absolute().ok_or(
+                                    SvgdxError::InvalidData(
+                                        "Corner type requires absolute offset".to_owned(),
+                                    ),
+                                )?;
 
                             vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
                         }

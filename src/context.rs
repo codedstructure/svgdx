@@ -1,4 +1,5 @@
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
@@ -12,8 +13,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
-
-use anyhow::{bail, Context, Result};
 
 pub struct TransformerContext {
     /// Current state of given element; may be updated as processing continues
@@ -98,16 +97,21 @@ impl ElementMap for TransformerContext {
                 let href = el
                     .get_attr("href")
                     .and_then(|href| href.strip_prefix('#').map(|s| s.to_string()))
-                    .context("Could not determine href for element")?;
+                    .ok_or(SvgdxError::InvalidData(
+                        "Could not determine href for element".to_owned(),
+                    ))?;
 
                 if already.contains(&href) {
-                    bail!("Circular reference: {}", href);
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "Circular reference: {}",
+                        href
+                    )));
                 }
                 already.push(href.clone());
 
-                let target_el = ctx
-                    .get_element(&href)
-                    .context("Could not find element with id")?;
+                let target_el = ctx.get_element(&href).ok_or_else(|| {
+                    SvgdxError::ReferenceError(format!("Could not find element with id '{}'", href))
+                })?;
                 // recurse to get bbox of the target
                 inner(target_el, ctx, already)?
             } else {

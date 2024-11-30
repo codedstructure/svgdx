@@ -1,23 +1,21 @@
 use crate::context::{ElementMap, TransformerContext};
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
+use crate::loop_el::LoopElement;
 use crate::position::{BoundingBox, BoundingBoxBuilder, LocSpec};
+use crate::reuse::ReuseElement;
 use crate::themes::ThemeBuilder;
 use crate::types::{fstr, split_unit, OrderIndex};
 use crate::TransformConfig;
 
-use crate::loop_el::LoopElement;
-use crate::reuse::ReuseElement;
-
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
+use std::mem;
 
-use itertools::Itertools;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
-
-use anyhow::{bail, Context, Result};
 
 pub trait EventGen {
     /// Determine the sequence of (XML-level) events to emit in response
@@ -255,7 +253,11 @@ impl EventGen for ConfigElement {
                 "font-family" => new_config.font_family.clone_from(value),
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
-                _ => bail!("Unknown config setting {key}"),
+                _ => {
+                    return Err(SvgdxError::InvalidData(format!(
+                        "Unknown config setting {key}"
+                    )))
+                }
             }
         }
         context.set_config(new_config);
@@ -272,7 +274,9 @@ impl EventGen for SpecsElement {
         context: &mut TransformerContext,
     ) -> Result<(EventList, Option<BoundingBox>)> {
         if context.in_specs {
-            bail!("Nested <specs> elements are not allowed");
+            return Err(SvgdxError::DocumentError(
+                "Nested <specs> elements are not allowed".to_string(),
+            ));
         }
         if let Some((start, end)) = self.0.event_range {
             let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
@@ -303,12 +307,12 @@ impl EventGen for VarElement {
                 let value = eval_attr(&value, context);
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
-                    bail!(
+                    return Err(SvgdxError::VarLimitError(format!(
                         "Variable `{}` value too long: {} (var-limit: {})",
                         key,
                         value.len(),
                         context.config.var_limit
-                    );
+                    )));
                 }
                 new_vars.push((key, value));
             }
@@ -449,10 +453,12 @@ fn tagify_events(events: EventList) -> Result<Vec<Tag>> {
         let ev = &input_ev.event;
         match ev {
             Event::Start(_) => {
-                let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
-                    "could not extract element at line {}",
-                    input_ev.line
-                ))?;
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
+                })?;
                 if let Some(alt_idx) = input_ev.alt_idx {
                     event_element.set_event_range((input_ev.index, alt_idx));
                     // Scan ahead to the end of this element, matching alt_idx.
@@ -469,10 +475,12 @@ fn tagify_events(events: EventList) -> Result<Vec<Tag>> {
                 tags.push(Tag::Compound(event_element, None));
             }
             Event::Empty(_) => {
-                let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
-                    "could not extract element at line {}",
-                    input_ev.line
-                ))?;
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
+                })?;
                 event_element.set_event_range((input_ev.index, input_ev.index));
                 tags.push(Tag::Leaf(event_element, None));
             }
@@ -506,52 +514,60 @@ fn tagify_events(events: EventList) -> Result<Vec<Tag>> {
 }
 
 fn process_tags(
-    tags: &mut [(OrderIndex, Tag)],
+    tags: &mut Vec<(OrderIndex, Tag)>,
     context: &mut TransformerContext,
     idx_output: &mut BTreeMap<OrderIndex, EventList>,
     bbb: &mut BoundingBoxBuilder,
 ) -> Result<Option<BoundingBox>> {
-    let init_seq_len = tags.len();
-    if init_seq_len == 0 {
-        return Ok(bbb.clone().build());
-    }
-    let mut remain = Vec::new();
-    for (idx, t) in &mut tags.iter_mut() {
-        let idx = idx.clone();
-        if let Some(el) = t.get_element() {
-            // update early so reuse targets are available even if the element
-            // is not ready (e.g. within a specs block)
-            context.update_element(&el);
-        }
-        let gen_result = t.generate_events(context);
-        if !context.in_specs {
-            // if we *are* in a specs block, we don't care if there were errors;
-            // a specs entry may have insufficient context until reuse time.
-            if let Ok((events, maybe_bbox)) = gen_result {
-                if let Some(bbox) = maybe_bbox {
-                    bbb.extend(bbox); // TODO: should this pattern take an Option?
-                }
-                if !events.is_empty() {
-                    idx_output.insert(idx, events);
-                }
+    let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
+    let remain = &mut Vec::new();
+
+    while !tags.is_empty() && remain.len() != tags.len() {
+        for (idx, t) in &mut tags.iter_mut() {
+            let idx = idx.clone();
+            let el = if let Some(el) = t.get_element() {
+                // update early so reuse targets are available even if the element
+                // is not ready (e.g. within a specs block)
+                context.update_element(&el);
+                Some(el.clone())
             } else {
-                remain.push((idx, t.clone()));
-                continue;
+                None
+            };
+            let gen_result = t.generate_events(context);
+            if !context.in_specs {
+                // if we *are* in a specs block, we don't care if there were errors;
+                // a specs entry may have insufficient context until reuse time.
+                // We do still call generate_events for side-effects including registering
+                // elements for reuse.
+                if let Ok((events, maybe_bbox)) = gen_result {
+                    if let Some(bbox) = maybe_bbox {
+                        bbb.extend(bbox); // TODO: should this pattern take an Option?
+                    }
+                    if !events.is_empty() {
+                        idx_output.insert(idx, events);
+                    }
+                } else {
+                    if let (Some(el), Err(err)) = (el, gen_result) {
+                        if let SvgdxError::MultiError(err_list) = err {
+                            for (idx, (el, err)) in err_list {
+                                element_errors.insert(idx, (el, err));
+                            }
+                        } else {
+                            element_errors.insert(idx.clone(), (el, err));
+                        }
+                    }
+                    remain.push((idx, t.clone()));
+                }
             }
         }
+        if tags.len() == remain.len() {
+            return Err(SvgdxError::MultiError(element_errors));
+        }
+
+        mem::swap(tags, remain);
+        remain.clear();
     }
-    if init_seq_len == remain.len() {
-        // TODO: warning logs
-        bail!(
-            "Could not resolve the following elements:\n{}",
-            remain
-                .iter()
-                .map(|r| (r.1.get_element().unwrap()))
-                .map(|el| format!("{:4}: {}", el.src_line, el.original))
-                .join("\n")
-        );
-    }
-    process_tags(&mut remain, context, idx_output, bbb)
+    Ok(bbb.clone().build())
 }
 
 pub fn process_events(
@@ -692,7 +708,7 @@ impl Transformer {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     element_set.insert(ee_name);
                     for attr in e.attributes() {
-                        let attr = attr?;
+                        let attr = attr.map_err(SvgdxError::from_err)?;
                         let key = String::from_utf8(attr.key.as_ref().to_vec())?;
                         let value = String::from_utf8(attr.value.to_vec())?;
                         if key == "class" {
