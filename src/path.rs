@@ -1,6 +1,6 @@
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::position::BoundingBox;
-use anyhow::{bail, Context, Result};
 
 struct PathParser {
     data: Vec<char>,
@@ -35,9 +35,10 @@ impl PathParser {
 
     fn check_not_end(&self) -> Result<()> {
         if self.at_end() {
-            bail!("Ran out of data!");
+            Err(SvgdxError::ParseError("Ran out of data!".to_string()))
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     fn skip_whitespace(&mut self) {
@@ -87,7 +88,7 @@ impl PathParser {
             self.skip_wsp_comma();
             Ok(command)
         } else {
-            bail!("Invalid path command")
+            Err(SvgdxError::InvalidData("Invalid path command".to_string()))
         }
     }
 
@@ -174,10 +175,9 @@ impl PathParser {
                 self.update_position((cpx, cpy + dy));
             }
             'Z' | 'z' => {
-                self.update_position(
-                    self.start_pos
-                        .context("Cannot 'z' without start position")?,
-                );
+                self.update_position(self.start_pos.ok_or_else(|| {
+                    SvgdxError::InvalidData("Cannot 'z' without start position".to_owned())
+                })?);
             }
             'C' => {
                 let _cp1 = self.read_coord()?; // control point 1
@@ -228,7 +228,9 @@ impl PathParser {
                 let (cpx, cpy) = self.position.unwrap_or((0., 0.));
                 self.update_position((cpx + dx, cpy + dy));
             }
-            _ => bail!("Unknown path data instruction"),
+            _ => Err(SvgdxError::InvalidData(
+                "Unknown path data instruction".to_string(),
+            ))?,
         }
         Ok(())
     }
@@ -243,14 +245,15 @@ impl PathParser {
 }
 
 pub fn path_bbox(element: &SvgElement) -> Result<BoundingBox> {
-    let path_data = element
-        .get_attr("d")
-        .context("path element should have 'd' attribute")?;
+    let path_data = element.get_attr("d").ok_or_else(|| {
+        SvgdxError::InvalidData("Path element should have 'd' attribute".to_string())
+    })?;
 
     let mut pp = PathParser::new(&path_data);
     pp.evaluate()?;
-    pp.get_bbox()
-        .context("Path element should have a computable boundingbox")
+    pp.get_bbox().ok_or_else(|| {
+        SvgdxError::InvalidData("Path element should have a computable boundingbox".to_string())
+    })
 }
 
 #[cfg(test)]

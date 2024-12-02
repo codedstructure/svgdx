@@ -92,7 +92,10 @@ fn test_position_relspec() {
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 
     let input = r##"
 <rect id="a" x="1" y="2" width="3" height="4"/>
@@ -102,7 +105,10 @@ fn test_position_relspec() {
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 
     let input = r##"
 <rect id="a" x="1" y="2" width="3" height="4"/>
@@ -112,7 +118,10 @@ fn test_position_relspec() {
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -125,7 +134,10 @@ fn test_position_scalar_locspec() {
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect x="5.5" y="5" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -138,7 +150,10 @@ fn test_position_scalar_edgespec() {
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect x="0.25" y="1" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -170,7 +185,10 @@ fn test_position_deferred() {
 <rect x="1" y="2" width="1.5" height="4"/>
 <rect id="a" x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -184,7 +202,10 @@ fn test_position_deferred_inferred() {
 <circle cx="2.5" cy="4" r="2"/>
 <rect id="a" x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 
     // check inferred cx/x2/y2
     let input = r##"
@@ -195,7 +216,10 @@ fn test_position_deferred_inferred() {
 <circle cx="2.5" cy="4.5" r="1.5"/>
 <rect id="a" x="1" y="2" width="3" height="4"/>
 "#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]

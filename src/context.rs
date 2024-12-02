@@ -1,21 +1,18 @@
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
-use crate::transform::ElementLike;
 use crate::transform_attr::TransformAttr;
 use crate::types::strp;
 use crate::TransformConfig;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
-
-use anyhow::{bail, Context, Result};
 
 pub struct TransformerContext {
     /// Current state of given element; may be updated as processing continues
@@ -27,7 +24,7 @@ pub struct TransformerContext {
     /// Note empty elements are normally not pushed onto the stack,
     /// but `<reuse>` elements are an exception during processing of
     /// the referenced element.
-    element_stack: Vec<Rc<RefCell<dyn ElementLike>>>,
+    element_stack: Vec<SvgElement>,
     /// The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
     /// Stack of scoped variable mappings
@@ -38,8 +35,6 @@ pub struct TransformerContext {
     pub real_svg: bool,
     /// Are we in a <specs> block?
     pub in_specs: bool,
-    /// How many <loop> elements deep are we?
-    pub loop_depth: usize,
     /// The event-representation of the entire input SVG
     pub events: Vec<InputEvent>,
     /// id used by top-level SVG element if local_styles is true
@@ -60,7 +55,6 @@ impl Default for TransformerContext {
             local_style_id: None,
             real_svg: false,
             in_specs: false,
-            loop_depth: 0,
             events: Vec::new(),
             config: TransformConfig::default(),
         }
@@ -103,16 +97,20 @@ impl ElementMap for TransformerContext {
                 let href = el
                     .get_attr("href")
                     .and_then(|href| href.strip_prefix('#').map(|s| s.to_string()))
-                    .context("Could not determine href for element")?;
+                    .ok_or_else(|| {
+                        SvgdxError::InvalidData("Could not determine href for element".to_owned())
+                    })?;
 
                 if already.contains(&href) {
-                    bail!("Circular reference: {}", href);
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "Circular reference: {href}"
+                    )));
                 }
                 already.push(href.clone());
 
-                let target_el = ctx
-                    .get_element(&href)
-                    .context("Could not find element with id")?;
+                let target_el = ctx.get_element(&href).ok_or_else(|| {
+                    SvgdxError::ReferenceError(format!("Could not find element with id '{href}'"))
+                })?;
                 // recurse to get bbox of the target
                 inner(target_el, ctx, already)?
             } else {
@@ -220,40 +218,18 @@ impl TransformerContext {
         }
     }
 
-    pub fn push_element(&mut self, ell: Rc<RefCell<dyn ElementLike>>) {
-        let attrs = if let Some(element) = ell.borrow().get_element() {
-            element.get_attrs()
-        } else {
-            HashMap::new()
-        };
-        self.element_stack.push(ell);
+    pub fn push_element(&mut self, el: &SvgElement) {
+        let attrs = el.get_attrs();
+        self.element_stack.push(el.clone());
         self.var_stack.push(attrs);
     }
 
-    pub fn pop_element(&mut self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+    pub fn pop_element(&mut self) -> Option<SvgElement> {
         self.var_stack.pop();
         self.element_stack.pop()
     }
 
-    pub fn get_closure(&self) -> HashMap<String, String> {
-        let mut closure = HashMap::new();
-        for var_scope in &self.var_stack {
-            for (k, v) in var_scope {
-                closure.insert(k.clone(), v.clone());
-            }
-        }
-        closure
-    }
-
-    pub fn set_closure(&mut self, c: HashMap<String, String>) {
-        self.var_stack.push(c.clone());
-    }
-
-    pub fn pop_closure(&mut self) {
-        self.var_stack.pop();
-    }
-
-    pub fn get_top_element(&self) -> Option<Rc<RefCell<dyn ElementLike>>> {
+    pub fn get_top_element(&self) -> Option<SvgElement> {
         self.element_stack.last().cloned()
     }
 

@@ -1,63 +1,48 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::eval_attr;
-use crate::transform::{process_events, ElementLike};
+use crate::position::BoundingBox;
+use crate::transform::{process_events, EventGen};
 
-use anyhow::{Context, Result};
 use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
 
-impl ElementLike for ReuseElement {
-    fn handle_element_start(
-        &mut self,
-        element: &SvgElement,
+impl EventGen for ReuseElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
-        // Even though `<reuse>`` is (typically) an Empty element, it acts as a
-        // container element around the referenced element for variable lookup.
-        let mut element = element.clone();
-        // Since attributes attached to the `<reuse>` element become part of the
-        // variable lookup context, evaluate them so indirection can be used -
-        // but avoid evaluation (which may have side-effects, e.g. on PRNG state)
-        // if not active at this point
-        if context.loop_depth == 0 && !context.in_specs {
-            element.eval_attributes(context);
-        }
-        context.push_element(element.to_ell());
-        Ok(())
-    }
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        let mut reuse_element = self.0.clone();
 
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.pop_element();
-        Ok(())
-    }
+        reuse_element.eval_attributes(context);
 
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
-        let reuse_element = self.0.clone();
-
-        let elref = reuse_element
-            .get_attr("href")
-            .context("reuse element should have an href attribute")?;
+        context.push_element(&reuse_element);
+        let elref = reuse_element.get_attr("href").ok_or_else(|| {
+            SvgdxError::InvalidData("reuse element should have an href attribute".to_owned())
+        })?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
-            .get_original_element(
-                elref
-                    .strip_prefix('#')
-                    .context("href value should begin with '#'")?,
-            )
-            .with_context(|| format!("unknown reference '{}'", elref))?
+            .get_original_element(elref.strip_prefix('#').ok_or_else(|| {
+                SvgdxError::InvalidData("href value should begin with '#'".to_owned())
+            })?)
+            .ok_or_else(|| SvgdxError::ReferenceError(format!("unknown reference '{}'", elref)))?
             .clone();
+
+        // Override 'default' attr values in the target
+        for (attr, value) in reuse_element.get_attrs() {
+            match attr.as_str() {
+                "href" | "id" | "x" | "y" | "transform" => continue,
+                _ => {
+                    if instance_element.has_attr(&attr) {
+                        instance_element.set_attr(&attr, &value);
+                    }
+                }
+            }
+        }
 
         // the referenced element will have an `id` attribute (which it was
         // referenced by) but the new instance should not have this to avoid
@@ -65,9 +50,9 @@ impl ElementLike for ReuseElement {
         // a class.
         // However we *do* want the instance element to inherit any `id` which
         // was on the `reuse` element.
-        let ref_id = instance_element
-            .pop_attr("id")
-            .context("referenced element should have id")?;
+        let ref_id = instance_element.pop_attr("id").ok_or_else(|| {
+            SvgdxError::InvalidData("referenced element should have id".to_owned())
+        })?;
         if let Some(inst_id) = reuse_element.get_attr("id") {
             instance_element.set_attr("id", &inst_id);
             context.update_element(&reuse_element);
@@ -115,7 +100,7 @@ impl ElementLike for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        if let (false, Some((start, end))) = (
+        let res = if let (false, Some((start, end))) = (
             instance_element.is_empty_element(),
             instance_element.event_range,
         ) {
@@ -134,7 +119,9 @@ impl ElementLike for ReuseElement {
             new_events.push(end_ev);
             process_events(new_events, context)
         } else {
-            instance_element.to_ell().borrow().generate_events(context)
-        }
+            instance_element.generate_events(context)
+        };
+        context.pop_element();
+        res
     }
 }

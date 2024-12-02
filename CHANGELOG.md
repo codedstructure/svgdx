@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Internal: event processing logic has been significantly refactored.
+
+  This significantly simplifies the internals of svgdx, which should improve
+  consistency and streamline improvements. The previous `ElementLike`
+  trait has been replaced with an `EventGen` trait which is simpler and
+  implemented by `SvgElement` as well as other types wrapping this to provide
+  element-specific behaviour.
+
+  This is a long-overdue improvement, but it does make changes to whitespace
+  in rendered documents, and other minor changes may be observed.
+
+- Internal: changed the error handling from using `anyhow` to a new `SvgdxError`
+  enum. The use of `anyhow` made it too easy to treat all errors alike, which is
+  unhelpful for distinguishing between recoverable (e.g. reference) and
+  non-recoverable errors.
+
+  The set of error variants is not yet fixed.
+
 - Fixed: avoid infinite recursion on use/reuse circular references.
 
 ## [0.14.0 - 2024-11-18]

@@ -1,11 +1,10 @@
-use anyhow::Result;
 use clap::Parser;
 
-use anyhow::{bail, Context};
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 
+use crate::errors::{Result, SvgdxError};
 use crate::themes::ThemeType;
 use crate::{transform_file, TransformConfig};
 
@@ -109,7 +108,9 @@ impl Config {
     fn from_args(args: Arguments) -> Result<Self> {
         if args.watch && args.file == "-" {
             // Should already be enforced by clap validation
-            bail!("A non-stdin file must be provided with -w/--watch argument");
+            return Err(SvgdxError::from(
+                "A non-stdin file must be provided with -w/--watch argument",
+            ));
         }
         if args.file != "-" && args.output != "-" {
             // Arguably creating this struct shouldn't do any IO, but this is a
@@ -118,14 +119,12 @@ impl Config {
             let in_path = Path::new(&args.file);
             let out_path = Path::new(&args.output);
             if out_path.exists()
-                && out_path
-                    .canonicalize()
-                    .context("output path should be valid")?
-                    == in_path
-                        .canonicalize()
-                        .context("input path should be valid")?
+                && out_path.canonicalize().map_err(SvgdxError::from_err)?
+                    == in_path.canonicalize().map_err(SvgdxError::from_err)?
             {
-                bail!("Output path must not refer to the same file as the input file.");
+                return Err(SvgdxError::from(
+                    "Output path must not refer to the same file as the input file.",
+                ));
             }
         }
         Ok(Self {
@@ -156,7 +155,7 @@ impl Config {
     /// spaces or quotes should be quoted or escaped appropriately.
     pub fn from_cmdline(args: &str) -> Result<Self> {
         let args = shlex::split(args).unwrap_or_default();
-        let args = Arguments::try_parse_from(args.iter())?;
+        let args = Arguments::try_parse_from(args.iter()).map_err(SvgdxError::from_err)?;
         Self::from_args(args)
     }
 }
@@ -179,7 +178,8 @@ pub fn run(config: Config) -> Result<()> {
         let watch_path = Path::new(&watch);
         watcher
             .watcher()
-            .watch(Path::new(&watch), RecursiveMode::NonRecursive)?;
+            .watch(Path::new(&watch), RecursiveMode::NonRecursive)
+            .map_err(SvgdxError::from_err)?;
         transform_file(&watch, &config.output_path, &config.transform).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });

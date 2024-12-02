@@ -1,96 +1,140 @@
 use crate::context::{ElementMap, TransformerContext};
-use crate::element::{ContentType, SvgElement};
-use crate::events::{EventList, SvgEvent};
+use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
+use crate::events::{EventList, InputEvent, SvgEvent};
 use crate::expression::{eval_attr, eval_condition};
-use crate::position::{BoundingBox, LocSpec, Position};
+use crate::loop_el::LoopElement;
+use crate::position::{BoundingBox, BoundingBoxBuilder, LocSpec};
+use crate::reuse::ReuseElement;
 use crate::themes::ThemeBuilder;
 use crate::types::{fstr, split_unit, OrderIndex};
 use crate::TransformConfig;
 
-use crate::loop_el::LoopElement;
-use crate::reuse::ReuseElement;
-
-use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
-use std::rc::Rc;
+use std::mem;
 
-use itertools::Itertools;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 
-use anyhow::{bail, Context, Result};
-
-pub trait ElementLike: std::fmt::Debug {
-    fn handle_element_start(
-        &mut self,
-        _element: &SvgElement,
-        _context: &mut TransformerContext,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        if let (Some(this_el), Some(parent)) = (self.get_element(), context.get_top_element()) {
-            parent.borrow_mut().on_child_element(&this_el, context)?;
-        }
-        Ok(())
-    }
-
+pub trait EventGen {
     /// Determine the sequence of (XML-level) events to emit in response
-    /// to a given `SvgElement`
-    fn generate_events(&self, _context: &mut TransformerContext) -> Result<EventList> {
-        Ok(EventList::new())
-    }
+    /// to a given item, as well as the corresponding bounding box.
+    ///
+    /// Note some implementations may mutate the context (e.g. `var` elements).
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)>;
+}
 
-    fn get_position(&self) -> Option<Position> {
-        None
-    }
-
-    fn on_child_element(
-        &mut self,
-        _element: &SvgElement,
-        _context: &mut TransformerContext,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    fn get_element(&self) -> Option<SvgElement> {
-        None
-    }
-
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        None
+impl EventGen for SvgElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        match self.name.as_str() {
+            "loop" => LoopElement(self.clone()).generate_events(context),
+            "config" => ConfigElement(self.clone()).generate_events(context),
+            "reuse" => ReuseElement(self.clone()).generate_events(context),
+            "specs" => SpecsElement(self.clone()).generate_events(context),
+            "var" => VarElement(self.clone()).generate_events(context),
+            "if" => IfElement(self.clone()).generate_events(context),
+            "g" => GroupElement(self.clone()).generate_events(context),
+            _ => {
+                if let Some((start, end)) = self.event_range {
+                    if start != end {
+                        return Container(self.clone()).generate_events(context);
+                    }
+                }
+                OtherElement(self.clone()).generate_events(context)
+            }
+        }
     }
 }
 
-impl ElementLike for SvgElement {
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.clone())
-    }
+/// Container will be used for many elements which contain other elements,
+/// but have no independent behaviour, such as defs, linearGradient, etc.
+#[derive(Debug, Clone)]
+struct Container(SvgElement);
 
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        Some(self)
-    }
+impl EventGen for Container {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        if let Some((start, end)) = self.0.event_range {
+            let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
+            // If there's only text/cdata events, apply to current element and render
+            let mut inner_text = None;
+            for e in inner_events.iter() {
+                match &e.event {
+                    Event::Text(t) => {
+                        if inner_text.is_none() {
+                            inner_text = Some(String::from_utf8(t.to_vec())?)
+                        }
+                    }
+                    Event::CData(c) => inner_text = Some(String::from_utf8(c.to_vec())?),
+                    _ => {
+                        // abandon the effort and mark as such.
+                        inner_text = None;
+                        break;
+                    }
+                }
+            }
+            if let (true, Some(text)) = (self.0.is_graphics_element(), &inner_text) {
+                let mut el = self.0.clone();
+                el.set_attr("text", text);
+                el.event_range = Some((start, start)); // emulate an Empty element
+                el.generate_events(context)
+            } else {
+                let mut new_el = self.0.clone();
+                new_el.eval_attributes(context);
+                let mut events = EventList::new();
+                events.push(SvgEvent::Start(new_el));
+                let (evlist, mut bbox) = if inner_text.is_some() {
+                    // inner_text implies no processable events; use as-is
+                    (inner_events, None)
+                } else {
+                    process_events(inner_events, context)?
+                };
+                events.extend(&evlist);
+                events.push(SvgEvent::End(self.0.name.clone()));
 
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+                if self.0.name == "defs" || self.0.name == "symbol" {
+                    bbox = None;
+                }
+
+                Ok((events, bbox))
+            }
+        } else {
+            Ok((EventList::new(), None))
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OtherElement(SvgElement);
+
+impl EventGen for OtherElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         let mut output = EventList::new();
-        let source_line = self.get_attr("data-source-line");
-        let mut e = self.clone();
+        let mut e = self.0.clone();
+        e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
         e.transmute(context)?;
         e.resolve_position(context)?;
         let events = e.element_events(context)?;
         context.update_element(&e);
-        if self.name == "point" {
+        if self.0.name == "point" {
             // "point" elements don't generate any events in the final output,
             // but *do* need to register themselves with update_element()
-            return Ok(EventList::new());
+            return Ok((EventList::new(), None));
         }
-        if !events.is_empty() && context.get_element_bbox(&e)?.is_some() {
+        let bb = context.get_element_bbox(&e)?;
+        if !events.is_empty() && bb.is_some() {
             context.set_prev_element(e.clone());
         }
         for svg_ev in events {
@@ -116,10 +160,10 @@ impl ElementLike for SvgElement {
                     )));
                 }
                 // Add 'data-source-line' for all elements generated by input `element`
-                if let Some(ref source_line) = source_line {
+                if context.config.add_metadata {
                     bs.push_attribute(Attribute::from((
                         "data-source-line".as_bytes(),
-                        source_line.as_bytes(),
+                        e.src_line.to_string().as_bytes(),
                     )));
                 }
                 let new_el = SvgElement::try_from(&bs)?;
@@ -134,79 +178,68 @@ impl ElementLike for SvgElement {
 
             output.push(adapted);
         }
-        Ok(output)
+        Ok((output, bb))
     }
 }
 
 #[derive(Debug, Clone)]
-struct GroupElement {
-    el: SvgElement,
-    bbox: Option<BoundingBox>,
-}
+struct GroupElement(SvgElement);
 
-impl ElementLike for GroupElement {
-    fn get_element(&self) -> Option<SvgElement> {
-        let mut el = self.el.clone();
-        el.computed_bbox = self.bbox;
-        Some(el)
-    }
-
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        self.el.computed_bbox = self.bbox;
-        Some(&mut self.el)
-    }
-
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
-        // since we synthesize the opening element event here rather than in process_seq, we need to
+impl EventGen for GroupElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
-        let mut new_el = self.el.clone();
+        let mut new_el = self.0.clone();
         new_el.eval_attributes(context);
-        Ok(EventList::from(if self.el.is_empty_element() {
-            SvgEvent::Empty(new_el)
+
+        // push variables onto the stack
+        context.push_element(&self.0);
+
+        // should remove any attrs except id and classes...
+
+        let mut result_bb = None;
+        let mut events = EventList::new();
+        if self.0.is_empty_element() {
+            events.push(SvgEvent::Empty(new_el));
         } else {
-            SvgEvent::Start(new_el)
-        }))
-    }
+            let el_name = new_el.name.clone();
+            events.push(SvgEvent::Start(new_el));
 
-    fn handle_element_end(
-        &mut self,
-        element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        element.computed_bbox = self.bbox;
-        if let (Some(this_el), Some(parent)) = (self.get_element(), context.get_top_element()) {
-            parent.borrow_mut().on_child_element(&this_el, context)?;
-        }
-        Ok(())
-    }
+            if let Some((start, end)) = self.0.event_range {
+                let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
 
-    fn on_child_element(
-        &mut self,
-        element: &SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        if let Ok(Some(el_bbox)) = context.get_element_bbox(element) {
-            if let Some(bbox) = self.bbox {
-                self.bbox = Some(bbox.combine(&el_bbox));
-            } else {
-                self.bbox = Some(el_bbox);
+                let (ev_list, bb) = process_events(inner_events, context)?;
+                result_bb = bb;
+                events.extend(&ev_list);
             }
+
+            events.push(SvgEvent::End(el_name));
         }
-        Ok(())
+
+        // pop variables off the stack
+        context.pop_element();
+
+        // Messy! should probably have a id->bbox map in context
+        let mut new_el = self.0.clone();
+        new_el.computed_bbox = result_bb;
+        context.update_element(&new_el);
+        Ok((events, result_bb))
     }
 }
 
 #[derive(Debug, Clone)]
-struct ConfigElement {}
+struct ConfigElement(SvgElement);
 
-impl ElementLike for ConfigElement {
-    fn handle_element_start(
-        &mut self,
-        element: &SvgElement,
+impl EventGen for ConfigElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         let mut new_config = context.config.clone();
-        for (key, value) in &element.attrs {
+        for (key, value) in &self.0.attrs {
             match key.as_str() {
                 "scale" => new_config.scale = value.parse()?,
                 "debug" => new_config.debug = value.parse()?,
@@ -220,69 +253,66 @@ impl ElementLike for ConfigElement {
                 "font-family" => new_config.font_family.clone_from(value),
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
-                _ => bail!("Unknown config setting {key}"),
+                _ => {
+                    return Err(SvgdxError::InvalidData(format!(
+                        "Unknown config setting {key}"
+                    )))
+                }
             }
         }
         context.set_config(new_config);
-        Ok(())
+        Ok((EventList::new(), None))
     }
 }
 
 #[derive(Debug, Clone)]
-struct SpecsElement {}
+struct SpecsElement(SvgElement);
 
-impl ElementLike for SpecsElement {
-    fn handle_element_start(
-        &mut self,
-        _element: &SvgElement,
+impl EventGen for SpecsElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         if context.in_specs {
-            bail!("Cannot nest <specs> elements");
+            return Err(SvgdxError::DocumentError(
+                "Nested <specs> elements are not allowed".to_string(),
+            ));
         }
-        context.in_specs = true;
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.in_specs = false;
-        Ok(())
+        if let Some((start, end)) = self.0.event_range {
+            let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
+            context.in_specs = true;
+            process_events(inner_events, context)?;
+            context.in_specs = false;
+        }
+        Ok((EventList::new(), None))
     }
 }
 
 #[derive(Debug, Clone)]
-struct VarElement {}
+struct VarElement(SvgElement);
 
-impl ElementLike for VarElement {
-    fn handle_element_start(
-        &mut self,
-        element: &SvgElement,
+impl EventGen for VarElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
-        if context.loop_depth > 0 {
-            return Ok(());
-        }
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
         let mut new_vars = Vec::new();
-        for (key, value) in element.attrs.clone() {
+        for (key, value) in self.0.attrs.clone() {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
             if key != "_" && key != "__" {
                 let value = eval_attr(&value, context);
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
-                    bail!(
+                    return Err(SvgdxError::VarLimitError(format!(
                         "Variable `{}` value too long: {} (var-limit: {})",
                         key,
                         value.len(),
                         context.config.var_limit
-                    );
+                    )));
                 }
                 new_vars.push((key, value));
             }
@@ -290,41 +320,18 @@ impl ElementLike for VarElement {
         for (k, v) in new_vars.into_iter() {
             context.set_var(&k, &v);
         }
-        Ok(())
+        Ok((EventList::new(), None))
     }
 }
 
 #[derive(Debug, Clone)]
 struct IfElement(SvgElement);
 
-impl ElementLike for IfElement {
-    fn handle_element_start(
-        &mut self,
-        _element: &SvgElement,
+impl EventGen for IfElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth += 1;
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth -= 1;
-        Ok(())
-    }
-
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        Some(&mut self.0)
-    }
-
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         if let (Some(range), Some(cond)) = (self.0.event_range, self.0.get_attr("test")) {
             if eval_condition(&cond, context)? {
                 // opening if element is not included in the processed inner events to avoid
@@ -335,25 +342,7 @@ impl ElementLike for IfElement {
             }
         }
 
-        Ok(EventList::new())
-    }
-}
-
-impl SvgElement {
-    pub fn to_ell(&self) -> Rc<RefCell<dyn ElementLike>> {
-        match self.name.as_str() {
-            "loop" => Rc::new(RefCell::new(LoopElement(self.clone()))), //LoopDef::try_from(element).unwrap())),
-            "config" => Rc::new(RefCell::new(ConfigElement {})),
-            "reuse" => Rc::new(RefCell::new(ReuseElement(self.clone()))),
-            "specs" => Rc::new(RefCell::new(SpecsElement {})),
-            "var" => Rc::new(RefCell::new(VarElement {})),
-            "if" => Rc::new(RefCell::new(IfElement(self.clone()))),
-            "g" => Rc::new(RefCell::new(GroupElement {
-                el: self.clone(),
-                bbox: None,
-            })),
-            _ => Rc::new(RefCell::new(self.clone())),
-        }
+        Ok((EventList::new(), None))
     }
 }
 
@@ -383,282 +372,231 @@ fn is_real_svg(events: &EventList) -> bool {
     false
 }
 
-fn process_seq(
-    context: &mut TransformerContext,
-    seq: EventList,
-    idx_output: &mut BTreeMap<OrderIndex, EventList>,
-) -> Result<EventList> {
-    // Recursion base-case
-    if seq.is_empty() {
-        return Ok(EventList::new());
+#[derive(Debug, Clone)]
+enum Tag {
+    /// Represents a Start..End block and all events in between
+    Compound(SvgElement, Option<String>),
+    /// Represents a single Empty element
+    Leaf(SvgElement, Option<String>),
+    Comment(String, Option<String>),
+    Text(String),
+    CData(String),
+}
+
+impl Tag {
+    fn set_text(&mut self, text: String) {
+        match self {
+            Tag::Compound(_, tail) => *tail = Some(text),
+            Tag::Leaf(_, tail) => *tail = Some(text),
+            Tag::Comment(_, tail) => *tail = Some(text),
+            _ => {}
+        }
     }
 
-    let mut remain = EventList::new();
-    let mut last_event = None;
-    let mut last_element = None;
-    let mut gen_events: Vec<(OrderIndex, EventList)>;
+    fn get_element(&self) -> Option<SvgElement> {
+        match self {
+            Tag::Compound(el, _) => Some(el.clone()),
+            Tag::Leaf(el, _) => Some(el.clone()),
+            _ => None,
+        }
+    }
+}
 
-    let init_seq_len = seq.len();
+impl EventGen for Tag {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(EventList, Option<BoundingBox>)> {
+        let mut events = EventList::new();
+        let mut bbox = None;
+        match self {
+            Tag::Compound(el, tail) => {
+                let (ev, bb) = el.generate_events(context)?;
+                (events, bbox) = (ev, bb);
+                if let (Some(tail), false) = (tail, events.is_empty()) {
+                    events.push(SvgEvent::Text(tail.to_owned()));
+                }
+            }
+            Tag::Leaf(el, tail) => {
+                let (ev, bb) = el.generate_events(context)?;
+                (events, bbox) = (ev, bb);
+                if let (Some(tail), false) = (tail, events.is_empty()) {
+                    events.push(SvgEvent::Text(tail.to_owned()));
+                }
+            }
+            Tag::Comment(c, tail) => {
+                events.push(SvgEvent::Comment(c.clone()));
+                if let Some(tail) = tail {
+                    events.push(SvgEvent::Text(tail.to_owned()));
+                }
+            }
+            Tag::Text(t) => {
+                events.push(SvgEvent::Text(t.clone()));
+            }
+            Tag::CData(c) => {
+                events.push(SvgEvent::CData(c.clone()));
+            }
+        }
+        Ok((events, bbox))
+    }
+}
 
-    for input_ev in seq {
+// Provide a list of tags which can be processed in-order.
+fn tagify_events(events: EventList) -> Result<Vec<Tag>> {
+    let mut tags = Vec::new();
+    let mut ev_idx = 0;
+
+    // we use indexed iteration as we need to skip ahead in some cases
+    while ev_idx < events.len() {
+        let input_ev = &events.events[ev_idx];
+        ev_idx += 1;
         let ev = &input_ev.event;
-        let idx = OrderIndex::new(input_ev.index);
-        gen_events = Vec::new();
-
         match ev {
-            Event::Empty(_) => {
-                let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
-                    "could not extract element at line {}",
-                    input_ev.line
-                ))?;
-                // This is copied from source element to any generated elements in transform_element()
-                if context.config.add_metadata && !event_element.is_phantom_element() {
-                    event_element
-                        .attrs
-                        .insert("data-source-line".to_string(), input_ev.line.to_string());
-                }
-                event_element.set_event_range((input_ev.index, input_ev.index));
-                context.update_element(&event_element);
-                last_element = Some(event_element.clone());
-
-                let ell = event_element.to_ell();
-                ell.borrow_mut()
-                    .handle_element_start(&event_element, context)?;
-
-                // List of events generated by *this* event.
-                let mut ev_events = EventList::new();
-                let ell_ref = event_element.to_ell();
-                if context.loop_depth == 0 && !context.in_specs {
-                    let mut reset_closure = false;
-                    if let Some(closure) = &input_ev.closure {
-                        context.set_closure(closure.clone());
-                        reset_closure = true;
-                    }
-                    // TODO: for group bbox extension, we need element to have 'resolved'
-                    // attributes, if possible. This is done in generate_events, but only
-                    // to a local cloned object, so it doesn't get reflected here. Ideally
-                    // we should split generate_events() to a 'resolve' and 'generate' phase,
-                    // where only the resolve part could produce retriable reference errors.
-                    let mut ok = true;
-                    if let Some(el) = ell_ref.borrow_mut().get_element_mut() {
-                        ok = el.resolve_position(context).is_ok();
-                    }
-                    let events = ell_ref.borrow_mut().generate_events(context);
-                    if reset_closure {
-                        context.pop_closure();
-                    }
-                    if let Ok(ref events) = events {
-                        if !events.is_empty() {
-                            ev_events.extend(events);
-                            gen_events.push((idx, ev_events.clone()));
-                        }
-                    } else {
-                        ok = false;
-                    }
-                    if !ok {
-                        let mut defer_ev = input_ev.clone();
-                        defer_ev.closure = Some(context.get_closure());
-                        remain.push(defer_ev);
-                    }
-                }
-
-                ell_ref
-                    .borrow_mut()
-                    .handle_element_end(&mut event_element, context)?;
-            }
             Event::Start(_) => {
-                let mut event_element = SvgElement::try_from(input_ev.clone()).context(format!(
-                    "could not extract element at line {}",
-                    input_ev.line
-                ))?;
-                // This is copied from source element to any generated elements in transform_element()
-                if context.config.add_metadata && !event_element.is_phantom_element() {
-                    event_element
-                        .attrs
-                        .insert("data-source-line".to_string(), input_ev.line.to_string());
-                }
-                last_element = Some(event_element.clone());
-
-                let ell = event_element.to_ell();
-                ell.borrow_mut()
-                    .handle_element_start(&event_element, context)?;
-                context.push_element(ell);
-            }
-            Event::End(e) => {
-                let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
-
-                let ell = context.pop_element().with_context(|| {
-                    format!(
-                        "no matching '{}' element to close at line {}",
-                        ee_name, input_ev.line
-                    )
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
                 })?;
-                let mut event_element = ell
-                    .borrow_mut()
-                    .get_element()
-                    .or_else(|| Some(SvgElement::new(&ee_name, &[])))
-                    .unwrap();
-
-                ell.borrow_mut()
-                    .handle_element_end(&mut event_element, context)?;
-
-                let start_idx = input_ev.alt_idx.expect("unreachable");
-                event_element.set_event_range((start_idx, input_ev.index));
-                if let Some(eee) = ell.borrow_mut().get_element_mut() {
-                    eee.set_event_range((start_idx, input_ev.index));
-                }
-                context.update_element(&event_element);
-
-                if event_element.name != ee_name {
-                    bail!(
-                        "Mismatched end tag: expected {}, got {ee_name}",
-                        event_element.name
-                    );
-                }
-
-                let mut events = if !context.in_specs && context.loop_depth == 0 {
-                    let mut reset_closure = false;
-                    if let Some(closure) = &input_ev.closure {
-                        context.set_closure(closure.clone());
-                        reset_closure = true;
-                    }
-                    let events = ell.borrow_mut().generate_events(context);
-                    if reset_closure {
-                        context.pop_closure();
-                    }
-                    events
-                } else {
-                    Ok(EventList::new())
-                };
-                if let Ok(ref mut events) = events {
-                    if !events.is_empty() {
-                        // graphics elements have responsibility for handling their own text content,
-                        // otherwise include the text element immediately after the opening element.
-                        if !event_element.is_graphics_element() {
-                            if let ContentType::Ready(content) = event_element.content.clone() {
-                                events.push(Event::Text(BytesText::new(&content)));
-                            }
-                        }
-                        gen_events.push((event_element.order_index.clone(), events.clone()));
-                        // TODO: this is about 'self_closing' elements include loop, g.
-                        if !(event_element.is_graphics_element()
-                            || event_element.name == "loop"
-                            || event_element.name == "if")
-                        {
-                            // Similarly, `is_content_text` elements should close themselves in the returned
-                            // event list if needed.
-                            gen_events.push((idx, EventList::from(ev.clone())));
+                if let Some(alt_idx) = input_ev.alt_idx {
+                    event_element.set_event_range((input_ev.index, alt_idx));
+                    // Scan ahead to the end of this element, matching alt_idx.
+                    // Note when called recursively on a subset of events, alt_idx
+                    // won't be the same as next_idx, so we need to scan rather than
+                    // just setting ev_idx = alt_idx + 1.
+                    for next_idx in ev_idx..events.len() {
+                        if events.events[next_idx].index == alt_idx {
+                            ev_idx = next_idx + 1; // skip the End event itself
+                            break;
                         }
                     }
-                } else if event_element.name == "loop" && context.loop_depth == 0 {
-                    // TODO - handle 'retriable' errors separately for better error reporting
-                    // currently we only handle loop separately, to ensure loop-limit works.
-                    // (though potential false-positive bail on other errors inside loops...)
-                    bail!("Error processing element: {events:?}");
-                } else {
-                    let mut defer_ev = input_ev.clone();
-                    defer_ev.closure = Some(context.get_closure());
-                    remain.push(defer_ev);
-                }
-                last_element = Some(event_element);
+                } // TODO: else warning message
+                tags.push(Tag::Compound(event_element, None));
             }
-            Event::Text(_) | Event::CData(_) => {
-                // Inner value for Text and CData are different, so need to break these out again
-                // into common String type.
-                let t_str = match ev {
-                    Event::Text(e) => String::from_utf8(e.to_vec())?,
-                    Event::CData(e) => String::from_utf8(e.to_vec())?,
-                    _ => panic!("unreachable"),
-                };
-
-                let mut set_element_content_text = false;
-                if let Some(ref last_element) = last_element {
-                    if last_element.is_phantom_element() {
-                        // Ignore text following a phantom element to avoid blank lines in output.
-                        continue;
-                    }
-                    let mut want_text = last_element.content.is_pending();
-                    if matches!(ev, Event::CData(_)) {
-                        // CData may happen after Text (e.g. newline+indent), in which case
-                        // override any previously stored text content. (CData is used to
-                        // preserve whitespace in the content text).
-                        want_text |= last_element.content.is_ready();
-                    }
-                    set_element_content_text = last_element.is_graphics_element() && want_text;
+            Event::Empty(_) => {
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
+                })?;
+                event_element.set_event_range((input_ev.index, input_ev.index));
+                tags.push(Tag::Leaf(event_element, None));
+            }
+            Event::Comment(c) => {
+                let text = String::from_utf8(c.to_vec())?;
+                tags.push(Tag::Comment(text, None));
+            }
+            Event::Text(t) => {
+                let text = String::from_utf8(t.to_vec())?;
+                if let Some(t) = tags.last_mut() {
+                    t.set_text(text)
+                } else {
+                    tags.push(Tag::Text(text));
                 }
-
-                let mut processed = false;
-                match last_event {
-                    Some(Event::Start(_)) | Some(Event::Text(_)) => {
-                        // if the last *event* was a Start event, the text should be
-                        // set as the content of the current *element*.
-                        if let Some(ref mut last_element) = context.get_top_element() {
-                            if set_element_content_text {
-                                if let Some(el) = last_element.borrow_mut().get_element_mut() {
-                                    el.content = ContentType::Ready(t_str.clone());
-                                }
-                                processed = true;
-                            }
-                        }
-                    }
-                    Some(Event::End(_)) => {
-                        // if the last *event* was an End event, the text should be
-                        // set as the tail of the last *element*.
-                        if let Some(ref mut last_element) = context.get_top_element() {
-                            if let Some(el) = last_element.borrow_mut().get_element_mut() {
-                                el.tail = Some(t_str.clone());
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-                if !(processed || context.in_specs || context.loop_depth > 0) {
-                    gen_events.push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
+            }
+            Event::CData(c) => {
+                let text = String::from_utf8(c.to_vec())?;
+                if let Some(t) = tags.last_mut() {
+                    t.set_text(text)
+                } else {
+                    tags.push(Tag::CData(text));
                 }
             }
             _ => {
-                gen_events.push((OrderIndex::new(input_ev.index), EventList::from(ev.clone())));
+                // This would include Event::End, as well as PI, DocType, etc.
+                // Specifically End shouldn't be seen due to alt_idx scan-ahead.
             }
         }
-
-        for (gen_idx, gen_events) in gen_events {
-            idx_output.insert(gen_idx, EventList::from(gen_events.events));
-        }
-
-        last_event = Some(ev.clone());
     }
-
-    if init_seq_len == remain.len() {
-        bail!(
-            "Could not resolve the following elements:\n{}",
-            remain
-                .iter()
-                .map(|r| format!("{:4}: {:?}", r.line, r.event))
-                .join("\n")
-        );
-    }
-
-    process_seq(context, remain, idx_output)
+    Ok(tags)
 }
 
-pub fn process_events(input: EventList, context: &mut TransformerContext) -> Result<EventList> {
+fn process_tags(
+    tags: &mut Vec<(OrderIndex, Tag)>,
+    context: &mut TransformerContext,
+    idx_output: &mut BTreeMap<OrderIndex, EventList>,
+    bbb: &mut BoundingBoxBuilder,
+) -> Result<Option<BoundingBox>> {
+    let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
+    let remain = &mut Vec::new();
+
+    while !tags.is_empty() && remain.len() != tags.len() {
+        for (idx, t) in &mut tags.iter_mut() {
+            let idx = idx.clone();
+            let el = if let Some(el) = t.get_element() {
+                // update early so reuse targets are available even if the element
+                // is not ready (e.g. within a specs block)
+                context.update_element(&el);
+                Some(el.clone())
+            } else {
+                None
+            };
+            let gen_result = t.generate_events(context);
+            if !context.in_specs {
+                // if we *are* in a specs block, we don't care if there were errors;
+                // a specs entry may have insufficient context until reuse time.
+                // We do still call generate_events for side-effects including registering
+                // elements for reuse.
+                if let Ok((events, maybe_bbox)) = gen_result {
+                    if let Some(bbox) = maybe_bbox {
+                        bbb.extend(bbox); // TODO: should this pattern take an Option?
+                    }
+                    if !events.is_empty() {
+                        idx_output.insert(idx, events);
+                    }
+                } else {
+                    if let (Some(el), Err(err)) = (el, gen_result) {
+                        if let SvgdxError::MultiError(err_list) = err {
+                            for (idx, (el, err)) in err_list {
+                                element_errors.insert(idx, (el, err));
+                            }
+                        } else {
+                            element_errors.insert(idx.clone(), (el, err));
+                        }
+                    }
+                    remain.push((idx, t.clone()));
+                }
+            }
+        }
+        if tags.len() == remain.len() {
+            return Err(SvgdxError::MultiError(element_errors));
+        }
+
+        mem::swap(tags, remain);
+        remain.clear();
+    }
+    Ok(bbb.clone().build())
+}
+
+pub fn process_events(
+    input: EventList,
+    context: &mut TransformerContext,
+) -> Result<(EventList, Option<BoundingBox>)> {
     if is_real_svg(&input) {
         if context.get_top_element().is_none() {
             // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document
             context.real_svg = true;
         }
-        return Ok(input);
+        return Ok((input, None));
     }
     let mut output = EventList { events: vec![] };
     let mut idx_output = BTreeMap::<OrderIndex, EventList>::new();
 
-    process_seq(context, input, &mut idx_output)?;
+    let mut bbb = BoundingBoxBuilder::new();
+    let mut tags = tagify_events(input)?
+        .iter()
+        .enumerate()
+        .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
+        .collect::<Vec<_>>();
+    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb)?;
 
     for (_idx, events) in idx_output {
         output.events.extend(events.events);
     }
 
-    Ok(output)
+    Ok((output, bbox))
 }
 
 pub struct Transformer {
@@ -679,131 +617,182 @@ impl Transformer {
         self.postprocess(output, writer)
     }
 
-    fn postprocess(&self, mut output: EventList, writer: &mut dyn Write) -> Result<()> {
-        if self.context.real_svg {
-            // We don't do any post-processing on 'real' SVG documents
-            return output.write_to(writer);
+    fn write_root_svg(
+        &self,
+        first_svg: InputEvent,
+        bbox: Option<BoundingBox>,
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        let mut new_svg_bs = BytesStart::new("svg");
+        let mut orig_svg_attrs = HashMap::new();
+        if let Event::Start(orig_svg) = first_svg.event {
+            new_svg_bs = orig_svg;
+            orig_svg_attrs = new_svg_bs
+                .attributes()
+                .map(|attr| {
+                    let attr = attr.expect("Invalid SVG attribute");
+                    (
+                        String::from_utf8(attr.key.into_inner().to_owned()).expect("Non-UTF8"),
+                        String::from_utf8(attr.value.to_vec()).expect("Non-UTF8"),
+                    )
+                })
+                .collect();
+        }
+        if !orig_svg_attrs.contains_key("version") {
+            new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
+        }
+        if !orig_svg_attrs.contains_key("xmlns") {
+            new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
+        }
+        if !orig_svg_attrs.contains_key("id") {
+            if let Some(local_id) = &self.context.local_style_id {
+                new_svg_bs.push_attribute(Attribute::from(("id", local_id.as_str())));
+            }
+        }
+        // If width or height are provided, leave width/height/viewBox alone.
+        let orig_width = orig_svg_attrs.get("width");
+        let orig_height = orig_svg_attrs.get("height");
+        // Expand by given border width
+        let mut extent = bbox;
+        if let Some(bb) = &mut extent {
+            bb.expand(
+                self.context.config.border as f32,
+                self.context.config.border as f32,
+            );
+            bb.round();
+
+            let aspect_ratio = bb.width() / bb.height();
+            let view_width = fstr(bb.width());
+            let view_height = fstr(bb.height());
+
+            // Populate any missing width/height attributes
+            if orig_width.is_none() && orig_height.is_none() {
+                // if neither present, assume user units are mm, scaled by config.scale
+                let width = fstr(bb.width() * self.context.config.scale);
+                let height = fstr(bb.height() * self.context.config.scale);
+                let new_width = format!("{}mm", width);
+                let new_height = format!("{}mm", height);
+                new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+                new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+            } else if orig_height.is_none() {
+                let (width, unit) = split_unit(orig_width.expect("logic"))?;
+                let new_height = format!("{}{}", fstr(width / aspect_ratio), unit);
+                new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
+            } else if orig_width.is_none() {
+                let (height, unit) = split_unit(orig_height.expect("logic"))?;
+                let new_width = format!("{}{}", fstr(height * aspect_ratio), unit);
+                new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
+            }
+
+            if !orig_svg_attrs.contains_key("viewBox") {
+                let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+                new_svg_bs.push_attribute(Attribute::from((
+                    "viewBox",
+                    format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height).as_str(),
+                )));
+            }
         }
 
-        let mut elem_path = Vec::new();
+        EventList::from(Event::Start(new_svg_bs)).write_to(writer)
+    }
+
+    fn write_auto_styles(&self, events: &mut EventList, writer: &mut dyn Write) -> Result<()> {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
         let mut element_set = HashSet::new();
         let mut class_set = HashSet::new();
-        // Calculate bounding box of diagram and use as new viewBox for the image.
-        // This also allows just using `<svg>` as the root element.
-        let mut bbox_list = vec![];
-        for input_ev in output.iter() {
+        for input_ev in events.iter() {
             let ev = &input_ev.event;
             match ev {
                 Event::Start(e) | Event::Empty(e) => {
                     let ee_name = String::from_utf8(e.name().as_ref().to_vec())?;
                     element_set.insert(ee_name);
-                    let is_empty = matches!(ev, Event::Empty(_));
-                    let event_element = SvgElement::try_from(e)?;
-                    class_set.extend(event_element.classes.to_vec());
-                    if !is_empty {
-                        elem_path.push(event_element.name.clone());
-                    }
-                    if event_element.classes.contains("background-grid") {
-                        // special-case "background-grid" as an 'infinite' grid
-                        // sitting behind everything...
-                        continue;
-                    }
-                    if !(elem_path.contains(&"defs".to_string())
-                        || elem_path.contains(&"symbol".to_string()))
-                    {
-                        if let Some(bb) = self.context.get_element_bbox(&event_element)? {
-                            bbox_list.push(bb);
+                    for attr in e.attributes() {
+                        let attr = attr.map_err(SvgdxError::from_err)?;
+                        let key = String::from_utf8(attr.key.as_ref().to_vec())?;
+                        let value = String::from_utf8(attr.value.to_vec())?;
+                        if key == "class" {
+                            class_set.extend(value.split_whitespace().map(|s| s.to_owned()));
                         }
                     }
-                }
-                Event::End(_) => {
-                    elem_path.pop();
                 }
                 _ => {}
             }
         }
-        // Expand by given border width
-        let mut extent = BoundingBox::union(bbox_list);
-        if let Some(extent) = &mut extent {
-            extent.expand(
-                self.context.config.border as f32,
-                self.context.config.border as f32,
-            );
-            extent.round();
+
+        let indent = 2;
+        let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
+        tb.build();
+        let auto_defs = tb.get_defs();
+        let auto_styles = tb.get_styles();
+        if !auto_defs.is_empty() {
+            let indent_line = format!("\n{}", " ".repeat(indent));
+            let mut event_vec = vec![
+                Event::Text(BytesText::new(&indent_line)),
+                Event::Start(BytesStart::new("defs")),
+                Event::Text(BytesText::new("\n")),
+            ];
+            let eee = EventList::from_str(indent_all(auto_defs, indent + 2).join("\n"))?;
+            event_vec.extend(eee.events.iter().map(|e| e.event.clone()));
+            event_vec.extend(vec![
+                Event::Text(BytesText::new(&indent_line)),
+                Event::End(BytesEnd::new("defs")),
+            ]);
+            let auto_defs_events = EventList::from(event_vec);
+            let (before, defs_pivot, after) = events.partition("defs");
+            if let Some(existing_defs) = defs_pivot {
+                before.write_to(writer)?;
+                auto_defs_events.write_to(writer)?;
+                EventList::from(existing_defs.event).write_to(writer)?;
+                *events = after;
+            } else {
+                auto_defs_events.write_to(writer)?;
+            }
+        }
+        if !auto_styles.is_empty() {
+            let auto_styles_events = EventList::from(vec![
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::Start(BytesStart::new("style")),
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::CData(BytesCData::new(format!(
+                    "\n{}\n{}",
+                    indent_all(auto_styles, indent + 2).join("\n"),
+                    " ".repeat(indent)
+                ))),
+                Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
+                Event::End(BytesEnd::new("style")),
+            ]);
+            let (before, style_pivot, after) = events.partition("styles");
+            if let Some(existing_styles) = style_pivot {
+                before.write_to(writer)?;
+                auto_styles_events.write_to(writer)?;
+                EventList::from(existing_styles.event).write_to(writer)?;
+                *events = after;
+            } else {
+                auto_styles_events.write_to(writer)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn postprocess(
+        &self,
+        output: (EventList, Option<BoundingBox>),
+        writer: &mut dyn Write,
+    ) -> Result<()> {
+        let (mut events, bbox) = output;
+
+        if self.context.real_svg {
+            // We don't do any post-processing on 'real' SVG documents
+            return events.write_to(writer);
         }
 
         let mut has_svg_element = false;
-        if let (pre_svg, Some(first_svg), remain) = output.partition("svg") {
-            has_svg_element = true;
+        if let (pre_svg, Some(first_svg), remain) = events.partition("svg") {
             pre_svg.write_to(writer)?;
-
-            let mut new_svg_bs = BytesStart::new("svg");
-            let mut orig_svg_attrs = HashMap::new();
-            if let Event::Start(orig_svg) = first_svg.event {
-                new_svg_bs = orig_svg;
-                orig_svg_attrs = new_svg_bs
-                    .attributes()
-                    .map(|attr| {
-                        let attr = attr.expect("Invalid SVG attribute");
-                        (
-                            String::from_utf8(attr.key.into_inner().to_owned()).expect("Non-UTF8"),
-                            String::from_utf8(attr.value.to_vec()).expect("Non-UTF8"),
-                        )
-                    })
-                    .collect();
-            }
-            if !orig_svg_attrs.contains_key("version") {
-                new_svg_bs.push_attribute(Attribute::from(("version", "1.1")));
-            }
-            if !orig_svg_attrs.contains_key("xmlns") {
-                new_svg_bs.push_attribute(Attribute::from(("xmlns", "http://www.w3.org/2000/svg")));
-            }
-            if !orig_svg_attrs.contains_key("id") {
-                if let Some(local_id) = &self.context.local_style_id {
-                    new_svg_bs.push_attribute(Attribute::from(("id", local_id.as_str())));
-                }
-            }
-            // If width or height are provided, leave width/height/viewBox alone.
-            let orig_width = orig_svg_attrs.get("width");
-            let orig_height = orig_svg_attrs.get("height");
-            if let Some(bb) = extent {
-                let aspect_ratio = bb.width() / bb.height();
-                let view_width = fstr(bb.width());
-                let view_height = fstr(bb.height());
-
-                // Populate any missing width/height attributes
-                if orig_width.is_none() && orig_height.is_none() {
-                    // if neither present, assume user units are mm, scaled by config.scale
-                    let width = fstr(bb.width() * self.context.config.scale);
-                    let height = fstr(bb.height() * self.context.config.scale);
-                    let new_width = format!("{}mm", width);
-                    let new_height = format!("{}mm", height);
-                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
-                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
-                } else if orig_height.is_none() {
-                    let (width, unit) = split_unit(orig_width.expect("logic"))?;
-                    let new_height = format!("{}{}", fstr(width / aspect_ratio), unit);
-                    new_svg_bs.push_attribute(Attribute::from(("height", new_height.as_str())));
-                } else if orig_width.is_none() {
-                    let (height, unit) = split_unit(orig_height.expect("logic"))?;
-                    let new_width = format!("{}{}", fstr(height * aspect_ratio), unit);
-                    new_svg_bs.push_attribute(Attribute::from(("width", new_width.as_str())));
-                }
-
-                if !orig_svg_attrs.contains_key("viewBox") {
-                    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-                    new_svg_bs.push_attribute(Attribute::from((
-                        "viewBox",
-                        format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height)
-                            .as_str(),
-                    )));
-                }
-            }
-
-            EventList::from(Event::Start(new_svg_bs)).write_to(writer)?;
-            output = remain;
+            self.write_root_svg(first_svg, bbox, writer)?;
+            events = remain;
+            has_svg_element = true;
         }
 
         if self.context.config.debug {
@@ -828,61 +817,10 @@ impl Transformer {
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
         if has_svg_element && self.context.config.add_auto_styles {
-            let indent = 2;
-            let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
-            tb.build();
-            let auto_defs = tb.get_defs();
-            let auto_styles = tb.get_styles();
-            if !auto_defs.is_empty() {
-                let indent_line = format!("\n{}", " ".repeat(indent));
-                let mut event_vec = vec![
-                    Event::Text(BytesText::new(&indent_line)),
-                    Event::Start(BytesStart::new("defs")),
-                    Event::Text(BytesText::new("\n")),
-                ];
-                let eee = EventList::from_str(indent_all(auto_defs, indent + 2).join("\n"))?;
-                event_vec.extend(eee.events.iter().map(|e| e.event.clone()));
-                event_vec.extend(vec![
-                    Event::Text(BytesText::new(&indent_line)),
-                    Event::End(BytesEnd::new("defs")),
-                ]);
-                let auto_defs_events = EventList::from(event_vec);
-                let (before, defs_pivot, after) = output.partition("defs");
-                if let Some(existing_defs) = defs_pivot {
-                    before.write_to(writer)?;
-                    auto_defs_events.write_to(writer)?;
-                    EventList::from(existing_defs.event).write_to(writer)?;
-                    output = after;
-                } else {
-                    auto_defs_events.write_to(writer)?;
-                }
-            }
-            if !auto_styles.is_empty() {
-                let auto_styles_events = EventList::from(vec![
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::Start(BytesStart::new("style")),
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::CData(BytesCData::new(format!(
-                        "\n{}\n{}",
-                        indent_all(auto_styles, indent + 2).join("\n"),
-                        " ".repeat(indent)
-                    ))),
-                    Event::Text(BytesText::new(&format!("\n{}", " ".repeat(indent)))),
-                    Event::End(BytesEnd::new("style")),
-                ]);
-                let (before, style_pivot, after) = output.partition("styles");
-                if let Some(existing_styles) = style_pivot {
-                    before.write_to(writer)?;
-                    auto_styles_events.write_to(writer)?;
-                    EventList::from(existing_styles.event).write_to(writer)?;
-                    output = after;
-                } else {
-                    auto_styles_events.write_to(writer)?;
-                }
-            }
+            self.write_auto_styles(&mut events, writer)?;
         }
 
-        output.write_to(writer)
+        events.write_to(writer)
     }
 }
 
@@ -951,16 +889,13 @@ mod tests {
     #[test]
     fn test_process_seq() {
         let mut transformer = Transformer::from_config(&TransformConfig::default());
-        let mut idx_output = BTreeMap::new();
         let seq = EventList::new();
 
-        let remain = process_seq(&mut transformer.context, seq, &mut idx_output);
-
-        assert_eq!(remain.unwrap(), EventList::new());
+        process_events(seq, &mut transformer.context).unwrap();
     }
 
     #[test]
-    fn test_process_seq_multiple_elements() {
+    fn test_process_tags_multiple_elements() {
         let mut transformer = Transformer::from_config(&TransformConfig::default());
         let mut idx_output = BTreeMap::new();
 
@@ -971,7 +906,16 @@ mod tests {
         </svg>"##,
         );
 
-        let result = process_seq(&mut transformer.context, seq, &mut idx_output);
+        transformer.context.set_events(seq.events.clone());
+        let mut tags = tagify_events(seq)
+            .unwrap()
+            .iter()
+            .enumerate()
+            .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
+            .collect::<Vec<_>>();
+        let bbb = &mut BoundingBoxBuilder::new();
+
+        let result = process_tags(&mut tags, &mut transformer.context, &mut idx_output, bbb);
         assert!(result.is_ok());
 
         let ok_ev_count = idx_output
@@ -980,30 +924,6 @@ mod tests {
             .reduce(|a, b| a + b)
             .unwrap();
         assert_eq!(ok_ev_count, 7);
-    }
-
-    #[test]
-    fn test_process_seq_slice() {
-        let mut transformer = Transformer::from_config(&TransformConfig::default());
-        let mut idx_output = BTreeMap::new();
-
-        let seq = EventList::from(
-            r##"<svg>
-          <rect id="a" wh="10"/>
-          <rect xy="#a:h" wh="10"/>
-        </svg>"##,
-        );
-
-        let remain = process_seq(&mut transformer.context, seq.slice(2, 5), &mut idx_output);
-
-        let ok_ev_count = idx_output
-            .iter()
-            .map(|entry| entry.1.events.len())
-            .reduce(|a, b| a + b)
-            .unwrap();
-        assert_eq!(ok_ev_count, 3);
-        let remain_ev_count = remain.unwrap().len();
-        assert_eq!(remain_ev_count, 0);
     }
 
     #[test]

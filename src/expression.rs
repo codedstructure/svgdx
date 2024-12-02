@@ -5,9 +5,8 @@ use itertools::Itertools;
 use lazy_regex::regex;
 use regex::Captures;
 
-use anyhow::{bail, Context, Result};
-
 use crate::context::{ContextView, VariableMap};
+use crate::errors::{Result, SvgdxError};
 use crate::functions::{eval_function, Function};
 use crate::position::ScalarSpec;
 use crate::types::fstr;
@@ -67,14 +66,14 @@ impl ExprValue {
     pub fn number(&self) -> Result<f32> {
         match self {
             Self::Number(v) => Ok(*v),
-            _ => bail!("Expected single number"),
+            _ => Err(SvgdxError::ParseError("Expected single number".to_owned())),
         }
     }
 
     pub fn number_list(&self) -> Result<Vec<f32>> {
         match self {
             Self::NumberList(v) => Ok(v.clone()),
-            _ => bail!("Expected number list"),
+            _ => Err(SvgdxError::ParseError("Expected number list".to_owned())),
         }
     }
 
@@ -90,7 +89,9 @@ impl ExprValue {
             ExprValue::Number(n) => Ok(*n),
             ExprValue::NumberList(l) => {
                 if l.len() != 1 {
-                    bail!("Expected exactly one argument");
+                    return Err(SvgdxError::ParseError(
+                        "Expected exactly one argument".to_owned(),
+                    ));
                 }
                 Ok(l[0])
             }
@@ -102,7 +103,9 @@ impl ExprValue {
         if nl.len() == 2 {
             return Ok((nl[0], nl[1]));
         }
-        bail!("Expected exactly two arguments");
+        Err(SvgdxError::ParseError(
+            "Expected exactly two arguments".to_owned(),
+        ))
     }
 
     pub fn get_triple(&self) -> Result<(f32, f32, f32)> {
@@ -110,7 +113,9 @@ impl ExprValue {
         if nl.len() == 3 {
             return Ok((nl[0], nl[1], nl[2]));
         }
-        bail!("Expected exactly three arguments");
+        Err(SvgdxError::ParseError(
+            "Expected exactly three arguments".to_owned(),
+        ))
     }
 }
 
@@ -151,7 +156,7 @@ enum Token {
 fn valid_variable_name(var: &str) -> Result<&str> {
     let re = regex!(r"[a-zA-Z][a-zA-Z0-9_]*");
     if !re.is_match(var) {
-        bail!("Invalid variable name");
+        return Err(SvgdxError::ParseError("Invalid variable name".to_owned()));
     }
     Ok(var)
 }
@@ -166,18 +171,20 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         if let Some(var) = var_name {
             valid_variable_name(var).map(|v| Token::Var(v.to_string()))
         } else {
-            bail!("Invalid variable");
+            Err(SvgdxError::ParseError("Invalid variable".to_owned()))
         }
     } else if input.starts_with('#') {
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(func) = input.parse() {
         Ok(Token::FnRef(func))
     } else {
-        input
+        Ok(input
             .parse::<f32>()
             .ok()
             .map(Token::Number)
-            .with_context(|| format!("Invalid number or function '{input}"))
+            .ok_or_else(|| {
+                SvgdxError::ParseError(format!("Invalid number or function '{input}"))
+            })?)
     }
 }
 
@@ -272,16 +279,18 @@ impl<'a> EvalState<'a> {
             self.advance();
             Ok(())
         } else {
-            bail!(
+            Err(SvgdxError::ParseError(format!(
                 "Expected token '{token:?}' not matched (got '{:?}')",
                 self.peek()
-            )
+            )))
         }
     }
 
     fn lookup(&mut self, v: &str) -> Result<ExprValue> {
         if self.checked_vars.iter().contains(&String::from(v)) {
-            bail!("Circular reference in variable lookup")
+            return Err(SvgdxError::CircularRefError(
+                "Circular reference in variable lookup".to_owned(),
+            ));
         }
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
@@ -294,11 +303,15 @@ impl<'a> EvalState<'a> {
                 if es.peek().is_none() {
                     e
                 } else {
-                    bail!("Unexpected trailing tokens")
+                    return Err(SvgdxError::ParseError(
+                        "Unexpected trailing tokens".to_owned(),
+                    ));
                 }
             }
         } else {
-            bail!("Could not evaluate variable")
+            return Err(SvgdxError::ParseError(
+                "Could not evaluate variable".to_owned(),
+            ));
         };
         // Need this to allow e.g. "$var + $var"
         self.checked_vars.pop();
@@ -329,13 +342,17 @@ impl<'a> EvalState<'a> {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {
                     Ok(bb.scalarspec(val).into())
                 } else {
-                    bail!("No bounding box for #{}", id);
+                    Err(SvgdxError::GeometryError(format!(
+                        "No bounding box for element #{id}"
+                    )))
                 }
             } else {
-                bail!("Element #{} not found", id);
+                Err(SvgdxError::ReferenceError(format!(
+                    "Element #{id} not found"
+                )))
             }
         } else {
-            bail!("Invalid element_ref: {}", v);
+            Err(SvgdxError::ParseError(format!("Invalid element_ref: {v}")))
         }
     }
 }
@@ -358,7 +375,9 @@ fn evaluate_inner(
     if eval_state.peek().is_none() {
         e
     } else {
-        bail!("Unexpected trailing tokens")
+        Err(SvgdxError::ParseError(
+            "Unexpected trailing tokens".to_owned(),
+        ))
     }
 }
 
@@ -454,7 +473,7 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
             Some(Token::OpenParen) | Some(Token::Number(_)) | Some(Token::Var(_)) => {
                 Ok(ExprValue::Number(-expr(eval_state)?.number()?))
             }
-            _ => bail!("Invalid unary minus"),
+            _ => Err(SvgdxError::ParseError("Invalid unary minus".to_owned())),
         },
         Some(Token::FnRef(fun)) => {
             eval_state.require(Token::OpenParen)?;
@@ -463,7 +482,9 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
-        _ => bail!("Invalid token in factor()"),
+        _ => Err(SvgdxError::ParseError(
+            "Invalid token in factor()".to_owned(),
+        )),
     }
 }
 
@@ -545,7 +566,7 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
     eval_str(&value, context)
         .parse::<f32>()
         .map(|v| v != 0.)
-        .with_context(|| format!("Invalid condition: '{value}'"))
+        .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
 }
 
 #[cfg(test)]
@@ -621,7 +642,9 @@ mod tests {
         if eval_state.peek().is_none() {
             Ok(e?.number()?)
         } else {
-            bail!("Unexpected trailing tokens")
+            Err(SvgdxError::ParseError(
+                "Unexpected trailing tokens".to_owned(),
+            ))
         }
     }
 
@@ -694,22 +717,19 @@ mod tests {
 
         // Check attributes as locals; this would be something like the attributes
         // of a surrounding <g> element, which can be referenced by child elements.
-        ctx.push_element(
-            SvgElement::new(
-                "g",
-                &[
-                    ("width".to_string(), "3".to_string()),
-                    ("height".to_string(), "4".to_string()),
-                    // Check this overrides the 'global' variables
-                    ("this_year".to_string(), "2024".to_string()),
-                ],
-            )
-            .to_ell(),
-        );
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[
+                ("width".to_string(), "3".to_string()),
+                ("height".to_string(), "4".to_string()),
+                // Check this overrides the 'global' variables
+                ("this_year".to_string(), "2024".to_string()),
+            ],
+        ));
         // push another element - the actual 'current' element containing this attribute.
         // This is skipped in variable lookup, so needed so the previous ('<g>') element
         // is used.
-        ctx.push_element(SvgElement::new("rect", &[]).to_ell());
+        ctx.push_element(&SvgElement::new("rect", &[]));
         assert_eq!(
             eval_vars("$this_year: $width.$one$height", &ctx),
             "2024: 3.14"
@@ -722,9 +742,18 @@ mod tests {
         assert_eq!(eval_vars("$this_year", &ctx), "2023");
 
         // Check multiple levels of override
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "1".to_string())]).to_ell());
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "2".to_string())]).to_ell());
-        ctx.push_element(SvgElement::new("g", &[("level".to_string(), "3".to_string())]).to_ell());
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "1".to_string())],
+        ));
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "2".to_string())],
+        ));
+        ctx.push_element(&SvgElement::new(
+            "g",
+            &[("level".to_string(), "3".to_string())],
+        ));
         assert_eq!(eval_vars("$level", &ctx), "3");
         ctx.pop_element();
         assert_eq!(eval_vars("$level", &ctx), "2");

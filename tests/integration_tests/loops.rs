@@ -33,7 +33,7 @@ fn test_loop_simple() {
 <rect x="6" y="0" width="2" height="2"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn test_loop_variables() {
 <circle cx="2" cy="2" r="2"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -71,12 +71,12 @@ fn test_loop_while() {
 <circle cx="2" cy="2" r="2"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 
     let input = r##"<var i="0"/><loop while="gt($i, 0)"><rect xy="2"/></loop>"##;
     let expected = r#""#;
     let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn test_loop_until() {
 <circle cx="0" cy="0" r="0"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -116,16 +116,18 @@ fn test_loop_nested() {
 <rect x="2" y="3" width="1" height="1"/>
 <rect x="1" y="3" width="1" height="1"/>
 
+
 <rect x="3" y="2" width="1" height="1"/>
 <rect x="2" y="2" width="1" height="1"/>
 <rect x="1" y="2" width="1" height="1"/>
+
 
 <rect x="3" y="1" width="1" height="1"/>
 <rect x="2" y="1" width="1" height="1"/>
 <rect x="1" y="1" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -173,6 +175,7 @@ fn test_loop_count_loop_var() {
 <rect x="6" y="0" width="1" height="1"/>
 
 
+
 <rect x="0" y="3" width="1" height="1"/>
 
 <rect x="3" y="3" width="1" height="1"/>
@@ -180,7 +183,7 @@ fn test_loop_count_loop_var() {
 <rect x="6" y="3" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -198,7 +201,7 @@ fn test_loop_count_loop_start_step() {
 <rect x="-1.5" y="10" width="1" height="1"/>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]

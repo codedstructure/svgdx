@@ -1,10 +1,10 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
+use crate::errors::{Result, SvgdxError};
 use crate::events::EventList;
 use crate::expression::{eval_attr, eval_condition};
-use crate::transform::{process_events, ElementLike};
-
-use anyhow::{bail, Result};
+use crate::position::{BoundingBox, BoundingBoxBuilder};
+use crate::transform::{process_events, EventGen};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -20,11 +20,13 @@ struct LoopDef {
 }
 
 impl TryFrom<&SvgElement> for LoopDef {
-    type Error = anyhow::Error;
+    type Error = SvgdxError;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name != "loop" {
-            bail!("LoopType can only be created from a loop element");
+            return Err(SvgdxError::InvalidData(
+                "LoopType can only be created from a loop element".to_string(),
+            ));
         }
         let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
             // Note we don't parse attributes here as they might be expressions,
@@ -43,7 +45,9 @@ impl TryFrom<&SvgElement> for LoopDef {
         } else if let Some(until_expr) = element.get_attr("until") {
             loop_type = LoopType::Until(until_expr);
         } else {
-            bail!("Loop element should have a count, while or until attribute");
+            return Err(SvgdxError::ParseError(
+                "Loop element should have a count, while or until attribute".to_string(),
+            ));
         }
         Ok(Self {
             loop_type,
@@ -55,28 +59,14 @@ impl TryFrom<&SvgElement> for LoopDef {
 #[derive(Debug, Clone)]
 pub struct LoopElement(pub SvgElement); // LoopDef);
 
-impl ElementLike for LoopElement {
-    fn handle_element_start(
-        &mut self,
-        _element: &SvgElement,
+impl EventGen for LoopElement {
+    fn generate_events(
+        &self,
         context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth += 1;
-        Ok(())
-    }
-
-    fn handle_element_end(
-        &mut self,
-        _element: &mut SvgElement,
-        context: &mut TransformerContext,
-    ) -> Result<()> {
-        context.loop_depth -= 1;
-        Ok(())
-    }
-
-    fn generate_events(&self, context: &mut TransformerContext) -> Result<EventList> {
+    ) -> Result<(EventList, Option<BoundingBox>)> {
         let event_element = &self.0;
         let mut gen_events = EventList::new();
+        let mut bbox = BoundingBoxBuilder::new();
         if let (Ok(loop_def), Some((start, end))) =
             (LoopDef::try_from(event_element), event_element.event_range)
         {
@@ -112,7 +102,11 @@ impl ElementLike for LoopElement {
                     context.set_var(&loop_var_name, &loop_var_value.to_string());
                 }
 
-                gen_events.extend(&process_events(inner_events.clone(), context)?);
+                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
+                gen_events.extend(&ev_list);
+                if let Some(bb) = ev_bbox {
+                    bbox.extend(bb);
+                }
 
                 if let LoopType::Until(expr) = &loop_def.loop_type {
                     if eval_condition(expr, context)? {
@@ -122,18 +116,12 @@ impl ElementLike for LoopElement {
                 iteration += 1;
                 loop_var_value += loop_step;
                 if iteration > context.config.loop_limit {
-                    bail!("Excessive looping detected");
+                    return Err(SvgdxError::LoopLimitError(
+                        "Excessive looping detected".to_string(),
+                    ));
                 }
             }
         }
-        Ok(gen_events)
-    }
-
-    fn get_element(&self) -> Option<SvgElement> {
-        Some(self.0.clone())
-    }
-
-    fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
-        Some(&mut self.0)
+        Ok((gen_events, bbox.build()))
     }
 }

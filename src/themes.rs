@@ -4,11 +4,11 @@
 // and a set of `styles` entries (typically CSS rules).
 
 use crate::context::TransformerContext;
+use crate::errors::{Result, SvgdxError};
 use crate::types::fstr;
 use std::{collections::HashSet, str::FromStr};
 
 use crate::colours::{COLOUR_LIST, DARK_COLOURS};
-use anyhow::bail;
 
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
@@ -23,9 +23,9 @@ pub enum ThemeType {
 }
 
 impl FromStr for ThemeType {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> Result<Self> {
         match s {
             "default" => Ok(Self::default()),
             "bold" => Ok(Self::Bold),
@@ -33,10 +33,10 @@ impl FromStr for ThemeType {
             "glass" => Ok(Self::Glass),
             "light" => Ok(Self::Light),
             "dark" => Ok(Self::Dark),
-            _ => bail!(
+            _ => Err(SvgdxError::InvalidData(format!(
                 "Unknown theme '{}' (available themes: default, bold, fine, glass, light, dark)",
                 s
-            ),
+            ))),
         }
     }
 }

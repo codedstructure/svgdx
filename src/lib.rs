@@ -12,7 +12,7 @@
 //! transform process, and the appropriate `transform_*` function called passing
 //! this and appropriate input / output parameters as required.
 //!
-//! Errors in processing are handled via `anyhow::Result`; currently these are mainly
+//! Errors in processing are handled via `svgdx::Result`; currently these are mainly
 //! useful in providing basic error messages suitable for end-users.
 //!
 //! ## Example
@@ -37,8 +37,6 @@ use std::io::{BufReader, IsTerminal, Read};
 
 use std::io::{BufRead, Cursor, Write};
 
-use anyhow::Result;
-
 #[cfg(feature = "cli")]
 use tempfile::NamedTempFile;
 
@@ -48,6 +46,7 @@ mod colours;
 mod connector;
 mod context;
 mod element;
+mod errors;
 mod events;
 mod expression;
 mod functions;
@@ -63,6 +62,7 @@ mod transform;
 mod transform_attr;
 mod types;
 
+pub use errors::Result;
 use transform::Transformer;
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used

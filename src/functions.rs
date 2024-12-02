@@ -1,5 +1,6 @@
+use crate::errors::{Result, SvgdxError};
 use crate::expression::{EvalState, ExprValue};
-use anyhow::{bail, Context, Result};
+
 use itertools::Itertools;
 use rand::Rng;
 use std::str::FromStr;
@@ -103,9 +104,9 @@ pub enum Function {
 }
 
 impl FromStr for Function {
-    type Err = anyhow::Error;
+    type Err = SvgdxError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         Ok(match value {
             "abs" => Self::Abs,
             "ceil" => Self::Ceil,
@@ -154,7 +155,7 @@ impl FromStr for Function {
             "empty" => Self::Empty,
             "count" => Self::Count,
             "in" => Self::In,
-            _ => bail!("Unknown function"),
+            _ => return Err(SvgdxError::ParseError(format!("Unknown function: {value}"))),
         })
     }
 }
@@ -181,7 +182,9 @@ pub fn eval_function(
         Function::Addv => {
             let args = args.number_list()?;
             if args.len() % 2 != 0 {
-                bail!("addv() requires an even number of arguments");
+                return Err(SvgdxError::ParseError(
+                    "addv() requires an even number of arguments".to_string(),
+                ));
             }
             let halflen = args.len() / 2;
             let mut result = Vec::with_capacity(halflen);
@@ -193,7 +196,9 @@ pub fn eval_function(
         Function::Subv => {
             let args = args.number_list()?;
             if args.len() % 2 != 0 {
-                bail!("addv() requires an even number of arguments");
+                return Err(SvgdxError::ParseError(
+                    "subv() requires an even number of arguments".to_string(),
+                ));
             }
             let halflen = args.len() / 2;
             let mut result = Vec::with_capacity(halflen);
@@ -205,7 +210,9 @@ pub fn eval_function(
         Function::Scalev => {
             let args = args.number_list()?;
             if args.len() < 2 {
-                bail!("scalev() requires at least two arguments");
+                return Err(SvgdxError::ParseError(
+                    "scalev() requires at least two arguments".to_string(),
+                ));
             }
             let mut result = Vec::new();
             for i in 1..args.len() {
@@ -238,20 +245,26 @@ pub fn eval_function(
         Function::Select => {
             let args = args.number_list()?;
             if args.len() < 2 {
-                bail!("select() requires at least two arguments");
+                return Err(SvgdxError::ParseError(
+                    "select() requires at least two arguments".to_string(),
+                ));
             }
             let n = args[0] as usize;
             let rest = &args[1..];
             if n < rest.len() {
                 rest[n]
             } else {
-                bail!("select() index out of range");
+                return Err(SvgdxError::InvalidData(
+                    "select() index out of range".to_string(),
+                ));
             }
         }
         Function::In => {
             let args = args.number_list()?;
             if args.is_empty() {
-                bail!("in() requires at least one argument");
+                return Err(SvgdxError::ParseError(
+                    "in() requires at least one argument".to_string(),
+                ));
             }
             let value = args[0];
             let rest = &args[1..];
@@ -293,7 +306,9 @@ pub fn eval_function(
             let (min, max) = args.get_pair()?;
             let (min, max) = (min as i32, max as i32);
             if min > max {
-                bail!("randint(min, max) - `min` must be <= `max`");
+                return Err(SvgdxError::InvalidData(
+                    "randint(min, max) - `min` must be <= `max`".to_string(),
+                ));
             }
             eval_state
                 .context
@@ -301,19 +316,19 @@ pub fn eval_function(
                 .borrow_mut()
                 .gen_range(min..=max) as f32
         }
-        Function::Max => args
-            .iter()
-            .max_by(|a, b| a.total_cmp(b))
-            .context("max() requires at least one argument")?,
-        Function::Min => args
-            .iter()
-            .min_by(|a, b| a.total_cmp(b))
-            .context("min() requires at least one argument")?,
+        Function::Max => args.iter().max_by(|a, b| a.total_cmp(b)).ok_or_else(|| {
+            SvgdxError::InvalidData("max() requires at least one argument".to_owned())
+        })?,
+        Function::Min => args.iter().min_by(|a, b| a.total_cmp(b)).ok_or_else(|| {
+            SvgdxError::InvalidData("min() requires at least one argument".to_owned())
+        })?,
         Function::Sum => args.iter().sum(),
         Function::Product => args.iter().product(),
         Function::Mean => {
             if args.is_empty() {
-                bail!("mean() requires at least one argument");
+                return Err(SvgdxError::ParseError(
+                    "mean() requires at least one argument".to_string(),
+                ));
             }
             let n = args.len() as f32;
             args.iter().sum::<f32>() / n
@@ -321,7 +336,9 @@ pub fn eval_function(
         Function::Clamp => {
             let (x, min, max) = args.get_triple()?;
             if min > max {
-                bail!("clamp(x, min, max) - `min` must be <= `max`");
+                return Err(SvgdxError::InvalidData(
+                    "clamp(x, min, max) - `min` must be <= `max`".to_string(),
+                ));
             }
             x.clamp(min, max)
         }

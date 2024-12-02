@@ -18,6 +18,7 @@
       <rect id="base" x="0" y="0" width="10" height="10" rx="1" class="d-fill-crimson"/>
 
         <circle cx="5" cy="5" r="1"/>
+
       </g>
 
     <g transform="translate(12, 0)" class="dice">
@@ -25,6 +26,7 @@
       <rect id="base" x="0" y="0" width="10" height="10" rx="1" class="d-fill-crimson"/>
 
         <circle cx="5" cy="5" r="1"/>
+
       </g>
 
     <g transform="translate(24, 0)" class="dice">
@@ -33,6 +35,7 @@
 
         <circle cx="2.5" cy="2.5" r="1"/>
         <circle cx="7.5" cy="7.5" r="1"/>
+
       </g>
 
     <g transform="translate(36, 0)" class="dice">
@@ -41,6 +44,7 @@
 
         <circle cx="2.5" cy="2.5" r="1"/>
         <circle cx="7.5" cy="7.5" r="1"/>
+
       </g>
 
     <g transform="translate(48, 0)" class="dice">
@@ -49,7 +53,10 @@
 
         <circle cx="5" cy="5" r="1"/>
 
+
         <circle cx="2.5" cy="2.5" r="1"/>
         <circle cx="7.5" cy="7.5" r="1"/>
+
       </g>
-  </svg>
+
+</svg>

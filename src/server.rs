@@ -7,6 +7,7 @@ use axum::{
     Router,
 };
 
+use crate::errors::SvgdxError;
 use crate::{transform_str, TransformConfig};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
@@ -26,7 +27,7 @@ async fn transform(input: String) -> impl IntoResponse {
     .and_then(|output| {
         if output.is_empty() {
             // Can't build a valid image/svg+xml response from empty string.
-            Err(anyhow::Error::msg("Empty response"))
+            Err(SvgdxError::from("Empty response"))
         } else {
             Ok(output)
         }

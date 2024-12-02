@@ -1,8 +1,8 @@
-use crate::element::{ContentType, SvgElement};
+use crate::element::SvgElement;
 use crate::position::{EdgeSpec, LocSpec};
 use crate::types::{attr_split_cycle, fstr, strp};
 
-use anyhow::{Context, Result};
+use crate::errors::{Result, SvgdxError};
 use lazy_regex::regex;
 use regex::Captures;
 
@@ -41,8 +41,12 @@ fn get_text_position<'a>(
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = parts.next().context("dx from text-dxy should be numeric")?;
-            t_dy = parts.next().context("dy from text-dxy should be numeric")?;
+            t_dx = parts.next().ok_or_else(|| {
+                SvgdxError::ParseError("dx from text-dxy should be numeric".to_owned())
+            })?;
+            t_dy = parts.next().ok_or_else(|| {
+                SvgdxError::ParseError("dy from text-dxy should be numeric".to_owned())
+            })?;
         }
         if let Some(dx) = dx {
             t_dx = strp(&dx)?;
@@ -126,7 +130,7 @@ fn get_text_position<'a>(
     //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element
         .bbox()?
-        .context("No BoundingBox")?
+        .ok_or_else(|| SvgdxError::GeometryError("No BoundingBox".to_owned()))?
         .get_point(&text_loc_str)?;
     tdx += t_dx;
     tdy += t_dy;
@@ -185,6 +189,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         text_elem.set_attr("transform", &transform);
     }
     text_elem.classes = orig_elem.classes.clone();
+    text_elem.src_line = orig_elem.src_line;
     for class in text_classes {
         text_elem.add_class(class);
     }
@@ -217,9 +222,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             text_elem.set_attr(text_attr, &attr);
         }
     }
-    if !multiline {
-        text_elem.content = ContentType::Ready(text_value.clone());
-    }
+    text_elem.text_content = Some(text_value.clone());
     text_elements.push(text_elem);
     if multiline {
         // Determine position of first text line; others follow this based on line spacing
@@ -240,6 +243,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         };
 
         let mut tspan_elem = SvgElement::new("tspan", &[]);
+        tspan_elem.src_line = orig_elem.src_line;
         if vertical {
             tspan_elem.set_attr("y", &y_str);
             lines = lines.into_iter().rev().collect();
@@ -266,7 +270,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 if vertical { "dx" } else { "dy" },
                 format!("{}em", fstr(line_offset)),
             );
-            tspan.content = ContentType::Ready(if text_fragment.is_empty() {
+            tspan.text_content = Some(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.
                 // Without this "a\n\nb" would render three tspans, but it would appear
                 // to have 'b' immediately below 'a' without a blank line between them.
