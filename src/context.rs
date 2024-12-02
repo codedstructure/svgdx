@@ -97,20 +97,19 @@ impl ElementMap for TransformerContext {
                 let href = el
                     .get_attr("href")
                     .and_then(|href| href.strip_prefix('#').map(|s| s.to_string()))
-                    .ok_or(SvgdxError::InvalidData(
-                        "Could not determine href for element".to_owned(),
-                    ))?;
+                    .ok_or_else(|| {
+                        SvgdxError::InvalidData("Could not determine href for element".to_owned())
+                    })?;
 
                 if already.contains(&href) {
                     return Err(SvgdxError::CircularRefError(format!(
-                        "Circular reference: {}",
-                        href
+                        "Circular reference: {href}"
                     )));
                 }
                 already.push(href.clone());
 
                 let target_el = ctx.get_element(&href).ok_or_else(|| {
-                    SvgdxError::ReferenceError(format!("Could not find element with id '{}'", href))
+                    SvgdxError::ReferenceError(format!("Could not find element with id '{href}'"))
                 })?;
                 // recurse to get bbox of the target
                 inner(target_el, ctx, already)?

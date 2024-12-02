@@ -34,7 +34,6 @@ impl Clone for InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
-            // closure: self.closure.clone(),
             alt_idx: self.alt_idx,
         }
     }
@@ -47,7 +46,6 @@ impl InputEvent {
             index: self.index,
             line: self.line,
             indent: self.indent,
-            // closure: self.closure,
             alt_idx: self.alt_idx,
         }
     }
@@ -72,7 +70,6 @@ impl From<Event<'_>> for EventList {
                 index: 0,
                 line: 0,
                 indent: 0,
-                // closure: None,
                 alt_idx: None,
             }],
         }
@@ -101,7 +98,6 @@ impl From<Vec<InputEvent>> for EventList {
                     index: v.index,
                     line: v.line,
                     indent: v.indent,
-                    // closure: v.closure.clone(),
                     alt_idx: v.alt_idx,
                 })
                 .collect(),
@@ -119,7 +115,6 @@ impl From<Vec<Event<'_>>> for EventList {
                     index: 0,
                     line: 0,
                     indent: 0,
-                    // closure: None,
                     alt_idx: None,
                 })
                 .collect(),
@@ -143,7 +138,6 @@ impl From<Event<'_>> for InputEvent {
             index: 0,
             line: 0,
             indent: 0,
-            // closure: None,
             alt_idx: None,
         }
     }
@@ -214,7 +208,6 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        // closure: None,
                         alt_idx: None,
                     });
                 }
@@ -224,7 +217,6 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        // closure: None,
                         alt_idx: None,
                     });
                     event_idx_stack.push(index);
@@ -239,7 +231,6 @@ impl EventList {
                         index,
                         line: line_count,
                         indent,
-                        // closure: None,
                         alt_idx: start_idx,
                     });
                 }
@@ -248,13 +239,11 @@ impl EventList {
                     index,
                     line: line_count,
                     indent,
-                    // closure: None,
                     alt_idx: None,
                 }),
                 Err(e) => {
                     return Err(SvgdxError::ParseError(format!(
-                        "XML error near line {}: {:?}",
-                        line_count, e
+                        "XML error near line {line_count}: {e:?}"
                     )))
                 }
             }

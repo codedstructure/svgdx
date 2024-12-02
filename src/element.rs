@@ -72,8 +72,7 @@ fn split_relspec<'a, 'b>(
             Ok((Some(el), remain))
         } else {
             Err(SvgdxError::ReferenceError(format!(
-                "Reference to unknown element '{}'",
-                id
+                "Reference to unknown element '{id}'",
             )))
         }
     } else {
@@ -535,17 +534,12 @@ impl SvgElement {
         let mut bbox_list = vec![];
 
         for elref in attr_split(&ref_list) {
-            let ref_id = elref
-                .strip_prefix('#')
-                .ok_or(SvgdxError::InvalidData(format!(
-                    "Invalid {} value {elref}",
-                    contain_str
-                )))?;
-            let el = ctx
-                .get_element(ref_id)
-                .ok_or(SvgdxError::ReferenceError(format!(
-                    "Element {elref} not found at this time"
-                )))?;
+            let ref_id = elref.strip_prefix('#').ok_or_else(|| {
+                SvgdxError::InvalidData(format!("Invalid {contain_str} value {elref}"))
+            })?;
+            let el = ctx.get_element(ref_id).ok_or_else(|| {
+                SvgdxError::ReferenceError(format!("Element {elref} not found at this time"))
+            })?;
             {
                 if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
                     bbox_list.push(el_bb);

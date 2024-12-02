@@ -155,12 +155,7 @@ impl FromStr for Function {
             "empty" => Self::Empty,
             "count" => Self::Count,
             "in" => Self::In,
-            _ => {
-                return Err(SvgdxError::ParseError(format!(
-                    "Unknown function: {}",
-                    value
-                )))
-            }
+            _ => return Err(SvgdxError::ParseError(format!("Unknown function: {value}"))),
         })
     }
 }
@@ -321,20 +316,12 @@ pub fn eval_function(
                 .borrow_mut()
                 .gen_range(min..=max) as f32
         }
-        Function::Max => {
-            args.iter()
-                .max_by(|a, b| a.total_cmp(b))
-                .ok_or(SvgdxError::InvalidData(
-                    "max() requires at least one argument".to_owned(),
-                ))?
-        }
-        Function::Min => {
-            args.iter()
-                .min_by(|a, b| a.total_cmp(b))
-                .ok_or(SvgdxError::InvalidData(
-                    "min() requires at least one argument".to_owned(),
-                ))?
-        }
+        Function::Max => args.iter().max_by(|a, b| a.total_cmp(b)).ok_or_else(|| {
+            SvgdxError::InvalidData("max() requires at least one argument".to_owned())
+        })?,
+        Function::Min => args.iter().min_by(|a, b| a.total_cmp(b)).ok_or_else(|| {
+            SvgdxError::InvalidData("min() requires at least one argument".to_owned())
+        })?,
         Function::Sum => args.iter().sum(),
         Function::Product => args.iter().product(),
         Function::Mean => {

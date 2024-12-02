@@ -21,16 +21,14 @@ impl EventGen for ReuseElement {
         reuse_element.eval_attributes(context);
 
         context.push_element(&reuse_element);
-        let elref = reuse_element
-            .get_attr("href")
-            .ok_or(SvgdxError::InvalidData(
-                "reuse element should have an href attribute".to_owned(),
-            ))?;
+        let elref = reuse_element.get_attr("href").ok_or_else(|| {
+            SvgdxError::InvalidData("reuse element should have an href attribute".to_owned())
+        })?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
-            .get_original_element(elref.strip_prefix('#').ok_or(SvgdxError::InvalidData(
-                "href value should begin with '#'".to_owned(),
-            ))?)
+            .get_original_element(elref.strip_prefix('#').ok_or_else(|| {
+                SvgdxError::InvalidData("href value should begin with '#'".to_owned())
+            })?)
             .ok_or_else(|| SvgdxError::ReferenceError(format!("unknown reference '{}'", elref)))?
             .clone();
 
@@ -52,11 +50,9 @@ impl EventGen for ReuseElement {
         // a class.
         // However we *do* want the instance element to inherit any `id` which
         // was on the `reuse` element.
-        let ref_id = instance_element
-            .pop_attr("id")
-            .ok_or(SvgdxError::InvalidData(
-                "referenced element should have id".to_owned(),
-            ))?;
+        let ref_id = instance_element.pop_attr("id").ok_or_else(|| {
+            SvgdxError::InvalidData("referenced element should have id".to_owned())
+        })?;
         if let Some(inst_id) = reuse_element.get_attr("id") {
             instance_element.set_attr("id", &inst_id);
             context.update_element(&reuse_element);

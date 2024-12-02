@@ -32,16 +32,14 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
                 return Err(SvgdxError::ParseError(format!(
-                    "Invalid character in numeric value: {}",
-                    ch
+                    "Invalid character in numeric value: {ch}"
                 )));
             }
             value.push(ch);
         } else {
             if value.is_empty() {
                 return Err(SvgdxError::ParseError(format!(
-                    "'{}' does not start with numeric value",
-                    s
+                    "'{s}' does not start with numeric value"
                 )));
             }
             got_value = true;

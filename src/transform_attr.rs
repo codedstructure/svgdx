@@ -1,7 +1,6 @@
-use crate::errors::{Result, SvgdxError};
-
 use std::str::FromStr;
 
+use crate::errors::{Result, SvgdxError};
 use crate::position::BoundingBox;
 use crate::types::strp;
 
@@ -39,16 +38,16 @@ enum TransformType {
 impl FromStr for TransformType {
     type Err = SvgdxError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         let mut parts = value.splitn(2, '(');
         let name = parts
             .next()
-            .ok_or(SvgdxError::ParseError("No transform name".to_owned()))?;
+            .ok_or_else(|| SvgdxError::ParseError("No transform name".to_owned()))?;
         let args = parts
             .next()
-            .ok_or(SvgdxError::ParseError("No transform args".to_owned()))?
+            .ok_or_else(|| SvgdxError::ParseError("No transform args".to_owned()))?
             .strip_suffix(')')
-            .ok_or(SvgdxError::ParseError("No closing bracket".to_owned()))?
+            .ok_or_else(|| SvgdxError::ParseError("No closing bracket".to_owned()))?
             .split(&[',', ' ', '\t', '\n', '\r'])
             .filter(|&v| !v.is_empty())
             .map(strp)
@@ -122,8 +121,7 @@ impl FromStr for TransformType {
                 }
             }
             _ => Err(SvgdxError::ParseError(format!(
-                "Unknown transform type: {}",
-                name
+                "Unknown transform type: {name}"
             )))?,
         })
     }
@@ -137,7 +135,7 @@ pub struct TransformAttr {
 impl FromStr for TransformAttr {
     type Err = SvgdxError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         let parts = value.split_inclusive(')').map(|v| v.trim());
         Ok(Self {
             transforms: parts

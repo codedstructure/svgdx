@@ -388,7 +388,7 @@ impl FromStr for Length {
 
     /// Parse a ratio (float or %age) to an f32
     /// Note this deliberately does not clamp to 0..1
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         let value = value.trim();
         if let Some(pc) = value.strip_suffix('%') {
             Ok(Length::Ratio(strp(pc)? * 0.01))
@@ -410,7 +410,7 @@ pub enum DirSpec {
 impl FromStr for DirSpec {
     type Err = SvgdxError;
 
-    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self> {
         match value {
             "h" => Ok(Self::InFront),
             "H" => Ok(Self::Behind),

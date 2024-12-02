@@ -7,7 +7,8 @@ use axum::{
     Router,
 };
 
-use crate::{errors::SvgdxError, transform_str, TransformConfig};
+use crate::errors::SvgdxError;
+use crate::{transform_str, TransformConfig};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
 // but otherwise restrict to same-origin resources.

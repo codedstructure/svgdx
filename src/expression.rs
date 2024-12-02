@@ -343,14 +343,12 @@ impl<'a> EvalState<'a> {
                     Ok(bb.scalarspec(val).into())
                 } else {
                     Err(SvgdxError::GeometryError(format!(
-                        "No bounding box for element #{}",
-                        id
+                        "No bounding box for element #{id}"
                     )))
                 }
             } else {
                 Err(SvgdxError::ReferenceError(format!(
-                    "Element #{} not found",
-                    id
+                    "Element #{id} not found"
                 )))
             }
         } else {
@@ -618,7 +616,7 @@ mod tests {
             None
         }
 
-        fn get_element_bbox(&self, el: &SvgElement) -> crate::errors::Result<Option<BoundingBox>> {
+        fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
             el.bbox()
         }
     }

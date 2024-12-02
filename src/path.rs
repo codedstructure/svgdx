@@ -175,9 +175,9 @@ impl PathParser {
                 self.update_position((cpx, cpy + dy));
             }
             'Z' | 'z' => {
-                self.update_position(self.start_pos.ok_or(SvgdxError::InvalidData(
-                    "Cannot 'z' without start position".to_owned(),
-                ))?);
+                self.update_position(self.start_pos.ok_or_else(|| {
+                    SvgdxError::InvalidData("Cannot 'z' without start position".to_owned())
+                })?);
             }
             'C' => {
                 let _cp1 = self.read_coord()?; // control point 1
@@ -245,15 +245,15 @@ impl PathParser {
 }
 
 pub fn path_bbox(element: &SvgElement) -> Result<BoundingBox> {
-    let path_data = element.get_attr("d").ok_or(SvgdxError::InvalidData(
-        "Path element should have 'd' attribute".to_string(),
-    ))?;
+    let path_data = element.get_attr("d").ok_or_else(|| {
+        SvgdxError::InvalidData("Path element should have 'd' attribute".to_string())
+    })?;
 
     let mut pp = PathParser::new(&path_data);
     pp.evaluate()?;
-    pp.get_bbox().ok_or(SvgdxError::InvalidData(
-        "Path element should have a computable boundingbox".to_string(),
-    ))
+    pp.get_bbox().ok_or_else(|| {
+        SvgdxError::InvalidData("Path element should have a computable boundingbox".to_string())
+    })
 }
 
 #[cfg(test)]
