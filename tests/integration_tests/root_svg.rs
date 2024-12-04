@@ -99,3 +99,28 @@ fn test_root_svg_no_height() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_internal_svg() {
+    // Tests that an SVG element inside another SVG element is not modified
+    // if the xmlns attribute is present
+    let input = r##"
+<svg>
+  <config add-auto-styles="false"/>
+  <rect xy="10" wh="50"/>
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50cm" height="25cm">
+    <rect x="0" y="0" width="50" height="25" text="blob"/>
+  </svg>
+</svg>
+"##;
+    let expected = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="60mm" height="60mm" viewBox="5 5 60 60">
+  <rect x="10" y="10" width="50" height="50"/>
+  <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50cm" height="25cm">
+    <rect x="0" y="0" width="50" height="25" text="blob"/>
+  </svg>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

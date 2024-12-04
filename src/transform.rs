@@ -92,6 +92,12 @@ impl EventGen for Container {
                 el.generate_events(context)
             } else {
                 let mut new_el = self.0.clone();
+                // Special case <svg> elements with an xmlns attribute - passed through
+                // transparently, with no bbox calculation.
+                if new_el.name == "svg" && new_el.get_attr("xmlns").is_some() {
+                    let all_events = EventList::from(context.events.clone()).slice(start, end + 1);
+                    return Ok((all_events, None));
+                }
                 new_el.eval_attributes(context);
                 let mut events = EventList::new();
                 events.push(SvgEvent::Start(new_el));

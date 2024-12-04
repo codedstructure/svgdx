@@ -25,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The set of error variants is not yet fixed.
 
+- Added: `<svg>` elements with the `xmlns` attribute may be used anywhere in a
+  document to suppress `svgdx` processing the content of that element, passing
+  it through unaltered.
+
 - Fixed: avoid infinite recursion on use/reuse circular references; a new
   `depth-limit` config value (default 100).
 
