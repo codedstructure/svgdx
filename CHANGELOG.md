@@ -25,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The set of error variants is not yet fixed.
 
-- Fixed: avoid infinite recursion on use/reuse circular references.
+- Fixed: avoid infinite recursion on use/reuse circular references; a new
+  `depth-limit` config value (default 100).
 
 ## [0.14.0 - 2024-11-18]
 

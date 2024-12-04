@@ -29,6 +29,7 @@ The following configuration settings can be applied using this element. These co
 | font-family | string | `font-family="Ubuntu Mono"` |
 | loop-limit | integer | `loop-limit="9999"` |
 | var-limit | integer | `var-limit="4096"` |
+| depth-limit | integer | `depth-limit="10000"` |
 
 ### `var`
 

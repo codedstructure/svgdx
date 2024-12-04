@@ -70,6 +70,10 @@ struct Arguments {
     #[arg(long, default_value = "1024")]
     var_limit: u32,
 
+    /// Recursion depth limit
+    #[arg(long, default_value = "100")]
+    depth_limit: u32,
+
     /// Default font-size (in user-units)
     ///
     /// Text size classes (such as d-text-smaller) are based on this value.
@@ -142,6 +146,7 @@ impl Config {
                 add_metadata: args.add_metadata,
                 loop_limit: args.loop_limit,
                 var_limit: args.var_limit,
+                depth_limit: args.depth_limit,
                 font_size: args.font_size,
                 font_family: args.font_family,
                 theme: args.theme,

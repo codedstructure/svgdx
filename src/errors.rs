@@ -21,6 +21,7 @@ pub enum SvgdxError {
     ReferenceError(String),
     VarLimitError(String),
     LoopLimitError(String),
+    DepthLimitExceeded(String),
     CircularRefError(String),
     DocumentError(String),
     ElementError(String),
@@ -39,6 +40,7 @@ impl fmt::Display for SvgdxError {
             SvgdxError::ReferenceError(reason) => write!(f, "Reference error: {}", reason),
             SvgdxError::VarLimitError(reason) => write!(f, "Variable limit error: {}", reason),
             SvgdxError::LoopLimitError(reason) => write!(f, "Loop limit error: {}", reason),
+            SvgdxError::DepthLimitExceeded(reason) => write!(f, "Depth limit exceeded: {}", reason),
             SvgdxError::CircularRefError(reason) => {
                 write!(f, "Circular reference error: {}", reason)
             }
@@ -66,6 +68,7 @@ impl Error for SvgdxError {
             SvgdxError::ReferenceError(_) => None,
             SvgdxError::VarLimitError(_) => None,
             SvgdxError::LoopLimitError(_) => None,
+            SvgdxError::DepthLimitExceeded(_) => None,
             SvgdxError::CircularRefError(_) => None,
             SvgdxError::DocumentError(_) => None,
             SvgdxError::ElementError(_) => None,

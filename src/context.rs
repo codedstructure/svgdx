@@ -31,6 +31,8 @@ pub struct TransformerContext {
     var_stack: Vec<HashMap<String, String>>,
     /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
+    /// Current recursion depth
+    current_depth: u32,
     /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
     /// Are we in a <specs> block?
@@ -53,6 +55,7 @@ impl Default for TransformerContext {
             var_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             local_style_id: None,
+            current_depth: 0,
             real_svg: false,
             in_specs: false,
             events: Vec::new(),
@@ -227,6 +230,26 @@ impl TransformerContext {
     pub fn pop_element(&mut self) -> Option<SvgElement> {
         self.var_stack.pop();
         self.element_stack.pop()
+    }
+
+    pub fn inc_depth(&mut self) -> Result<()> {
+        self.current_depth += 1;
+        if self.current_depth > self.config.depth_limit {
+            return Err(SvgdxError::DepthLimitExceeded(format!(
+                "Recursion depth limit ({}) exceeded",
+                self.config.depth_limit
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn dec_depth(&mut self) -> Result<()> {
+        if self.current_depth > 0 {
+            self.current_depth -= 1;
+        } else {
+            return Err(SvgdxError::from("Depth must be positive"));
+        }
+        Ok(())
     }
 
     pub fn get_top_element(&self) -> Option<SvgElement> {

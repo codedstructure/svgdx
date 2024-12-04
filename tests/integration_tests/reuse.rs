@@ -235,8 +235,38 @@ fn test_reuse_if() {
 }
 
 #[test]
-fn test_reuse_circular() {
+fn test_use_circular() {
     assert!(transform_str_default(r##"<use id="a" href="#a"/>"##).is_err());
 
     assert!(transform_str_default(r##"<use id="a" href="#b"/><use id="b" href="#a"/>"##).is_err());
+}
+
+#[test]
+fn test_reuse_circular() {
+    assert!(transform_str_default(r##"<reuse id="a" href="#a"/>"##).is_err());
+
+    assert!(
+        transform_str_default(r##"<reuse id="a" href="#b"/><reuse id="b" href="#a"/>"##).is_err()
+    );
+}
+
+#[test]
+fn test_reuse_depth_limit() {
+    let input_fn = |limit: u32| {
+        format!(
+            r##"
+<config depth-limit="{limit}"/>
+<rect id="a" wh="0"/>
+<reuse id="b" href="#a"/>
+<reuse id="c" href="#b"/>
+<reuse id="d" href="#c"/>
+"##
+        )
+    };
+
+    let input = input_fn(4);
+    assert!(transform_str_default(&input).is_ok());
+
+    let input = input_fn(3);
+    assert!(transform_str_default(&input).is_err());
 }

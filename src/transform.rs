@@ -33,7 +33,8 @@ impl EventGen for SvgElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(EventList, Option<BoundingBox>)> {
-        match self.name.as_str() {
+        context.inc_depth()?;
+        let res = match self.name.as_str() {
             "loop" => LoopElement(self.clone()).generate_events(context),
             "config" => ConfigElement(self.clone()).generate_events(context),
             "reuse" => ReuseElement(self.clone()).generate_events(context),
@@ -49,7 +50,9 @@ impl EventGen for SvgElement {
                 }
                 OtherElement(self.clone()).generate_events(context)
             }
-        }
+        };
+        context.dec_depth()?;
+        res
     }
 }
 
@@ -249,6 +252,7 @@ impl EventGen for ConfigElement {
                 "background" => new_config.background.clone_from(value),
                 "loop-limit" => new_config.loop_limit = value.parse()?,
                 "var-limit" => new_config.var_limit = value.parse()?,
+                "depth-limit" => new_config.depth_limit = value.parse()?,
                 "font-size" => new_config.font_size = value.parse()?,
                 "font-family" => new_config.font_family.clone_from(value),
                 "seed" => new_config.seed = value.parse()?,
