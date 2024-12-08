@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: avoid infinite recursion on use/reuse circular references; a new
   `depth-limit` config value (default 100).
 
+- Fixed: specifying relative sizes for circles and ellipses, e.g. `r="#abc 25%"`
+
 ## [0.14.0 - 2024-11-18]
 
 - Improved text positioning, useful when needing multiple text labels inside or

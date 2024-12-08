@@ -776,7 +776,11 @@ impl SvgElement {
                     // default value - same 'type' as attr name, e.g. y2 => ymax
                     let mut v = bbox.scalarspec(ss);
 
-                    if let "width" | "height" | "dw" | "dh" = name {
+                    let mut length_attr = matches!(name, "width" | "height" | "dw" | "dh");
+                    length_attr = length_attr || (self.name == "circle" && name == "r");
+                    length_attr =
+                        length_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
+                    if length_attr {
                         if let Ok(len) = strp_length(remain) {
                             v = len.adjust(v);
                         }

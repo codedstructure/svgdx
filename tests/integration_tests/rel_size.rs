@@ -95,6 +95,44 @@ fn test_rel_size_delta() {
 }
 
 #[test]
+fn test_rel_size_circle() {
+    let rel_size_circle_input = r#"
+<circle r="20" />
+<circle xy="^:h 10" r="^" id="z"/>
+"#;
+    let expected_circle = r#"<circle id="z" cx="50" cy="0" r="20"/>"#;
+    let output = transform_str_default(rel_size_circle_input).unwrap();
+    assert_contains!(output, expected_circle);
+
+    let rel_size_circle_input = r#"
+<circle r="20" />
+<circle xy="^:h 10" r="^ 50%" id="z"/>
+"#;
+    let expected_circle = r#"<circle id="z" cx="40" cy="0" r="10"/>"#;
+    let output = transform_str_default(rel_size_circle_input).unwrap();
+    assert_contains!(output, expected_circle);
+}
+
+#[test]
+fn test_rel_size_ellipse() {
+    let rel_size_ellipse_input = r#"
+<ellipse rxy="10 20" />
+<ellipse xy="^:h 10" rxy="^" id="z"/>
+"#;
+    let expected_ellipse = r#"<ellipse id="z" cx="30" cy="0" rx="10" ry="20"/>"#;
+    let output = transform_str_default(rel_size_ellipse_input).unwrap();
+    assert_contains!(output, expected_ellipse);
+
+    let rel_size_ellipse_input = r#"
+<ellipse rxy="10 20" />
+<ellipse xy="^:h 10" rxy="^ 50%" id="z"/>
+"#;
+    let expected_ellipse = r#"<ellipse id="z" cx="25" cy="0" rx="5" ry="10"/>"#;
+    let output = transform_str_default(rel_size_ellipse_input).unwrap();
+    assert_contains!(output, expected_ellipse);
+}
+
+#[test]
 fn test_rel_size_dxy_pct() {
     let rel_size_dxy_pct_input = r#"
 <rect xy="10 20" wh="20 60" />
