@@ -29,6 +29,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   document to suppress `svgdx` processing the content of that element, passing
   it through unaltered.
 
+- Fixed: bounding box calculation for `<reuse>` elements targeting a compound
+  element such as `<g>` where an offset transform (e.g. `x`, `y` attributes on
+  the `reuse` element) is present.
+
 - Fixed: avoid infinite recursion on use/reuse circular references; a new
   `depth-limit` config value (default 100).
 

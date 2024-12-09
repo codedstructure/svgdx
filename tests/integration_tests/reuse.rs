@@ -270,3 +270,74 @@ fn test_reuse_depth_limit() {
     let input = input_fn(3);
     assert!(transform_str_default(&input).is_err());
 }
+
+#[test]
+fn test_nesting_depth_limit() {
+    let input_fn = |limit: u32| {
+        format!(
+            r##"
+<config depth-limit="{limit}"/>
+<g>
+  <g>
+    <g>
+      <rect id="a" wh="0"/>
+    </g>
+  </g>
+</g>
+"##
+        )
+    };
+
+    let input = input_fn(4);
+    assert!(transform_str_default(&input).is_ok());
+
+    let input = input_fn(3);
+    assert!(transform_str_default(&input).is_err());
+}
+
+#[test]
+fn test_reuse_group_rel() {
+    let input = r##"
+<svg>
+<config border="0" add-auto-styles="false"/>
+<g id="tt"><rect xy="5" wh="10"/></g>
+<reuse id="a" href="#tt" x="10" y="15"/>
+</svg>
+"##;
+    let expected1 = r##"<g id="a" transform="translate(10, 15)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
+    let expected2 = r##"viewBox="5 5 20 25"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r##"
+<svg>
+<config border="0" add-auto-styles="false"/>
+<defs>
+<g id="tt"><rect xy="5" wh="10"/></g>
+</defs>
+<reuse id="a" href="#tt" x="10" y="15"/>
+</svg>
+"##;
+    let expected1 = r##"<g id="a" transform="translate(10, 15)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
+    let expected2 = r##"viewBox="15 20 10 10"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    // same without the surrounding <g> element
+    let input = r##"
+<svg>
+<config border="0" add-auto-styles="false"/>
+<defs>
+<rect id="tt" xy="5" wh="10"/>
+</defs>
+<reuse id="a" href="#tt" x="10" y="15"/>
+</svg>
+"##;
+    let expected1 = r##"<rect id="a" x="5" y="5" width="10" height="10" transform="translate(10, 15)" class="tt"/>"##;
+    let expected2 = r##"viewBox="15 20 10 10"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
