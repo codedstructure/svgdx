@@ -341,3 +341,20 @@ fn test_reuse_group_rel() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_use_symbol() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <symbol id="tt">
+    <rect xy="0" wh="5"/>
+    <rect xy="3" wh="5"/>
+  </symbol>
+  <use href="#tt" x="2" y="5"/>
+</svg>
+"##;
+    let expected = r##"viewBox="2 5 8 8""##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

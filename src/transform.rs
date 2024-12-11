@@ -41,7 +41,7 @@ impl EventGen for SvgElement {
             "specs" => SpecsElement(self.clone()).generate_events(context),
             "var" => VarElement(self.clone()).generate_events(context),
             "if" => IfElement(self.clone()).generate_events(context),
-            "g" => GroupElement(self.clone()).generate_events(context),
+            "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
             _ => {
                 if let Some((start, end)) = self.event_range {
                     if start != end {
@@ -235,6 +235,12 @@ impl EventGen for GroupElement {
         let mut new_el = self.0.clone();
         new_el.computed_bbox = result_bb;
         context.update_element(&new_el);
+        if self.0.name == "symbol" {
+            // symbols have a size which needs storing in context for evaluating
+            // bbox of 'use' elements referencing them, but they don't contribute
+            // to the parent bbox.
+            result_bb = None;
+        }
         Ok((events, result_bb))
     }
 }
