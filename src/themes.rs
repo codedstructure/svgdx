@@ -61,7 +61,7 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
     for (class, rule) in [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
-        ("d-tbox", "text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }"),
+        ("d-text", "text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }"),
         ("d-text-top", "text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }"),
         ("d-text-bottom", "text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }"),
         ("d-text-left", "text.d-text-left, text.d-text-left * { text-anchor: start; }"),

@@ -72,7 +72,7 @@ fn test_src_line_text() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="30" height="40" data-src-line="2"/>
-<text x="15" y="20" data-src-line="2" class="d-tbox">Hello world!</text>
+<text x="15" y="20" data-src-line="2" class="d-text">Hello world!</text>
 "#;
     let result = transform_str(input, &meta_config()).unwrap();
     assert_eq!(result, expected);

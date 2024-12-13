@@ -5,7 +5,7 @@
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
   ]]>
   </style>
 
@@ -48,21 +48,21 @@
     </style>
 
     <rect x="2" y="10" width="36" height="10"/>
-    <text x="20" y="15" class="d-tbox">State hypothesis</text>
+    <text x="20" y="15" class="d-text">State hypothesis</text>
     <rect x="2" y="28" width="36" height="10"/>
-    <text x="20" y="33" class="d-tbox">Design experiment</text>
+    <text x="20" y="33" class="d-text">Design experiment</text>
     <rect x="2" y="46" width="36" height="10"/>
-    <text x="20" y="51" class="d-tbox">Perform experiment</text>
+    <text x="20" y="51" class="d-text">Perform experiment</text>
     <rect x="2" y="64" width="36" height="10"/>
-    <text x="20" y="69" class="d-tbox">Gather data</text>
+    <text x="20" y="69" class="d-text">Gather data</text>
     <rect x="2" y="82" width="36" height="10"/>
-    <text x="20" y="87" class="d-tbox">Clean data</text>
+    <text x="20" y="87" class="d-text">Clean data</text>
     <rect x="2" y="100" width="36" height="10"/>
-    <text x="20" y="105" class="d-tbox">Create model</text>
+    <text x="20" y="105" class="d-text">Create model</text>
     <rect x="2" y="118" width="36" height="10"/>
-    <text x="20" y="123" class="d-tbox">Evaluate model</text>
+    <text x="20" y="123" class="d-text">Evaluate model</text>
     <rect x="2" y="136" width="36" height="10"/>
-    <text x="20" y="141" class="d-tbox">Check hypothesis</text>
+    <text x="20" y="141" class="d-text">Check hypothesis</text>
 
     <path d="M 4 0
         a 4 8 0 0 0 0 16

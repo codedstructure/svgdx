@@ -57,7 +57,7 @@ fn test_indent_out_of_order() {
 
     let expected = r##"
   <line x1="1" y1="1.5" x2="2" y2="1.5"/>
-  <text x="1.5" y="1.5" class="d-tbox">a</text>
+  <text x="1.5" y="1.5" class="d-text">a</text>
   <rect id="a" x="1" y="1" width="1" height="1"/>
 "##;
 
@@ -74,7 +74,7 @@ fn test_indent_ooo_varying() {
 
     let expected = r##"
      <line x1="1" y1="1.5" x2="2" y2="1.5"/>
-     <text x="1.5" y="1.5" class="d-tbox">a</text>
+     <text x="1.5" y="1.5" class="d-text">a</text>
    <rect id="a" x="1" y="1" width="1" height="1"/>
 "##;
 

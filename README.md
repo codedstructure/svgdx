@@ -76,15 +76,15 @@ which is a rendering of the following generated SVG:
   <style>
     rect, circle, ellipse, line, polyline, polygon, path { stroke-width: 0.5; stroke: black; fill: none; }
     text { font-family: sans-serif; font-size: 3px; }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
   </style>
   <rect id="in" width="20" height="10"/>
-  <text x="10" y="5" class="d-tbox">input</text>
+  <text x="10" y="5" class="d-text">input</text>
   <rect id="proc" x="30" y="0" width="20" height="10"/>
-  <text x="40" y="5" class="d-tbox">process</text>
+  <text x="40" y="5" class="d-text">process</text>
   <rect id="out" x="60" y="0" width="20" height="10"/>
-  <text x="70" y="5" class="d-tbox">output</text>
+  <text x="70" y="5" class="d-text">output</text>
 
   <line x1="20" y1="5" x2="30" y2="5" class="d-arrow"/>
   <line x1="50" y1="5" x2="60" y2="5" class="d-arrow"/>

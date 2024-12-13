@@ -5,7 +5,7 @@
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
   ]]>
   </style>
     <defs>
@@ -47,19 +47,19 @@
 
     <rect x="-30" y="-10" width="70" height="70" class="background-grid"/>
     <rect id="base" x="0" y="0" width="10" height="30"/>
-    <text x="5" y="15" class="d-tbox">base</text>
+    <text x="5" y="15" class="d-text">base</text>
     <rect id="a" x="15" y="0" width="10" height="5"/>
-    <text x="20" y="2.5" class="d-tbox">a</text>
+    <text x="20" y="2.5" class="d-text">a</text>
     <rect id="b" x="15" y="10" width="10" height="5"/>
-    <text x="20" y="12.5" class="d-tbox">b</text>
+    <text x="20" y="12.5" class="d-text">b</text>
     <rect id="c" x="15" y="25" width="10" height="5"/>
-    <text x="20" y="27.5" class="d-tbox">c</text>
+    <text x="20" y="27.5" class="d-text">c</text>
     <rect id="d" x="5" y="40" width="20" height="5"/>
-    <text x="15" y="42.5" class="d-tbox">d</text>
+    <text x="15" y="42.5" class="d-text">d</text>
     <rect id="e" x="-15" y="15" width="10" height="30"/>
-    <text x="-10" y="30" class="d-tbox">e</text>
+    <text x="-10" y="30" class="d-text">e</text>
     <rect id="f" x="-15" y="7.5" width="10" height="5"/>
-    <text x="-10" y="10" class="d-tbox">f</text>
+    <text x="-10" y="10" class="d-text">f</text>
     <line x1="10" y1="2.5" x2="15" y2="2.5" marker-end="url(#arrow)"/>
     <line x1="10" y1="12.5" x2="15" y2="12.5" marker-end="url(#arrow)"/>
     <line x1="10" y1="27.5" x2="15" y2="27.5" marker-end="url(#arrow)"/>

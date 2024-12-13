@@ -56,7 +56,7 @@ fn get_text_position<'a>(
         }
     }
 
-    let mut text_classes = vec!["d-tbox"];
+    let mut text_classes = vec!["d-text"];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
     let text_anchor = if let Ok(edge) = text_loc_str.parse::<EdgeSpec>() {
         edge.as_loc()
@@ -127,7 +127,7 @@ fn get_text_position<'a>(
 
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
-    //  text.d-tbox { dominant-baseline: central; text-anchor: middle; }
+    //  text.d-text { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element
         .bbox()?
         .ok_or_else(|| SvgdxError::GeometryError("No BoundingBox".to_owned()))?
@@ -153,7 +153,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_value = get_text_value(&mut orig_elem);
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
-    text_classes.push("d-tbox");
+    text_classes.push("d-text");
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);

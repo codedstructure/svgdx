@@ -16,7 +16,7 @@
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     .d-thin { stroke-width: 0.25; }
     text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     marker path { fill: inherit; }
     .d-dash { stroke-dasharray: 1.5 0.5; }
@@ -40,16 +40,16 @@
   </style>
   <rect id="base" width="40" height="20" class="d-fill-whitesmoke"/>
   <rect id="in" x="-5" y="7.5" width="10" height="5" class="d-fill-green"/>
-  <text x="0" y="10" class="d-fill-green d-tbox">in</text>
+  <text x="0" y="10" class="d-fill-green d-text">in</text>
   <rect id="send" x="7" y="-2.5" width="10" height="5" class="d-fill-lightgrey"/>
-  <text x="12" y="0" class="d-fill-lightgrey d-tbox">send</text>
+  <text x="12" y="0" class="d-fill-lightgrey d-text">send</text>
   <rect id="return" x="23" y="-2.5" width="10" height="5" class="d-fill-grey"/>
-  <text x="28" y="0" class="d-fill-grey d-tbox">return</text>
+  <text x="28" y="0" class="d-fill-grey d-text">return</text>
   <rect id="out" x="35" y="7.5" width="10" height="5" class="d-fill-red"/>
-  <text x="40" y="10" class="d-fill-red d-tbox">out</text>
+  <text x="40" y="10" class="d-fill-red d-text">out</text>
 
   <rect id="effect" x="10" y="-28" width="20" height="8" class="d-fill-darkmagenta"/>
-  <text x="20" y="-24" class="d-fill-darkmagenta d-tbox">effect</text>
+  <text x="20" y="-24" class="d-fill-darkmagenta d-text">effect</text>
 
   <line x1="13.5" y1="-2.5" x2="13.5" y2="-20" class="d-arrow d-dash"/>
   <line x1="26.5" y1="-20" x2="26.5" y2="-2.5" class="d-arrow d-dash"/>

@@ -5,7 +5,7 @@
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }
     text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }
     text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }
@@ -17,43 +17,43 @@
   </style>
   <!-- top row -->
   <rect id="top" x="0" y="0" width="25" height="25" class="d-text-vertical d-text-small"/>
-  <text x="1" y="1" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-top-vertical d-text-left-vertical">
+  <text x="1" y="1" writing-mode="tb" class="d-text-vertical d-text-small d-text d-text-top-vertical d-text-left-vertical">
   <tspan y="1" dx="0em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="0" width="25" height="25" class="d-text-vertical d-text-medium"/>
-  <text x="42.5" y="1" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox d-text-top-vertical">
+  <text x="42.5" y="1" writing-mode="tb" class="d-text-vertical d-text-medium d-text d-text-top-vertical">
   <tspan y="1" dx="-1.05em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="0" width="25" height="25" class="d-text-vertical d-text-large"/>
-  <text x="84" y="1" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-top-vertical d-text-right-vertical">
+  <text x="84" y="1" writing-mode="tb" class="d-text-vertical d-text-large d-text d-text-top-vertical d-text-right-vertical">
   <tspan y="1" dx="-2.1em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
 
   <!-- middle row -->
   <rect id="middle" x="0" y="30" width="25" height="25" class="d-text-vertical d-text-small"/>
-  <text x="1" y="42.5" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-left-vertical">
+  <text x="1" y="42.5" writing-mode="tb" class="d-text-vertical d-text-small d-text d-text-left-vertical">
   <tspan y="42.5" dx="0em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="30" width="25" height="25" class="d-text-vertical d-text-medium"/>
-  <text x="42.5" y="42.5" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox">
+  <text x="42.5" y="42.5" writing-mode="tb" class="d-text-vertical d-text-medium d-text">
   <tspan y="42.5" dx="-1.05em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="30" width="25" height="25" class="d-text-vertical d-text-large"/>
-  <text x="84" y="42.5" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-right-vertical">
+  <text x="84" y="42.5" writing-mode="tb" class="d-text-vertical d-text-large d-text d-text-right-vertical">
   <tspan y="42.5" dx="-2.1em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
 
   <!-- bottom row -->
   <rect x="0" y="60" width="25" height="25" class="d-text-vertical d-text-small"/>
-  <text x="1" y="84" writing-mode="tb" class="d-text-vertical d-text-small d-tbox d-text-bottom-vertical d-text-left-vertical">
+  <text x="1" y="84" writing-mode="tb" class="d-text-vertical d-text-small d-text d-text-bottom-vertical d-text-left-vertical">
   <tspan y="84" dx="0em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="60" width="25" height="25" class="d-text-vertical d-text-medium"/>
-  <text x="42.5" y="84" writing-mode="tb" class="d-text-vertical d-text-medium d-tbox d-text-bottom-vertical">
+  <text x="42.5" y="84" writing-mode="tb" class="d-text-vertical d-text-medium d-text d-text-bottom-vertical">
   <tspan y="84" dx="-1.05em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="60" width="25" height="25" class="d-text-vertical d-text-large"/>
-  <text x="84" y="84" writing-mode="tb" class="d-text-vertical d-text-large d-tbox d-text-bottom-vertical d-text-right-vertical">
+  <text x="84" y="84" writing-mode="tb" class="d-text-vertical d-text-large d-text d-text-bottom-vertical d-text-right-vertical">
   <tspan y="84" dx="-2.1em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
 </svg>

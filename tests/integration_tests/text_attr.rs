@@ -7,7 +7,7 @@ fn test_basic_rect_text() {
 "#;
     let expected = r#"
 <rect x="0" y="1" width="5" height="4"/>
-<text x="2.5" y="3" class="d-tbox">thing</text>
+<text x="2.5" y="3" class="d-text">thing</text>
 "#;
 
     assert_eq!(
@@ -23,7 +23,7 @@ fn test_expanded_rect_text() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="20" class="d-tbox">thing</text>
+<text x="20" y="20" class="d-text">thing</text>
 "#;
 
     assert_eq!(
@@ -39,7 +39,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="11" class="d-tbox d-text-top">thing</text>
+<text x="20" y="11" class="d-text d-text-top">thing</text>
 "#;
 
     assert_eq!(
@@ -52,7 +52,7 @@ fn test_text_loc() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="11" y="29" class="d-tbox d-text-bottom d-text-left">thing</text>
+<text x="11" y="29" class="d-text d-text-bottom d-text-left">thing</text>
 "#;
 
     assert_eq!(
@@ -68,7 +68,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">
+<text x="5" y="5" class="d-text">
 <tspan x="5" dy="-0.525em">multi</tspan><tspan x="5" dy="1.05em">line</tspan>
 </text>
 "#;
@@ -82,7 +82,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="1" class="d-tbox d-text-top">
+<text x="5" y="1" class="d-text d-text-top">
 <tspan x="5" dy="0em">multi</tspan><tspan x="5" dy="2em">line</tspan>
 </text>
 "#;
@@ -96,7 +96,7 @@ fn test_text_multiline() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="9" y="9" class="d-tbox d-text-bottom d-text-right">
+<text x="9" y="9" class="d-text d-text-bottom d-text-right">
 <tspan x="9" dy="-1em">multi</tspan><tspan x="9" dy="1em">line</tspan>
 </text>
 "#;
@@ -114,7 +114,7 @@ fn test_text_multiline() {
         "{}\u{200b}{}\u{200b}{}",
         r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">
+<text x="5" y="5" class="d-text">
 <tspan x="5" dy="-1.5em">multi</tspan><tspan x="5" dy="1em">"#,
         r#"</tspan><tspan x="5" dy="1em">"#,
         r#"</tspan><tspan x="5" dy="1em">line</tspan>
@@ -134,7 +134,7 @@ fn test_text_vertical() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="50" class="d-text-vertical"/>
-<text x="5" y="25" writing-mode="tb" class="d-text-vertical d-tbox">
+<text x="5" y="25" writing-mode="tb" class="d-text-vertical d-text">
 <tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
 </text>
 "#;
@@ -151,7 +151,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="7" y="5" class="d-tbox">blob</text>
+<text x="7" y="5" class="d-text">blob</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -163,7 +163,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="3" class="d-tbox">blob</text>
+<text x="5" y="3" class="d-text">blob</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -175,7 +175,7 @@ fn test_text_dxy() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="6.5" y="8" class="d-tbox">blob</text>
+<text x="6.5" y="8" class="d-text">blob</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -192,7 +192,7 @@ fn test_text_line() {
     // would it be better if default was 'above' the line?
     let expected = r#"
 <line x1="0" y1="0" x2="10" y2="0"/>
-<text x="5" y="0" class="d-tbox">blob</text>
+<text x="5" y="0" class="d-text">blob</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -204,7 +204,7 @@ fn test_text_line() {
 "#;
     let expected = r#"
 <line x1="0" y1="0" x2="10" y2="0"/>
-<text x="11" y="0" class="d-tbox d-text-left">blob</text>
+<text x="11" y="0" class="d-text d-text-left">blob</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -219,7 +219,7 @@ fn test_text_content() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">some text</text>
+<text x="5" y="5" class="d-text">some text</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -232,7 +232,7 @@ text</rect>
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">
+<text x="5" y="5" class="d-text">
 <tspan x="5" dy="-0.525em">multi-line</tspan><tspan x="5" dy="1.05em">text</tspan>
 </text>
 "#;
@@ -249,7 +249,7 @@ fn test_text_cdata() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">some text</text>
+<text x="5" y="5" class="d-text">some text</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -268,7 +268,7 @@ fn test_text_cdata() {
     // In this test we replace 'Z' with a zero-width space for easier string authoring...
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">
+<text x="5" y="5" class="d-text">
 <tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print(&quot;Hello World!&quot;)</tspan>
 </text>
 "#;
@@ -297,7 +297,7 @@ fn test_text_cdata_pre() {
     // repectively, for easier string authoring...
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">
+<text x="5" y="5" class="d-text">
 <tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;HelloNWorld!&quot;)</tspan>
 </text>
 "#;
@@ -315,7 +315,7 @@ fn test_text_offset() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20" y="13" class="d-tbox d-text-top">thing</text>
+<text x="20" y="13" class="d-text d-text-top">thing</text>
 "#;
 
     assert_eq!(
@@ -328,7 +328,7 @@ fn test_text_offset() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="13" y="27" class="d-tbox d-text-bottom d-text-left">thing</text>
+<text x="13" y="27" class="d-text d-text-bottom d-text-left">thing</text>
 "#;
 
     assert_eq!(
@@ -345,7 +345,7 @@ fn test_text_inset_dxy() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="21" y="13" class="d-tbox d-text-top">thing</text>
+<text x="21" y="13" class="d-text d-text-top">thing</text>
 "#;
 
     assert_eq!(
@@ -358,7 +358,7 @@ fn test_text_inset_dxy() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="20.5" y="13.5" class="d-tbox d-text-top">thing</text>
+<text x="20.5" y="13.5" class="d-text d-text-top">thing</text>
 "#;
 
     assert_eq!(
@@ -371,7 +371,7 @@ fn test_text_inset_dxy() {
 "#;
     let expected = r#"
 <rect x="10" y="10" width="20" height="20"/>
-<text x="26.5" y="12.5" class="d-tbox d-text-top d-text-right">thing</text>
+<text x="26.5" y="12.5" class="d-text d-text-top d-text-right">thing</text>
 "#;
 
     assert_eq!(
@@ -387,7 +387,7 @@ fn test_text_style() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" style="font-size: 2em; font-weight: bold;" class="d-tbox">thing</text>
+<text x="5" y="5" style="font-size: 2em; font-weight: bold;" class="d-text">thing</text>
 "#;
 
     assert_eq!(
@@ -402,7 +402,7 @@ fn test_text_element() {
 <text xy="0" text="thing"/>
 "#;
     let expected = r#"
-<text x="0" y="0" class="d-tbox">thing</text>
+<text x="0" y="0" class="d-text">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -413,7 +413,7 @@ fn test_text_element() {
 <text xy="0">thing</text>
 "#;
     let expected = r#"
-<text x="0" y="0" class="d-tbox">thing</text>
+<text x="0" y="0" class="d-text">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -426,7 +426,7 @@ fn test_text_element() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">thing</text>
+<text x="5" y="5" class="d-text">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -439,7 +439,7 @@ fn test_text_element() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-tbox">thing</text>
+<text x="5" y="5" class="d-text">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -455,7 +455,7 @@ fn test_text_anchor() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="14" y="5" class="d-tbox d-text-left">thing</text>
+<text x="14" y="5" class="d-text d-text-left">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -468,7 +468,7 @@ fn test_text_anchor() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="-2" y="12" class="d-tbox d-text-top d-text-right">thing</text>
+<text x="-2" y="12" class="d-text d-text-top d-text-right">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -481,7 +481,7 @@ fn test_text_anchor() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="2" y="8" class="d-tbox d-text-bottom d-text-left">thing</text>
+<text x="2" y="8" class="d-text d-text-bottom d-text-left">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -493,7 +493,7 @@ fn test_text_anchor() {
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
-<text x="11" y="5" class="d-tbox d-text-left">thing</text>
+<text x="11" y="5" class="d-text d-text-left">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input).unwrap().trim(),
@@ -510,7 +510,7 @@ fn test_text_element_attrs() {
 <text xy="0" font-size="2em" font-weight="bold">thing</text>
 "#;
     let expected = r#"
-<text x="0" y="0" font-size="2em" font-weight="bold" class="d-tbox">thing</text>
+<text x="0" y="0" font-size="2em" font-weight="bold" class="d-text">thing</text>
 "#;
     assert_eq!(
         transform_str_default(input1).unwrap().trim(),
@@ -529,7 +529,7 @@ fn test_multiline_outside() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="11" y="11" class="d-tbox d-text-top d-text-left">
+<text x="11" y="11" class="d-text d-text-top d-text-left">
 <tspan x="11" dy="0em">multi</tspan><tspan x="11" dy="1.05em">line</tspan>
 </text>
 "#;
@@ -544,7 +544,7 @@ fn test_multiline_outside() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="-1" y="-1" class="d-tbox d-text-bottom d-text-right">
+<text x="-1" y="-1" class="d-text d-text-bottom d-text-right">
 <tspan x="-1" dy="-1.05em">multi</tspan><tspan x="-1" dy="1.05em">line</tspan>
 </text>
 "#;

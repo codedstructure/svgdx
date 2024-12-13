@@ -5,7 +5,7 @@
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
     text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
-    text.d-tbox, text.d-tbox * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
     text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
     text.d-text-left, text.d-text-left * { text-anchor: start; }
@@ -36,28 +36,28 @@
   </style>
 
   <rect x="0" y="0" width="20" height="30"/>
-  <text x="10" y="15" class="d-tbox">left</text>
+  <text x="10" y="15" class="d-text">left</text>
   <line x1="25" y1="0" x2="25" y2="30"/>
-  <text x="25" y="-1" class="d-tbox d-text-bottom">top</text>
+  <text x="25" y="-1" class="d-text d-text-bottom">top</text>
   <rect x="30" y="0" width="20" height="30"/>
-  <text x="40" y="15" class="d-tbox">right</text>
+  <text x="40" y="15" class="d-text">right</text>
   <line x1="0" y1="35" x2="50" y2="35"/>
-  <text x="25" y="36" class="d-tbox d-text-top">bottom</text>
+  <text x="25" y="36" class="d-text d-text-top">bottom</text>
   <g class="small">
     <line x1="0" y1="45" x2="25" y2="45"/>
-    <text x="12.5" y="46" class="d-tbox d-text-top">
+    <text x="12.5" y="46" class="d-text d-text-top">
     <tspan x="12.5" dy="0em">below</tspan><tspan x="12.5" dy="1.05em">the line</tspan>
     </text>
     <line x1="0" y1="45" x2="25" y2="45"/>
-    <text x="-1" y="45" class="d-tbox d-text-right">
+    <text x="-1" y="45" class="d-text d-text-right">
     <tspan x="-1" dy="-1.575em">left</tspan><tspan x="-1" dy="1.05em">of</tspan><tspan x="-1" dy="1.05em">the</tspan><tspan x="-1" dy="1.05em">line</tspan>
     </text>
     <line x1="0" y1="45" x2="25" y2="45"/>
-    <text x="26" y="46" class="d-tbox d-text-top d-text-left">
+    <text x="26" y="46" class="d-text d-text-top d-text-left">
     <tspan x="26" dy="0em">on the right</tspan><tspan x="26" dy="1.05em">and down a bit</tspan>
     </text>
     <line x1="0" y1="45" x2="25" y2="45"/>
-    <text x="12.5" y="44" class="d-tbox d-text-bottom">
+    <text x="12.5" y="44" class="d-text d-text-bottom">
     <tspan x="12.5" dy="-1.05em">above</tspan><tspan x="12.5" dy="1.05em">line</tspan>
     </text>
   </g>

@@ -56,17 +56,17 @@ fn test_reuse_group() {
     let expected = r#"
 <g id="first" class="a">
 <rect x="0" y="0" width="50" height="40"/>
-<text x="1" y="39" class="d-tbox d-text-bottom d-text-left">40</text>
+<text x="1" y="39" class="d-text d-text-bottom d-text-left">40</text>
 <circle cx="0" cy="40" r="0.5"/>
 </g>
 <g class="a">
 <rect x="0" y="0" width="40" height="30"/>
-<text x="1" y="29" class="d-tbox d-text-bottom d-text-left">30</text>
+<text x="1" y="29" class="d-text d-text-bottom d-text-left">30</text>
 <circle cx="0" cy="30" r="0.5"/>
 </g>
 <g id="third" class="test-class a">
 <rect x="0" y="0" width="30" height="20"/>
-<text x="1" y="19" class="d-tbox d-text-bottom d-text-left">20</text>
+<text x="1" y="19" class="d-text d-text-bottom d-text-left">20</text>
 <circle cx="0" cy="20" r="0.5"/>
 </g>
 "#;
@@ -111,7 +111,7 @@ fn test_reuse_xy_transform() {
 "##;
     let output = transform_str_default(input).unwrap();
     let expected1 = r#"<rect width="20" height="10" transform="translate(10) translate(11) translate(0, 1)" class="tb"/>"#;
-    let expected2 = r#"<text x="10" y="5" transform="translate(10) translate(11) translate(0, 1)" class="tb d-tbox">thing</text>"#;
+    let expected2 = r#"<text x="10" y="5" transform="translate(10) translate(11) translate(0, 1)" class="tb d-text">thing</text>"#;
 
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
@@ -181,7 +181,7 @@ fn test_reuse_recursive() {
 <reuse href="#d" t="5"/>
 "##;
     let expected = r#"<g class="d c b a"><rect x="0" y="0" width="5" height="5"/>
-<text x="2.5" y="2.5" class="d-tbox">5</text></g>"#;
+<text x="2.5" y="2.5" class="d-text">5</text></g>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output.trim(), expected.trim());
 }
