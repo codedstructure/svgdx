@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0 - 2024-12-13]
+
 - Internal: event processing logic has been significantly refactored.
 
   This significantly simplifies the internals of svgdx, which should improve
