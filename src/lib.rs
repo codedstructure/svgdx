@@ -184,9 +184,9 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn transform_string(input: String) -> core::result::Result<String, String> {
+pub fn transform_string(input: String, add_metadata: bool) -> core::result::Result<String, String> {
     let cfg = TransformConfig {
-        add_metadata: true,
+        add_metadata,
         ..Default::default()
     };
     transform_str(input, &cfg).map_err(|e| e.to_string())

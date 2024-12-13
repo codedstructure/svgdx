@@ -19,6 +19,7 @@ mod rel_size;
 mod reuse;
 mod root_svg;
 mod roundtrip;
+mod src_line;
 mod text_attr;
 mod transform_svg;
 mod variables;

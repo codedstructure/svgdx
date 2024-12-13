@@ -1,11 +1,12 @@
 use axum::{
     body::Body,
-    extract::Path,
+    extract::{Path, Query},
     http::Response,
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
+use serde_derive::Deserialize;
 
 use crate::errors::SvgdxError;
 use crate::{transform_str, TransformConfig};
@@ -16,38 +17,50 @@ use crate::{transform_str, TransformConfig};
 // transforms rather than in-browser.
 const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
 
-async fn transform(input: String) -> impl IntoResponse {
-    transform_str(
-        input,
-        &TransformConfig {
-            add_metadata: true,
+// Not all fields make sense for the editor, but add_metadata
+// is needed to allow hover-over line highlighting.
+#[derive(Debug, Default, Deserialize)]
+struct RequestConfig {
+    #[serde(default)]
+    add_metadata: bool,
+}
+
+impl From<RequestConfig> for TransformConfig {
+    fn from(config: RequestConfig) -> Self {
+        TransformConfig {
+            add_metadata: config.add_metadata,
             ..Default::default()
-        },
-    )
-    .and_then(|output| {
-        if output.is_empty() {
-            // Can't build a valid image/svg+xml response from empty string.
-            Err(SvgdxError::from("Empty response"))
-        } else {
-            Ok(output)
         }
-    })
-    .map(|output| {
-        Response::builder()
-            .header("Content-Type", "image/svg+xml")
-            .header("Content-Security-Policy", CSP)
-            .body(Body::from(output))
-            .unwrap()
-    })
-    .map_err(|e| {
-        // TODO: make the error more informative, e.g. by returning a JSON object
-        // including line number(s) of failed elements.
-        Response::builder()
-            .status(400)
-            .header("Content-Type", "text/plain")
-            .body(Body::from(format!("Error: {}", e)))
-            .unwrap()
-    })
+    }
+}
+
+async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResponse {
+    let Query(config) = config;
+    transform_str(input, &config.into())
+        .and_then(|output| {
+            if output.is_empty() {
+                // Can't build a valid image/svg+xml response from empty string.
+                Err(SvgdxError::from("Empty response"))
+            } else {
+                Ok(output)
+            }
+        })
+        .map(|output| {
+            Response::builder()
+                .header("Content-Type", "image/svg+xml")
+                .header("Content-Security-Policy", CSP)
+                .body(Body::from(output))
+                .unwrap()
+        })
+        .map_err(|e| {
+            // TODO: make the error more informative, e.g. by returning a JSON object
+            // including line number(s) of failed elements.
+            Response::builder()
+                .status(400)
+                .header("Content-Type", "text/plain")
+                .body(Body::from(format!("Error: {}", e)))
+                .unwrap()
+        })
 }
 
 macro_rules! include_or_read {

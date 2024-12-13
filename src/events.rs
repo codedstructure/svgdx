@@ -186,14 +186,16 @@ impl EventList {
         // Stack of indices of open tags
         let mut event_idx_stack = Vec::new();
 
-        let mut line_count = 1;
+        let mut src_line = 1;
         let mut indent = 0;
         let mut index = 0;
         loop {
             let ev = reader.read_event_into(&mut buf);
-            if let Ok(ok_ev) = ev.clone() {
-                line_count += &ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count();
-            }
+            let event_lines = if let Ok(ok_ev) = ev.clone() {
+                ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count()
+            } else {
+                0
+            };
             match &ev {
                 Ok(Event::Eof) => break, // exits the loop when reaching end of file
                 Ok(Event::Text(t)) => {
@@ -206,7 +208,7 @@ impl EventList {
                     events.push(InputEvent {
                         event: ev.expect("match").into_owned(),
                         index,
-                        line: line_count,
+                        line: src_line,
                         indent,
                         alt_idx: None,
                     });
@@ -215,7 +217,7 @@ impl EventList {
                     events.push(InputEvent {
                         event: ev.expect("match").into_owned(),
                         index,
-                        line: line_count,
+                        line: src_line,
                         indent,
                         alt_idx: None,
                     });
@@ -229,7 +231,7 @@ impl EventList {
                     events.push(InputEvent {
                         event: ev.expect("match").into_owned(),
                         index,
-                        line: line_count,
+                        line: src_line,
                         indent,
                         alt_idx: start_idx,
                     });
@@ -237,17 +239,18 @@ impl EventList {
                 Ok(e) => events.push(InputEvent {
                     event: e.clone().into_owned(),
                     index,
-                    line: line_count,
+                    line: src_line,
                     indent,
                     alt_idx: None,
                 }),
                 Err(e) => {
                     return Err(SvgdxError::ParseError(format!(
-                        "XML error near line {line_count}: {e:?}"
+                        "XML error near line {src_line}: {e:?}"
                     )))
                 }
             }
 
+            src_line += event_lines;
             index += 1;
             buf.clear();
         }
@@ -435,7 +438,8 @@ mod tests {
         assert_eq!(el.events[0].line, 1);
         assert_eq!(el.events[0].indent, 0);
         assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
-        assert_eq!(el.events[1].line, 2);
+        // Multi-line events (e.g. text here) store starting line number
+        assert_eq!(el.events[1].line, 1);
         assert_eq!(
             el.events[1].event,
             Event::Text(BytesText::new("\n        "))

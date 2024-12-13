@@ -1013,6 +1013,8 @@ dependencies = [
  "quick-xml",
  "rand",
  "rand_pcg",
+ "serde",
+ "serde_derive",
  "shlex",
  "tempfile",
  "tokio",

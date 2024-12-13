@@ -84,10 +84,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let original_viewbox = null;
     let original_width = null;
     let original_height = null;
-    let last_text_response = "";
 
     function update_response(svgData) {
-        last_text_response = svgData;
         if (document.getElementById('text-output').style.display !== "none") {
             // Updating the codemirror editor while hidden is ineffective;
             // we set if visible or when it becomes visible.
@@ -122,10 +120,16 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         // }
     }
 
+    function want_metadata() {
+        // We want metadata if the SVG is showing rather than the text output
+        return document.getElementById('svg-output').style.display !== "none";
+    }
+
     async function svgdx_transform_server(svgdx_input) {
         try {
             statusbar.style.opacity = "0.3";
-            const response = await fetch('api/transform', {
+            let add_metadata = want_metadata() ? "true" : "false";
+            const response = await fetch(`api/transform?add_metadata=${add_metadata}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml'
@@ -151,7 +155,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 ok = false;
                 setTimeout(update, 100);
             } else {
-                result = svgdx_transform(svgdx_input);
+                result = svgdx_transform(svgdx_input, want_metadata());
                 ok = true;
             }
         } catch (e) {
@@ -159,6 +163,59 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             ok = false;
         }
         return Promise.resolve([ok, result]);
+    }
+
+    function rateLimited(target) {
+        // WASM should be able to handle frequent updates, server maybe not
+        // but could be localhost, so don't want to be too slow
+        let MAX_CALL_RATE = window.svgdx_use_server ? 250 : 75;
+        // if a call hangs for some reason, don't block the next call forever
+        let IN_PROGRESS_TIMEOUT = 5000;
+        let lastCallTime = 0;
+        let callInProgress = false;
+        let pendingCall = false;
+
+        return async function() {
+            const now = Date.now();
+
+            // Prevent new requests if already in progress, unless they
+            // were a very long time ago.
+            if (callInProgress && lastCallTime + IN_PROGRESS_TIMEOUT > now) {
+                pendingCall = true;
+                return;
+            }
+
+            if (now - lastCallTime >= MAX_CALL_RATE) {
+                // call target immediately if last call was a while ago
+                // to avoid latency on infrequent calls
+                lastCallTime = now;
+                callInProgress = true;
+                await target();
+                callInProgress = false;
+
+                if (pendingCall) {
+                    // another call came in while running target, schedule it
+                    // so eventual state is up-to-date
+                    pendingCall = false;
+                    rateLimited(target)();
+                }
+            } else {
+                // schedule next call to target after MAX_CALL_RATE since last
+                setTimeout(async () => {
+                    if (!callInProgress) {
+                        lastCallTime = Date.now();
+                        callInProgress = true;
+                        await target();
+                        callInProgress = false;
+
+                        if (pendingCall) {
+                            pendingCall = false;
+                            rateLimited(target)();
+                        }
+                    }
+                }, MAX_CALL_RATE - (now - lastCallTime));
+            }
+        };
     }
 
     async function update() {
@@ -218,7 +275,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         update();
     }
 
-    editor.on('change', update);
+    editor.on('change', rateLimited(update));
 
     function activeTab() {
         let stored = localStorage.getItem("svgdx-active-tab") || "1";
@@ -443,10 +500,11 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         if (toggleOutputChecked === "true") {
             document.getElementById('svg-output').style.display = "none";
             document.getElementById('text-output').style.display = "";
-            textViewer.setValue(last_text_response);
+            update();
         } else {
             document.getElementById('svg-output').style.display = "";
             document.getElementById('text-output').style.display = "none";
+            update();
         }
     }
 
@@ -578,8 +636,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             if (e.target.tagName === 'tspan') {
                 hover_element = e.target.closest('text');
             }
-            if (hover_element.dataset.sourceLine) {
-                const lineNumber = parseInt(hover_element.dataset.sourceLine);
+            if (hover_element.dataset.srcLine) {
+                const lineNumber = parseInt(hover_element.dataset.srcLine);
                 editor.addLineClass(lineNumber - 1, "background", "hover-line");
             }
             // display mouse position in SVG user-space coordinates

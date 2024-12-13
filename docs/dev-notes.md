@@ -59,7 +59,7 @@ would be useful.
 
 Alternatively having warnings when e.g. `strp` fails might be helpful, though
 the current system only returns errors or the document. Perhaps metadata
-analogous to the `data-source-line` - e.g. `data-warning` - would allow the
+analogous to the `data-src-line` - e.g. `data-warning` - would allow the
 client program (using `config.add_metadata`) to extract the info without
 changing to return the document and some out-of-band data?
 

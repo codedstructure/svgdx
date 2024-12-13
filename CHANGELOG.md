@@ -39,6 +39,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: specifying relative sizes for circles and ellipses, e.g. `r="#abc 25%"`
 
+- Editor & `svgdx-server` changes:
+
+  - implemented rate-limiting on calls to `/transform` endpoint, and added
+    `defer` attribute to various JavaScript file loading. These improve behaviour
+    on high-latency connections to an svgdx-server instance.
+  - source line highlighting now reflects the first line of an element, not
+    the last.
+  - the 'Text Output' view no longer includes the source-line metadata, which
+    cluttered the generated SVG.
+
 ## [0.14.0 - 2024-11-18]
 
 - Improved text positioning, useful when needing multiple text labels inside or
