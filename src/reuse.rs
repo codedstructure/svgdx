@@ -1,7 +1,7 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::events::{EventList, InputEvent, SvgEvent};
+use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::{process_events, EventGen};
@@ -16,7 +16,7 @@ impl EventGen for ReuseElement {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
-    ) -> Result<(EventList, Option<BoundingBox>)> {
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 
         reuse_element.eval_attributes(context);
@@ -107,17 +107,17 @@ impl EventGen for ReuseElement {
         ) {
             // we've changed the initial (and possibly closing) tag of the instance element,
             // so we create a new list including that and process it.
-            let mut new_events = EventList::new();
+            let mut new_events = InputList::new();
             let tag_name = instance_element.name.clone();
             let xfrm = instance_element
                 .get_attr("transform")
                 .and_then(|a| a.parse::<TransformAttr>().ok());
-            let mut start_ev = InputEvent::from(SvgEvent::Start(instance_element));
+            let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
             start_ev.index = start;
             start_ev.alt_idx = Some(end);
             new_events.push(start_ev);
-            new_events.extend(&EventList::from(context.events.clone()).slice(start + 1, end));
-            let mut end_ev = InputEvent::from(SvgEvent::End(tag_name));
+            new_events.extend(&InputList::from(&context.events[start + 1..end]));
+            let mut end_ev = InputEvent::from(OutputEvent::End(tag_name));
             end_ev.index = end;
             end_ev.alt_idx = Some(start);
             new_events.push(end_ev);

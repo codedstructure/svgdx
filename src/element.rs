@@ -1,7 +1,7 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
-use crate::events::SvgEvent;
+use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
@@ -15,7 +15,7 @@ use lazy_regex::{regex, Captures};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
     pub name: String,
     pub original: String,
@@ -199,9 +199,25 @@ impl SvgElement {
         Ok(())
     }
 
+    pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
+        if let Some((start, end)) = self.event_range {
+            Some(InputList::from(&context.events[start + 1..end]))
+        } else {
+            None
+        }
+    }
+
+    pub fn all_events(&self, context: &TransformerContext) -> InputList {
+        if let Some((start, end)) = self.event_range {
+            InputList::from(&context.events[start..end + 1])
+        } else {
+            InputList::new()
+        }
+    }
+
     /// Process a given `SvgElement` into a list of `SvgEvent`s
     // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<SvgEvent>> {
+    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
         let mut events = vec![];
 
         if ctx.config.debug {
@@ -209,26 +225,26 @@ impl SvgElement {
             //
             // Replace double quote with backtick to avoid messy XML entity conversion
             // (i.e. &quot; or &apos; if single quotes were used)
-            events.push(SvgEvent::Comment(
+            events.push(OutputEvent::Comment(
                 format!(" {} ", self.original)
                     .replace('"', "`")
                     .replace(['<', '>'], ""),
             ));
-            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
             let value = eval_attr(&comment, ctx);
-            events.push(SvgEvent::Comment(format!(" {value} ")));
-            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(OutputEvent::Comment(format!(" {value} ")));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // 'Raw' comment: no evaluation of expressions occurs here
         if let Some(comment) = self.get_attr("__") {
-            events.push(SvgEvent::Comment(format!(" {comment} ")));
-            events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(OutputEvent::Comment(format!(" {comment} ")));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         if self.has_attr("text") {
@@ -236,49 +252,49 @@ impl SvgElement {
             if orig_elem.name != "text" {
                 // We only care about the original element if it wasn't a text element
                 // (otherwise we generate a useless empty text element for the original)
-                events.push(SvgEvent::Empty(orig_elem));
-                events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                events.push(OutputEvent::Empty(orig_elem));
+                events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
             }
             match text_elements.as_slice() {
                 [] => {}
                 [elem] => {
-                    events.push(SvgEvent::Start(elem.clone()));
+                    events.push(OutputEvent::Start(elem.clone()));
                     if let Some(value) = &elem.text_content {
-                        events.push(SvgEvent::Text(value.clone()));
+                        events.push(OutputEvent::Text(value.clone()));
                     } else {
                         return Err(SvgdxError::InvalidData(
                             "Text element should have content".to_owned(),
                         ));
                     }
-                    events.push(SvgEvent::End("text".to_string()));
+                    events.push(OutputEvent::End("text".to_string()));
                 }
                 _ => {
                     // Multiple text spans
                     let text_elem = &text_elements[0];
-                    events.push(SvgEvent::Start(text_elem.clone()));
-                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(OutputEvent::Start(text_elem.clone()));
+                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
                     for elem in &text_elements[1..] {
                         // Note: we can't insert a newline/last_indent here as whitespace
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
-                        events.push(SvgEvent::Start(elem.clone()));
+                        events.push(OutputEvent::Start(elem.clone()));
                         if let Some(value) = &elem.text_content {
-                            events.push(SvgEvent::Text(value.clone()));
+                            events.push(OutputEvent::Text(value.clone()));
                         } else {
                             return Err(SvgdxError::InvalidData(
                                 "Text element should have content".to_owned(),
                             ));
                         }
-                        events.push(SvgEvent::End("tspan".to_string()));
+                        events.push(OutputEvent::End("tspan".to_string()));
                     }
-                    events.push(SvgEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    events.push(SvgEvent::End("text".to_string()));
+                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(OutputEvent::End("text".to_string()));
                 }
             }
         } else if self.is_empty_element() {
-            events.push(SvgEvent::Empty(self.clone()));
+            events.push(OutputEvent::Empty(self.clone()));
         } else {
-            events.push(SvgEvent::Start(self.clone()));
+            events.push(OutputEvent::Start(self.clone()));
         }
 
         Ok(events)
@@ -363,6 +379,10 @@ impl SvgElement {
     /// Remove a class from the element, returning `true` if the class was present
     pub fn pop_class(&mut self, class: &str) -> bool {
         self.classes.remove(class)
+    }
+
+    pub fn get_classes(&self) -> Vec<String> {
+        self.classes.to_vec()
     }
 
     pub fn has_attr(&self, key: &str) -> bool {

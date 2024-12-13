@@ -1,7 +1,7 @@
 use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::events::EventList;
+use crate::events::OutputList;
 use crate::expression::{eval_attr, eval_condition};
 use crate::position::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, EventGen};
@@ -63,17 +63,14 @@ impl EventGen for LoopElement {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
-    ) -> Result<(EventList, Option<BoundingBox>)> {
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
         let event_element = &self.0;
-        let mut gen_events = EventList::new();
+        let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
-        if let (Ok(loop_def), Some((start, end))) =
-            (LoopDef::try_from(event_element), event_element.event_range)
-        {
-            // opening loop element is not included in the processed inner events to avoid
-            // infinite recursion...
-            let inner_events = EventList::from(context.events.clone()).slice(start + 1, end);
-
+        if let (Ok(loop_def), Some(inner_events)) = (
+            LoopDef::try_from(event_element),
+            event_element.inner_events(context),
+        ) {
             let mut iteration = 0;
             let mut loop_var_name = String::new();
             let mut loop_count = 0;

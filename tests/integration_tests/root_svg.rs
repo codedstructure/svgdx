@@ -23,7 +23,7 @@ fn test_root_svg_wh() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg width="50cm" height="25cm" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50cm" height="25cm" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -37,7 +37,7 @@ fn test_root_svg_no_width() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg height="30in" version="1.1" xmlns="http://www.w3.org/2000/svg" width="60in" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="60in" height="30in" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -48,7 +48,7 @@ fn test_root_svg_no_width() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg height="30" version="1.1" xmlns="http://www.w3.org/2000/svg" width="60" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="60" height="30" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -59,7 +59,7 @@ fn test_root_svg_no_width() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg height="40%" version="1.1" xmlns="http://www.w3.org/2000/svg" width="80%" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="80%" height="40%" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -73,7 +73,7 @@ fn test_root_svg_no_height() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg width="30in" version="1.1" xmlns="http://www.w3.org/2000/svg" height="15in" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="30in" height="15in" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -84,7 +84,7 @@ fn test_root_svg_no_height() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg width="30" version="1.1" xmlns="http://www.w3.org/2000/svg" height="15" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="30" height="15" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -95,7 +95,7 @@ fn test_root_svg_no_height() {
   <rect x="10" y="10" width="50" height="25"/>
 </svg>
 "##;
-    let expected = r##"<svg width="40%" version="1.1" xmlns="http://www.w3.org/2000/svg" height="20%" viewBox="10 10 50 25">"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40%" height="20%" viewBox="10 10 50 25">"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }

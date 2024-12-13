@@ -97,7 +97,7 @@ impl OrderIndex {
 /// operations on the same `AttrMap` instance could cause overflow, especially for
 /// usize < 64 bits. For the target use-case and typical 64-bit target
 /// architectures, this is not considered a problem.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct AttrMap {
     attrs: BTreeMap<(isize, String), String>,
     index_map: HashMap<String, isize>,
@@ -244,7 +244,7 @@ impl<'s> IntoIterator for &'s AttrMap {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ClassList {
     classes: BTreeSet<(usize, String)>,
     index_map: HashMap<String, usize>,

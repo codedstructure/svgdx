@@ -3,131 +3,35 @@ use crate::errors::{Result, SvgdxError};
 use crate::types::OrderIndex;
 
 use std::io::{BufRead, BufReader, Cursor, Write};
+use std::str::FromStr;
 
 use lazy_regex::regex;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
 
-pub enum SvgEvent {
-    Comment(String),
-    Text(String),
-    CData(String),
-    Start(SvgElement),
-    Empty(SvgElement),
-    End(String),
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputEvent {
-    pub event: Event<'static>,
+    event: Event<'static>,
     pub index: usize,
-    pub line: usize,
-    pub indent: usize,
+    line: usize,
+    indent: usize,
     pub alt_idx: Option<usize>,
 }
 
-impl Clone for InputEvent {
-    fn clone(&self) -> Self {
-        Self {
-            event: self.event.clone(),
-            index: self.index,
-            line: self.line,
-            indent: self.indent,
-            alt_idx: self.alt_idx,
-        }
-    }
-}
-
 impl InputEvent {
-    fn into_owned(self) -> InputEvent {
-        InputEvent {
-            event: self.event,
-            index: self.index,
-            line: self.line,
-            indent: self.indent,
-            alt_idx: self.alt_idx,
+    pub fn text_string(&self) -> Option<String> {
+        match &self.event {
+            Event::Text(t) => Some(String::from_utf8(t.to_vec()).expect("utf8")),
+            _ => None,
         }
     }
-}
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct EventList {
-    pub events: Vec<InputEvent>,
-}
-
-impl From<&str> for EventList {
-    fn from(value: &str) -> Self {
-        Self::from_str(value).expect("failed to parse string")
-    }
-}
-
-impl From<Event<'_>> for EventList {
-    fn from(value: Event) -> Self {
-        Self {
-            events: vec![InputEvent {
-                event: value.into_owned(),
-                index: 0,
-                line: 0,
-                indent: 0,
-                alt_idx: None,
-            }],
+    pub fn cdata_string(&self) -> Option<String> {
+        match &self.event {
+            Event::CData(c) => Some(String::from_utf8(c.to_vec()).expect("utf8")),
+            _ => None,
         }
-    }
-}
-
-impl From<SvgEvent> for InputEvent {
-    fn from(value: SvgEvent) -> Self {
-        InputEvent::from(Event::from(value))
-    }
-}
-
-impl From<SvgEvent> for EventList {
-    fn from(value: SvgEvent) -> Self {
-        Event::from(value).into()
-    }
-}
-
-impl From<Vec<InputEvent>> for EventList {
-    fn from(value: Vec<InputEvent>) -> Self {
-        Self {
-            events: value
-                .into_iter()
-                .map(|v| InputEvent {
-                    event: v.event.into_owned(),
-                    index: v.index,
-                    line: v.line,
-                    indent: v.indent,
-                    alt_idx: v.alt_idx,
-                })
-                .collect(),
-        }
-    }
-}
-
-impl From<Vec<Event<'_>>> for EventList {
-    fn from(value: Vec<Event>) -> Self {
-        Self {
-            events: value
-                .into_iter()
-                .map(|v| InputEvent {
-                    event: v.into_owned(),
-                    index: 0,
-                    line: 0,
-                    indent: 0,
-                    alt_idx: None,
-                })
-                .collect(),
-        }
-    }
-}
-
-impl IntoIterator for EventList {
-    type Item = InputEvent;
-    type IntoIter = std::vec::IntoIter<InputEvent>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.events.into_iter()
     }
 }
 
@@ -143,13 +47,52 @@ impl From<Event<'_>> for InputEvent {
     }
 }
 
-impl Default for EventList {
-    fn default() -> Self {
-        Self::new()
+impl From<OutputEvent> for InputEvent {
+    fn from(value: OutputEvent) -> Self {
+        InputEvent::from(Event::from(value))
     }
 }
 
-impl EventList {
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct InputList {
+    pub events: Vec<InputEvent>,
+}
+
+impl From<&[InputEvent]> for InputList {
+    fn from(value: &[InputEvent]) -> Self {
+        Self {
+            events: value
+                .iter()
+                .map(|v| InputEvent {
+                    event: v.event.clone(),
+                    index: v.index,
+                    line: v.line,
+                    indent: v.indent,
+                    alt_idx: v.alt_idx,
+                })
+                .collect(),
+        }
+    }
+}
+
+impl IntoIterator for InputList {
+    type Item = InputEvent;
+    type IntoIter = std::vec::IntoIter<InputEvent>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.events.into_iter()
+    }
+}
+
+impl FromStr for InputList {
+    type Err = SvgdxError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        Self::from_reader(&mut BufReader::new(Cursor::new(s.as_bytes())))
+    }
+}
+
+impl InputList {
     pub fn new() -> Self {
         Self { events: vec![] }
     }
@@ -168,10 +111,10 @@ impl EventList {
 
     pub fn push(&mut self, ev: impl Into<InputEvent>) {
         let ev = ev.into();
-        self.events.push(ev.clone().into_owned());
+        self.events.push(ev.clone());
     }
 
-    pub fn extend(&mut self, other: &EventList) {
+    pub fn extend(&mut self, other: &InputList) {
         for ev in other.iter().cloned() {
             self.events.push(ev);
         }
@@ -258,14 +201,197 @@ impl EventList {
         Ok(Self { events })
     }
 
-    pub fn from_str(s: impl Into<String>) -> Result<Self> {
-        Self::from_reader(&mut BufReader::new(Cursor::new(s.into().as_bytes())))
-    }
-
     pub fn slice(&self, start: usize, end: usize) -> Self {
         Self {
             events: self.events[start..end].to_vec(),
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Tag {
+    /// Represents a Start..End block and all events in between
+    Compound(SvgElement, Option<String>),
+    /// Represents a single Empty element
+    Leaf(SvgElement, Option<String>),
+    Comment(String, Option<String>),
+    Text(String),
+    CData(String),
+}
+
+impl Tag {
+    fn set_text(&mut self, text: String) {
+        match self {
+            Tag::Compound(_, tail) => *tail = Some(text),
+            Tag::Leaf(_, tail) => *tail = Some(text),
+            Tag::Comment(_, tail) => *tail = Some(text),
+            _ => {}
+        }
+    }
+
+    pub fn get_element(&self) -> Option<SvgElement> {
+        match self {
+            Tag::Compound(el, _) => Some(el.clone()),
+            Tag::Leaf(el, _) => Some(el.clone()),
+            _ => None,
+        }
+    }
+}
+
+// Provide a list of tags which can be processed in-order.
+pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
+    let mut tags = Vec::new();
+    let mut ev_idx = 0;
+
+    // we use indexed iteration as we need to skip ahead in some cases
+    while ev_idx < events.len() {
+        let input_ev = &events.events[ev_idx];
+        ev_idx += 1;
+        let ev = &input_ev.event;
+        match ev {
+            Event::Start(_) => {
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
+                })?;
+                if let Some(alt_idx) = input_ev.alt_idx {
+                    event_element.set_event_range((input_ev.index, alt_idx));
+                    // Scan ahead to the end of this element, matching alt_idx.
+                    // Note when called recursively on a subset of events, alt_idx
+                    // won't be the same as next_idx, so we need to scan rather than
+                    // just setting ev_idx = alt_idx + 1.
+                    for next_idx in ev_idx..events.len() {
+                        if events.events[next_idx].index == alt_idx {
+                            ev_idx = next_idx + 1; // skip the End event itself
+                            break;
+                        }
+                    }
+                } // TODO: else warning message
+                tags.push(Tag::Compound(event_element, None));
+            }
+            Event::Empty(_) => {
+                let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
+                    SvgdxError::DocumentError(format!(
+                        "could not extract element at line {}",
+                        input_ev.line
+                    ))
+                })?;
+                event_element.set_event_range((input_ev.index, input_ev.index));
+                tags.push(Tag::Leaf(event_element, None));
+            }
+            Event::Comment(c) => {
+                let text = String::from_utf8(c.to_vec())?;
+                tags.push(Tag::Comment(text, None));
+            }
+            Event::Text(t) => {
+                let text = String::from_utf8(t.to_vec())?;
+                if let Some(t) = tags.last_mut() {
+                    t.set_text(text)
+                } else {
+                    tags.push(Tag::Text(text));
+                }
+            }
+            Event::CData(c) => {
+                let text = String::from_utf8(c.to_vec())?;
+                if let Some(t) = tags.last_mut() {
+                    t.set_text(text)
+                } else {
+                    tags.push(Tag::CData(text));
+                }
+            }
+            _ => {
+                // This would include Event::End, as well as PI, DocType, etc.
+                // Specifically End shouldn't be seen due to alt_idx scan-ahead.
+            }
+        }
+    }
+    Ok(tags)
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OutputEvent {
+    Comment(String),
+    Text(String),
+    CData(String),
+    Start(SvgElement),
+    Empty(SvgElement),
+    End(String),
+    Other(Event<'static>),
+}
+
+impl From<InputEvent> for OutputEvent {
+    fn from(value: InputEvent) -> Self {
+        match value.event {
+            Event::Empty(e) => OutputEvent::Empty(SvgElement::try_from(&e).unwrap()),
+            Event::Start(e) => OutputEvent::Start(SvgElement::try_from(&e).unwrap()),
+            Event::End(e) => {
+                let elem_name: String =
+                    String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
+                OutputEvent::End(elem_name)
+            }
+            Event::Text(t) => {
+                OutputEvent::Text(String::from_utf8(t.into_inner().to_vec()).expect("utf8"))
+            }
+            Event::CData(c) => {
+                OutputEvent::CData(String::from_utf8(c.into_inner().to_vec()).expect("utf8"))
+            }
+            Event::Comment(c) => {
+                OutputEvent::Comment(String::from_utf8(c.into_inner().to_vec()).expect("utf8"))
+            }
+            _ => OutputEvent::Other(value.event),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct OutputList {
+    events: Vec<OutputEvent>,
+}
+
+impl From<&[OutputEvent]> for OutputList {
+    fn from(value: &[OutputEvent]) -> Self {
+        Self {
+            events: value.to_vec(),
+        }
+    }
+}
+
+impl From<Vec<OutputEvent>> for OutputList {
+    fn from(value: Vec<OutputEvent>) -> Self {
+        Self { events: value }
+    }
+}
+
+impl From<InputList> for OutputList {
+    fn from(value: InputList) -> Self {
+        Self {
+            events: value.events.into_iter().map(|ev| ev.into()).collect(),
+        }
+    }
+}
+
+impl OutputList {
+    pub fn new() -> Self {
+        Self { events: vec![] }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.events.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &OutputEvent> + '_ {
+        self.events.iter()
+    }
+
+    pub fn push(&mut self, ev: impl Into<OutputEvent>) {
+        let ev = ev.into();
+        self.events.push(ev.clone());
+    }
+
+    pub fn extend(&mut self, other: &OutputList) {
+        self.events.extend(other.events.clone());
     }
 
     pub fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
@@ -280,10 +406,9 @@ impl EventList {
             // just using `trim_end()` on Text events won't work
             // as Text event may be followed by a Start/Empty event.
             // blank lines *within* Text can be trimmed.
-            let event = event_pos.event.clone();
-            if let Event::Text(ref t) = event {
-                let content = String::from_utf8(t.as_ref().to_vec())?;
-                text_buf.push_str(&content);
+            let event = event_pos.clone();
+            if let OutputEvent::Text(ref content) = event {
+                text_buf.push_str(content);
                 continue;
             } else if !text_buf.is_empty() {
                 let content = blank_line_remover.replace_all(&text_buf, "\n").to_string();
@@ -306,26 +431,24 @@ impl EventList {
         Ok(())
     }
 
-    /// Split an `EventList` into (up to) 3 parts: before, pivot, after.
-    pub fn partition(&self, name: &str) -> (Self, Option<InputEvent>, Self) {
+    /// Split an `OutputList` into (up to) 3 parts: before, pivot, after.
+    pub fn partition(&self, name: &str) -> (Self, Option<OutputEvent>, Self) {
         let mut before = vec![];
         let mut pivot = None;
         let mut after = vec![];
-        for input_ev in self.events.clone() {
+        for output_ev in self.events.clone() {
             if pivot.is_some() {
-                after.push(input_ev);
+                after.push(output_ev);
             } else {
-                match input_ev.event {
-                    Event::Start(ref e) | Event::Empty(ref e) => {
-                        let elem_name: String =
-                            String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
-                        if elem_name == name {
-                            pivot = Some(input_ev);
+                match &output_ev {
+                    OutputEvent::Start(e) | OutputEvent::Empty(e) => {
+                        if e.name == name {
+                            pivot = Some(output_ev);
                         } else {
-                            before.push(input_ev);
+                            before.push(output_ev);
                         }
                     }
-                    _ => before.push(input_ev),
+                    _ => before.push(output_ev),
                 }
             }
         }
@@ -334,29 +457,42 @@ impl EventList {
     }
 }
 
-impl<'a> From<SvgEvent> for Event<'a> {
-    fn from(svg_ev: SvgEvent) -> Event<'a> {
+impl IntoIterator for OutputList {
+    type Item = OutputEvent;
+    type IntoIter = std::vec::IntoIter<OutputEvent>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.events.into_iter()
+    }
+}
+
+impl<'a> From<OutputEvent> for Event<'a> {
+    fn from(svg_ev: OutputEvent) -> Event<'a> {
         match svg_ev {
-            SvgEvent::Empty(e) => Event::Empty(e.into()),
-            SvgEvent::Start(e) => Event::Start(e.into()),
-            SvgEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
-            SvgEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
-            SvgEvent::CData(t) => Event::CData(BytesCData::new(t)),
-            SvgEvent::End(name) => Event::End(BytesEnd::new(name)),
+            OutputEvent::Empty(e) => Event::Empty(e.into_bytesstart()),
+            OutputEvent::Start(e) => Event::Start(e.into_bytesstart()),
+            OutputEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
+            OutputEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            OutputEvent::CData(t) => Event::CData(BytesCData::new(t)),
+            OutputEvent::End(name) => Event::End(BytesEnd::new(name)),
+            OutputEvent::Other(e) => e,
         }
     }
 }
 
-impl From<SvgElement> for BytesStart<'static> {
-    fn from(e: SvgElement) -> BytesStart<'static> {
-        let mut bs = BytesStart::new(e.name);
-        for (k, v) in e.attrs {
+impl SvgElement {
+    /// Convert an `SvgElement` into a `BytesStart` value.
+    ///
+    /// Implemented as a method rather than a `From` impl to keep private
+    fn into_bytesstart(self) -> BytesStart<'static> {
+        let mut bs = BytesStart::new(self.name);
+        for (k, v) in &self.attrs {
             bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
         }
-        if !e.classes.is_empty() {
+        if !self.classes.is_empty() {
             bs.push_attribute(Attribute::from((
                 "class".as_bytes(),
-                e.classes
+                self.classes
                     .into_iter()
                     .collect::<Vec<String>>()
                     .join(" ")
@@ -421,7 +557,7 @@ mod tests {
     #[test]
     fn test_eventlist_minimal() {
         let input = r#"<svg></svg>"#;
-        let el = EventList::from_str(input).unwrap();
+        let el = InputList::from_str(input).unwrap();
         assert_eq!(el.events.len(), 2);
         assert_eq!(el.events[0].line, 1);
         assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
@@ -433,7 +569,7 @@ mod tests {
     fn test_eventlist_indent() {
         let input = r#"<svg>
         </svg>"#;
-        let el = EventList::from_str(input).unwrap();
+        let el = InputList::from_str(input).unwrap();
         assert_eq!(el.events.len(), 3);
         assert_eq!(el.events[0].line, 1);
         assert_eq!(el.events[0].indent, 0);
@@ -447,5 +583,90 @@ mod tests {
         assert_eq!(el.events[2].line, 2);
         assert_eq!(el.events[2].indent, 8);
         assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
+    }
+
+    #[test]
+    fn test_outputlist_write_to() {
+        let input = r#"<svg><rect width="100" height="100"/></svg>"#;
+        let input_list = InputList::from_str(input).unwrap();
+        let output_list: OutputList = input_list.into();
+
+        let mut cursor = Cursor::new(Vec::new());
+        output_list.write_to(&mut cursor).unwrap();
+
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_outputlist_partition_rect() {
+        let input = r#"<svg><rect/><circle/><ellipse/></svg>"#;
+        let input_list = InputList::from_str(input).unwrap();
+        let output_list: OutputList = input_list.into();
+
+        let (before, pivot, after) = output_list.partition("rect");
+        assert!(pivot.is_some());
+        assert_eq!(
+            pivot.unwrap(),
+            OutputEvent::Empty(SvgElement::new("rect", &[]))
+        );
+
+        let mut cursor = Cursor::new(Vec::new());
+        before.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "<svg>");
+
+        let mut cursor = Cursor::new(Vec::new());
+        after.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "<circle/><ellipse/></svg>");
+    }
+
+    #[test]
+    fn test_outputlist_partition_circle() {
+        let input = r#"<svg><rect/><circle/><ellipse/></svg>"#;
+        let input_list = InputList::from_str(input).unwrap();
+        let output_list: OutputList = input_list.into();
+
+        let (before, pivot, after) = output_list.partition("circle");
+        assert!(pivot.is_some());
+        assert_eq!(
+            pivot.unwrap(),
+            OutputEvent::Empty(SvgElement::new("circle", &[]))
+        );
+
+        let mut cursor = Cursor::new(Vec::new());
+        before.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "<svg><rect/>");
+
+        let mut cursor = Cursor::new(Vec::new());
+        after.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "<ellipse/></svg>");
+    }
+
+    #[test]
+    fn test_outputlist_partition_ellipse() {
+        let input = r#"<svg><rect/><circle/><ellipse/></svg>"#;
+        let input_list = InputList::from_str(input).unwrap();
+        let output_list: OutputList = input_list.into();
+
+        let (before, pivot, after) = output_list.partition("ellipse");
+        assert!(pivot.is_some());
+        assert_eq!(
+            pivot.unwrap(),
+            OutputEvent::Empty(SvgElement::new("ellipse", &[]))
+        );
+
+        let mut cursor = Cursor::new(Vec::new());
+        before.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "<svg><rect/><circle/>");
+
+        let mut cursor = Cursor::new(Vec::new());
+        after.write_to(&mut cursor).unwrap();
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, "</svg>");
     }
 }
