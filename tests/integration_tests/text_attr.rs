@@ -502,6 +502,51 @@ fn test_text_anchor() {
 }
 
 #[test]
+fn test_text_element_anchor() {
+    // Key thing: xy doesn't have a locspec => text should be centered
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" class="d-text">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    // No locspec on xy, but text-loc is set (outside by default)
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z" text-loc="r" text="thing"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="11" y="5" class="d-text d-text-left">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    // No locspec on xy, text-loc set, inside flag set
+    let input = r##"
+<rect id="z" xy="0" wh="10"/>
+<text xy="#z" text-loc="r" text="thing" class="d-text-inside"/>
+"##;
+    let expected = r#"
+<rect id="z" x="0" y="0" width="10" height="10"/>
+<text x="9" y="5" class="d-text d-text-right">thing</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
 fn test_text_element_attrs() {
     let input1 = r#"
 <text xy="0" text="thing" font-size="2em" font-weight="bold"/>

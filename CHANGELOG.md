@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: Default text anchor for relative positioning of `<text>` elements to
+  center of target element.
+
 - Fixed: Arrow connector (`class="d-arrow"`) did not display correctly on Firefox.
 
 ## [0.15.0 - 2024-12-13]

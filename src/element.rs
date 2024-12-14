@@ -805,8 +805,17 @@ impl SvgElement {
                             v = len.adjust(v);
                         }
                     } else {
+                        let anchor = if self.name == "text" {
+                            // text elements (currently) have no size, and default
+                            // to center of the referenced element
+                            LocSpec::from_str(&self.get_attr("text-loc").unwrap_or("c".to_owned()))?
+                        } else {
+                            // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
+                            // will set x2 to the 'x2' (i.e. right edge) of #abc
+                            ss.into()
+                        };
                         // position attributes handle dx/dy within eval_pos_helper
-                        if let Ok(Some((x, y))) = self.eval_pos_helper(remain, &bbox, ss.into()) {
+                        if let Ok(Some((x, y))) = self.eval_pos_helper(remain, &bbox, anchor) {
                             use ScalarSpec::*;
                             v = match ss {
                                 Minx | Maxx | Cx => x,
@@ -942,6 +951,11 @@ impl SvgElement {
                         LocSpec::Left => self.set_default_attr("text-loc", "l"),
                         LocSpec::Center => self.set_default_attr("text-loc", "c"),
                     }
+                } else {
+                    return Err(SvgdxError::InvalidData(format!(
+                        "Could not derive text anchor: '{}'",
+                        edge_loc
+                    )));
                 }
             }
         }
