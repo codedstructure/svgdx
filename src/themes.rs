@@ -189,8 +189,8 @@ fn append_arrow_styles(tb: &mut ThemeBuilder) {
         // reduce the line length by the marker width - but that would be complex
         // in this program. Maybe in the future.
         tb.add_defs(
-            r#"<marker id="d-arrow" refX="0.8" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 0.4 1">
-  <path d="M 0 0 1 0.5 0 1" style="stroke: none; fill: context-stroke;"/>
+            r#"<marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+  <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
 </marker>"#);
     }
 }

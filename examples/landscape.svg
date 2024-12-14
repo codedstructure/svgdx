@@ -1,0 +1,108 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="490mm" height="600mm" viewBox="-245 -105 490 600">
+  <style>
+  <![CDATA[
+    svg { background: none; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    .d-thick { stroke-width: 1; }
+    .d-fill-gold:not(text,tspan) { fill: gold; }
+    text.d-fill-gold, text.d-fill-gold * { fill: black; }
+    .d-fill-green:not(text,tspan) { fill: green; }
+    text.d-fill-green, text.d-fill-green * { fill: white; }
+    .d-fill-khaki:not(text,tspan) { fill: khaki; }
+    text.d-fill-khaki, text.d-fill-khaki * { fill: black; }
+    .d-fill-olive:not(text,tspan) { fill: olive; }
+    text.d-fill-olive, text.d-fill-olive * { fill: white; }
+    .d-fill-skyblue:not(text,tspan) { fill: skyblue; }
+    text.d-fill-skyblue, text.d-fill-skyblue * { fill: black; }
+    .d-gold:not(text,tspan) { stroke: gold; }
+    text.d-gold, text.d-gold * { fill: gold; }
+    .d-none:not(text,tspan) { stroke: none; }
+  ]]>
+  </style>
+  <defs>
+    <mask id="thing">
+      <rect x="-50" y="-25" width="100" height="50"/>
+    </mask>
+  </defs>
+  <g mask="url(#thing)">
+    <circle r="100" class="d-fill-skyblue"/>
+    <circle r="6" class="d-none d-fill-gold"/>
+
+      <line x1="7" y1="0" x2="10" y2="0" class="d-gold d-thick"/>
+
+      <line x1="6.894" y1="1.216" x2="9.848" y2="1.736" class="d-gold d-thick"/>
+
+      <line x1="6.578" y1="2.394" x2="9.397" y2="3.42" class="d-gold d-thick"/>
+
+      <line x1="6.062" y1="3.5" x2="8.66" y2="5" class="d-gold d-thick"/>
+
+      <line x1="5.362" y1="4.5" x2="7.66" y2="6.428" class="d-gold d-thick"/>
+
+      <line x1="4.5" y1="5.362" x2="6.428" y2="7.66" class="d-gold d-thick"/>
+
+      <line x1="3.5" y1="6.062" x2="5" y2="8.66" class="d-gold d-thick"/>
+
+      <line x1="2.394" y1="6.578" x2="3.42" y2="9.397" class="d-gold d-thick"/>
+
+      <line x1="1.216" y1="6.894" x2="1.736" y2="9.848" class="d-gold d-thick"/>
+
+      <line x1="0" y1="7" x2="0" y2="10" class="d-gold d-thick"/>
+
+      <line x1="-1.216" y1="6.894" x2="-1.736" y2="9.848" class="d-gold d-thick"/>
+
+      <line x1="-2.394" y1="6.578" x2="-3.42" y2="9.397" class="d-gold d-thick"/>
+
+      <line x1="-3.5" y1="6.062" x2="-5" y2="8.66" class="d-gold d-thick"/>
+
+      <line x1="-4.5" y1="5.362" x2="-6.428" y2="7.66" class="d-gold d-thick"/>
+
+      <line x1="-5.362" y1="4.5" x2="-7.66" y2="6.428" class="d-gold d-thick"/>
+
+      <line x1="-6.062" y1="3.5" x2="-8.66" y2="5" class="d-gold d-thick"/>
+
+      <line x1="-6.578" y1="2.394" x2="-9.397" y2="3.42" class="d-gold d-thick"/>
+
+      <line x1="-6.894" y1="1.216" x2="-9.848" y2="1.736" class="d-gold d-thick"/>
+
+      <line x1="-7" y1="0" x2="-10" y2="0" class="d-gold d-thick"/>
+
+      <line x1="-6.894" y1="-1.216" x2="-9.848" y2="-1.736" class="d-gold d-thick"/>
+
+      <line x1="-6.578" y1="-2.394" x2="-9.397" y2="-3.42" class="d-gold d-thick"/>
+
+      <line x1="-6.062" y1="-3.5" x2="-8.66" y2="-5" class="d-gold d-thick"/>
+
+      <line x1="-5.362" y1="-4.5" x2="-7.66" y2="-6.428" class="d-gold d-thick"/>
+
+      <line x1="-4.5" y1="-5.362" x2="-6.428" y2="-7.66" class="d-gold d-thick"/>
+
+      <line x1="-3.5" y1="-6.062" x2="-5" y2="-8.66" class="d-gold d-thick"/>
+
+      <line x1="-2.394" y1="-6.578" x2="-3.42" y2="-9.397" class="d-gold d-thick"/>
+
+      <line x1="-1.216" y1="-6.894" x2="-1.736" y2="-9.848" class="d-gold d-thick"/>
+
+      <line x1="0" y1="-7" x2="0" y2="-10" class="d-gold d-thick"/>
+
+      <line x1="1.216" y1="-6.894" x2="1.736" y2="-9.848" class="d-gold d-thick"/>
+
+      <line x1="2.394" y1="-6.578" x2="3.42" y2="-9.397" class="d-gold d-thick"/>
+
+      <line x1="3.5" y1="-6.062" x2="5" y2="-8.66" class="d-gold d-thick"/>
+
+      <line x1="4.5" y1="-5.362" x2="6.428" y2="-7.66" class="d-gold d-thick"/>
+
+      <line x1="5.362" y1="-4.5" x2="7.66" y2="-6.428" class="d-gold d-thick"/>
+
+      <line x1="6.062" y1="-3.5" x2="8.66" y2="-5" class="d-gold d-thick"/>
+
+      <line x1="6.578" y1="-2.394" x2="9.397" y2="-3.42" class="d-gold d-thick"/>
+
+      <line x1="6.894" y1="-1.216" x2="9.848" y2="-1.736" class="d-gold d-thick"/>
+
+    <circle cx="50" cy="165" r="170" class="d-fill-khaki"/>
+    <circle cx="-50" cy="135" r="140" class="d-fill-olive"/>
+    <circle cx="0" cy="250" r="240" class="d-fill-green"/>
+  </g>
+</svg>

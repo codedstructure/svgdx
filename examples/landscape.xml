@@ -1,0 +1,17 @@
+<svg>
+  <defs>
+    <mask id="thing">
+      <rect cxy="0" wh="100 50"/>
+    </mask>
+  </defs>
+  <g mask="url(#thing)">
+    <circle r="100" class="d-fill-skyblue"/>
+    <circle r="6" class="d-none d-fill-gold"/>
+    <loop count="36" step="10" loop-var="theta">
+      <line xy1="{{p2r(7, $theta)}}" xy2="{{p2r(10, $theta)}}" class="d-gold d-thick"/>
+    </loop>
+    <circle r="170" cxy="50 165" class="d-fill-khaki"/>
+    <circle r="140" cxy="-50 135" class="d-fill-olive"/>
+    <circle r="240" cxy="0 250" class="d-fill-green"/>
+  </g>
+</svg>

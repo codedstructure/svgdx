@@ -1,0 +1,7 @@
+<svg>
+  <style>svg * {stroke-width: 0.005; fill:none}</style>
+  <circle xy="0" r="0" id="abc"/>
+  <loop count="999" loop-var="i">
+    <circle xy="#abc:{{log(1+$i)}}r$i" r="{{500-200*sin(1.234 * $i)}}"/>
+  </loop>
+</svg>
