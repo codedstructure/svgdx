@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: `inside` attribute behaviour for inscribing circles / ellipses.
+  Still room for further improvements here, but simple cases (e.g. ellipse
+  inside rect) now work as expected.
+
 - Fixed: Default text anchor for relative positioning of `<text>` elements to
   center of target element.
 

@@ -57,7 +57,7 @@ fn test_surround_non_rect() {
 <rect id="b" xy="2 0" wh="5" />
 <circle id="s" surround="#a #b" margin="2 1"/>
 "##;
-    let expected = r#"<circle id="s" cx="3.5" cy="2.5" r="6.363" class="d-surround"/>"#;
+    let expected = r#"<circle id="s" cx="3.5" cy="2.5" r="6.364" class="d-surround"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -66,8 +66,7 @@ fn test_surround_non_rect() {
 <rect id="b" xy="2 0" wh="5" />
 <ellipse id="s" surround="#a #b" margin="1 2"/>
 "##;
-    let expected =
-        r#"<ellipse id="s" cx="3.5" cy="2.5" rx="7.777" ry="4.949" class="d-surround"/>"#;
+    let expected = r#"<ellipse id="s" cx="3.5" cy="2.5" rx="7.778" ry="4.95" class="d-surround"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -154,6 +153,35 @@ fn test_surround_connectors_permute() {
 }
 
 #[test]
+fn test_inside_simple() {
+    let input = r##"
+<rect id="a" wh="20" />
+<rect id="z" inside="#a" />
+"##;
+    let expected = r#"<rect id="z" x="0" y="0" width="20" height="20" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" wh="20" />
+<rect id="b" wh="50" />
+<rect id="z" inside="#a #b" />
+"##;
+    let expected = r#"<rect id="z" x="0" y="0" width="20" height="20" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" wh="20" />
+<rect id="b" wh="10" />
+<rect id="z" inside="#a #b" />
+"##;
+    let expected = r#"<rect id="z" x="0" y="0" width="10" height="10" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
 fn test_inside_margin() {
     let input = r##"
 <rect wh="20" id="a" />
@@ -181,6 +209,60 @@ fn test_inside_margin() {
     let expected = r#"<rect id="r" x="11" y="13" width="8" height="4" class="d-inside"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
+}
+
+#[test]
+fn test_inside_simple_nonrect() {
+    let input = r##"
+<circle id="a" r="0.5"/>
+<circle id="z" inside="#a"/>
+"##;
+    let expected = r#"<circle id="z" cx="0" cy="0" r="0.5" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<circle id="a" r="0.5"/>
+<rect id="z" inside="#a"/>
+"##;
+    let expected =
+        r#"<rect id="z" x="-0.354" y="-0.354" width="0.707" height="0.707" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<ellipse id="a" rx="1" ry="0.5"/>
+<rect id="z" inside="#a"/>
+"##;
+    let expected =
+        r#"<rect id="z" x="-0.707" y="-0.354" width="1.414" height="0.707" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_inside_mixed_nonrect() {
+    let input = r##"
+<rect id="a" wh="2"/>
+<circle id="b" cxy="#a@r" r="1"/>
+<rect id="z" inside="#a #b"/>
+"##;
+    let expected =
+        r#"<rect id="z" x="1.293" y="0.293" width="0.707" height="1.414" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" wh="2"/>
+<circle id="b" cxy="#a@r" r="1"/>
+<circle id="z" inside="#a #b"/>
+"##;
+    let expected = r#"<circle id="z" cx="1.5" cy="1" r="0.5" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // TODO: there are bunch of cases which don't work properly yet when non-rects
+    // are involved, e.g. ellipse inside rect+circle, non-axis-aligned shapes, etc.
 }
 
 #[test]
