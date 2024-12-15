@@ -63,28 +63,14 @@ impl ExprValue {
         self.len() == 0
     }
 
-    pub fn number(&self) -> Result<f32> {
-        match self {
-            Self::Number(v) => Ok(*v),
-            _ => Err(SvgdxError::ParseError("Expected single number".to_owned())),
-        }
-    }
-
-    pub fn number_list(&self) -> Result<Vec<f32>> {
-        match self {
-            Self::NumberList(v) => Ok(v.clone()),
-            _ => Err(SvgdxError::ParseError("Expected number list".to_owned())),
-        }
-    }
-
-    pub fn to_vec(&self) -> Vec<f32> {
+    pub fn number_list(&self) -> Vec<f32> {
         match self {
             Self::Number(v) => vec![*v],
             Self::NumberList(v) => v.clone(),
         }
     }
 
-    pub fn get_only(&self) -> Result<f32> {
+    pub fn one_number(&self) -> Result<f32> {
         match self {
             ExprValue::Number(n) => Ok(*n),
             ExprValue::NumberList(l) => {
@@ -98,8 +84,8 @@ impl ExprValue {
         }
     }
 
-    pub fn get_pair(&self) -> Result<(f32, f32)> {
-        let nl = self.number_list()?;
+    pub fn number_pair(&self) -> Result<(f32, f32)> {
+        let nl = self.number_list();
         if nl.len() == 2 {
             return Ok((nl[0], nl[1]));
         }
@@ -108,8 +94,8 @@ impl ExprValue {
         ))
     }
 
-    pub fn get_triple(&self) -> Result<(f32, f32, f32)> {
-        let nl = self.number_list()?;
+    pub fn number_triple(&self) -> Result<(f32, f32, f32)> {
+        let nl = self.number_list();
         if nl.len() == 3 {
             return Ok((nl[0], nl[1], nl[2]));
         }
@@ -409,16 +395,16 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
 
 fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
     let t = term(eval_state)?;
-    if let Ok(mut e) = t.get_only() {
+    if let Ok(mut e) = t.one_number() {
         loop {
             match eval_state.peek() {
                 Some(Token::Add) => {
                     eval_state.advance();
-                    e += term(eval_state)?.get_only()?;
+                    e += term(eval_state)?.one_number()?;
                 }
                 Some(Token::Sub) => {
                     eval_state.advance();
-                    e -= term(eval_state)?.get_only()?;
+                    e -= term(eval_state)?.one_number()?;
                 }
                 _ => {
                     break;
@@ -433,20 +419,22 @@ fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
 
 fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
     let f = factor(eval_state)?;
-    if let Ok(mut e) = f.get_only() {
+    if let Ok(mut e) = f.one_number() {
         loop {
             match eval_state.peek() {
                 Some(Token::Mul) => {
                     eval_state.advance();
-                    e *= factor(eval_state)?.get_only()?;
+                    e *= factor(eval_state)?.one_number()?;
                 }
                 Some(Token::Div) => {
                     eval_state.advance();
-                    e /= factor(eval_state)?.get_only()?;
+                    e /= factor(eval_state)?.one_number()?;
                 }
                 Some(Token::Mod) => {
                     eval_state.advance();
-                    e %= factor(eval_state)?.get_only()?;
+                    // note euclid remainder rather than '%' operator
+                    // to ensure positive result useful for indexing
+                    e = e.rem_euclid(factor(eval_state)?.one_number()?);
                 }
                 _ => {
                     break;
@@ -469,12 +457,8 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
-        Some(Token::Sub) => match eval_state.peek() {
-            Some(Token::OpenParen) | Some(Token::Number(_)) | Some(Token::Var(_)) => {
-                Ok(ExprValue::Number(-expr(eval_state)?.number()?))
-            }
-            _ => Err(SvgdxError::ParseError("Invalid unary minus".to_owned())),
-        },
+        // unary minus
+        Some(Token::Sub) => Ok(ExprValue::Number(-factor(eval_state)?.one_number()?)),
         Some(Token::FnRef(fun)) => {
             eval_state.require(Token::OpenParen)?;
             let args = expr_list(eval_state)?;
@@ -640,7 +624,7 @@ mod tests {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         let e = expr(&mut eval_state);
         if eval_state.peek().is_none() {
-            Ok(e?.number()?)
+            Ok(e?.one_number()?)
         } else {
             Err(SvgdxError::ParseError(
                 "Unexpected trailing tokens".to_owned(),
@@ -674,6 +658,27 @@ mod tests {
                 expr_check(tokenize(expr).expect("test"), &ctx).ok(),
                 expected,
             )
+        }
+    }
+
+    #[test]
+    fn test_arithmetic_expr() {
+        let ctx = TestContext::new();
+
+        for (expr, expected) in [
+            ("1+1", 2.),
+            ("6 - 9", -3.),
+            ("-4 * 5", -20.),
+            ("60 / 12", 5.),
+            ("63 % 4", 3.),
+            ("-1 % 4", 3.), // ensure -a % b is non-negative
+            ("-4 * 4", -16.),
+            ("-5 - 8", -13.), // check precedence of unary minus
+        ] {
+            assert_eq!(
+                expr_check(tokenize(expr).expect("test"), &ctx).ok(),
+                Some(ExprValue::Number(expected)),
+            );
         }
     }
 
@@ -1064,7 +1069,7 @@ mod tests {
     #[test]
     fn test_bad_expressions() {
         let ctx = TestContext::with_vars(&[("numbers", "20 40")]);
-        for expr in ["1+", "--23", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
+        for expr in ["1+", "2++2", "%1", "(1+2", "1+4)", "$numbers"] {
             assert!(
                 evaluate_one(tokenize(expr).expect("test"), &ctx).is_err(),
                 "Should have failed: {expr}"

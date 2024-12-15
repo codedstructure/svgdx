@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: '%' operator now computes non-negative result, as in the Python
+  '%' operator rather than the Rust '%' operator. This only affects negative
+  operands, and is more useful when using '%' to compute indices into lists.
+  Previous behaviour was `-1 % 4 == -1`; this change means `-1 % 4 == 3`.
+
+- Fixed: precedence of the unary minus operator was incorrect. This fixes
+  expressions such as `-5 - 8` (now `-13` rather than `3`).
+
 - Improved: `inside` attribute behaviour for inscribing circles / ellipses.
   Still room for further improvements here, but simple cases (e.g. ellipse
   inside rect) now work as expected.

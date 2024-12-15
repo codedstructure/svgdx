@@ -81,17 +81,6 @@ particularly tricky AFAICT).
 
 ## Open questions
 
-### '%' behaviour in expressions
-
-Should the `%` operator in expressions actually be 'modulus' rather than
-remainder (i.e. always positive; implementation would use `T::rem_euclid()`)?
-Note Python uses modulus (i.e. `-3 % 10 == 7` in Python), whereas Rust uses
-remainder (i.e. `-3 % 10 == -3` in Rust).
-Given a set of things with some index, and always wanting to index into them,
-having `-3 % 10 === -3` isn't very helpful (vs the 'expected' value 7).
-
-Therefore should probably make breaking change and switch to modulus.
-
 ### Round-tripping / preserving SVG document structure
 
 Early on the goal for `svgdx` was that any SVG document not using svgdx extensions

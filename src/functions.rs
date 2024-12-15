@@ -167,20 +167,20 @@ pub fn eval_function(
 ) -> Result<ExprValue> {
     let e = match fun {
         Function::Swap => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             return Ok([b, a].as_slice().into());
         }
         Function::Rect2Polar => {
-            let (x, y) = args.get_pair()?;
+            let (x, y) = args.number_pair()?;
             return Ok([x.hypot(y), y.atan2(x).to_degrees()].as_slice().into());
         }
         Function::Polar2Rect => {
-            let (r, theta) = args.get_pair()?;
+            let (r, theta) = args.number_pair()?;
             let theta = theta.to_radians();
             return Ok([r * theta.cos(), r * theta.sin()].as_slice().into());
         }
         Function::Addv => {
-            let args = args.number_list()?;
+            let args = args.number_list();
             if args.len() % 2 != 0 {
                 return Err(SvgdxError::ParseError(
                     "addv() requires an even number of arguments".to_string(),
@@ -194,7 +194,7 @@ pub fn eval_function(
             return Ok(result.into());
         }
         Function::Subv => {
-            let args = args.number_list()?;
+            let args = args.number_list();
             if args.len() % 2 != 0 {
                 return Err(SvgdxError::ParseError(
                     "subv() requires an even number of arguments".to_string(),
@@ -208,7 +208,7 @@ pub fn eval_function(
             return Ok(result.into());
         }
         Function::Scalev => {
-            let args = args.number_list()?;
+            let args = args.number_list();
             if args.len() < 2 {
                 return Err(SvgdxError::ParseError(
                     "scalev() requires at least two arguments".to_string(),
@@ -221,14 +221,14 @@ pub fn eval_function(
             return Ok(result.into());
         }
         Function::Head => {
-            let args = args.to_vec();
+            let args = args.number_list();
             if args.is_empty() {
                 return Ok([].as_slice().into());
             }
             args[0]
         }
         Function::Tail => {
-            let args = args.to_vec();
+            let args = args.number_list();
             if args.len() < 2 {
                 return Ok([].as_slice().into());
             }
@@ -243,7 +243,7 @@ pub fn eval_function(
         }
         Function::Count => args.len() as f32,
         Function::Select => {
-            let args = args.number_list()?;
+            let args = args.number_list();
             if args.len() < 2 {
                 return Err(SvgdxError::ParseError(
                     "select() requires at least two arguments".to_string(),
@@ -260,7 +260,7 @@ pub fn eval_function(
             }
         }
         Function::In => {
-            let args = args.number_list()?;
+            let args = args.number_list();
             if args.is_empty() {
                 return Err(SvgdxError::ParseError(
                     "in() requires at least one argument".to_string(),
@@ -274,36 +274,36 @@ pub fn eval_function(
                 0.
             }
         }
-        Function::Abs => args.get_only()?.abs(),
-        Function::Ceil => args.get_only()?.ceil(),
-        Function::Floor => args.get_only()?.floor(),
-        Function::Fract => args.get_only()?.fract(),
+        Function::Abs => args.one_number()?.abs(),
+        Function::Ceil => args.one_number()?.ceil(),
+        Function::Floor => args.one_number()?.floor(),
+        Function::Fract => args.one_number()?.fract(),
         Function::Sign => {
             // Can't just use signum since it returns +1 for
             // input of (positive) zero.
-            let e = args.get_only()?;
+            let e = args.one_number()?;
             if e == 0. {
                 0.
             } else {
                 e.signum()
             }
         }
-        Function::Sqrt => args.get_only()?.sqrt(),
-        Function::Log => args.get_only()?.ln(),
-        Function::Exp => args.get_only()?.exp(),
+        Function::Sqrt => args.one_number()?.sqrt(),
+        Function::Log => args.one_number()?.ln(),
+        Function::Exp => args.one_number()?.exp(),
         Function::Pow => {
-            let (x, y) = args.get_pair()?;
+            let (x, y) = args.number_pair()?;
             x.powf(y)
         }
-        Function::Sin => args.get_only()?.to_radians().sin(),
-        Function::Cos => args.get_only()?.to_radians().cos(),
-        Function::Tan => args.get_only()?.to_radians().tan(),
-        Function::Asin => args.get_only()?.asin().to_degrees(),
-        Function::Acos => args.get_only()?.acos().to_degrees(),
-        Function::Atan => args.get_only()?.atan().to_degrees(),
+        Function::Sin => args.one_number()?.to_radians().sin(),
+        Function::Cos => args.one_number()?.to_radians().cos(),
+        Function::Tan => args.one_number()?.to_radians().tan(),
+        Function::Asin => args.one_number()?.asin().to_degrees(),
+        Function::Acos => args.one_number()?.acos().to_degrees(),
+        Function::Atan => args.one_number()?.atan().to_degrees(),
         Function::Random => eval_state.context.get_rng().borrow_mut().gen::<f32>(),
         Function::RandInt => {
-            let (min, max) = args.get_pair()?;
+            let (min, max) = args.number_pair()?;
             let (min, max) = (min as i32, max as i32);
             if min > max {
                 return Err(SvgdxError::InvalidData(
@@ -334,7 +334,7 @@ pub fn eval_function(
             args.iter().sum::<f32>() / n
         }
         Function::Clamp => {
-            let (x, min, max) = args.get_triple()?;
+            let (x, min, max) = args.number_triple()?;
             if min > max {
                 return Err(SvgdxError::InvalidData(
                     "clamp(x, min, max) - `min` must be <= `max`".to_string(),
@@ -343,11 +343,11 @@ pub fn eval_function(
             x.clamp(min, max)
         }
         Function::Mix => {
-            let (a, b, c) = args.get_triple()?;
+            let (a, b, c) = args.number_triple()?;
             a * (1. - c) + b * c
         }
         Function::Equal => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a == b {
                 1.
             } else {
@@ -355,7 +355,7 @@ pub fn eval_function(
             }
         }
         Function::NotEqual => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a != b {
                 1.
             } else {
@@ -363,7 +363,7 @@ pub fn eval_function(
             }
         }
         Function::LessThan => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a < b {
                 1.
             } else {
@@ -371,7 +371,7 @@ pub fn eval_function(
             }
         }
         Function::LessThanEqual => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a <= b {
                 1.
             } else {
@@ -379,7 +379,7 @@ pub fn eval_function(
             }
         }
         Function::GreaterThan => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a > b {
                 1.
             } else {
@@ -387,7 +387,7 @@ pub fn eval_function(
             }
         }
         Function::GreaterThanEqual => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a >= b {
                 1.
             } else {
@@ -395,7 +395,7 @@ pub fn eval_function(
             }
         }
         Function::If => {
-            let (cond, a, b) = args.get_triple()?;
+            let (cond, a, b) = args.number_triple()?;
             if cond != 0. {
                 a
             } else {
@@ -403,14 +403,14 @@ pub fn eval_function(
             }
         }
         Function::Not => {
-            if args.get_only()? == 0. {
+            if args.one_number()? == 0. {
                 1.
             } else {
                 0.
             }
         }
         Function::And => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a != 0. && b != 0. {
                 1.
             } else {
@@ -418,7 +418,7 @@ pub fn eval_function(
             }
         }
         Function::Or => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if a != 0. || b != 0. {
                 1.
             } else {
@@ -426,7 +426,7 @@ pub fn eval_function(
             }
         }
         Function::Xor => {
-            let (a, b) = args.get_pair()?;
+            let (a, b) = args.number_pair()?;
             if (a != 0.) ^ (b != 0.) {
                 1.
             } else {
