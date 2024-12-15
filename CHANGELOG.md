@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1 - 2024-12-15]
+
 - Changed: '%' operator now computes non-negative result, as in the Python
   '%' operator rather than the Rust '%' operator. This only affects negative
   operands, and is more useful when using '%' to compute indices into lists.
