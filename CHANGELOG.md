@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: relative positioning of `<use>` elements now works consistently.
+
 - Internal: replaced regex with basic string parsing throughout, eliminating
   a dependency and reducing size of WASM build.
 
