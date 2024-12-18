@@ -373,7 +373,23 @@ impl SvgElement {
             self.set_attr("d", &expand_relspec(&d, ctx));
         }
 
-        let p = Position::from(self as &SvgElement);
+        let mut p = Position::from(self as &SvgElement);
+        if self.name == "use" {
+            if let Some(href) = self.get_attr("href") {
+                let elref = href.parse()?;
+                let el = ctx
+                    .get_element(&elref)
+                    .ok_or_else(|| SvgdxError::ReferenceError(elref))?;
+                if let Some(bb) = ctx.get_element_bbox(el)? {
+                    p.update_from(&bb);
+                    if el.name == "circle" || el.name == "ellipse" {
+                        // The referenced element is defined by its center,
+                        // but use elements are defined by top-left pos.
+                        p.translate(bb.width() / 4., bb.height() / 4.);
+                    }
+                }
+            }
+        }
         p.set_position_attrs(self);
 
         Ok(())

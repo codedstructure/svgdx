@@ -453,3 +453,53 @@ fn test_reuse_prev() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_use_relspec() {
+    // For the <use> case, the bbox of the target is derived,
+    // then an adjustment is made to the x/y of the <use> element
+    // to put it in the right locspec.
+    let input = r##"
+<rect id="a" wh="10 6"/>
+<circle id="b" r="0.1"/>
+<use id="z" href="#b" cxy="#a@c"/>
+"##;
+    let expected = r##"<use id="z" href="#b" x="5" y="3"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" wh="10 6"/>
+<rect id="b" wh="2" />
+<use id="z" href="#b" cxy="#a@c"/>
+"##;
+    let expected = r##"<use id="z" href="#b" x="4" y="2"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<defs>
+ <g id="zz">
+  <rect id="a" wh="5"/>
+  <rect xy="^|h 5" wh="^"/>
+  <line start="^@l:30%" end="#a@r:30%"/>
+ </g>
+</defs>
+<circle id="base" xy="15 30" r="10"/>
+<use cxy="#base 0 -2" href="#zz"/>
+"##;
+    let expected = r##"
+<defs>
+ <g id="zz">
+  <rect id="a" width="5" height="5"/>
+  <rect x="10" y="0" width="5" height="5"/>
+  <line x1="10" y1="1.5" x2="5" y2="1.5"/>
+ </g>
+</defs>
+<circle id="base" cx="25" cy="40" r="10"/>
+<use href="#zz" x="17.5" y="35.5"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+

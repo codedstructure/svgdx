@@ -145,6 +145,20 @@ impl Position {
         self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some() || self.dy.is_some()
     }
 
+    pub fn update_from(&mut self, bb: &BoundingBox) {
+        self.width = Some(bb.width());
+        self.height = Some(bb.height());
+    }
+
+    pub fn translate(&mut self, dx: f32, dy: f32) {
+        self.xmin = self.xmin.map(|x| x + dx);
+        self.xmax = self.xmax.map(|x| x + dx);
+        self.cx = self.cx.map(|x| x + dx);
+        self.ymin = self.ymin.map(|y| y + dy);
+        self.ymax = self.ymax.map(|y| y + dy);
+        self.cy = self.cy.map(|y| y + dy);
+    }
+
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
         if let Some(bbox) = self.to_bbox() {
             match element.name.as_str() {
@@ -158,8 +172,10 @@ impl Position {
                     if self.has_y_position() {
                         element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
                     }
-                    element.set_attr("width", &fstr(width));
-                    element.set_attr("height", &fstr(height));
+                    if element.name != "use" {
+                        element.set_attr("width", &fstr(width));
+                        element.set_attr("height", &fstr(height));
+                    }
                     element.remove_attrs(&[
                         "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
                     ]);
