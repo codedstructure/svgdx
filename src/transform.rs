@@ -50,6 +50,16 @@ impl EventGen for SvgElement {
             }
         };
         context.dec_depth()?;
+        // if let Ok((_ev, Some(_bb))) = res.as_ref() {
+        //     context.set_prev_element(self.clone());
+        // }
+
+        // println!(
+        //     "{} {}: {:?}",
+        //     self.name,
+        //     self.attrs.get("id").unwrap_or(&"".to_string()),
+        //     res.as_ref().map(|(_, bb)| bb)
+        // );
         res
     }
 }
