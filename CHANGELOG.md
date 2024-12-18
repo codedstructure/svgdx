@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     connector `start` / `end` attributes.
   - element id references may use the '-' character
 
+- Fixed: relative positioning of `<use>` elements now works consistently.
+
 ## [0.15.1 - 2024-12-15]
 
 - Changed: '%' operator now computes non-negative result, as in the Python
