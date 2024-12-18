@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: relative positioning of `<use>` elements now works consistently.
+
 ## [0.16.0 - 2024-12-31]
 
 - Added: auto styles for text-outlines. These use the SVG2 `paint-order` attribute
