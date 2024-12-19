@@ -44,14 +44,14 @@
         a {{$width / 2}} {{$width / 4}} 0 0 0 {{-$width}} 0
         v {{$height - $width / 2}}
         a {{$width / 2}} {{$width / 4}} 0 0 0 $width 0
-        v {{-$height - $width / 2}}" />
+        v {{-$height + $width / 2}}" />
 
         <path id="pipeline_h" d="M {{$height / 4}} 0
         a {{$height / 4}} {{$height / 2}} 0 0 0 0 $height
         a {{$height / 4}} {{$height / 2}} 0 0 0 0 {{-$height}}
         h {{$width - $height / 2}}
         a {{$height / 4}} {{$height / 2}} 0 0 1 0 $height
-        h {{-$width - $height / 2}}" />
+        h {{-$width + $height / 2}}" />
     </specs>
 
     <rect x="2" y="10" width="36" height="10" text="State hypothesis"/>

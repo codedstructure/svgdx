@@ -10,7 +10,7 @@
       a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 {{-$pipe_w}} 0
       v {{$pipe_h - $pipe_w / 2}}
       a {{$pipe_w / 2}} {{$pipe_w / 4}} 0 0 0 $pipe_w 0
-      v {{-$pipe_h - $pipe_w / 2}}" />
+      v {{-$pipe_h + $pipe_w / 2}}" />
 
     <path id="box3d" d="M $target@tl l 2 -2 h $target.w l -2 2 z M $target@tr v $target.h l 2 -2 v -$target.h z"/>
   </specs>
