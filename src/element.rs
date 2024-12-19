@@ -5,7 +5,7 @@ use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
-    strp_length, BoundingBox, DirSpec, EdgeSpec, LocSpec, Position, ScalarSpec, TrblLength,
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
 use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
@@ -58,17 +58,13 @@ fn split_relspec<'a, 'b>(
     if input.starts_with('^') {
         let skip_prev = input.strip_prefix('^').unwrap_or(input);
         Ok((ctx.get_prev_element(), skip_prev.trim_start()))
-    } else if input.starts_with('#') {
-        let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
-        let (id, remain) = extract_ref_id_re
-            .captures(input)
-            .map(|caps| {
-                (
-                    caps.name("id").expect("Regex Match").as_str(),
-                    caps.name("remain").expect("Regex Match").as_str(),
-                )
-            })
-            .unwrap_or(("INVALID ELEMENT ID", input));
+    } else if let Some(input) = input.strip_prefix('#') {
+        let (id, remain) = if let Some(split_pos) = input.find(|c: char| !c.is_alphanumeric()) {
+            let id_rem = input.split_at(split_pos);
+            (id_rem.0, id_rem.1.trim_start())
+        } else {
+            (input, "")
+        };
         if let Some(el) = ctx.get_element(id) {
             Ok((Some(el), remain))
         } else {
@@ -100,17 +96,17 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
 }
 
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let elem_loc = |elem: &SvgElement, loc: &str| {
+    let elem_loc = |elem: &SvgElement, loc: LocSpec| {
         ctx.get_element_bbox(elem)
-            .map(|bb| bb.map(|bb| bb.get_point(loc)))
+            .map(|bb| bb.map(|bb| bb.locspec(loc)))
     };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name == "point" {
-            if let Ok(Some(Ok(point))) = elem_loc(elem, "c") {
+            if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
-        } else if let Some(loc) = rest.strip_prefix('@') {
-            if let Ok(Some(Ok(point))) = elem_loc(elem, loc) {
+        } else if let Some(loc) = rest.strip_prefix('@').and_then(|s| s.parse().ok()) {
+            if let Ok(Some(point)) = elem_loc(elem, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
@@ -915,16 +911,16 @@ impl SvgElement {
         anchor: LocSpec,
     ) -> Result<Option<(f32, f32)>> {
         if let Some((x, y)) = if remain.starts_with('@') {
-            let (loc, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-
-            if let Some(Ok((x, y))) = loc.strip_prefix('@').map(|loc| bbox.get_point(loc)) {
+            let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+            if let Some(loc) = loc_str.strip_prefix('@').and_then(|ls| ls.parse().ok()) {
+                let (x, y) = bbox.locspec(loc);
                 let (dx, dy) = self.extract_dx_dy(dxy)?;
                 {
                     Some((x + dx, y + dy))
                 }
             } else {
                 return Err(SvgdxError::ReferenceError(format!(
-                    "Could not determine location from {loc}"
+                    "Could not determine location from {loc_str}"
                 )));
             }
         } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
@@ -991,15 +987,8 @@ impl SvgElement {
                     DirSpec::InFront => self.set_default_attr("text-loc", "r"),
                     DirSpec::Behind => self.set_default_attr("text-loc", "l"),
                 }
-            } else if let Some(edge_loc) = rel_loc.strip_prefix('@') {
-                if let Ok(edge_spec) = edge_loc.parse::<EdgeSpec>() {
-                    match edge_spec {
-                        EdgeSpec::Top(_) => self.set_default_attr("text-loc", "t"),
-                        EdgeSpec::Bottom(_) => self.set_default_attr("text-loc", "b"),
-                        EdgeSpec::Left(_) => self.set_default_attr("text-loc", "l"),
-                        EdgeSpec::Right(_) => self.set_default_attr("text-loc", "r"),
-                    }
-                } else if let Ok(loc_spec) = edge_loc.parse::<LocSpec>() {
+            } else if let Some(loc) = rel_loc.strip_prefix('@') {
+                if let Ok(loc_spec) = loc.parse::<LocSpec>() {
                     match loc_spec {
                         LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
                         LocSpec::Top => self.set_default_attr("text-loc", "t"),
@@ -1010,11 +999,15 @@ impl SvgElement {
                         LocSpec::BottomLeft => self.set_default_attr("text-loc", "bl"),
                         LocSpec::Left => self.set_default_attr("text-loc", "l"),
                         LocSpec::Center => self.set_default_attr("text-loc", "c"),
+                        LocSpec::TopEdge(_) => self.set_default_attr("text-loc", "t"),
+                        LocSpec::BottomEdge(_) => self.set_default_attr("text-loc", "b"),
+                        LocSpec::LeftEdge(_) => self.set_default_attr("text-loc", "l"),
+                        LocSpec::RightEdge(_) => self.set_default_attr("text-loc", "r"),
                     }
                 } else {
                     return Err(SvgdxError::InvalidData(format!(
                         "Could not derive text anchor: '{}'",
-                        edge_loc
+                        loc
                     )));
                 }
             }

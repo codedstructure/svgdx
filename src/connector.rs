@@ -1,9 +1,8 @@
 use crate::context::ElementMap;
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::position::{strp_length, Length, ScalarSpec};
+use crate::position::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
 use crate::types::{attr_split, fstr, strp};
-use lazy_regex::regex;
 
 #[derive(Clone, Copy, Debug)]
 enum Direction {
@@ -43,17 +42,24 @@ impl ConnectionType {
     }
 }
 
-fn edge_locations(el: &SvgElement, ctype: ConnectionType) -> Vec<&str> {
-    let mut result = match ctype {
-        ConnectionType::Horizontal => vec!["l", "r"],
-        ConnectionType::Vertical => vec!["t", "b"],
-        ConnectionType::Corner => vec!["t", "r", "b", "l"],
-        ConnectionType::Straight => vec!["t", "b", "l", "r", "tl", "bl", "tr", "br"],
-    };
-    if el.name == "line" {
-        result.extend(&["xy1", "start", "xy2", "end"]);
+fn edge_locations(ctype: ConnectionType) -> Vec<LocSpec> {
+    match ctype {
+        ConnectionType::Horizontal => vec![LocSpec::Left, LocSpec::Right],
+        ConnectionType::Vertical => vec![LocSpec::Top, LocSpec::Bottom],
+        ConnectionType::Corner => {
+            vec![LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left]
+        }
+        ConnectionType::Straight => vec![
+            LocSpec::Top,
+            LocSpec::Bottom,
+            LocSpec::Left,
+            LocSpec::Right,
+            LocSpec::TopLeft,
+            LocSpec::BottomLeft,
+            LocSpec::TopRight,
+            LocSpec::BottomRight,
+        ],
     }
-    result
 }
 
 #[derive(Clone)]
@@ -72,16 +78,16 @@ fn closest_loc(
     point: (f32, f32),
     conn_type: ConnectionType,
     context: &impl ElementMap,
-) -> Result<String> {
+) -> Result<LocSpec> {
     let mut min_dist_sq = f32::MAX;
-    let mut min_loc = "c";
+    let mut min_loc = LocSpec::Center;
 
     let this_bb = context
         .get_element_bbox(this)?
         .ok_or_else(|| SvgdxError::GeometryError("no bbox for element".to_owned()))?;
 
-    for loc in edge_locations(this, conn_type) {
-        let this_coord = this_bb.get_point(loc)?;
+    for loc in edge_locations(conn_type) {
+        let this_coord = this_bb.locspec(loc);
         let ((x1, y1), (x2, y2)) = (this_coord, point);
         let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
         if dist_sq < min_dist_sq {
@@ -89,7 +95,7 @@ fn closest_loc(
             min_loc = loc;
         }
     }
-    Ok(min_loc.to_string())
+    Ok(min_loc)
 }
 
 fn shortest_link(
@@ -97,10 +103,10 @@ fn shortest_link(
     that: &SvgElement,
     conn_type: ConnectionType,
     context: &impl ElementMap,
-) -> Result<(String, String)> {
+) -> Result<(LocSpec, LocSpec)> {
     let mut min_dist_sq = f32::MAX;
-    let mut this_min_loc = "c";
-    let mut that_min_loc = "c";
+    let mut this_min_loc = LocSpec::Center;
+    let mut that_min_loc = LocSpec::Center;
 
     let this_bb = context
         .get_element_bbox(this)?
@@ -109,10 +115,10 @@ fn shortest_link(
         .get_element_bbox(that)?
         .ok_or_else(|| SvgdxError::GeometryError("no bbox for element".to_owned()))?;
 
-    for this_loc in edge_locations(this, conn_type) {
-        for that_loc in edge_locations(that, conn_type) {
-            let this_coord = this_bb.get_point(this_loc)?;
-            let that_coord = that_bb.get_point(that_loc)?;
+    for this_loc in edge_locations(conn_type) {
+        for that_loc in edge_locations(conn_type) {
+            let this_coord = this_bb.locspec(this_loc);
+            let that_coord = that_bb.locspec(that_loc);
             let ((x1, y1), (x2, y2)) = (this_coord, that_coord);
             let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
             if dist_sq < min_dist_sq {
@@ -122,18 +128,18 @@ fn shortest_link(
             }
         }
     }
-    Ok((this_min_loc.to_owned(), that_min_loc.to_owned()))
+    Ok((this_min_loc, that_min_loc))
 }
 
 impl Connector {
     // TODO: This should take a LocSpec
-    fn loc_to_dir(loc: &str) -> Option<Direction> {
+    fn loc_to_dir(loc: LocSpec) -> Option<Direction> {
         // loc may have a 'length' part following a colon, ignore that
-        match loc.split(':').next().expect("always at least once") {
-            "t" => Some(Direction::Up),
-            "r" => Some(Direction::Right),
-            "b" => Some(Direction::Down),
-            "l" => Some(Direction::Left),
+        match loc {
+            LocSpec::Top => Some(Direction::Up),
+            LocSpec::Right => Some(Direction::Right),
+            LocSpec::Bottom => Some(Direction::Down),
+            LocSpec::Left => Some(Direction::Left),
             _ => None,
         }
     }
@@ -163,23 +169,22 @@ impl Connector {
         // Needs to support explicit coordinate pairs or element references, and
         // for element references support given locations or not (in which case
         // the location is determined automatically to give the shortest distance)
-        let mut start_el = None;
-        let mut end_el = None;
-        let mut start_loc = String::new();
-        let mut end_loc = String::new();
+        let mut start_el: Option<&SvgElement> = None;
+        let mut end_el: Option<&SvgElement> = None;
+        let mut start_loc: Option<LocSpec> = None;
+        let mut end_loc: Option<LocSpec> = None;
         let mut start_point: Option<(f32, f32)> = None;
         let mut end_point: Option<(f32, f32)> = None;
-        let mut start_dir = None;
-        let mut end_dir = None;
+        let mut start_dir: Option<Direction> = None;
+        let mut end_dir: Option<Direction> = None;
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        let re = regex!(r"^#(?<id>[^@]+)(@(?<loc>\S+))?$");
-
-        if let Some(caps) = re.captures(&start_ref) {
-            let name = &caps["id"];
-            start_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            start_dir = Self::loc_to_dir(&start_loc);
-            start_el = elem_map.get_element(name);
+        if let Ok((name, loc)) = parse_el_loc(&start_ref) {
+            if let Some(loc) = loc {
+                start_dir = Self::loc_to_dir(loc);
+                start_loc = Some(loc);
+            }
+            start_el = elem_map.get_element(&name);
         } else {
             let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
             start_point = Some((
@@ -191,11 +196,12 @@ impl Connector {
                 })?,
             ));
         }
-        if let Some(caps) = re.captures(&end_ref) {
-            let name = &caps["id"];
-            end_loc = caps.name("loc").map_or("", |v| v.as_str()).to_string();
-            end_dir = Self::loc_to_dir(&end_loc);
-            end_el = elem_map.get_element(name);
+        if let Ok((name, loc)) = parse_el_loc(&end_ref) {
+            if let Some(loc) = loc {
+                end_dir = Self::loc_to_dir(loc);
+                end_loc = Some(loc);
+            }
+            end_el = elem_map.get_element(&name);
         } else {
             let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
             end_point = Some((
@@ -216,14 +222,15 @@ impl Connector {
             (Some(start_point), None) => {
                 let end_el =
                     end_el.ok_or_else(|| SvgdxError::ElementError("no end_el".to_owned()))?;
-                if end_loc.is_empty() {
-                    end_loc = closest_loc(end_el, start_point, conn_type, elem_map)?;
-                    end_dir = Self::loc_to_dir(&end_loc);
+                if end_loc.is_none() {
+                    let eloc = closest_loc(end_el, start_point, conn_type, elem_map)?;
+                    end_loc = Some(eloc);
+                    end_dir = Self::loc_to_dir(eloc);
                 }
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
                     .ok_or_else(|| SvgdxError::GeometryError("no bounding box".to_owned()))?
-                    .get_point(&end_loc)?;
+                    .locspec(end_loc.expect("Set from closest_loc"));
                 (
                     Endpoint::new(start_point, start_dir),
                     Endpoint::new(end_coord, end_dir),
@@ -232,14 +239,15 @@ impl Connector {
             (None, Some(end_point)) => {
                 let start_el =
                     start_el.ok_or_else(|| SvgdxError::ElementError("no start_el".to_owned()))?;
-                if start_loc.is_empty() {
-                    start_loc = closest_loc(start_el, end_point, conn_type, elem_map)?;
-                    start_dir = Self::loc_to_dir(&start_loc);
+                if start_loc.is_none() {
+                    let sloc = closest_loc(start_el, end_point, conn_type, elem_map)?;
+                    start_loc = Some(sloc);
+                    start_dir = Self::loc_to_dir(sloc);
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
                     .ok_or_else(|| SvgdxError::GeometryError("no bounding box".to_owned()))?
-                    .get_point(&start_loc)?;
+                    .locspec(start_loc.expect("Set from closest_loc"));
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_point, end_dir),
@@ -250,37 +258,41 @@ impl Connector {
                     start_el.ok_or_else(|| SvgdxError::ElementError("no start_el".to_owned()))?,
                     end_el.ok_or_else(|| SvgdxError::ElementError("no end_el".to_owned()))?,
                 );
-                if start_loc.is_empty() && end_loc.is_empty() {
-                    (start_loc, end_loc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
-                    start_dir = Self::loc_to_dir(&start_loc);
-                    end_dir = Self::loc_to_dir(&end_loc);
-                } else if start_loc.is_empty() {
+                if start_loc.is_none() && end_loc.is_none() {
+                    let (sloc, eloc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
+                    start_loc = Some(sloc);
+                    end_loc = Some(eloc);
+                    start_dir = Self::loc_to_dir(sloc);
+                    end_dir = Self::loc_to_dir(eloc);
+                } else if start_loc.is_none() {
                     let end_coord = elem_map
                         .get_element_bbox(end_el)?
                         .ok_or_else(|| {
                             SvgdxError::GeometryError("no bbox for end_coord".to_owned())
                         })?
-                        .get_point(&end_loc)?;
-                    start_loc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
-                    start_dir = Self::loc_to_dir(&start_loc);
-                } else if end_loc.is_empty() {
+                        .locspec(end_loc.expect("Not both None"));
+                    let sloc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
+                    start_loc = Some(sloc);
+                    start_dir = Self::loc_to_dir(sloc);
+                } else if end_loc.is_none() {
                     let start_coord = elem_map
                         .get_element_bbox(start_el)?
                         .ok_or_else(|| {
                             SvgdxError::GeometryError("no bbox for start_coord".to_owned())
                         })?
-                        .get_point(&start_loc)?;
-                    end_loc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
-                    end_dir = Self::loc_to_dir(&end_loc);
+                        .locspec(start_loc.expect("Not both None"));
+                    let eloc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
+                    end_loc = Some(eloc);
+                    end_dir = Self::loc_to_dir(eloc);
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
                     .ok_or_else(|| SvgdxError::GeometryError("no bbox for start_coord".to_owned()))?
-                    .get_point(&start_loc)?;
+                    .locspec(start_loc.expect("Set above"));
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
                     .ok_or_else(|| SvgdxError::GeometryError("no bbox for end_coord".to_owned()))?
-                    .get_point(&end_loc)?;
+                    .locspec(end_loc.expect("Set above"));
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_coord, end_dir),

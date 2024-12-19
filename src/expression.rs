@@ -8,7 +8,7 @@ use regex::Captures;
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Result, SvgdxError};
 use crate::functions::{eval_function, Function};
-use crate::position::ScalarSpec;
+use crate::position::parse_el_scalar;
 use crate::types::fstr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -140,8 +140,13 @@ enum Token {
 }
 
 fn valid_variable_name(var: &str) -> Result<&str> {
-    let re = regex!(r"[a-zA-Z][a-zA-Z0-9_]*");
-    if !re.is_match(var) {
+    if !var.starts_with(|c: char| c.is_ascii_alphabetic()) {
+        return Err(SvgdxError::ParseError("Invalid variable name".to_owned()));
+    }
+    if !var[1..]
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
         return Err(SvgdxError::ParseError("Invalid variable name".to_owned()));
     }
     Ok(var)
@@ -319,14 +324,10 @@ impl<'a> EvalState<'a> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
-        let re = regex!(r"#(?<id>[[:alpha:]][[:word:]]*)\.(?<val>[[:alpha:]][[:word:]]*)");
-        if let Some(caps) = re.captures(v) {
-            let id = caps.name("id").expect("must match if here").as_str();
-            let val = caps.name("val").expect("must match if here").as_str();
-            let val: ScalarSpec = val.parse()?;
-            if let Some(elem) = self.context.get_element(id) {
+        if let Ok((id, Some(scalar))) = parse_el_scalar(v) {
+            if let Some(elem) = self.context.get_element(&id) {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {
-                    Ok(bb.scalarspec(val).into())
+                    Ok(bb.scalarspec(scalar).into())
                 } else {
                     Err(SvgdxError::GeometryError(format!(
                         "No bounding box for element #{id}"
@@ -1043,8 +1044,8 @@ mod tests {
             "(((((4+5)))))",
             "$abcthing",
             "$abc-${thing}",
-            "$abc}", // Not obvious, but '}' here is just another character.
             "${abcthing}",
+            "$abc 1",
         ] {
             assert!(tokenize(expr).is_ok(), "Should succeed: {expr}");
         }
@@ -1057,6 +1058,7 @@ mod tests {
             "$",
             "${}",
             "${abc",
+            "$abc.",
             "${-}",
             "${abc-thing}",
             "${abc-thing}",

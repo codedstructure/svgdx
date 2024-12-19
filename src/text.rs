@@ -1,5 +1,5 @@
 use crate::element::SvgElement;
-use crate::position::{EdgeSpec, LocSpec};
+use crate::position::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
 use crate::errors::{Result, SvgdxError};
@@ -58,11 +58,7 @@ fn get_text_position<'a>(
 
     let mut text_classes = vec!["d-text"];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
-    let text_anchor = if let Ok(edge) = text_loc_str.parse::<EdgeSpec>() {
-        edge.as_loc()
-    } else {
-        text_loc_str.parse::<LocSpec>()?
-    };
+    let text_anchor = text_loc_str.parse::<LocSpec>()?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without offset text squishes to the edge and can be unreadable
@@ -82,7 +78,7 @@ fn get_text_position<'a>(
         matches!(element.name.as_str(), "line" | "point" | "text")
     };
     match text_anchor {
-        LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => {
+        ls if ls.is_top() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-top",
                 (true, false) => "d-text-bottom",
@@ -91,7 +87,7 @@ fn get_text_position<'a>(
             });
             t_dy += if outside { -text_offset } else { text_offset };
         }
-        LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
+        ls if ls.is_bottom() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-bottom",
                 (true, false) => "d-text-top",
@@ -104,7 +100,7 @@ fn get_text_position<'a>(
     }
 
     match text_anchor {
-        LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => {
+        ls if ls.is_left() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-left",
                 (true, false) => "d-text-right",
@@ -113,7 +109,7 @@ fn get_text_position<'a>(
             });
             t_dx += if outside { -text_offset } else { text_offset };
         }
-        LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
+        ls if ls.is_right() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-right",
                 (true, false) => "d-text-left",
@@ -131,7 +127,7 @@ fn get_text_position<'a>(
     let (mut tdx, mut tdy) = element
         .bbox()?
         .ok_or_else(|| SvgdxError::GeometryError("No BoundingBox".to_owned()))?
-        .get_point(&text_loc_str)?;
+        .locspec(text_anchor);
     tdx += t_dx;
     tdy += t_dy;
 
@@ -228,17 +224,15 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         // Determine position of first text line; others follow this based on line spacing
         let first_line_offset = match (outside, vertical, text_loc) {
             // shapes - text 'inside'
-            (false, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
-            (false, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
-            (false, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_DOWN,
-            (false, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_UP,
+            (false, false, ls) if ls.is_top() => WRAP_DOWN,
+            (false, false, ls) if ls.is_bottom() => WRAP_UP,
+            (false, true, ls) if ls.is_left() => WRAP_DOWN,
+            (false, true, ls) if ls.is_right() => WRAP_UP,
             // lines - text 'beyond'
-            (true, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
-            (true, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => {
-                WRAP_DOWN
-            }
-            (true, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_UP,
-            (true, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_DOWN,
+            (true, false, ls) if ls.is_top() => WRAP_UP,
+            (true, false, ls) if ls.is_bottom() => WRAP_DOWN,
+            (true, true, ls) if ls.is_left() => WRAP_UP,
+            (true, true, ls) if ls.is_right() => WRAP_DOWN,
             (_, _, _) => WRAP_MID,
         };
 

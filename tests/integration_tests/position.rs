@@ -141,7 +141,7 @@ fn test_position_scalar_locspec() {
 }
 
 #[test]
-fn test_position_scalar_edgespec() {
+fn test_position_scalar_edge() {
     let input = r##"
 <rect id="a" x="1" y="2" width="3" height="4"/>
 <rect cx="#a@b:25%" y2="#a@r:75%" width="3" height="4"/>
