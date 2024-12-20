@@ -45,5 +45,4 @@ fn test_scalarspec() {
         transform_str_default(input).unwrap().trim(),
         expected.trim()
     );
-
 }
