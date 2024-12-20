@@ -502,4 +502,3 @@ fn test_use_relspec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
-
