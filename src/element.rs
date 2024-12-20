@@ -13,7 +13,6 @@ use crate::types::{
 };
 
 use core::fmt::Display;
-use lazy_regex::{regex, Captures};
 use std::collections::HashMap;
 use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
 use std::str::FromStr;
@@ -79,13 +78,33 @@ fn split_relspec<'a, 'b>(
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     // For most elements either a `#elem.X` or `#elem@X` form is required,
     // but for `<point>` elements a standalone `#elem` suffices.
-    let locspec = regex!(r"([#^][[:word:]]+)([.@]([[:word:]]+)|\b)");
 
-    locspec
-        .replace_all(value, |caps: &Captures| {
-            expand_single_relspec(caps.get(0).expect("match").into(), ctx)
-        })
-        .to_string()
+    let word_break = |c: char| {
+        !(
+            // not ideal, e.g. a second '.' *would* be a word break.
+            c.is_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':' || c == '@'
+        )
+    };
+    let mut result = String::new();
+    let mut value = value;
+    while !value.is_empty() {
+        if let Some(idx) = value.find(['#', '^']) {
+            result.push_str(&value[..idx]);
+            value = &value[idx..];
+            if let Some(mut idx) = value[1..].find(word_break) {
+                idx += 1; // account for ignoring #/^ in word break search
+                result.push_str(&expand_single_relspec(&value[..idx], ctx));
+                value = &value[idx..];
+            } else {
+                result.push_str(&expand_single_relspec(value, ctx));
+                break;
+            };
+        } else {
+            result.push_str(value);
+            break;
+        }
+    }
+    result
 }
 
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {

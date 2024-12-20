@@ -2,8 +2,6 @@
 use std::fmt::{self, Display, Formatter};
 
 use itertools::Itertools;
-use lazy_regex::regex;
-use regex::Captures;
 
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Result, SvgdxError};
@@ -477,47 +475,89 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
 pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
-    let re = regex!(r"(?<inner>\$(\{(?<var_brace>[[:word:]]+)\}|(?<var_simple>([[:word:]]+))))");
-    let value = re.replace_all(value, |caps: &Captures| {
-        let inner = caps
-            .name("inner")
-            .expect("Matched regex must have this group");
-        // Check if the match is escaped; do this here rather than within the regex
-        // to avoid the need for an extra initial character which can cause matches
-        // to overlap and fail replacement. We're safe to look at the previous byte
-        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
-        // the top bit clear, so will only match on a one-byte utf8 char.
-        let start = inner.start();
-        if start > 0 && value.as_bytes()[start - 1] == b'\\' {
-            inner.as_str().to_string()
+    let mut result = String::new();
+    let mut value = value;
+    while !value.is_empty() {
+        if let Some(idx) = value.find('$') {
+            let (prefix, remain) = value.split_at(idx);
+            if let Some(esc_prefix) = prefix.strip_prefix('\\') {
+                // Escaped '$'; ignore '\' and add '$' to result
+                result.push_str(esc_prefix);
+                result.push('$');
+                value = &remain[1..];
+                continue;
+            }
+            result.push_str(prefix);
+            let remain = &remain[1..]; // skip '$'
+            if let Some(inner) = remain.strip_prefix('{') {
+                value = inner;
+                if let Some(end_idx) = value.find('}') {
+                    let inner = &value[..end_idx];
+                    if let Some(value) = context.get_var(inner) {
+                        result.push_str(&value);
+                    } else {
+                        result.push_str("${");
+                        result.push_str(inner);
+                        result.push('}');
+                    }
+                    value = &value[end_idx + 1..]; // skip '}'
+                } else {
+                    result.push_str("${");
+                    result.push_str(value);
+                    break;
+                }
+            } else {
+                // un-braced reference; consume until non-alphanumeric/_ character
+                if let Some(idx) = remain.find(|c: char| !(c.is_alphanumeric() || c == '_')) {
+                    let (var, remain) = remain.split_at(idx);
+                    if let Some(value) = context.get_var(var) {
+                        result.push_str(&value);
+                    } else {
+                        result.push('$');
+                        result.push_str(var);
+                    }
+                    value = remain;
+                } else {
+                    if let Some(value) = context.get_var(remain) {
+                        result.push_str(&value);
+                    } else {
+                        result.push('$');
+                        result.push_str(remain);
+                    }
+                    break;
+                }
+            }
         } else {
-            let cap = caps.name("var_brace").unwrap_or_else(|| {
-                caps.name("var_simple")
-                    .expect("Matched regex must have var_simple or var_brace")
-            });
-            context
-                .get_var(cap.as_str())
-                .unwrap_or(inner.as_str().to_string())
-                .to_string()
+            result.push_str(value);
+            break;
         }
-    });
-    // Following that, replace any escaped "\$" back into "$"" characters
-    value.replace("\\$", "$")
+    }
+    result
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
 fn eval_expr(value: &str, context: &impl ContextView) -> String {
-    // Note - non-greedy match to catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
-    let re = regex!(r"\{\{(?<inner>.+?)\}\}");
-    re.replace_all(value, |caps: &Captures| {
-        eval_str(
-            caps.name("inner")
-                .expect("Matched regex must have this group")
-                .as_str(),
-            context,
-        )
-    })
-    .to_string()
+    // Note - must catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
+    let mut result = String::new();
+    let mut value = value;
+    loop {
+        if let Some(idx) = value.find("{{") {
+            result.push_str(&value[..idx]);
+            value = &value[idx + 2..];
+            if let Some(end_idx) = value.find("}}") {
+                let inner = &value[..end_idx];
+                result.push_str(&eval_str(inner, context));
+                value = &value[end_idx + 2..];
+            } else {
+                result.push_str(value);
+                break;
+            }
+        } else {
+            result.push_str(value);
+            break;
+        }
+    }
+    result
 }
 
 fn eval_str(value: &str, context: &impl ContextView) -> String {
@@ -1180,6 +1220,21 @@ mod tests {
             ("xor(0, 0)", false),
         ] {
             assert_eq!(eval_condition(expr, &ctx).expect("test"), expected);
+        }
+    }
+
+    #[test]
+    fn test_eval_expr() {
+        let ctx = TestContext::new();
+        for (expr, expected) in [
+            ("{{1 + 2}} + {{3 + 4}}", "3 + 7"),
+            // TODO: following may be unexpected; basically '{{' inside
+            // an expression is treated as any other text literal. This
+            // may change in future.
+            ("abc {{2 {{ 4 }} 3}}", "abc 2 {{ 4  3}}"),
+            ("abc 2 {{ 4 }} 3", "abc 2 4 3"),
+        ] {
+            assert_eq!(eval_expr(expr, &ctx), expected);
         }
     }
 
