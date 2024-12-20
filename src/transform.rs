@@ -49,6 +49,10 @@ impl EventGen for SvgElement {
                 OtherElement(self.clone()).generate_events(context)
             }
         };
+        // Ideally would have a single 'if bbox, set prev_element' here,
+        // but is used for attribute lookup as well as bbox, so need the
+        // full *resolved* element, which isn't available here.
+        // TODO: see if just storing a 'prev_bbox' is feasible.
         context.dec_depth()?;
         res
     }
@@ -101,7 +105,7 @@ impl EventGen for Container {
                         .insert("data-src-line", self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
-                events.push(OutputEvent::Start(new_el));
+                events.push(OutputEvent::Start(new_el.clone()));
                 let (evlist, mut bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
@@ -115,6 +119,9 @@ impl EventGen for Container {
                     bbox = None;
                 }
 
+                if bbox.is_some() {
+                    context.set_prev_element(new_el);
+                }
                 Ok((events, bbox))
             }
         } else {
