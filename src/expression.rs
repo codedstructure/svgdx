@@ -162,7 +162,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         } else {
             Err(SvgdxError::ParseError("Invalid variable".to_owned()))
         }
-    } else if input.starts_with('#') {
+    } else if input.starts_with(['#', '^']) {
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(func) = input.parse() {
         Ok(Token::FnRef(func))
@@ -180,24 +180,30 @@ fn tokenize_atom(input: &str) -> Result<Token> {
 fn tokenize(input: &str) -> Result<Vec<Token>> {
     let mut tokens = Vec::new();
     let mut buffer = Vec::new();
+    // hack to allow '-' in id-based element references
+    let mut in_elref_id = false;
 
     for ch in input.chars() {
         let next_token = match ch {
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
             '+' => Token::Add,
-            // TODO: '-' may be valid in an ElementRef
-            '-' => Token::Sub,
+            '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,
             '/' => Token::Div,
             '%' => Token::Mod,
             ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
+            '#' => {
+                in_elref_id = true;
+                Token::Other
+            }
             _ => Token::Other,
         };
         if next_token == Token::Other {
             buffer.push(ch);
         } else {
+            in_elref_id = false;
             if !buffer.is_empty() {
                 let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
                 buffer.clear();
