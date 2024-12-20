@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Internal: replaced regex with basic string parsing throughout, eliminating
+  a dependency and reducing size of WASM build.
+
+- Improved: refactor to consolidate element reference parsing; improves
+  consistency, allowing e.g.:
+  - edge spec to be used in connectors
+  - allowing 'previous element' references (`^`) in contexts which
+    previously only supported id-based references, including
+    connector `start` / `end` attributes.
+  - element id references may use the '-' character
+
 ## [0.15.1 - 2024-12-15]
 
 - Changed: '%' operator now computes non-negative result, as in the Python

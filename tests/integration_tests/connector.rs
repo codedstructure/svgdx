@@ -255,3 +255,20 @@ fn test_connector_edgespec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_connector_previous() {
+    // checks connectors can use previous element and references containing '-'
+    let input = r##"
+<rect id="a-123" wh="20"/>
+<rect xy="^:h 10" wh="^"/>
+<line start="^@l:40%" end="#a-123@r:40%"/>
+"##;
+    let expected = r#"
+<rect id="a-123" width="20" height="20"/>
+<rect x="30" y="0" width="20" height="20"/>
+<line x1="30" y1="8" x2="20" y2="8"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
