@@ -5,13 +5,14 @@ use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
-    strp_length, BoundingBox, DirSpec, EdgeSpec, LocSpec, Position, ScalarSpec, TrblLength,
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
+use crate::types::{
+    attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
+};
 
 use core::fmt::Display;
-use lazy_regex::{regex, Captures};
 use std::collections::HashMap;
 use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
 use std::str::FromStr;
@@ -55,25 +56,12 @@ fn split_relspec<'a, 'b>(
     input: &'b str,
     ctx: &'a impl ElementMap,
 ) -> Result<(Option<&'a SvgElement>, &'b str)> {
-    if input.starts_with('^') {
-        let skip_prev = input.strip_prefix('^').unwrap_or(input);
-        Ok((ctx.get_prev_element(), skip_prev.trim_start()))
-    } else if input.starts_with('#') {
-        let extract_ref_id_re = regex!(r"^#(?<id>[[:word:]]+)\s*(?<remain>.*)$");
-        let (id, remain) = extract_ref_id_re
-            .captures(input)
-            .map(|caps| {
-                (
-                    caps.name("id").expect("Regex Match").as_str(),
-                    caps.name("remain").expect("Regex Match").as_str(),
-                )
-            })
-            .unwrap_or(("INVALID ELEMENT ID", input));
-        if let Some(el) = ctx.get_element(id) {
-            Ok((Some(el), remain))
+    if let Ok((elref, remain)) = extract_elref(input) {
+        if let Some(el) = ctx.get_element(&elref) {
+            Ok((Some(el), remain.trim_start()))
         } else {
             Err(SvgdxError::ReferenceError(format!(
-                "Reference to unknown element '{id}'",
+                "Reference to unknown element '{elref}'",
             )))
         }
     } else {
@@ -90,27 +78,47 @@ fn split_relspec<'a, 'b>(
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     // For most elements either a `#elem.X` or `#elem@X` form is required,
     // but for `<point>` elements a standalone `#elem` suffices.
-    let locspec = regex!(r"([#^][[:word:]]+)([.@]([[:word:]]+)|\b)");
 
-    locspec
-        .replace_all(value, |caps: &Captures| {
-            expand_single_relspec(caps.get(0).expect("match").into(), ctx)
-        })
-        .to_string()
+    let word_break = |c: char| {
+        !(
+            // not ideal, e.g. a second '.' *would* be a word break.
+            c.is_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':' || c == '@'
+        )
+    };
+    let mut result = String::new();
+    let mut value = value;
+    while !value.is_empty() {
+        if let Some(idx) = value.find(['#', '^']) {
+            result.push_str(&value[..idx]);
+            value = &value[idx..];
+            if let Some(mut idx) = value[1..].find(word_break) {
+                idx += 1; // account for ignoring #/^ in word break search
+                result.push_str(&expand_single_relspec(&value[..idx], ctx));
+                value = &value[idx..];
+            } else {
+                result.push_str(&expand_single_relspec(value, ctx));
+                break;
+            };
+        } else {
+            result.push_str(value);
+            break;
+        }
+    }
+    result
 }
 
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let elem_loc = |elem: &SvgElement, loc: &str| {
+    let elem_loc = |elem: &SvgElement, loc: LocSpec| {
         ctx.get_element_bbox(elem)
-            .map(|bb| bb.map(|bb| bb.get_point(loc)))
+            .map(|bb| bb.map(|bb| bb.locspec(loc)))
     };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name == "point" {
-            if let Ok(Some(Ok(point))) = elem_loc(elem, "c") {
+            if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
-        } else if let Some(loc) = rest.strip_prefix('@') {
-            if let Ok(Some(Ok(point))) = elem_loc(elem, loc) {
+        } else if let Some(loc) = rest.strip_prefix('@').and_then(|s| s.parse().ok()) {
+            if let Ok(Some(point)) = elem_loc(elem, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
@@ -555,10 +563,7 @@ impl SvgElement {
         let mut bbox_list = vec![];
 
         for elref in attr_split(&ref_list) {
-            let ref_id = elref.strip_prefix('#').ok_or_else(|| {
-                SvgdxError::InvalidData(format!("Invalid {contain_str} value {elref}"))
-            })?;
-            let el = ctx.get_element(ref_id).ok_or_else(|| {
+            let el = ctx.get_element(&elref.parse()?).ok_or_else(|| {
                 SvgdxError::ReferenceError(format!("Element {elref} not found at this time"))
             })?;
             {
@@ -915,16 +920,16 @@ impl SvgElement {
         anchor: LocSpec,
     ) -> Result<Option<(f32, f32)>> {
         if let Some((x, y)) = if remain.starts_with('@') {
-            let (loc, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-
-            if let Some(Ok((x, y))) = loc.strip_prefix('@').map(|loc| bbox.get_point(loc)) {
+            let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+            if let Some(loc) = loc_str.strip_prefix('@').and_then(|ls| ls.parse().ok()) {
+                let (x, y) = bbox.locspec(loc);
                 let (dx, dy) = self.extract_dx_dy(dxy)?;
                 {
                     Some((x + dx, y + dy))
                 }
             } else {
                 return Err(SvgdxError::ReferenceError(format!(
-                    "Could not determine location from {loc}"
+                    "Could not determine location from {loc_str}"
                 )));
             }
         } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
@@ -991,15 +996,8 @@ impl SvgElement {
                     DirSpec::InFront => self.set_default_attr("text-loc", "r"),
                     DirSpec::Behind => self.set_default_attr("text-loc", "l"),
                 }
-            } else if let Some(edge_loc) = rel_loc.strip_prefix('@') {
-                if let Ok(edge_spec) = edge_loc.parse::<EdgeSpec>() {
-                    match edge_spec {
-                        EdgeSpec::Top(_) => self.set_default_attr("text-loc", "t"),
-                        EdgeSpec::Bottom(_) => self.set_default_attr("text-loc", "b"),
-                        EdgeSpec::Left(_) => self.set_default_attr("text-loc", "l"),
-                        EdgeSpec::Right(_) => self.set_default_attr("text-loc", "r"),
-                    }
-                } else if let Ok(loc_spec) = edge_loc.parse::<LocSpec>() {
+            } else if let Some(loc) = rel_loc.strip_prefix('@') {
+                if let Ok(loc_spec) = loc.parse::<LocSpec>() {
                     match loc_spec {
                         LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
                         LocSpec::Top => self.set_default_attr("text-loc", "t"),
@@ -1010,11 +1008,15 @@ impl SvgElement {
                         LocSpec::BottomLeft => self.set_default_attr("text-loc", "bl"),
                         LocSpec::Left => self.set_default_attr("text-loc", "l"),
                         LocSpec::Center => self.set_default_attr("text-loc", "c"),
+                        LocSpec::TopEdge(_) => self.set_default_attr("text-loc", "t"),
+                        LocSpec::BottomEdge(_) => self.set_default_attr("text-loc", "b"),
+                        LocSpec::LeftEdge(_) => self.set_default_attr("text-loc", "l"),
+                        LocSpec::RightEdge(_) => self.set_default_attr("text-loc", "r"),
                     }
                 } else {
                     return Err(SvgdxError::InvalidData(format!(
                         "Could not derive text anchor: '{}'",
-                        edge_loc
+                        loc
                     )));
                 }
             }
@@ -1028,7 +1030,6 @@ impl SvgElement {
     /// (^|#id)(:(h|H|v|V) [gap])
     /// ```
     fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
-        let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
         if let Some(input) = input {
@@ -1037,17 +1038,24 @@ impl SvgElement {
                 Some(el) => el,
                 None => return Ok(()),
             };
-            if let (Some(bbox), Some(caps)) =
-                (ctx.get_element_bbox(ref_el)?, rel_re.captures(remain))
+            if let (Some(bbox), Some(skip_colon)) =
+                (ctx.get_element_bbox(ref_el)?, remain.strip_prefix(':'))
             {
-                let rel: DirSpec = caps.name("rel").expect("Regex Match").as_str().parse()?;
+                let parts = skip_colon.find(|c: char| c.is_whitespace());
+                let (reldir, remain) = if let Some(split_idx) = parts {
+                    let (a, b) = skip_colon.split_at(split_idx);
+                    (a, b.trim_start())
+                } else {
+                    (skip_colon, "")
+                };
+                let rel: DirSpec = reldir.parse()?;
                 // this relies on x / y defaulting to 0 if not present, so we can get a bbox
                 // from only having a defined width / height.
                 let this_bbox = ctx.get_element_bbox(self)?;
                 let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
                 let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
-                let gap = if let Some(remain) = caps.name("remain") {
-                    let mut parts = attr_split(remain.as_str());
+                let gap = if !remain.is_empty() {
+                    let mut parts = attr_split(remain);
                     strp(&parts.next().unwrap_or("0".to_string()))?
                 } else {
                     0.
@@ -1197,6 +1205,8 @@ impl SvgElement {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::types::ElRef;
+
     use super::*;
 
     #[test]
@@ -1299,11 +1309,10 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
-        fn get_element(&self, id: &str) -> Option<&SvgElement> {
-            self.elements.get(id)
-        }
-
-        fn get_prev_element(&self) -> Option<&SvgElement> {
+        fn get_element(&self, id: &ElRef) -> Option<&SvgElement> {
+            if let ElRef::Id(id) = id {
+                return self.elements.get(id);
+            }
             None
         }
 

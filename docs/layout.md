@@ -44,8 +44,8 @@ specifier', or 'relspec'.
 `^`) or an element referenced by its `id`, as `#<id>`, for example `#abc`.
 
 **Location Spec** - ('locspec') a specific point on a given element,
-for example 'top-left', or 'center'. These are given by one of the
-following abbreviations:
+for example 'top-left', 'center', or '75% along the top edge'.
+These are given by one of the following abbreviations:
 
 * `tl` - top-left
 * `t` - top, i.e. center of the top edge of the bounding box
@@ -59,7 +59,7 @@ following abbreviations:
 
 Together an 'elref' and a 'locspec' denote a point in 2D user coordinates.
 
-**Edge Offset Spec** - ('edgespec') as a special case of 'locspec', those locations
+**Edge-based LocSpec** - as a special case of 'locspec', those locations
 which define the edge of an element (i.e. t,r,b,l) may be followed by an offset to
 vary the resulting point position along the edge. The offset is separated from the
 locspec by a colon (`:`), and may be either a number or a percentage.
@@ -96,16 +96,15 @@ The above pieces fit together according to the following grammar.
 
 ```
 dirspec    := : [h|H|v|V]
-locspec    := @ [tl|t|tr|r|br|b|bl|l|c]
-edgespec   := @ [t|r|b|l] : length
-length     := number | number %
+locspec    := @ [tl|t|tr|r|br|b|bl|l|c] | ([t|r|b|l] : length)
+length     := number | (number %)
 
 elref      := prevspec | ref
 prevspec   := ^
 ref        := # ident
 ident      := alphanumeric
 
-relspec  := elref [dirspec | locspec | edgespec]
+relspec  := elref [dirspec | locspec]
 ```
 
 Following the `relspec` as defined above, additional values may be given to define

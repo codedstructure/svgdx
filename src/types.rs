@@ -1,6 +1,7 @@
 use crate::errors::{Result, SvgdxError};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
+use std::str::FromStr;
 
 /// Return a 'minimal' representation of the given number
 pub fn fstr(x: f32) -> String {
@@ -347,6 +348,54 @@ impl<'s> IntoIterator for &'s ClassList {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum ElRef {
+    Id(String),
+    Prev,
+}
+
+impl FromStr for ElRef {
+    type Err = SvgdxError;
+    fn from_str(s: &str) -> Result<Self> {
+        let (elref, remain) = extract_elref(s)?;
+        if remain.is_empty() {
+            Ok(elref)
+        } else {
+            Err(SvgdxError::ParseError(format!("Invalid elref format {s}")))
+        }
+    }
+}
+
+impl Display for ElRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ElRef::Id(id) => write!(f, "#{}", id),
+            ElRef::Prev => write!(f, "^"),
+        }
+    }
+}
+
+/// return Elref and remaining string
+pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
+    let first_char_match = |c: char| c.is_alphabetic() || c == '_';
+    let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+
+    if let Some(s) = s.strip_prefix('#') {
+        if s.starts_with(first_char_match) {
+            if let Some(split) = s.find(|c: char| !subseq_char_match(c)) {
+                let (id, remain) = s.split_at(split);
+                return Ok((ElRef::Id(id.to_owned()), remain));
+            } else {
+                return Ok((ElRef::Id(s.to_owned()), ""));
+            }
+        }
+    } else if let Some(s) = s.strip_prefix('^') {
+        return Ok((ElRef::Prev, s));
+    }
+
+    Err(SvgdxError::ParseError(format!("Invalid elref format {s}")))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -512,5 +561,28 @@ mod test {
         assert_lt!(idx1.with_sub_index(&subidx1), idx1.with_sub_index(&subidx2));
         assert_lt!(idx1.with_sub_index(&subidx2), idx2);
         assert_lt!(idx1.with_sub_index(&subidx2), idx2.with_sub_index(&subidx1));
+    }
+
+    #[test]
+    fn test_extract_elref() {
+        assert_eq!(
+            extract_elref("#id@tl:10%").unwrap(),
+            (ElRef::Id("id".to_string()), "@tl:10%")
+        );
+        assert_eq!(
+            extract_elref("#id").unwrap(),
+            (ElRef::Id("id".to_string()), "")
+        );
+        assert_eq!(
+            extract_elref("#id@").unwrap(),
+            (ElRef::Id("id".to_string()), "@")
+        );
+        assert_eq!(
+            extract_elref("#id_a@xyz 2 3").unwrap(),
+            (ElRef::Id("id_a".to_string()), "@xyz 2 3")
+        );
+        assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev, "@bl"));
+        assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev, ""));
+        assert!(extract_elref("id").is_err());
     }
 }

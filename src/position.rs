@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
 #[derive(Clone, Debug, Default)]
 pub struct Position {
@@ -434,51 +434,8 @@ impl DirSpec {
     }
 }
 
-/// `EdgeSpec` defines an offset along one edge of a `BoundingBox`.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum EdgeSpec {
-    Top(Length),
-    Right(Length),
-    Bottom(Length),
-    Left(Length),
-}
-
-impl FromStr for EdgeSpec {
-    type Err = SvgdxError;
-
-    fn from_str(value: &str) -> Result<Self> {
-        if let Some((edge, len)) = value.split_once(':') {
-            let len = len.parse::<Length>()?;
-            match edge {
-                "t" => Ok(Self::Top(len)),
-                "r" => Ok(Self::Right(len)),
-                "b" => Ok(Self::Bottom(len)),
-                "l" => Ok(Self::Left(len)),
-                _ => Err(SvgdxError::InvalidData(format!(
-                    "Invalid EdgeSpec format {value}"
-                ))),
-            }
-        } else {
-            Err(SvgdxError::InvalidData(format!(
-                "Invalid EdgeSpec format {value}"
-            )))
-        }
-    }
-}
-
-impl EdgeSpec {
-    pub fn as_loc(&self) -> LocSpec {
-        match self {
-            Self::Top(_) => LocSpec::Top,
-            Self::Right(_) => LocSpec::Right,
-            Self::Bottom(_) => LocSpec::Bottom,
-            Self::Left(_) => LocSpec::Left,
-        }
-    }
-}
-
 /// `LocSpec` defines a location on a `BoundingBox`
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum LocSpec {
     TopLeft,
     Top,
@@ -489,6 +446,40 @@ pub enum LocSpec {
     BottomLeft,
     Left,
     Center,
+    TopEdge(Length),
+    RightEdge(Length),
+    BottomEdge(Length),
+    LeftEdge(Length),
+}
+
+impl LocSpec {
+    pub fn is_top(&self) -> bool {
+        matches!(
+            self,
+            Self::Top | Self::TopLeft | Self::TopRight | Self::TopEdge(_)
+        )
+    }
+
+    pub fn is_right(&self) -> bool {
+        matches!(
+            self,
+            Self::Right | Self::TopRight | Self::BottomRight | Self::RightEdge(_)
+        )
+    }
+
+    pub fn is_bottom(&self) -> bool {
+        matches!(
+            self,
+            Self::Bottom | Self::BottomLeft | Self::BottomRight | Self::BottomEdge(_)
+        )
+    }
+
+    pub fn is_left(&self) -> bool {
+        matches!(
+            self,
+            Self::Left | Self::TopLeft | Self::BottomLeft | Self::LeftEdge(_)
+        )
+    }
 }
 
 impl FromStr for LocSpec {
@@ -505,9 +496,24 @@ impl FromStr for LocSpec {
             "bl" => Ok(Self::BottomLeft),
             "l" => Ok(Self::Left),
             "c" => Ok(Self::Center),
-            _ => Err(SvgdxError::InvalidData(format!(
-                "Invalid LocSpec format {value}"
-            ))),
+            s => {
+                if let Some((edge, len)) = s.split_once(':') {
+                    let len = len.parse::<Length>()?;
+                    match edge {
+                        "t" => Ok(Self::TopEdge(len)),
+                        "r" => Ok(Self::RightEdge(len)),
+                        "b" => Ok(Self::BottomEdge(len)),
+                        "l" => Ok(Self::LeftEdge(len)),
+                        _ => Err(SvgdxError::InvalidData(format!(
+                            "Invalid LocSpec format {value}"
+                        ))),
+                    }
+                } else {
+                    Err(SvgdxError::InvalidData(format!(
+                        "Invalid LocSpec format {value}"
+                    )))
+                }
+            }
         }
     }
 }
@@ -622,16 +628,21 @@ impl BoundingBox {
         let br = (self.x2, self.y2);
         let bl = (self.x1, self.y2);
         let c = ((self.x1 + self.x2) / 2., (self.y1 + self.y2) / 2.);
+        use LocSpec::*;
         match ls {
-            LocSpec::TopLeft => tl,
-            LocSpec::Top => ((self.x1 + self.x2) / 2., self.y1),
-            LocSpec::TopRight => tr,
-            LocSpec::Right => (self.x2, (self.y1 + self.y2) / 2.),
-            LocSpec::BottomRight => br,
-            LocSpec::Bottom => ((self.x1 + self.x2) / 2., self.y2),
-            LocSpec::BottomLeft => bl,
-            LocSpec::Left => (self.x1, (self.y1 + self.y2) / 2.),
-            LocSpec::Center => c,
+            TopLeft => tl,
+            Top => ((self.x1 + self.x2) / 2., self.y1),
+            TopRight => tr,
+            Right => (self.x2, (self.y1 + self.y2) / 2.),
+            BottomRight => br,
+            Bottom => ((self.x1 + self.x2) / 2., self.y2),
+            BottomLeft => bl,
+            Left => (self.x1, (self.y1 + self.y2) / 2.),
+            Center => c,
+            TopEdge(len) => (len.calc_offset(self.x1, self.x2), self.y1),
+            RightEdge(len) => (self.x2, len.calc_offset(self.y1, self.y2)),
+            BottomEdge(len) => (len.calc_offset(self.x1, self.x2), self.y2),
+            LeftEdge(len) => (self.x1, len.calc_offset(self.y1, self.y2)),
         }
     }
 
@@ -647,27 +658,6 @@ impl BoundingBox {
             ScalarSpec::Cy => (self.y1 + self.y2) / 2.,
             ScalarSpec::Rx => (self.x2 - self.x1).abs() / 2.,
             ScalarSpec::Ry => (self.y2 - self.y1).abs() / 2.,
-        }
-    }
-
-    pub fn edgespec(&self, es: EdgeSpec) -> (f32, f32) {
-        match es {
-            EdgeSpec::Top(len) => (len.calc_offset(self.x1, self.x2), self.y1),
-            EdgeSpec::Right(len) => (self.x2, len.calc_offset(self.y1, self.y2)),
-            EdgeSpec::Bottom(len) => (len.calc_offset(self.x1, self.x2), self.y2),
-            EdgeSpec::Left(len) => (self.x1, len.calc_offset(self.y1, self.y2)),
-        }
-    }
-
-    /// Get point from a string such as 'tl' (top-left of this bbox) or
-    /// 'r:30%' (30% down the right edge).
-    pub fn get_point(&self, s: &str) -> Result<(f32, f32)> {
-        if let Ok(es) = s.parse::<EdgeSpec>() {
-            Ok(self.edgespec(es))
-        } else if let Ok(ls) = s.parse::<LocSpec>() {
-            Ok(self.locspec(ls))
-        } else {
-            Err(SvgdxError::InvalidData(format!("Invalid point spec {s}")))
         }
     }
 
@@ -853,9 +843,70 @@ impl FromStr for TrblLength {
     }
 }
 
+/// Parse a elref + optional locspec, e.g. `#id@tl:10%` or `#id`
+pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
+    let (elref, remain) = extract_elref(s)?;
+    if remain.is_empty() {
+        return Ok((elref, None));
+    }
+    let remain = remain
+        .strip_prefix('@')
+        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: {s}")))?;
+    let mut chars = remain.chars();
+    let mut loc = String::new();
+    loop {
+        match chars.next() {
+            Some(c) if c.is_whitespace() => {
+                return Err(SvgdxError::ParseError(format!("Invalid locspec: {s}")))
+            }
+            Some(c) => loc.push(c),
+            None => return Ok((elref, Some(loc.parse()?))),
+        }
+    }
+}
+
+pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
+    let (elref, remain) = extract_elref(s)?;
+    if remain.is_empty() {
+        return Ok((elref, None));
+    }
+    let remain = remain
+        .strip_prefix('.')
+        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))?;
+    let mut chars = remain.chars();
+    let mut scalar = String::new();
+    loop {
+        match chars.next() {
+            Some(c) if c.is_whitespace() => {
+                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))
+            }
+            Some(c) => scalar.push(c),
+            None => return Ok((elref, Some(scalar.parse()?))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_parse_loc() {
+        assert_eq!(
+            parse_el_loc("#a@b").unwrap(),
+            (ElRef::Id("a".to_string()), Some(LocSpec::Bottom))
+        );
+        assert_eq!(
+            parse_el_loc("#id@tl").unwrap(),
+            (ElRef::Id("id".to_string()), Some(LocSpec::TopLeft))
+        );
+        assert_eq!(
+            parse_el_loc("#id").unwrap(),
+            (ElRef::Id("id".to_string()), None)
+        );
+        assert!(parse_el_loc("#id@").is_err());
+        assert!(parse_el_loc("#id@ l").is_err());
+    }
 
     #[test]
     fn test_x1_y1_w_h() {
@@ -1039,26 +1090,6 @@ mod test {
     }
 
     #[test]
-    fn test_edgespec() {
-        assert_eq!(
-            "t:10".parse::<EdgeSpec>().expect("test"),
-            EdgeSpec::Top(Length::Absolute(10.))
-        );
-        assert_eq!(
-            "r:25%".parse::<EdgeSpec>().expect("test"),
-            EdgeSpec::Right(Length::Ratio(0.25))
-        );
-        assert_eq!(
-            "b:10".parse::<EdgeSpec>().expect("test"),
-            EdgeSpec::Bottom(Length::Absolute(10.))
-        );
-        assert_eq!(
-            "l:75%".parse::<EdgeSpec>().expect("test"),
-            EdgeSpec::Left(Length::Ratio(0.75))
-        );
-    }
-
-    #[test]
     fn test_locspec() {
         assert_eq!("tl".parse::<LocSpec>().expect("test"), LocSpec::TopLeft);
         assert_eq!("t".parse::<LocSpec>().expect("test"), LocSpec::Top);
@@ -1069,23 +1100,39 @@ mod test {
         assert_eq!("bl".parse::<LocSpec>().expect("test"), LocSpec::BottomLeft);
         assert_eq!("l".parse::<LocSpec>().expect("test"), LocSpec::Left);
         assert_eq!("c".parse::<LocSpec>().expect("test"), LocSpec::Center);
+        assert_eq!(
+            "t:10".parse::<LocSpec>().expect("test"),
+            LocSpec::TopEdge(Length::Absolute(10.))
+        );
+        assert_eq!(
+            "r:25%".parse::<LocSpec>().expect("test"),
+            LocSpec::RightEdge(Length::Ratio(0.25))
+        );
+        assert_eq!(
+            "b:10".parse::<LocSpec>().expect("test"),
+            LocSpec::BottomEdge(Length::Absolute(10.))
+        );
+        assert_eq!(
+            "l:75%".parse::<LocSpec>().expect("test"),
+            LocSpec::LeftEdge(Length::Ratio(0.75))
+        );
     }
 
     #[test]
     fn test_get_point() {
         let bb = BoundingBox::new(10., 10., 20., 20.);
-        assert_eq!(bb.get_point("t:2").expect("test"), (12., 10.));
-        assert_eq!(bb.get_point("r:25%").expect("test"), (20., 12.5));
-        assert_eq!(bb.get_point("b:6").expect("test"), (16., 20.));
-        assert_eq!(bb.get_point("l:150%").expect("test"), (10., 25.));
-        assert_eq!(bb.get_point("tl").expect("test"), (10., 10.));
-        assert_eq!(bb.get_point("t").expect("test"), (15., 10.));
-        assert_eq!(bb.get_point("tr").expect("test"), (20., 10.));
-        assert_eq!(bb.get_point("r").expect("test"), (20., 15.));
-        assert_eq!(bb.get_point("br").expect("test"), (20., 20.));
-        assert_eq!(bb.get_point("b").expect("test"), (15., 20.));
-        assert_eq!(bb.get_point("bl").expect("test"), (10., 20.));
-        assert_eq!(bb.get_point("l").expect("test"), (10., 15.));
-        assert_eq!(bb.get_point("c").expect("test"), (15., 15.));
+        assert_eq!(bb.locspec("t:2".parse().expect("test")), (12., 10.));
+        assert_eq!(bb.locspec("r:25%".parse().expect("test")), (20., 12.5));
+        assert_eq!(bb.locspec("b:6".parse().expect("test")), (16., 20.));
+        assert_eq!(bb.locspec("l:150%".parse().expect("test")), (10., 25.));
+        assert_eq!(bb.locspec("tl".parse().expect("test")), (10., 10.));
+        assert_eq!(bb.locspec("t".parse().expect("test")), (15., 10.));
+        assert_eq!(bb.locspec("tr".parse().expect("test")), (20., 10.));
+        assert_eq!(bb.locspec("r".parse().expect("test")), (20., 15.));
+        assert_eq!(bb.locspec("br".parse().expect("test")), (20., 20.));
+        assert_eq!(bb.locspec("b".parse().expect("test")), (15., 20.));
+        assert_eq!(bb.locspec("bl".parse().expect("test")), (10., 20.));
+        assert_eq!(bb.locspec("l".parse().expect("test")), (10., 15.));
+        assert_eq!(bb.locspec("c".parse().expect("test")), (15., 15.));
     }
 }

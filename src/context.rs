@@ -4,7 +4,7 @@ use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform_attr::TransformAttr;
-use crate::types::strp;
+use crate::types::{strp, ElRef};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -65,8 +65,7 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
-    fn get_element(&self, id: &str) -> Option<&SvgElement>;
-    fn get_prev_element(&self) -> Option<&SvgElement>;
+    fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
 }
 
@@ -78,12 +77,11 @@ pub trait VariableMap {
 pub trait ContextView: ElementMap + VariableMap {}
 
 impl ElementMap for TransformerContext {
-    fn get_element(&self, id: &str) -> Option<&SvgElement> {
-        self.elem_map.get(id)
-    }
-
-    fn get_prev_element(&self) -> Option<&SvgElement> {
-        self.prev_element.as_ref()
+    fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
+        match elref {
+            ElRef::Id(id) => self.elem_map.get(id),
+            ElRef::Prev => self.prev_element.as_ref(),
+        }
     }
 
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
@@ -97,12 +95,9 @@ impl ElementMap for TransformerContext {
             let mut el_bbox = if el.name == "use" || el.name == "reuse" {
                 // use and reuse elements reference another element - get the bbox of the target
                 // (which could be another (re)use element)
-                let href = el
-                    .get_attr("href")
-                    .and_then(|href| href.strip_prefix('#').map(|s| s.to_string()))
-                    .ok_or_else(|| {
-                        SvgdxError::InvalidData("Could not determine href for element".to_owned())
-                    })?;
+                let href = el.get_attr("href").ok_or_else(|| {
+                    SvgdxError::InvalidData("Could not determine href for element".to_owned())
+                })?;
 
                 if already.contains(&href) {
                     return Err(SvgdxError::CircularRefError(format!(
@@ -111,7 +106,8 @@ impl ElementMap for TransformerContext {
                 }
                 already.push(href.clone());
 
-                let target_el = ctx.get_element(&href).ok_or_else(|| {
+                let elref: ElRef = href.parse()?;
+                let target_el = ctx.get_element(&elref).ok_or_else(|| {
                     SvgdxError::ReferenceError(format!("Could not find element with id '{href}'"))
                 })?;
                 // recurse to get bbox of the target

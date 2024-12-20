@@ -1,33 +1,39 @@
 use crate::element::SvgElement;
-use crate::position::{EdgeSpec, LocSpec};
+use crate::position::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
 use crate::errors::{Result, SvgdxError};
-use lazy_regex::regex;
-use regex::Captures;
 
 fn get_text_value(element: &mut SvgElement) -> String {
     let text_value = element
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
-    // Convert unescaped '\n' into newline characters for multi-line text
-    let re = regex!(r"\\n");
-    let text_value = re.replace_all(&text_value, |caps: &Captures| {
-        let inner = caps.get(0).expect("Matched regex must have this group");
-        // Check if the newline is escaped; do this here rather than within the regex
-        // to avoid the need for an extra initial character which can cause matches
-        // to overlap and fail replacement. We're safe to look at the previous byte
-        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
-        // the top bit clear, so will only match on a one-byte utf8 char.
-        let start = inner.start();
-        if start > 0 && text_value.as_bytes()[start - 1] == b'\\' {
-            inner.as_str().to_string()
+    text_string(&text_value)
+}
+
+/// Convert unescaped r"\n" into newline characters for multi-line text
+fn text_string(text_value: &str) -> String {
+    let mut result = String::new();
+    let mut remain = text_value;
+    while !remain.is_empty() {
+        if let Some(idx) = remain.find("\\n") {
+            let (start, new_remain) = remain.split_at(idx);
+            remain = &new_remain[2..]; // Skip the two chars '\', 'n'
+            if idx > 0 && start.ends_with('\\') {
+                // Escaped newline; re-apply the backslash and continue
+                result.push_str(&start[..idx - 1]);
+                result.push_str("\\n");
+            } else {
+                result.push_str(start);
+                result.push('\n');
+            }
         } else {
-            "\n".to_owned()
+            // No more newlines
+            result.push_str(remain);
+            break;
         }
-    });
-    // Following that, replace any escaped "\\n" into literal '\'+'n' characters
-    text_value.replace("\\\\n", "\\n")
+    }
+    result
 }
 
 fn get_text_position<'a>(
@@ -58,11 +64,7 @@ fn get_text_position<'a>(
 
     let mut text_classes = vec!["d-text"];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
-    let text_anchor = if let Ok(edge) = text_loc_str.parse::<EdgeSpec>() {
-        edge.as_loc()
-    } else {
-        text_loc_str.parse::<LocSpec>()?
-    };
+    let text_anchor = text_loc_str.parse::<LocSpec>()?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without offset text squishes to the edge and can be unreadable
@@ -82,7 +84,7 @@ fn get_text_position<'a>(
         matches!(element.name.as_str(), "line" | "point" | "text")
     };
     match text_anchor {
-        LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight => {
+        ls if ls.is_top() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-top",
                 (true, false) => "d-text-bottom",
@@ -91,7 +93,7 @@ fn get_text_position<'a>(
             });
             t_dy += if outside { -text_offset } else { text_offset };
         }
-        LocSpec::BottomRight | LocSpec::Bottom | LocSpec::BottomLeft => {
+        ls if ls.is_bottom() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-bottom",
                 (true, false) => "d-text-top",
@@ -104,7 +106,7 @@ fn get_text_position<'a>(
     }
 
     match text_anchor {
-        LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft => {
+        ls if ls.is_left() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-left",
                 (true, false) => "d-text-right",
@@ -113,7 +115,7 @@ fn get_text_position<'a>(
             });
             t_dx += if outside { -text_offset } else { text_offset };
         }
-        LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight => {
+        ls if ls.is_right() => {
             text_classes.push(match (outside, vertical) {
                 (false, false) => "d-text-right",
                 (true, false) => "d-text-left",
@@ -131,7 +133,7 @@ fn get_text_position<'a>(
     let (mut tdx, mut tdy) = element
         .bbox()?
         .ok_or_else(|| SvgdxError::GeometryError("No BoundingBox".to_owned()))?
-        .get_point(&text_loc_str)?;
+        .locspec(text_anchor);
     tdx += t_dx;
     tdy += t_dy;
 
@@ -228,17 +230,15 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         // Determine position of first text line; others follow this based on line spacing
         let first_line_offset = match (outside, vertical, text_loc) {
             // shapes - text 'inside'
-            (false, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_DOWN,
-            (false, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => WRAP_UP,
-            (false, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_DOWN,
-            (false, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_UP,
+            (false, false, ls) if ls.is_top() => WRAP_DOWN,
+            (false, false, ls) if ls.is_bottom() => WRAP_UP,
+            (false, true, ls) if ls.is_left() => WRAP_DOWN,
+            (false, true, ls) if ls.is_right() => WRAP_UP,
             // lines - text 'beyond'
-            (true, false, LocSpec::TopLeft | LocSpec::Top | LocSpec::TopRight) => WRAP_UP,
-            (true, false, LocSpec::BottomLeft | LocSpec::Bottom | LocSpec::BottomRight) => {
-                WRAP_DOWN
-            }
-            (true, true, LocSpec::TopLeft | LocSpec::Left | LocSpec::BottomLeft) => WRAP_UP,
-            (true, true, LocSpec::TopRight | LocSpec::Right | LocSpec::BottomRight) => WRAP_DOWN,
+            (true, false, ls) if ls.is_top() => WRAP_UP,
+            (true, false, ls) if ls.is_bottom() => WRAP_DOWN,
+            (true, true, ls) if ls.is_left() => WRAP_UP,
+            (true, true, ls) if ls.is_right() => WRAP_DOWN,
             (_, _, _) => WRAP_MID,
         };
 
@@ -282,4 +282,23 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
     Ok((orig_elem, text_elements))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_text_string() {
+        let text = r"Hello, \nworld!";
+        assert_eq!(text_string(text), "Hello, \nworld!");
+
+        // when not part of a '\n', '\' is not special
+        let text = r"Hello, world! \1";
+        assert_eq!(text_string(text), "Hello, world! \\1");
+
+        // when precedes '\n', '\' escapes it.
+        let text = r"Hello, \\nworld!";
+        assert_eq!(text_string(text), r"Hello, \nworld!");
+    }
 }
