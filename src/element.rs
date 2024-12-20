@@ -355,7 +355,7 @@ impl SvgElement {
                 let elref = &href.parse()?;
                 let el = ctx
                     .get_element(elref)
-                    .ok_or_else(|| SvgdxError::ReferenceError("Element not found".to_owned()))?;
+                    .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
                 if let Some(bb) = ctx.get_element_bbox(el)? {
                     p.update_from(&bb);
                     if el.name == "circle" || el.name == "ellipse" {
