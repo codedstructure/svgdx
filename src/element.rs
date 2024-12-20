@@ -8,7 +8,9 @@ use crate::position::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
-use crate::types::{attr_split, attr_split_cycle, fstr, strp, AttrMap, ClassList, OrderIndex};
+use crate::types::{
+    attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
+};
 
 use core::fmt::Display;
 use lazy_regex::{regex, Captures};
@@ -55,21 +57,12 @@ fn split_relspec<'a, 'b>(
     input: &'b str,
     ctx: &'a impl ElementMap,
 ) -> Result<(Option<&'a SvgElement>, &'b str)> {
-    if input.starts_with('^') {
-        let skip_prev = input.strip_prefix('^').unwrap_or(input);
-        Ok((ctx.get_prev_element(), skip_prev.trim_start()))
-    } else if let Some(input) = input.strip_prefix('#') {
-        let (id, remain) = if let Some(split_pos) = input.find(|c: char| !c.is_alphanumeric()) {
-            let id_rem = input.split_at(split_pos);
-            (id_rem.0, id_rem.1.trim_start())
-        } else {
-            (input, "")
-        };
-        if let Some(el) = ctx.get_element(id) {
-            Ok((Some(el), remain))
+    if let Ok((elref, remain)) = extract_elref(input) {
+        if let Some(el) = ctx.get_element(&elref) {
+            Ok((Some(el), remain.trim_start()))
         } else {
             Err(SvgdxError::ReferenceError(format!(
-                "Reference to unknown element '{id}'",
+                "Reference to unknown element '{elref}'",
             )))
         }
     } else {
@@ -551,10 +544,7 @@ impl SvgElement {
         let mut bbox_list = vec![];
 
         for elref in attr_split(&ref_list) {
-            let ref_id = elref.strip_prefix('#').ok_or_else(|| {
-                SvgdxError::InvalidData(format!("Invalid {contain_str} value {elref}"))
-            })?;
-            let el = ctx.get_element(ref_id).ok_or_else(|| {
+            let el = ctx.get_element(&elref.parse()?).ok_or_else(|| {
                 SvgdxError::ReferenceError(format!("Element {elref} not found at this time"))
             })?;
             {
@@ -1021,7 +1011,6 @@ impl SvgElement {
     /// (^|#id)(:(h|H|v|V) [gap])
     /// ```
     fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
-        let rel_re = regex!(r"^:(?<rel>[hHvV])(\s+(?<remain>.*))?$");
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
         if let Some(input) = input {
@@ -1030,17 +1019,24 @@ impl SvgElement {
                 Some(el) => el,
                 None => return Ok(()),
             };
-            if let (Some(bbox), Some(caps)) =
-                (ctx.get_element_bbox(ref_el)?, rel_re.captures(remain))
+            if let (Some(bbox), Some(skip_colon)) =
+                (ctx.get_element_bbox(ref_el)?, remain.strip_prefix(':'))
             {
-                let rel: DirSpec = caps.name("rel").expect("Regex Match").as_str().parse()?;
+                let parts = skip_colon.find(|c: char| c.is_whitespace());
+                let (reldir, remain) = if let Some(split_idx) = parts {
+                    let (a, b) = skip_colon.split_at(split_idx);
+                    (a, b.trim_start())
+                } else {
+                    (skip_colon, "")
+                };
+                let rel: DirSpec = reldir.parse()?;
                 // this relies on x / y defaulting to 0 if not present, so we can get a bbox
                 // from only having a defined width / height.
                 let this_bbox = ctx.get_element_bbox(self)?;
                 let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
                 let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
-                let gap = if let Some(remain) = caps.name("remain") {
-                    let mut parts = attr_split(remain.as_str());
+                let gap = if !remain.is_empty() {
+                    let mut parts = attr_split(remain);
                     strp(&parts.next().unwrap_or("0".to_string()))?
                 } else {
                     0.
@@ -1190,6 +1186,8 @@ impl SvgElement {
 mod tests {
     use std::collections::HashMap;
 
+    use crate::types::ElRef;
+
     use super::*;
 
     #[test]
@@ -1292,11 +1290,10 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
-        fn get_element(&self, id: &str) -> Option<&SvgElement> {
-            self.elements.get(id)
-        }
-
-        fn get_prev_element(&self) -> Option<&SvgElement> {
+        fn get_element(&self, id: &ElRef) -> Option<&SvgElement> {
+            if let ElRef::Id(id) = id {
+                return self.elements.get(id);
+            }
             None
         }
 

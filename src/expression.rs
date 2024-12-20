@@ -188,6 +188,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
             '+' => Token::Add,
+            // TODO: '-' may be valid in an ElementRef
             '-' => Token::Sub,
             '*' => Token::Mul,
             '/' => Token::Div,
@@ -324,18 +325,18 @@ impl<'a> EvalState<'a> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
         // <line x1="#abc.l" .../>
-        if let Ok((id, Some(scalar))) = parse_el_scalar(v) {
-            if let Some(elem) = self.context.get_element(&id) {
+        if let Ok((elref, Some(scalar))) = parse_el_scalar(v) {
+            if let Some(elem) = self.context.get_element(&elref) {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {
                     Ok(bb.scalarspec(scalar).into())
                 } else {
                     Err(SvgdxError::GeometryError(format!(
-                        "No bounding box for element #{id}"
+                        "No bounding box for element {elref}"
                     )))
                 }
             } else {
                 Err(SvgdxError::ReferenceError(format!(
-                    "Element #{id} not found"
+                    "Element #{elref} not found"
                 )))
             }
         } else {
@@ -545,10 +546,15 @@ pub fn eval_attr(value: &str, context: &impl ContextView) -> String {
 pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
     // Conditions don't need surrounding by {{...}} since they always evaluate to
     // a single numeric expression, but allow for consistency with other attr values.
-    let re = regex!(r"\{\{(?<inner>.+?)\}\}");
-    // "If no match is found, then the haystack is returned unchanged."
-    let value = re.replace(value, r"$inner");
-    eval_str(&value, context)
+    let mut value = value;
+    if let Some(inner) = value.strip_prefix("{{") {
+        value = inner
+            .strip_suffix("}}")
+            .ok_or(SvgdxError::ParseError(format!(
+                "Expected closing '}}': '{value}'"
+            )))?;
+    }
+    eval_str(value, context)
         .parse::<f32>()
         .map(|v| v != 0.)
         .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
@@ -561,6 +567,7 @@ mod tests {
     use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
     use crate::position::BoundingBox;
+    use crate::types::ElRef;
     use assertables::{assert_in_delta, assert_lt};
     use rand::prelude::*;
     use rand_pcg::Pcg32;
@@ -593,11 +600,7 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
-        fn get_element(&self, _id: &str) -> Option<&SvgElement> {
-            None
-        }
-
-        fn get_prev_element(&self) -> Option<&SvgElement> {
+        fn get_element(&self, _elref: &ElRef) -> Option<&SvgElement> {
             None
         }
 

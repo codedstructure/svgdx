@@ -132,14 +132,12 @@ fn shortest_link(
 }
 
 impl Connector {
-    // TODO: This should take a LocSpec
     fn loc_to_dir(loc: LocSpec) -> Option<Direction> {
-        // loc may have a 'length' part following a colon, ignore that
         match loc {
-            LocSpec::Top => Some(Direction::Up),
-            LocSpec::Right => Some(Direction::Right),
-            LocSpec::Bottom => Some(Direction::Down),
-            LocSpec::Left => Some(Direction::Left),
+            LocSpec::Top | LocSpec::TopEdge(_) => Some(Direction::Up),
+            LocSpec::Right | LocSpec::RightEdge(_) => Some(Direction::Right),
+            LocSpec::Bottom | LocSpec::BottomEdge(_) => Some(Direction::Down),
+            LocSpec::Left | LocSpec::LeftEdge(_) => Some(Direction::Left),
             _ => None,
         }
     }
@@ -179,12 +177,12 @@ impl Connector {
         let mut end_dir: Option<Direction> = None;
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
-        if let Ok((name, loc)) = parse_el_loc(&start_ref) {
+        if let Ok((elref, loc)) = parse_el_loc(&start_ref) {
             if let Some(loc) = loc {
                 start_dir = Self::loc_to_dir(loc);
                 start_loc = Some(loc);
             }
-            start_el = elem_map.get_element(&name);
+            start_el = elem_map.get_element(&elref);
         } else {
             let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
             start_point = Some((
@@ -196,12 +194,12 @@ impl Connector {
                 })?,
             ));
         }
-        if let Ok((name, loc)) = parse_el_loc(&end_ref) {
+        if let Ok((elref, loc)) = parse_el_loc(&end_ref) {
             if let Some(loc) = loc {
                 end_dir = Self::loc_to_dir(loc);
                 end_loc = Some(loc);
             }
-            end_el = elem_map.get_element(&name);
+            end_el = elem_map.get_element(&elref);
         } else {
             let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
             end_point = Some((

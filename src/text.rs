@@ -3,31 +3,37 @@ use crate::position::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
 use crate::errors::{Result, SvgdxError};
-use lazy_regex::regex;
-use regex::Captures;
 
 fn get_text_value(element: &mut SvgElement) -> String {
     let text_value = element
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
-    // Convert unescaped '\n' into newline characters for multi-line text
-    let re = regex!(r"\\n");
-    let text_value = re.replace_all(&text_value, |caps: &Captures| {
-        let inner = caps.get(0).expect("Matched regex must have this group");
-        // Check if the newline is escaped; do this here rather than within the regex
-        // to avoid the need for an extra initial character which can cause matches
-        // to overlap and fail replacement. We're safe to look at the previous byte
-        // since Match.start() is guaranteed to be a utf8 char boundary, and '\' has
-        // the top bit clear, so will only match on a one-byte utf8 char.
-        let start = inner.start();
-        if start > 0 && text_value.as_bytes()[start - 1] == b'\\' {
-            inner.as_str().to_string()
+    text_string(&text_value)
+}
+
+/// Convert unescaped r"\n" into newline characters for multi-line text
+fn text_string(text_value: &str) -> String {
+    let mut result = String::new();
+    let mut remain = text_value;
+    while !remain.is_empty() {
+        if let Some(idx) = remain.find("\\n") {
+            let (start, new_remain) = remain.split_at(idx);
+            remain = &new_remain[2..]; // Skip the two chars '\', 'n'
+            if idx > 0 && start.ends_with('\\') {
+                // Escaped newline; re-apply the backslash and continue
+                result.push_str(&start[..idx - 1]);
+                result.push_str("\\n");
+            } else {
+                result.push_str(start);
+                result.push('\n');
+            }
         } else {
-            "\n".to_owned()
+            // No more newlines
+            result.push_str(remain);
+            break;
         }
-    });
-    // Following that, replace any escaped "\\n" into literal '\'+'n' characters
-    text_value.replace("\\\\n", "\\n")
+    }
+    result
 }
 
 fn get_text_position<'a>(
@@ -276,4 +282,23 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
     Ok((orig_elem, text_elements))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_text_string() {
+        let text = r"Hello, \nworld!";
+        assert_eq!(text_string(text), "Hello, \nworld!");
+
+        // when not part of a '\n', '\' is not special
+        let text = r"Hello, world! \1";
+        assert_eq!(text_string(text), "Hello, world! \\1");
+
+        // when precedes '\n', '\' escapes it.
+        let text = r"Hello, \\nworld!";
+        assert_eq!(text_string(text), r"Hello, \nworld!");
+    }
 }

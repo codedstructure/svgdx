@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
 #[derive(Clone, Debug, Default)]
 pub struct Position {
@@ -844,68 +844,44 @@ impl FromStr for TrblLength {
 }
 
 /// Parse a elref + optional locspec, e.g. `#id@tl:10%` or `#id`
-pub fn parse_el_loc(s: &str) -> Result<(String, Option<LocSpec>)> {
-    let mut chars = s.chars();
-    if chars.next() != Some('#') {
-        return Err(SvgdxError::InvalidData(format!("Invalid locspec {s}")));
+pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
+    let (elref, remain) = extract_elref(s)?;
+    if remain.is_empty() {
+        return Ok((elref, None));
     }
-    let mut id = String::new();
+    let remain = remain
+        .strip_prefix('@')
+        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: {s}")))?;
+    let mut chars = remain.chars();
     let mut loc = String::new();
-    loop {
-        match chars.next() {
-            Some('@') => {
-                if id.is_empty() {
-                    return Err(SvgdxError::InvalidData(format!("Invalid locspec {s}")));
-                }
-                break;
-            }
-            Some(c) => id.push(c),
-            None => return Ok((id, None)),
-        }
-    }
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
                 return Err(SvgdxError::ParseError(format!("Invalid locspec: {s}")))
             }
             Some(c) => loc.push(c),
-            None if loc.is_empty() => {
-                return Err(SvgdxError::ParseError(format!("Invalid locspec: {s}")))
-            }
-            None => return Ok((id, Some(loc.parse()?))),
+            None => return Ok((elref, Some(loc.parse()?))),
         }
     }
 }
 
-pub fn parse_el_scalar(s: &str) -> Result<(String, Option<ScalarSpec>)> {
-    let mut chars = s.chars();
-    if chars.next() != Some('#') {
-        return Err(SvgdxError::InvalidData(format!("Invalid scalarspec {s}")));
+pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
+    let (elref, remain) = extract_elref(s)?;
+    if remain.is_empty() {
+        return Ok((elref, None));
     }
-    let mut id = String::new();
+    let remain = remain
+        .strip_prefix('.')
+        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))?;
+    let mut chars = remain.chars();
     let mut scalar = String::new();
-    loop {
-        match chars.next() {
-            Some('.') => {
-                if id.is_empty() {
-                    return Err(SvgdxError::InvalidData(format!("Invalid scalarspec {s}")));
-                }
-                break;
-            }
-            Some(c) => id.push(c),
-            None => return Ok((id, None)),
-        }
-    }
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
                 return Err(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))
             }
             Some(c) => scalar.push(c),
-            None if scalar.is_empty() => {
-                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))
-            }
-            None => return Ok((id, Some(scalar.parse()?))),
+            None => return Ok((elref, Some(scalar.parse()?))),
         }
     }
 }
@@ -918,13 +894,16 @@ mod test {
     fn test_parse_loc() {
         assert_eq!(
             parse_el_loc("#a@b").unwrap(),
-            ("a".to_owned(), Some(LocSpec::Bottom))
+            (ElRef::Id("a".to_string()), Some(LocSpec::Bottom))
         );
         assert_eq!(
             parse_el_loc("#id@tl").unwrap(),
-            ("id".to_owned(), Some(LocSpec::TopLeft))
+            (ElRef::Id("id".to_string()), Some(LocSpec::TopLeft))
         );
-        assert_eq!(parse_el_loc("#id").unwrap(), ("id".to_owned(), None));
+        assert_eq!(
+            parse_el_loc("#id").unwrap(),
+            (ElRef::Id("id".to_string()), None)
+        );
         assert!(parse_el_loc("#id@").is_err());
         assert!(parse_el_loc("#id@ l").is_err());
     }

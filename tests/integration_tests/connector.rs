@@ -243,3 +243,15 @@ fn test_connector_use() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_connector_edgespec() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="10" wh="10"/>
+<polyline start="#a@r:70%" end="#b@t:30%"/>
+"##;
+    let expected = r#"<polyline points="10 7, 13 7, 13 10"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
