@@ -479,14 +479,6 @@ impl SvgElement {
         }
     }
 
-    /// 'phantom' elements in the input do not (directly) generate any output events
-    pub fn is_phantom_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "config" | "specs" | "var" | "loop" | "if" | "point"
-        )
-    }
-
     /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
     /// Note `reuse` is not a standard SVG element, but is used here in similar
     /// contexts to the `use` element.
@@ -676,7 +668,7 @@ impl SvgElement {
                 let y = strp(y)?;
                 Ok(Some(BoundingBox::new(x, y, x, y)))
             }
-            "rect" | "image" | "svg" | "foreignObject" => {
+            "box" | "rect" | "image" | "svg" | "foreignObject" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
                     let x = self.attrs.get("x").unwrap_or(&zstr);
                     let y = self.attrs.get("y").unwrap_or(&zstr);

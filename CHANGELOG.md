@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: "box" element. Analogous to the "point" element, but defining a
+  'phantom' rectangle which may be used for relative positioning.
+
 - Internal: replaced regex with basic string parsing throughout, eliminating
   a dependency and reducing size of WASM build.
 
