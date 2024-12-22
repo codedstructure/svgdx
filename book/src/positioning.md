@@ -26,18 +26,24 @@ For each of these, a further numeric value can be given which provides the 'marg
 
 So we can have:
 
-![](./images/positioning-simple-1.svg)
-
-```xml
-{{#include ./images/positioning-simple-1.xml}}
+```svgdx+xml
+<svg>
+ <rect xy="0" wh="20" text="a"/>
+ <rect xy="^:h" wh="20" text="b"/>
+ <rect xy="^:v" wh="20" text="c"/>
+ <rect xy="^:h" wh="20" text="d"/>
+</svg>
 ```
 
 or:
 
-![](./images/positioning-simple-2.svg)
-
-```xml
-{{#include ./images/positioning-simple-2.xml}}
+```svgdx+xml
+<svg>
+ <rect xy="0" wh="20" text="A"/>
+ <rect xy="^:h 10" wh="20" text="B"/>
+ <rect xy="^:V 5" wh="20" text="C"/>
+ <rect xy="^:H 10" wh="20" text="D"/>
+</svg>
 ```
 
 ## Layout
@@ -46,6 +52,18 @@ The most important concept for positioning is the element **bounding box**. This
 
 The diagram below shows the bounding box (blue dashed line) of several shapes (in red).
 
-![](./images/bounding-boxes.svg)
+```svgdx
+<svg>
+ <rect id="r1" xy="0" wh="30 20" class="d-none d-fill-red"/>
+ <circle id="c1" cxy="50 10" r="10" class="d-none d-fill-red"/>
+ <polyline id="pl1" points="60,30 40,50 60,70" class="d-red"/>
+ <polygon id="pg1" points="10,30 30,50 30,60 10,70 0,60 0,40" class="d-none d-fill-red"/>
+
+ <rect surround="#r1" class="d-blue d-dash"/>
+ <rect surround="#c1" class="d-blue d-dash"/>
+ <rect surround="#pl1" class="d-blue d-dash"/>
+ <rect surround="#pg1" class="d-blue d-dash"/>
+</svg>
+```
 
 Each bounding box has nine 'locations' which can be used as related
