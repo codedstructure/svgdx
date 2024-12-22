@@ -8,14 +8,14 @@ SVG supports a number of different 'basic shapes', as well as support for comple
 
 ## The `text` attribute
 
-Consider the following (not very interesting!) image:
+Consider the following (not very interesting!) image and source:
 
-![](./images/text-shape.svg)
-
-This is generated from the following `svgdx` document:
-
-```xml
-{{#include ./images/text-shape.xml}}
+```svgdx+xml
+<svg>
+  <rect xy="0" wh="40 10" text="I am a rectangle!"/>
+  <circle cxy="20 30" r="15" text="I am a circle!"/>
+  <rect xy="50 0" wh="50" text="I am a square!"/>
+</svg>
 ```
 
 The value of any `text` attribute is extracted and a new `<text>` element is created placed so it appears within the shape - centered by default.

@@ -67,16 +67,11 @@ As a convenience, `svgdx` translates an `<svg>` root element as follows:
 
 When the above SVG is passed through `svgdx`, it outputs the following[^4]. Note how the addition of `width`, `height` and `viewBox` attributes cause the entire image - and only the image - to be rendered.
 
-![](./images/minimal-svg-processed.svg)
-
-```xml
-{{#include ./images/minimal-svg-processed.svg}}
-```
-
 Using the shortcuts introduced so far, this SVG file can be created from the following input to `svgdx`:
 
-```xml
+```xml+svgdx
 <svg>
+  <config add-auto-styles="false"/>
   <rect xy="0" wh="120 50" fill="red"/>
   <rect xy="120 0" wh="120 50" fill="green"/>
   <rect xy="240 0" wh="120 50" fill="blue"/>
