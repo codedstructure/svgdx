@@ -114,7 +114,8 @@ impl EventGen for LoopElement {
                 loop_var_value += loop_step;
                 if iteration > context.config.loop_limit {
                     return Err(SvgdxError::LoopLimitError(
-                        "Excessive looping detected".to_string(),
+                        iteration,
+                        context.config.loop_limit,
                     ));
                 }
             }

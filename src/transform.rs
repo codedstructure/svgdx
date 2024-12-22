@@ -316,12 +316,11 @@ impl EventGen for VarElement {
                 let value = eval_attr(&value, context);
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
-                    return Err(SvgdxError::VarLimitError(format!(
-                        "Variable `{}` value too long: {} (var-limit: {})",
-                        key,
+                    return Err(SvgdxError::VarLimitError(
+                        key.clone(),
                         value.len(),
-                        context.config.var_limit
-                    )));
+                        context.config.var_limit,
+                    ));
                 }
                 new_vars.push((key, value));
             }

@@ -60,9 +60,7 @@ fn split_relspec<'a, 'b>(
         if let Some(el) = ctx.get_element(&elref) {
             Ok((Some(el), remain.trim_start()))
         } else {
-            Err(SvgdxError::ReferenceError(format!(
-                "Reference to unknown element '{elref}'",
-            )))
+            Err(SvgdxError::ReferenceError(elref))
         }
     } else {
         Ok((None, input))
@@ -555,9 +553,10 @@ impl SvgElement {
         let mut bbox_list = vec![];
 
         for elref in attr_split(&ref_list) {
-            let el = ctx.get_element(&elref.parse()?).ok_or_else(|| {
-                SvgdxError::ReferenceError(format!("Element {elref} not found at this time"))
-            })?;
+            let elref = elref.parse()?;
+            let el = ctx
+                .get_element(&elref)
+                .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
             {
                 let bb = if is_surround {
                     ctx.get_element_bbox(el)
@@ -920,7 +919,7 @@ impl SvgElement {
                     Some((x + dx, y + dy))
                 }
             } else {
-                return Err(SvgdxError::ReferenceError(format!(
+                return Err(SvgdxError::GeometryError(format!(
                     "Could not determine location from {loc_str}"
                 )));
             }

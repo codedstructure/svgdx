@@ -6,6 +6,7 @@ use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::{process_events, EventGen};
 use crate::transform_attr::TransformAttr;
+use crate::types::ElRef;
 
 use itertools::Itertools;
 
@@ -25,12 +26,11 @@ impl EventGen for ReuseElement {
         let elref = reuse_element.get_attr("href").ok_or_else(|| {
             SvgdxError::InvalidData("reuse element should have an href attribute".to_owned())
         })?;
+        let elref: ElRef = elref.parse()?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
-            .get_original_element(elref.strip_prefix('#').ok_or_else(|| {
-                SvgdxError::InvalidData("href value should begin with '#'".to_owned())
-            })?)
-            .ok_or_else(|| SvgdxError::ReferenceError(format!("unknown reference '{}'", elref)))?
+            .get_original_element(&elref)
+            .ok_or_else(|| SvgdxError::ReferenceError(elref))?
             .clone();
 
         // Override 'default' attr values in the target

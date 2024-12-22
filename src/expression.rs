@@ -284,9 +284,7 @@ impl<'a> EvalState<'a> {
 
     fn lookup(&mut self, v: &str) -> Result<ExprValue> {
         if self.checked_vars.iter().contains(&String::from(v)) {
-            return Err(SvgdxError::CircularRefError(
-                "Circular reference in variable lookup".to_owned(),
-            ));
+            return Err(SvgdxError::CircularRefError(v.to_owned()));
         }
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
@@ -339,9 +337,7 @@ impl<'a> EvalState<'a> {
                     )))
                 }
             } else {
-                Err(SvgdxError::ReferenceError(format!(
-                    "Element #{elref} not found"
-                )))
+                Err(SvgdxError::ReferenceError(elref))
             }
         } else {
             Err(SvgdxError::ParseError(format!("Invalid element_ref: {v}")))

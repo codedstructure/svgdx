@@ -150,10 +150,10 @@ impl Connector {
         let mut element = element.clone();
         let start_ref = element
             .pop_attr("start")
-            .ok_or_else(|| SvgdxError::ElementError("No 'start' element".to_owned()))?;
+            .ok_or_else(|| SvgdxError::MissingAttribute("start".to_string()))?;
         let end_ref = element
             .pop_attr("end")
-            .ok_or_else(|| SvgdxError::ElementError("No 'end' element".to_owned()))?;
+            .ok_or_else(|| SvgdxError::MissingAttribute("end".to_string()))?;
         let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
             Some(
                 strp_length(&o_inner)
@@ -219,7 +219,7 @@ impl Connector {
             ),
             (Some(start_point), None) => {
                 let end_el =
-                    end_el.ok_or_else(|| SvgdxError::ElementError("no end_el".to_owned()))?;
+                    end_el.ok_or_else(|| SvgdxError::InvalidData("no end_el".to_owned()))?;
                 if end_loc.is_none() {
                     let eloc = closest_loc(end_el, start_point, conn_type, elem_map)?;
                     end_loc = Some(eloc);
@@ -236,7 +236,7 @@ impl Connector {
             }
             (None, Some(end_point)) => {
                 let start_el =
-                    start_el.ok_or_else(|| SvgdxError::ElementError("no start_el".to_owned()))?;
+                    start_el.ok_or_else(|| SvgdxError::InvalidData("no start_el".to_owned()))?;
                 if start_loc.is_none() {
                     let sloc = closest_loc(start_el, end_point, conn_type, elem_map)?;
                     start_loc = Some(sloc);
@@ -253,8 +253,8 @@ impl Connector {
             }
             (None, None) => {
                 let (start_el, end_el) = (
-                    start_el.ok_or_else(|| SvgdxError::ElementError("no start_el".to_owned()))?,
-                    end_el.ok_or_else(|| SvgdxError::ElementError("no end_el".to_owned()))?,
+                    start_el.ok_or_else(|| SvgdxError::InvalidData("no start_el".to_owned()))?,
+                    end_el.ok_or_else(|| SvgdxError::InvalidData("no end_el".to_owned()))?,
                 );
                 if start_loc.is_none() && end_loc.is_none() {
                     let (sloc, eloc) = shortest_link(start_el, end_el, conn_type, elem_map)?;

@@ -100,16 +100,14 @@ impl ElementMap for TransformerContext {
                 })?;
 
                 if already.contains(&href) {
-                    return Err(SvgdxError::CircularRefError(format!(
-                        "Circular reference: {href}"
-                    )));
+                    return Err(SvgdxError::CircularRefError(href));
                 }
                 already.push(href.clone());
 
                 let elref: ElRef = href.parse()?;
-                let target_el = ctx.get_element(&elref).ok_or_else(|| {
-                    SvgdxError::ReferenceError(format!("Could not find element with id '{href}'"))
-                })?;
+                let target_el = ctx
+                    .get_element(&elref)
+                    .ok_or_else(|| SvgdxError::ReferenceError(elref))?;
                 // recurse to get bbox of the target
                 inner(target_el, ctx, already)?
             } else {
@@ -198,8 +196,11 @@ impl TransformerContext {
         self.events = events;
     }
 
-    pub fn get_original_element(&self, id: &str) -> Option<&SvgElement> {
-        self.original_map.get(id)
+    pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
+        match elref {
+            ElRef::Id(id) => self.original_map.get(id),
+            ElRef::Prev => self.prev_element.as_ref(),
+        }
     }
 
     pub fn seed_rng(&mut self, seed: u64) {
@@ -231,10 +232,10 @@ impl TransformerContext {
     pub fn inc_depth(&mut self) -> Result<()> {
         self.current_depth += 1;
         if self.current_depth > self.config.depth_limit {
-            return Err(SvgdxError::DepthLimitExceeded(format!(
-                "Recursion depth limit ({}) exceeded",
-                self.config.depth_limit
-            )));
+            return Err(SvgdxError::DepthLimitExceeded(
+                self.current_depth,
+                self.config.depth_limit,
+            ));
         }
         Ok(())
     }
