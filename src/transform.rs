@@ -262,6 +262,7 @@ impl EventGen for ConfigElement {
                 "font-family" => new_config.font_family.clone_from(value),
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
+                "svg-style" => new_config.svg_style = Some(value.clone()),
                 _ => {
                     return Err(SvgdxError::InvalidData(format!(
                         "Unknown config setting {key}"
@@ -543,6 +544,9 @@ impl Transformer {
             if let Some(local_id) = &self.context.local_style_id {
                 new_svg_attrs.insert("id", local_id.as_str());
             }
+        }
+        if let Some(svg_style) = &self.context.config.svg_style {
+            new_svg_attrs.insert("style", svg_style.as_str());
         }
         // If width or height are provided, leave width/height/viewBox alone.
         let orig_width = orig_svg_attrs.get("width");

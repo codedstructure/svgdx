@@ -30,6 +30,7 @@ The following configuration settings can be applied using this element. These co
 | loop-limit | integer | `loop-limit="9999"` |
 | var-limit | integer | `var-limit="4096"` |
 | depth-limit | integer | `depth-limit="10000"` |
+| svg-style | string | `max-width: 100%; height: auto;` |
 
 ### `var`
 

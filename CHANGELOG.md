@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: new config option `svg-style` available as `TransformConfig::svg_style`
+  or `--svg-style` command line argument, inserted as `style` attribute on the
+  root SVG. Use-case is to provide CSS when embedded in a larger document.
+
 - Added: "box" element. Analogous to the "point" element, but defining a
   'phantom' rectangle which may be used for relative positioning.
 

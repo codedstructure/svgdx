@@ -103,6 +103,8 @@ pub struct TransformConfig {
     pub theme: ThemeType,
     /// Make styles local to this document
     pub use_local_styles: bool,
+    /// Optional style to apply to SVG root element
+    pub svg_style: Option<String>,
 }
 
 impl Default for TransformConfig {
@@ -122,6 +124,7 @@ impl Default for TransformConfig {
             font_family: "sans-serif".to_owned(),
             theme: ThemeType::default(),
             use_local_styles: false,
+            svg_style: None,
         }
     }
 }

@@ -87,6 +87,10 @@ struct Arguments {
     /// Theme to use
     #[arg(long, default_value = "default")]
     theme: ThemeType,
+
+    /// Optional style to apply to SVG root element
+    #[arg(long)]
+    svg_style: Option<String>,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -150,6 +154,7 @@ impl Config {
                 font_size: args.font_size,
                 font_family: args.font_family,
                 theme: args.theme,
+                svg_style: args.svg_style,
             },
         })
     }
