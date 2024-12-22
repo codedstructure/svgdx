@@ -23,9 +23,9 @@ impl EventGen for ReuseElement {
         reuse_element.eval_attributes(context);
 
         context.push_element(&reuse_element);
-        let elref = reuse_element.get_attr("href").ok_or_else(|| {
-            SvgdxError::InvalidData("reuse element should have an href attribute".to_owned())
-        })?;
+        let elref = reuse_element
+            .get_attr("href")
+            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
         let elref: ElRef = elref.parse()?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
@@ -52,7 +52,7 @@ impl EventGen for ReuseElement {
         // However we *do* want the instance element to inherit any `id` which
         // was on the `reuse` element.
         let ref_id = instance_element.pop_attr("id").ok_or_else(|| {
-            SvgdxError::InvalidData("referenced element should have id".to_owned())
+            SvgdxError::InternalLogicError("referenced element should have id".to_owned())
         })?;
         if let Some(inst_id) = reuse_element.get_attr("id") {
             instance_element.set_attr("id", &inst_id);

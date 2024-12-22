@@ -84,7 +84,7 @@ fn closest_loc(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .ok_or_else(|| SvgdxError::GeometryError("no bbox for element".to_owned()))?;
+        .ok_or_else(|| SvgdxError::MissingBoundingBox(this.to_string()))?;
 
     for loc in edge_locations(conn_type) {
         let this_coord = this_bb.locspec(loc);
@@ -110,10 +110,10 @@ fn shortest_link(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .ok_or_else(|| SvgdxError::GeometryError("no bbox for element".to_owned()))?;
+        .ok_or_else(|| SvgdxError::MissingBoundingBox(this.to_string()))?;
     let that_bb = context
         .get_element_bbox(that)?
-        .ok_or_else(|| SvgdxError::GeometryError("no bbox for element".to_owned()))?;
+        .ok_or_else(|| SvgdxError::MissingBoundingBox(that.to_string()))?;
 
     for this_loc in edge_locations(conn_type) {
         for that_loc in edge_locations(conn_type) {
@@ -219,7 +219,7 @@ impl Connector {
             ),
             (Some(start_point), None) => {
                 let end_el =
-                    end_el.ok_or_else(|| SvgdxError::InvalidData("no end_el".to_owned()))?;
+                    end_el.ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?;
                 if end_loc.is_none() {
                     let eloc = closest_loc(end_el, start_point, conn_type, elem_map)?;
                     end_loc = Some(eloc);
@@ -227,7 +227,7 @@ impl Connector {
                 }
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::GeometryError("no bounding box".to_owned()))?
+                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
                     .locspec(end_loc.expect("Set from closest_loc"));
                 (
                     Endpoint::new(start_point, start_dir),
@@ -235,8 +235,8 @@ impl Connector {
                 )
             }
             (None, Some(end_point)) => {
-                let start_el =
-                    start_el.ok_or_else(|| SvgdxError::InvalidData("no start_el".to_owned()))?;
+                let start_el = start_el
+                    .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?;
                 if start_loc.is_none() {
                     let sloc = closest_loc(start_el, end_point, conn_type, elem_map)?;
                     start_loc = Some(sloc);
@@ -244,7 +244,7 @@ impl Connector {
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::GeometryError("no bounding box".to_owned()))?
+                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
                     .locspec(start_loc.expect("Set from closest_loc"));
                 (
                     Endpoint::new(start_coord, start_dir),
@@ -253,8 +253,9 @@ impl Connector {
             }
             (None, None) => {
                 let (start_el, end_el) = (
-                    start_el.ok_or_else(|| SvgdxError::InvalidData("no start_el".to_owned()))?,
-                    end_el.ok_or_else(|| SvgdxError::InvalidData("no end_el".to_owned()))?,
+                    start_el
+                        .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?,
+                    end_el.ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?,
                 );
                 if start_loc.is_none() && end_loc.is_none() {
                     let (sloc, eloc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
@@ -265,9 +266,7 @@ impl Connector {
                 } else if start_loc.is_none() {
                     let end_coord = elem_map
                         .get_element_bbox(end_el)?
-                        .ok_or_else(|| {
-                            SvgdxError::GeometryError("no bbox for end_coord".to_owned())
-                        })?
+                        .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
                         .locspec(end_loc.expect("Not both None"));
                     let sloc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
                     start_loc = Some(sloc);
@@ -275,9 +274,7 @@ impl Connector {
                 } else if end_loc.is_none() {
                     let start_coord = elem_map
                         .get_element_bbox(start_el)?
-                        .ok_or_else(|| {
-                            SvgdxError::GeometryError("no bbox for start_coord".to_owned())
-                        })?
+                        .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
                         .locspec(start_loc.expect("Not both None"));
                     let eloc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
                     end_loc = Some(eloc);
@@ -285,11 +282,11 @@ impl Connector {
                 }
                 let start_coord = elem_map
                     .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::GeometryError("no bbox for start_coord".to_owned()))?
+                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
                     .locspec(start_loc.expect("Set above"));
                 let end_coord = elem_map
                     .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::GeometryError("no bbox for end_coord".to_owned()))?
+                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
                     .locspec(end_loc.expect("Set above"));
                 (
                     Endpoint::new(start_coord, start_dir),
@@ -324,12 +321,12 @@ impl Connector {
                 // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = start_el.bbox()?.ok_or_else(|| {
-                            SvgdxError::GeometryError("start element bbox".to_owned())
-                        })?;
-                        let end_bb = end_el.bbox()?.ok_or_else(|| {
-                            SvgdxError::GeometryError("end element bbox".to_owned())
-                        })?;
+                        let start_bb = start_el
+                            .bbox()?
+                            .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?;
+                        let end_bb = end_el
+                            .bbox()?
+                            .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?;
                         let overlap_top = start_bb
                             .scalarspec(ScalarSpec::Miny)
                             .max(end_bb.scalarspec(ScalarSpec::Miny));
@@ -355,12 +352,12 @@ impl Connector {
                 // If we have start and end elements, use midpoint of overlapping region
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = ctx.get_element_bbox(start_el)?.ok_or_else(|| {
-                            SvgdxError::GeometryError("start element bbox".to_owned())
-                        })?;
-                        let end_bb = ctx.get_element_bbox(end_el)?.ok_or_else(|| {
-                            SvgdxError::GeometryError("end element bbox".to_owned())
-                        })?;
+                        let start_bb = ctx
+                            .get_element_bbox(start_el)?
+                            .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?;
+                        let end_bb = ctx
+                            .get_element_bbox(end_el)?
+                            .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?;
                         let overlap_left = start_bb
                             .scalarspec(ScalarSpec::Minx)
                             .max(end_bb.scalarspec(ScalarSpec::Minx));

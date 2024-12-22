@@ -132,7 +132,7 @@ fn get_text_position<'a>(
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element
         .bbox()?
-        .ok_or_else(|| SvgdxError::GeometryError("No BoundingBox".to_owned()))?
+        .ok_or_else(|| SvgdxError::MissingBoundingBox(element.to_string()))?
         .locspec(text_anchor);
     tdx += t_dx;
     tdy += t_dy;

@@ -340,10 +340,12 @@ impl EventGen for IfElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        if let (Some(inner_events), Some(cond)) =
-            (self.0.inner_events(context), self.0.get_attr("test"))
-        {
-            if eval_condition(&cond, context)? {
+        let test = self
+            .0
+            .get_attr("test")
+            .ok_or_else(|| SvgdxError::MissingAttribute("test".to_owned()))?;
+        if let Some(inner_events) = self.0.inner_events(context) {
+            if eval_condition(&test, context)? {
                 // opening if element is not included in the processed inner events to avoid
                 // infinite recursion...
                 return process_events(inner_events.clone(), context);

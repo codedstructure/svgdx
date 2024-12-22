@@ -95,9 +95,9 @@ impl ElementMap for TransformerContext {
             let mut el_bbox = if el.name == "use" || el.name == "reuse" {
                 // use and reuse elements reference another element - get the bbox of the target
                 // (which could be another (re)use element)
-                let href = el.get_attr("href").ok_or_else(|| {
-                    SvgdxError::InvalidData("Could not determine href for element".to_owned())
-                })?;
+                let href = el
+                    .get_attr("href")
+                    .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
 
                 if already.contains(&href) {
                     return Err(SvgdxError::CircularRefError(href));

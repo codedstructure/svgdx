@@ -45,8 +45,8 @@ impl TryFrom<&SvgElement> for LoopDef {
         } else if let Some(until_expr) = element.get_attr("until") {
             loop_type = LoopType::Until(until_expr);
         } else {
-            return Err(SvgdxError::ParseError(
-                "Loop element should have a count, while or until attribute".to_string(),
+            return Err(SvgdxError::MissingAttribute(
+                "count | while | until".to_string(),
             ));
         }
         Ok(Self {

@@ -570,9 +570,7 @@ impl SvgElement {
                 if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
                 } else {
-                    return Err(SvgdxError::InvalidData(format!(
-                        "Element {elref} has no bounding box at this time"
-                    )));
+                    return Err(SvgdxError::MissingBoundingBox(el.to_string()));
                 }
             }
         }
@@ -919,7 +917,7 @@ impl SvgElement {
                     Some((x + dx, y + dy))
                 }
             } else {
-                return Err(SvgdxError::GeometryError(format!(
+                return Err(SvgdxError::MissingBoundingBox(format!(
                     "Could not determine location from {loc_str}"
                 )));
             }

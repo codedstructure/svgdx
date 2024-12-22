@@ -25,8 +25,9 @@ pub enum SvgdxError {
     CircularRefError(String),
     DocumentError(String),
     MissingAttribute(String),
-    GeometryError(String),
+    MissingBoundingBox(String),
     MessageError(String),
+    InternalLogicError(String),
     MultiError(HashMap<OrderIndex, (SvgElement, SvgdxError)>),
     OtherError(Box<dyn std::error::Error>),
 }
@@ -56,8 +57,9 @@ impl fmt::Display for SvgdxError {
             }
             SvgdxError::DocumentError(reason) => write!(f, "Document error: {}", reason),
             SvgdxError::MissingAttribute(attr) => write!(f, "Element missing attribute '{}'", attr),
-            SvgdxError::GeometryError(reason) => write!(f, "Geometry error: {}", reason),
+            SvgdxError::MissingBoundingBox(reason) => write!(f, "Missing bounding box: {}", reason),
             SvgdxError::MessageError(reason) => write!(f, "{}", reason),
+            SvgdxError::InternalLogicError(reason) => write!(f, "Internal logic error: {}", reason),
             SvgdxError::MultiError(errors) => {
                 for (_, (el, err)) in errors.iter().sorted_by(|a, b| a.0.cmp(b.0)) {
                     write!(f, "\n {:>4}: {}: {}", el.src_line, el.original, err)?;
@@ -82,8 +84,9 @@ impl Error for SvgdxError {
             SvgdxError::CircularRefError(_) => None,
             SvgdxError::DocumentError(_) => None,
             SvgdxError::MissingAttribute(_) => None,
-            SvgdxError::GeometryError(_) => None,
+            SvgdxError::MissingBoundingBox(_) => None,
             SvgdxError::MessageError(_) => None,
+            SvgdxError::InternalLogicError(_) => None,
             SvgdxError::MultiError(_) => None,
             SvgdxError::OtherError(e) => Some(&**e),
         }

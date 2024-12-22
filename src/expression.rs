@@ -332,9 +332,7 @@ impl<'a> EvalState<'a> {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {
                     Ok(bb.scalarspec(scalar).into())
                 } else {
-                    Err(SvgdxError::GeometryError(format!(
-                        "No bounding box for element {elref}"
-                    )))
+                    Err(SvgdxError::MissingBoundingBox(elem.to_string()))
                 }
             } else {
                 Err(SvgdxError::ReferenceError(elref))
