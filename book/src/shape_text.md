@@ -10,7 +10,7 @@ SVG supports a number of different 'basic shapes', as well as support for comple
 
 Consider the following (not very interesting!) image and source:
 
-```svgdx+xml
+```svgdx-xml
 <svg>
   <rect xy="0" wh="40 10" text="I am a rectangle!"/>
   <circle cxy="20 30" r="15" text="I am a circle!"/>
@@ -32,11 +32,29 @@ Note the use of the `d-tbox` class; CSS is used to anchor text as required; for 
 
 The text attribute works well where there is a single short text value - perhaps a label - attached to another element. If the text is longer, squeezing into a single attribute could be messy. There are several ways of dealing with this:
 
-```xml
-{{#include ./images/text-multiline.xml}}
-```
+```xml-svgdx
+<svg>
+  <rect id="r" xy="0" wh="50 20" text="One way to implement multiple
+line text - by splitting the `text`
+attribute over several lines."/>
 
-![](./images/text-multiline.svg)
+  <rect xy="^:h 5" wh="50 20" text="Or use '\\n'\nto separate\nlines"/>
+
+  <rect xy="#r:v 5" wh="50 20">
+    And you can just
+    put the text as
+    the element content.
+  </rect>
+
+  <rect xy="^:h 5" wh="50 20">
+<![CDATA[The content can be a CDATA
+  block, allowing things such
+  as "i < &j" without the need
+  for escaping.
+]]>
+  </rect>
+</svg>
+```
 
 ## Text positioning
 
