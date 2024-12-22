@@ -69,7 +69,7 @@ When the above SVG is passed through `svgdx`, it outputs the following[^4]. Note
 
 Using the shortcuts introduced so far, this SVG file can be created from the following input to `svgdx`:
 
-```xml+svgdx
+```xml-svgdx
 <svg>
   <config add-auto-styles="false"/>
   <rect xy="0" wh="120 50" fill="red"/>

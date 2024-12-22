@@ -26,7 +26,7 @@ For each of these, a further numeric value can be given which provides the 'marg
 
 So we can have:
 
-```svgdx+xml
+```svgdx-xml-inline
 <svg>
  <rect xy="0" wh="20" text="a"/>
  <rect xy="^:h" wh="20" text="b"/>
@@ -37,7 +37,7 @@ So we can have:
 
 or:
 
-```svgdx+xml
+```svgdx-xml-inline
 <svg>
  <rect xy="0" wh="20" text="A"/>
  <rect xy="^:h 10" wh="20" text="B"/>
@@ -66,4 +66,23 @@ The diagram below shows the bounding box (blue dashed line) of several shapes (i
 </svg>
 ```
 
-Each bounding box has nine 'locations' which can be used as related
+Each bounding box has nine 'locations' which can be used as relative positioning points, as shown here:
+
+```svgdx
+<svg>
+<config font-size="4" font-family="monospace"/>
+<style>circle {stroke:none}</style>
+<rect id="r1" wh="50" class="d-fill-beige"/>
+<circle r="5" cxy="#r1@tl" text="tl"/>
+<circle r="5" cxy="#r1@t" text="t"/>
+<circle r="5" cxy="#r1@tr" text="tr"/>
+<circle r="5" cxy="#r1@r" text="r"/>
+<circle r="5" cxy="#r1@br" text="br"/>
+<circle r="5" cxy="#r1@b" text="b"/>
+<circle r="5" cxy="#r1@bl" text="bl"/>
+<circle r="5" cxy="#r1@l" text="l"/>
+<circle r="5" cxy="#r1@c" text="c"/>
+</svg>
+```
+
+A mnemonic to remember these positions is "TRBL", so stay out of 'trouble' by remembering these! A further point to note is that for the corner positions, the Top/Bottom indicator is always before the Left/Right indicator, so it's always `br` - not `rb` - for the bottom-right corner.

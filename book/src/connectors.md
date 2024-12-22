@@ -10,8 +10,13 @@ Connections between elements are a key part of diagrams, where they can represen
 
 Given two elements with unique `id` attributes, a connection between them may be created using the `<line>` or `<polyline>` element with `start` and `end` attributes of the relevant id references:
 
-![](./images/simple.svg)
+```svgdx-xml
+<svg>
+  <rect id="in" wh="20 10" text="input" />
+  <rect id="proc" xy="^:h 10" wh="^" text="process" />
+  <rect id="out" xy="^:h 10" wh="^" text="output" />
 
-```xml
-{{#include ./images/simple.xml}}
+  <line start="#in" end="#proc" class="d-arrow"/>
+  <line start="#proc" end="#out" class="d-arrow"/>
+</svg>
 ```
