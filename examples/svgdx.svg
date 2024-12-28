@@ -7,23 +7,24 @@
   <style>
   <![CDATA[
     svg { background: none; }
+    .d-surround { fill: none; }
+    svg * { stroke-linecap: round; stroke-linejoin: round; }
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black }
+    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+    .d-fill-green { fill: green; }
+    text.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+    .d-fill-orange { fill: orange; }
+    text.d-fill-orange, text.d-fill-orange * { fill: white; stroke: black; }
+    .d-fill-papayawhip { fill: papayawhip; }
+    text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; stroke: white; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
     text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     marker path { fill: inherit; }
-    .d-dash { stroke-dasharray: 1.5 0.5; }
-    .d-dot { stroke-dasharray: 0.5 0.5; }
-    .d-surround:not(text,tspan) { fill: none; }
-    .d-fill-green:not(text,tspan) { fill: green; }
-    text.d-fill-green, text.d-fill-green * { fill: white; }
-    .d-fill-orange:not(text,tspan) { fill: orange; }
-    text.d-fill-orange, text.d-fill-orange * { fill: white; }
-    .d-fill-papayawhip:not(text,tspan) { fill: papayawhip; }
-    text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; }
-    .d-fill-red:not(text,tspan) { fill: red; }
-    text.d-fill-red, text.d-fill-red * { fill: white; }
+    .d-dash { stroke-dasharray: 1 1.5; }
+    .d-dot { stroke-dasharray: 0 1; }
   ]]>
   </style>
     <style>text {font-weight: bold; font-size:4px}</style>
@@ -31,11 +32,11 @@
     <rect x="-44" y="-5" width="78" height="18" opacity="0.5" class="d-dash d-fill-red d-surround"/>
     <rect x="-4" y="-3" width="78" height="18" opacity="0.5" class="d-dot d-fill-green d-surround"/>
     <rect id="svgdx" width="30" height="10" class="d-fill-orange"/>
-    <text x="15" y="5" class="d-fill-orange d-text">svgdx</text>
+    <text x="15" y="5" class="d-text d-fill-orange">svgdx</text>
     <rect id="input" x="-40" y="0" width="30" height="10" rx="3" class="d-fill-red"/>
-    <text x="-25" y="5" class="d-fill-red d-text">svgdx.xml</text>
+    <text x="-25" y="5" class="d-text d-fill-red">svgdx.xml</text>
     <rect id="output" x="40" y="0" width="30" height="10" rx="3" class="d-fill-green"/>
-    <text x="55" y="5" class="d-fill-green d-text">svgdx.svg</text>
+    <text x="55" y="5" class="d-text d-fill-green">svgdx.svg</text>
     <line x1="-10" y1="5" x2="0" y2="5" class="d-arrow"/>
     <line x1="30" y1="5" x2="40" y2="5" class="d-arrow"/>
 </svg>

@@ -36,9 +36,7 @@ fn text_string(text_value: &str) -> String {
     result
 }
 
-fn get_text_position<'a>(
-    element: &mut SvgElement,
-) -> Result<(f32, f32, bool, LocSpec, Vec<&'a str>)> {
+fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -62,7 +60,7 @@ fn get_text_position<'a>(
         }
     }
 
-    let mut text_classes = vec!["d-text"];
+    let mut text_classes = vec!["d-text".to_owned()];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
     let text_anchor = text_loc_str.parse::<LocSpec>()?;
 
@@ -85,21 +83,27 @@ fn get_text_position<'a>(
     };
     match text_anchor {
         ls if ls.is_top() => {
-            text_classes.push(match (outside, vertical) {
-                (false, false) => "d-text-top",
-                (true, false) => "d-text-bottom",
-                (false, true) => "d-text-top-vertical",
-                (true, true) => "d-text-bottom-vertical",
-            });
+            text_classes.push(
+                match (outside, vertical) {
+                    (false, false) => "d-text-top",
+                    (true, false) => "d-text-bottom",
+                    (false, true) => "d-text-top-vertical",
+                    (true, true) => "d-text-bottom-vertical",
+                }
+                .to_owned(),
+            );
             t_dy += if outside { -text_offset } else { text_offset };
         }
         ls if ls.is_bottom() => {
-            text_classes.push(match (outside, vertical) {
-                (false, false) => "d-text-bottom",
-                (true, false) => "d-text-top",
-                (false, true) => "d-text-bottom-vertical",
-                (true, true) => "d-text-top-vertical",
-            });
+            text_classes.push(
+                match (outside, vertical) {
+                    (false, false) => "d-text-bottom",
+                    (true, false) => "d-text-top",
+                    (false, true) => "d-text-bottom-vertical",
+                    (true, true) => "d-text-top-vertical",
+                }
+                .to_owned(),
+            );
             t_dy += if outside { text_offset } else { -text_offset };
         }
         _ => (),
@@ -107,21 +111,27 @@ fn get_text_position<'a>(
 
     match text_anchor {
         ls if ls.is_left() => {
-            text_classes.push(match (outside, vertical) {
-                (false, false) => "d-text-left",
-                (true, false) => "d-text-right",
-                (false, true) => "d-text-left-vertical",
-                (true, true) => "d-text-right-vertical",
-            });
+            text_classes.push(
+                match (outside, vertical) {
+                    (false, false) => "d-text-left",
+                    (true, false) => "d-text-right",
+                    (false, true) => "d-text-left-vertical",
+                    (true, true) => "d-text-right-vertical",
+                }
+                .to_owned(),
+            );
             t_dx += if outside { -text_offset } else { text_offset };
         }
         ls if ls.is_right() => {
-            text_classes.push(match (outside, vertical) {
-                (false, false) => "d-text-right",
-                (true, false) => "d-text-left",
-                (false, true) => "d-text-right-vertical",
-                (true, true) => "d-text-left-vertical",
-            });
+            text_classes.push(
+                match (outside, vertical) {
+                    (false, false) => "d-text-right",
+                    (true, false) => "d-text-left",
+                    (false, true) => "d-text-right-vertical",
+                    (true, true) => "d-text-left-vertical",
+                }
+                .to_owned(),
+            );
             t_dx += if outside { text_offset } else { -text_offset };
         }
         _ => (),
@@ -155,7 +165,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_value = get_text_value(&mut orig_elem);
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
-    text_classes.push("d-text");
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);
@@ -183,18 +192,52 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // element and generated text, as is likely there will be conflicts with
     // the original element's desired style (e.g. setting `style="fill:red"`
     // on a rect with `text` present would cause red-on-red invisible text).
-    if let Some(style) = orig_elem.pop_attr("text-style") {
-        text_elem.set_attr("style", &style);
+    let text_style = orig_elem.pop_attr("text-style");
+    if let Some(ref style) = text_style {
+        text_elem.set_attr("style", style);
     }
     // Generated text elements inherit any transform from the original element.
     if let Some(transform) = orig_elem.get_attr("transform") {
         text_elem.set_attr("transform", &transform);
     }
-    text_elem.classes = orig_elem.classes.clone();
-    text_elem.src_line = orig_elem.src_line;
-    for class in text_classes {
-        text_elem.add_class(class);
+
+    // The following should *not* be inherited by the text element.
+    // Ideally we'd just have a list of classes to *include*, but this would
+    // match all the d-<colour> classes which would be very extensive.
+    //
+    // In an SVG + CSS3 context, could just use `[selector]:not(text,tspan)`
+    // instead of this, but that doesn't work in e.g. Inkscape.
+    let text_ignore_classes = [
+        "d-softshadow",
+        "d-hardshadow",
+        "d-stipple",
+        "d-crosshatch",
+        "d-hatch",
+        "d-surround",
+        "d-grid",
+        "d-grid5",
+        "d-grid10",
+        "d-flow",
+        "d-dot",
+        "d-dash",
+        "d-dot-dash",
+    ];
+    let text_ignore_class_fns = [|c: &str| c.starts_with("d-flow-")];
+    // Split classes into text-related and non-text-related and
+    // assign to appropriate elements.
+    for class in orig_elem.classes.clone().into_iter() {
+        if class.starts_with("d-text-") {
+            orig_elem.pop_class(&class);
+        }
+        if !text_ignore_classes.contains(&class.as_str())
+            && !text_ignore_class_fns.iter().any(|f| f(&class))
+        {
+            text_classes.push(class);
+        }
     }
+    text_elem.src_line = orig_elem.src_line;
+    text_elem.classes = text_classes.into();
+
     // Add this prior to copying over presentation attrs which take precedence
     if vertical {
         text_elem.set_attr("writing-mode", "tb");
@@ -243,6 +286,9 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         };
 
         let mut tspan_elem = SvgElement::new("tspan", &[]);
+        if let Some(ref style) = text_style {
+            tspan_elem.set_attr("style", style);
+        }
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {
             tspan_elem.set_attr("y", &y_str);

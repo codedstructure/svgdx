@@ -43,21 +43,22 @@ impl FromStr for ThemeType {
 
 fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_width: f32) {
     // Default styles suitable for box-and-line diagrams
+    let font_family = &tb.font_family;
+    let font_size = tb.font_size;
     for s in [
+        "svg * { stroke-linecap: round; stroke-linejoin: round; }".to_string(),
         format!("rect, circle, ellipse, polygon {{ stroke-width: {stroke_width}; fill: {fill}; stroke: {stroke}; }}"),
         format!("line, polyline, path {{ stroke-width: {stroke_width}; fill: none; stroke: {stroke}; }}"),
+        format!("text, tspan {{ stroke-width: 0; font-family: {font_family}; font-size: {font_size}px; fill: {stroke}; paint-order: stroke; stroke: {fill}; }}"),
     ] {
         tb.add_style(&s);
     }
 }
 
-fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
+fn append_text_styles(tb: &mut ThemeBuilder) {
     if !tb.has_element("text") {
         return;
     }
-    let font_family = &tb.font_family;
-    let font_size = tb.font_size;
-    tb.add_style(&format!("text, tspan {{ stroke-width: 0; font-family: {font_family}; font-size: {font_size}px; fill: {text_colour} }}"));
     for (class, rule) in [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
@@ -101,6 +102,26 @@ fn append_text_styles(tb: &mut ThemeBuilder, text_colour: &str) {
             ));
         }
     }
+    let text_ol_widths = vec![
+        ("d-text-ol", 0.5), // Must be first, so other classes can override
+        ("d-text-ol-thinner", 0.125),
+        ("d-text-ol-thin", 0.25),
+        ("d-text-ol-medium", 0.5), // Default, but include explicitly for completeness
+        ("d-text-ol-thick", 1.),
+        ("d-text-ol-thicker", 2.),
+    ];
+    for (class, width) in text_ol_widths {
+        if tb.has_class(class) {
+            // Selector must be more specific than e.g. `d-thinner`,
+            // and must appear after any colour styles, where
+            // `d-text-ol-[colour]` provides a default stroke-width.
+            tb.add_style(&format!(
+                "text.{0}, text.{0} * {{ stroke-width: {1}; }}",
+                class,
+                fstr(width)
+            ));
+        }
+    }
 }
 
 fn append_stroke_width_styles(tb: &mut ThemeBuilder, base: f32) {
@@ -124,42 +145,57 @@ fn append_colour_styles(tb: &mut ThemeBuilder) {
     //   to an appropriate contrast colour.
     // - d-text-colour sets the colour for text elements, which overrides any
     //   colours set by d-colour or d-fill-colour.
+    // - d-text-ol-colour sets the colour for text outline
     for colour in COLOUR_LIST {
         if tb.has_class(&format!("d-fill-{colour}")) {
-            tb.add_style(&format!(
-                ".d-fill-{colour}:not(text,tspan) {{ fill: {colour}; }}"
-            ));
-            let text_colour = if DARK_COLOURS.contains(colour) {
-                "white"
+            tb.add_style(&format!(".d-fill-{colour} {{ fill: {colour}; }}"));
+            let (text_fill, text_stroke) = if DARK_COLOURS.contains(colour) {
+                ("white", "black")
             } else {
-                "black"
+                ("black", "white")
             };
             tb.add_style(&format!(
-                "text.d-fill-{colour}, text.d-fill-{colour} * {{ fill: {text_colour}; }}"
+                "text.d-fill-{colour}, text.d-fill-{colour} * {{ fill: {text_fill}; stroke: {text_stroke}; }}"
             ));
         }
     }
     for colour in COLOUR_LIST {
         if tb.has_class(&format!("d-{colour}")) {
-            tb.add_style(&format!(
-                ".d-{colour}:not(text,tspan) {{ stroke: {colour}; }}"
-            ));
+            tb.add_style(&format!(".d-{colour} {{ stroke: {colour}; }}"));
             // By default text is the same colour as shape stroke, but may be
             // overridden by d-text-colour (e.g. for text attrs on shapes)
             // Also special-case 'none'; there are many use-cases for not having
             // a stroke colour (using `d-none`), but text should always have a colour.
             if *colour != "none" {
+                let text_stroke = if DARK_COLOURS.contains(colour) {
+                    "white"
+                } else {
+                    "black"
+                };
                 tb.add_style(&format!(
-                    "text.d-{colour}, text.d-{colour} * {{ fill: {colour}; }}"
+                    "text.d-{colour}, text.d-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
                 ));
             }
         }
     }
     for colour in COLOUR_LIST {
         if tb.has_class(&format!("d-text-{colour}")) {
+            let text_stroke = if DARK_COLOURS.contains(colour) {
+                "white"
+            } else {
+                "black"
+            };
             // Must be at least as specific as d-fill-colour
             tb.add_style(&format!(
-                "text.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; }}"
+                "text.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
+            ));
+        }
+    }
+    for colour in COLOUR_LIST {
+        if tb.has_class(&format!("d-text-ol-{colour}")) {
+            // Must be at least as specific as d-fill-colour
+            tb.add_style(&format!(
+                "text.d-text-ol-{colour}, text.d-text-ol-{colour} * {{ stroke: {colour}; stroke-width: 0.5; }}"
             ));
         }
     }
@@ -209,27 +245,30 @@ fn append_dash_styles(tb: &mut ThemeBuilder) {
     for (class, speed) in flow_style {
         if tb.has_class(class) {
             // d-flow defaults to equivalent of d-dash, but also works with d-dot.
-            tb.add_style(&format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }}"));
+            tb.add_style(&format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }}"));
             has_flow = true;
         }
     }
     if has_flow {
-        tb.add_style("@keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }");
+        tb.add_style("@keyframes d-flow-animation { from {stroke-dashoffset: 5;} to {stroke-dashoffset: 0;} }");
     }
     if tb.has_class("d-flow-rev") {
         tb.add_style(".d-flow-rev { animation-direction: reverse; }");
     }
     // NOTE: these are after the d-flow-* classes, as they provide a default dasharray these may override.
     if tb.has_class("d-dash") {
-        tb.add_style(".d-dash { stroke-dasharray: 1.5 0.5; }");
+        tb.add_style(".d-dash { stroke-dasharray: 1 1.5; }");
     }
     if tb.has_class("d-dot") {
-        tb.add_style(".d-dot { stroke-dasharray: 0.5 0.5; }");
+        tb.add_style(".d-dot { stroke-dasharray: 0 1; }");
+    }
+    if tb.has_class("d-dot-dash") {
+        tb.add_style(".d-dot-dash { stroke-dasharray: 0 1 1.5 1 0 1.5; }");
     }
 }
 
 fn d_stipple(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-stipple:not(text,tspan) {fill: url(#stipple)}");
+    tb.add_style(".d-stipple {fill: url(#stipple)}");
     tb.add_defs(&format!(
 r#"<pattern id="stipple" x="0" y="0" width="1" height="1" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -239,7 +278,7 @@ r#"<pattern id="stipple" x="0" y="0" width="1" height="1" patternTransform="rota
 }
 
 fn d_crosshatch(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-crosshatch:not(text,tspan) {fill: url(#crosshatch)}");
+    tb.add_style(".d-crosshatch {fill: url(#crosshatch)}");
     tb.add_defs(&format!(
 r#"<pattern id="crosshatch" x="0" y="0" width="1" height="1" patternTransform="rotate(75)" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -250,7 +289,7 @@ r#"<pattern id="crosshatch" x="0" y="0" width="1" height="1" patternTransform="r
 }
 
 fn d_hatch(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-hatch:not(text,tspan) {fill: url(#hatch)}");
+    tb.add_style(".d-hatch {fill: url(#hatch)}");
     tb.add_defs(&format!(
 r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate(120)" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -262,7 +301,7 @@ r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate
 // TODO: would be good to parameterise the various d-grid* patterns, but the current
 // generic interface just has stroke colour passed in.
 fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid:not(text,tspan) {fill: url(#grid)}");
+    tb.add_style(".d-grid {fill: url(#grid)}");
     tb.add_defs(&format!(
         r#"<pattern id="grid" x="0" y="0" width="1" height="1" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -273,7 +312,7 @@ fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str) {
 }
 
 fn d_grid5(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid5:not(text,tspan) {fill: url(#grid5)}");
+    tb.add_style(".d-grid5 {fill: url(#grid5)}");
     tb.add_defs(&format!(
         r#"<pattern id="grid5" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -284,7 +323,7 @@ fn d_grid5(tb: &mut ThemeBuilder, t_stroke: &str) {
 }
 
 fn d_grid10(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid10:not(text,tspan) {fill: url(#grid10)}");
+    tb.add_style(".d-grid10 {fill: url(#grid10)}");
     tb.add_defs(&format!(
         r#"<pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none"/>
@@ -295,7 +334,7 @@ fn d_grid10(tb: &mut ThemeBuilder, t_stroke: &str) {
 }
 
 fn d_softshadow(tb: &mut ThemeBuilder, _: &str) {
-    tb.add_style(".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }");
+    tb.add_style(".d-softshadow { filter: url(#d-softshadow); }");
     tb.add_defs(
         r#"<filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
@@ -306,7 +345,7 @@ fn d_softshadow(tb: &mut ThemeBuilder, _: &str) {
 }
 
 fn d_hardshadow(tb: &mut ThemeBuilder, _: &str) {
-    tb.add_style(".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }");
+    tb.add_style(".d-hardshadow { filter: url(#d-hardshadow); }");
     tb.add_defs(
         r#"<filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
   <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
@@ -342,25 +381,29 @@ trait Theme: Clone {
             tb.add_style(&format!("#{} {{", id));
         }
         self.append_early_styles(tb);
+        // Must be before any colour styles which need to override this
+        if tb.has_class("d-surround") {
+            tb.add_style(".d-surround { fill: none; }");
+        }
+
         append_common_styles(
             tb,
             &self.default_fill(),
             &self.default_stroke(),
             self.default_stroke_width(),
         );
+        // Colour styles must appear before text styles, at least so
+        // d-text-ol-[colour] (which sets a default stroke-width) can be
+        // overridden by the text style `d-text-ol-[thickness]`.
+        append_colour_styles(tb);
+
         append_stroke_width_styles(tb, self.default_stroke_width());
         if tb.elements.contains("text") {
-            append_text_styles(tb, &self.default_stroke());
+            append_text_styles(tb);
         }
 
         append_arrow_styles(tb);
         append_dash_styles(tb);
-
-        if tb.has_class("d-surround") {
-            tb.add_style(".d-surround:not(text,tspan) { fill: none; }");
-        }
-
-        append_colour_styles(tb);
 
         type Tfn = dyn Fn(&mut ThemeBuilder, &str);
         for (class, build_fn) in [

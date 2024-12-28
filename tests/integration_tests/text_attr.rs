@@ -133,8 +133,8 @@ fn test_text_vertical() {
 <rect xy="0" wh="10 50" text="The Rust\nProgramming Language" class="d-text-vertical"/>
 "#;
     let expected = r#"
-<rect x="0" y="0" width="10" height="50" class="d-text-vertical"/>
-<text x="5" y="25" writing-mode="tb" class="d-text-vertical d-text">
+<rect x="0" y="0" width="10" height="50"/>
+<text x="5" y="25" writing-mode="tb" class="d-text d-text-vertical">
 <tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
 </text>
 "#;
@@ -388,6 +388,22 @@ fn test_text_style() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" style="font-size: 2em; font-weight: bold;" class="d-text">thing</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    // Multi-line - check tspan gets the style
+    let input = r#"
+<rect xy="0" wh="10" text="two\nlines" text-style="font-size: 2em;"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" style="font-size: 2em;" class="d-text">
+<tspan x="5" style="font-size: 2em;" dy="-0.525em">two</tspan><tspan x="5" style="font-size: 2em;" dy="1.05em">lines</tspan>
+</text>
 "#;
 
     assert_eq!(

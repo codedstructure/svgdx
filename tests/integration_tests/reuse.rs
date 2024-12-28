@@ -111,7 +111,7 @@ fn test_reuse_xy_transform() {
 "##;
     let output = transform_str_default(input).unwrap();
     let expected1 = r#"<rect width="20" height="10" transform="translate(10) translate(11) translate(0, 1)" class="tb"/>"#;
-    let expected2 = r#"<text x="10" y="5" transform="translate(10) translate(11) translate(0, 1)" class="tb d-text">thing</text>"#;
+    let expected2 = r#"<text x="10" y="5" transform="translate(10) translate(11) translate(0, 1)" class="d-text tb">thing</text>"#;
 
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);

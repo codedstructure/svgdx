@@ -284,10 +284,13 @@ impl ClassList {
         self.classes.iter().map(|item| (&item.1))
     }
 
+    /// Replace a class entry with a new class (or multiple space-separated)
     pub fn replace(&mut self, old: impl Into<String>, new: impl Into<String>) {
         // Can't just do an in-place update in a BTreeSet
         if self.remove(old) {
-            self.insert(new);
+            for class in new.into().split_whitespace() {
+                self.insert(class);
+            }
         }
     }
 
@@ -309,6 +312,12 @@ impl ClassList {
 impl Display for ClassList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ClassList{:?}", self.to_vec())
+    }
+}
+
+impl From<Vec<String>> for ClassList {
+    fn from(value: Vec<String>) -> Self {
+        value.into_iter().collect()
     }
 }
 
