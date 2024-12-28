@@ -870,6 +870,7 @@ impl SvgElement {
         }
     }
 
+    // given a single dimension position attr, return the computed String value
     fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
         if let Ok(ss) = ScalarSpec::from_str(name) {
             if let (Some(el), remain) = split_relspec(value, ctx)? {
@@ -960,12 +961,12 @@ impl SvgElement {
         }
     }
 
-    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
+    pub fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
             if matches!(
                 (self.name.as_str(), key.as_str()),
                 (
-                    "rect" | "use" | "image" | "svg" | "foreignObject" | "line",
+                    "rect" | "use" | "reuse" | "image" | "svg" | "foreignObject" | "line",
                     "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2" | "width" | "height",
                 ) | (
                     "circle",
@@ -1175,7 +1176,7 @@ impl SvgElement {
     // xy="#o" -> x="#o", y="#o"
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
-    fn expand_compound_pos(&mut self) {
+    pub fn expand_compound_pos(&mut self) {
         // NOTE: must have already done any relative positioning (e.g. `xy="#abc:h"`)
         // before this point as xy is not considered a compound attribute in that case.
         if let Some(xy) = self.pop_attr("xy") {
