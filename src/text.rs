@@ -194,7 +194,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // on a rect with `text` present would cause red-on-red invisible text).
     let text_style = orig_elem.pop_attr("text-style");
     if let Some(ref style) = text_style {
-        text_elem.set_attr("style", &style);
+        text_elem.set_attr("style", style);
     }
     // Generated text elements inherit any transform from the original element.
     if let Some(transform) = orig_elem.get_attr("transform") {
@@ -211,10 +211,12 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         "d-softshadow",
         "d-hardshadow",
         "d-stipple",
+        "d-crosshatch",
+        "d-hatch",
         "d-surround",
         "d-grid",
-        "d-grid-5",
-        "d-grid-10",
+        "d-grid5",
+        "d-grid10",
     ];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
@@ -278,7 +280,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
         let mut tspan_elem = SvgElement::new("tspan", &[]);
         if let Some(ref style) = text_style {
-            tspan_elem.set_attr("style", &style);
+            tspan_elem.set_attr("style", style);
         }
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {

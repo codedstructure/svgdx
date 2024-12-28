@@ -23,8 +23,8 @@
     text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
     line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     marker path { fill: inherit; }
-    .d-dash { stroke-dasharray: 1.5 0.5; }
-    .d-dot { stroke-dasharray: 0.5 0.5; }
+    .d-dash { stroke-dasharray: 1 1.5; }
+    .d-dot { stroke-dasharray: 0 1; }
   ]]>
   </style>
     <style>text {font-weight: bold; font-size:4px}</style>

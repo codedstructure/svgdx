@@ -56,7 +56,6 @@ fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_
 }
 
 fn append_text_styles(tb: &mut ThemeBuilder) {
-    //.., text_colour: &str) {
     if !tb.has_element("text") {
         return;
     }
@@ -104,10 +103,10 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
         }
     }
     let text_ol_widths = vec![
-        ("d-text-ol", 0.5),  // Must be first, so other classes can override
+        ("d-text-ol", 0.5), // Must be first, so other classes can override
         ("d-text-ol-thinner", 0.125),
         ("d-text-ol-thin", 0.25),
-        ("d-text-ol-medium", 0.5),  // Default, but include explicitly for completeness
+        ("d-text-ol-medium", 0.5), // Default, but include explicitly for completeness
         ("d-text-ol-thick", 1.),
         ("d-text-ol-thicker", 2.),
     ];
@@ -246,22 +245,25 @@ fn append_dash_styles(tb: &mut ThemeBuilder) {
     for (class, speed) in flow_style {
         if tb.has_class(class) {
             // d-flow defaults to equivalent of d-dash, but also works with d-dot.
-            tb.add_style(&format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1.5 0.5; }}"));
+            tb.add_style(&format!(".{class} {{ animation: {speed}s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }}"));
             has_flow = true;
         }
     }
     if has_flow {
-        tb.add_style("@keyframes d-flow-animation { from {stroke-dashoffset: 4;} to {stroke-dashoffset: 0;} }");
+        tb.add_style("@keyframes d-flow-animation { from {stroke-dashoffset: 5;} to {stroke-dashoffset: 0;} }");
     }
     if tb.has_class("d-flow-rev") {
         tb.add_style(".d-flow-rev { animation-direction: reverse; }");
     }
     // NOTE: these are after the d-flow-* classes, as they provide a default dasharray these may override.
     if tb.has_class("d-dash") {
-        tb.add_style(".d-dash { stroke-dasharray: 1.5 0.5; }");
+        tb.add_style(".d-dash { stroke-dasharray: 1 1.5; }");
     }
     if tb.has_class("d-dot") {
-        tb.add_style(".d-dot { stroke-dasharray: 0.5 0.5; }");
+        tb.add_style(".d-dot { stroke-dasharray: 0 1; }");
+    }
+    if tb.has_class("d-dot-dash") {
+        tb.add_style(".d-dot-dash { stroke-dasharray: 0 1 1.5 1 0 1.5; }");
     }
 }
 

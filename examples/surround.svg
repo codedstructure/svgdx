@@ -20,8 +20,8 @@
     .d-red { stroke: red; }
     text.d-red, text.d-red * { fill: red; stroke: white; }
     text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-    .d-dash { stroke-dasharray: 1.5 0.5; }
-    .d-dot { stroke-dasharray: 0.5 0.5; }
+    .d-dash { stroke-dasharray: 1 1.5; }
+    .d-dot { stroke-dasharray: 0 1; }
   ]]>
   </style>
   <rect x="-2" y="-2" width="104" height="24" opacity="0.5" class="d-dash d-fill-blue d-surround"/>

@@ -13,7 +13,7 @@
     text.d-fill-white, text.d-fill-white * { fill: black; stroke: white; }
     .d-none { stroke: none; }
     text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-    .d-dash { stroke-dasharray: 1.5 0.5; }
+    .d-dash { stroke-dasharray: 1 1.5; }
   ]]>
   </style>
   <rect x="-10" y="-10" width="75" height="111" class="d-fill-white d-surround"/>

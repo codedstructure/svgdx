@@ -39,7 +39,8 @@ fn test_style_fill_colour() {
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-fill-lightgrey { fill: lightgrey; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }"#;
+    let expected_style =
+        r#"text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 }
 
@@ -52,7 +53,8 @@ fn test_style_text_colour() {
 
     let colour_input = r#"<svg><text xy="0" class="d-text-black">Hello!</text></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#"text.d-text-black, text.d-text-black * { fill: black; stroke: white; }"#;
+    let expected_style =
+        r#"text.d-text-black, text.d-text-black * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 }
 
