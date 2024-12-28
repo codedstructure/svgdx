@@ -1,0 +1,48 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="230mm" height="70mm" viewBox="-5 -16 115 35">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+  <![CDATA[
+    svg { background: rgba(200, 230, 220, 0.5); }
+    rect, circle, ellipse, polygon { opacity: 0.7; }
+    .d-surround { fill: none; }
+    svg * { stroke-linecap: round; stroke-linejoin: round; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: rgba(0, 30, 50, 0.15); stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    text, tspan { stroke-width: 0; font-family: monospace; font-size: 3px; fill: black; paint-order: stroke; stroke: rgba(0, 30, 50, 0.15); }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    marker path { fill: inherit; }
+    .d-dot { stroke-dasharray: 0 1; }
+  ]]>
+  </style>
+  <rect id="seed" width="15" height="10"/>
+  <text x="7.5" y="5" class="d-text">seed</text>
+  <rect id="state" x="25" y="0" width="15" height="10"/>
+  <text x="32.5" y="5" class="d-text">
+  <tspan x="32.5" dy="-0.525em">x</tspan><tspan x="32.5" dy="1.05em">(state)</tspan>
+  </text>
+  <rect id="mult" x="45" y="0" width="10" height="10"/>
+  <text x="50" y="5" class="d-text">* a</text>
+  <rect id="const" x="60" y="0" width="10" height="10"/>
+  <text x="65" y="5" class="d-text">+ c</text>
+  <rect id="mod" x="75" y="0" width="10" height="10"/>
+  <text x="80" y="5" class="d-text">% m</text>
+  <rect id="out" x="95" y="0" width="10" height="10"/>
+  <text x="100" y="5" class="d-text">out</text>
+
+  <line x1="15" y1="5" x2="25" y2="5" class="d-arrow"/>
+  <line x1="40" y1="5" x2="45" y2="5" class="d-arrow"/>
+  <line x1="55" y1="5" x2="60" y2="5" class="d-arrow"/>
+  <line x1="70" y1="5" x2="75" y2="5" class="d-arrow"/>
+  <line x1="85" y1="5" x2="95" y2="5" class="d-arrow"/>
+
+  <polyline id="fb" points="80 0, 80 -7, 32.5 -7, 32.5 0" class="d-arrow"/>
+
+  <rect x="21" y="-11" width="68" height="25" rx="3" class="d-dot d-surround"/>
+  <text x="55" y="19" class="d-text d-text-bottom">linear congruential generator</text>
+</svg>

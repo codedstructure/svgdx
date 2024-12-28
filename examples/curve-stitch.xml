@@ -1,0 +1,9 @@
+<svg>
+  <rect id="i1" wh="200"/>
+  <var i="0"/>
+  <loop while="lt($i,40)">
+    <line xy1="#i1@br 0 {{-200 + 5 * $i}}" xy2="#i1@br {{-5 * $i}} 0"/>
+    <line xy1="#i1@tl {{5 * $i}} 0" xy2="#i1@tl 0 {{200 - 5 * $i}}"/>
+    <var i="{{$i + 1}}"/>
+  </loop>
+</svg>

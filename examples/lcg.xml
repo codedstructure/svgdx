@@ -1,0 +1,21 @@
+<svg>
+  <config theme="glass" scale="2" font-family="monospace"/>
+  <rect id="seed" wh="15 10" text="seed"/>
+  <rect id="state" xy="^:h 10" wh="^" text="x\n(state)"/>
+  <rect id="mult" xy="^:h 5" wh="^ -5 0" text="* a"/>
+  <rect id="const" xy="^:h 5" wh="^" text="+ c" />
+  <rect id="mod" xy="^:h 5" wh="^" text="% m" />
+  <rect id="out" xy="#mod:h 10" wh="^" text="out" />
+
+  <line start="#seed" end="#state" class="d-arrow"/>
+  <line start="#state" end="#mult" class="d-arrow"/>
+  <line start="#mult" end="#const" class="d-arrow"/>
+  <line start="#const" end="#mod" class="d-arrow"/>
+  <line start="#mod" end="#out" class="d-arrow"/>
+
+  <polyline id="fb" start="#mod@t" end="#state@t" corner-offset="7"
+            class="d-arrow"/>
+
+  <rect surround="#state #mult #const #mod #fb" margin="4" class="d-dot" rx="3"
+        text="linear congruential generator" text-loc="b" text-dy="6"/>
+</svg>
