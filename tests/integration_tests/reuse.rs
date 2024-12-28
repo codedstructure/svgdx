@@ -502,3 +502,42 @@ fn test_use_relspec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_relspec() {
+    // For the <reuse> case, the bbox of the target is derived,
+    // then an adjustment is made to the x/y of the <reuse> element
+    // to put it in the right locspec.
+    let input = r##"
+<rect id="a" wh="10 6"/>
+<circle id="b" r="1"/>
+<reuse id="z" href="#b" x="7" y="2"/>
+"##;
+    let expected = r##"<circle id="z" r="1" transform="translate(7, 2)" class="b"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" wh="10 6"/>
+<circle id="b" r="1"/>
+<reuse id="z" href="#b" xy="#a@r"/>
+"##;
+    let expected = r##"<circle id="z" r="1" transform="translate(10, 3)" class="b"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    //     let input = r##"
+    // <rect id="a" wh="10 6"/>
+    // <rect id="b" wh="2" />
+    // <reuse id="z" href="#b" cxy="#a@c"/>
+    // "##;
+    //     let expected = r##"<use id="z" href="#b" x="4" y="2"/>"##;
+    //     let output = transform_str_default(input).unwrap();
+    //     assert_contains!(output, expected);
+}
+
+// <defs>
+// <g id="tt"><rect xy="3" wh="10"/></g>
+// </defs>
+// <use id="a" href="#tt"/>
+// <use xy="#a:h 10" href="#tt"/>

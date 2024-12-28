@@ -19,6 +19,10 @@ impl EventGen for ReuseElement {
         let mut reuse_element = self.0.clone();
 
         reuse_element.eval_attributes(context)?;
+        // TODO: ideally we need the size of the referenced element before we can
+        // apply any relative positioning, eg. with eval_rel_position()
+        reuse_element.expand_compound_pos();
+        reuse_element.eval_rel_attributes(context)?;
 
         context.push_element(&reuse_element);
         let elref = reuse_element

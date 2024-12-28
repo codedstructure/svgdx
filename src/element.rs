@@ -1107,7 +1107,7 @@ impl SvgElement {
         Ok((dx, dy))
     }
 
-    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
+    pub fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
             if self.is_size_attr(&key) {
                 let computed = self.eval_size_attr(&key, &value, ctx)?;
@@ -1321,7 +1321,7 @@ impl SvgElement {
     // xy="#o" -> x="#o", y="#o"
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
-    fn expand_compound_pos(&mut self) {
+    pub fn expand_compound_pos(&mut self) {
         // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
         // before this point as xy is not considered a compound attribute in that case.
         if let Some(xy) = self.pop_attr("xy") {
