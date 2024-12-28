@@ -2,15 +2,17 @@
   <style>
   <![CDATA[
     svg { background: none; }
+    .d-surround { fill: none; }
+    svg * { stroke-linecap: round; stroke-linejoin: round; }
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    .d-surround:not(text,tspan) { fill: none; }
-    .d-fill-blue:not(text,tspan) { fill: blue; }
-    text.d-fill-blue, text.d-fill-blue * { fill: white; }
-    .d-fill-lime:not(text,tspan) { fill: lime; }
-    text.d-fill-lime, text.d-fill-lime * { fill: black; }
-    .d-fill-red:not(text,tspan) { fill: red; }
-    text.d-fill-red, text.d-fill-red * { fill: white; }
+    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+    .d-fill-blue { fill: blue; }
+    text.d-fill-blue, text.d-fill-blue * { fill: white; stroke: black; }
+    .d-fill-lime { fill: lime; }
+    text.d-fill-lime, text.d-fill-lime * { fill: black; stroke: white; }
+    .d-fill-red { fill: red; }
+    text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
   ]]>
   </style>
   <style>#a, #b { fill: none; stroke-width: 2; }</style>
