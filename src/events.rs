@@ -323,8 +323,20 @@ pub enum OutputEvent {
 impl From<InputEvent> for OutputEvent {
     fn from(value: InputEvent) -> Self {
         match value.event {
-            Event::Empty(e) => OutputEvent::Empty(SvgElement::try_from(&e).unwrap()),
-            Event::Start(e) => OutputEvent::Start(SvgElement::try_from(&e).unwrap()),
+            Event::Empty(ref e) => {
+                if let Ok(el) = SvgElement::try_from(e) {
+                    OutputEvent::Empty(el)
+                } else {
+                    OutputEvent::Other(value.event)
+                }
+            }
+            Event::Start(ref e) => {
+                if let Ok(el) = SvgElement::try_from(e) {
+                    OutputEvent::Start(el)
+                } else {
+                    OutputEvent::Other(value.event)
+                }
+            }
             Event::End(e) => {
                 let elem_name: String =
                     String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
