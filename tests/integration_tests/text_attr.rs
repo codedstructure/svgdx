@@ -133,8 +133,8 @@ fn test_text_vertical() {
 <rect xy="0" wh="10 50" text="The Rust\nProgramming Language" class="d-text-vertical"/>
 "#;
     let expected = r#"
-<rect x="0" y="0" width="10" height="50" class="d-text-vertical"/>
-<text x="5" y="25" writing-mode="tb" class="d-text-vertical d-text">
+<rect x="0" y="0" width="10" height="50"/>
+<text x="5" y="25" writing-mode="tb" class="d-text d-text-vertical">
 <tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
 </text>
 "#;

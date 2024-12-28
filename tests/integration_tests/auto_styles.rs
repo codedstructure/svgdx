@@ -5,24 +5,24 @@ use svgdx::transform_str_default;
 fn test_style_stroke_colour() {
     let colour_input = r#"<svg><rect xy="0" wh="20" class="d-red" /></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#".d-red:not(text,tspan) { stroke: red; }"#;
+    let expected_style = r#".d-red { stroke: red; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-red, text.d-red * { fill: red; }"#;
+    let expected_style = r#"text.d-red, text.d-red * { fill: red; stroke: white; }"#;
     assert_contains!(output, expected_style);
 
     let colour_input = r#"<svg><rect xy="0" wh="20" class="d-black" /></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#".d-black:not(text,tspan) { stroke: black; }"#;
+    let expected_style = r#".d-black { stroke: black; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-black, text.d-black * { fill: black; }"#;
+    let expected_style = r#"text.d-black, text.d-black * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 
     // Check special case that d-none does not set text fill
     let colour_input = r#"<svg><rect xy="0" wh="20" class="d-none" /></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#".d-none:not(text,tspan) { stroke: none; }"#;
+    let expected_style = r#".d-none { stroke: none; }"#;
     assert_contains!(output, expected_style);
-    let unexpected_style = r#"text.d-none, text.d-none * { fill: none; }"#;
+    let unexpected_style = r#"text.d-none, text.d-none * { fill: none;"#;
     assert_not_contains!(output, unexpected_style);
 }
 
@@ -30,16 +30,16 @@ fn test_style_stroke_colour() {
 fn test_style_fill_colour() {
     let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-red" /></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#".d-fill-red:not(text,tspan) { fill: red; }"#;
+    let expected_style = r#".d-fill-red { fill: red; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-fill-red, text.d-fill-red * { fill: white; }"#;
+    let expected_style = r#"text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }"#;
     assert_contains!(output, expected_style);
 
     let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-lightgrey" /></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#".d-fill-lightgrey:not(text,tspan) { fill: lightgrey; }"#;
+    let expected_style = r#".d-fill-lightgrey { fill: lightgrey; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; }"#;
+    let expected_style = r#"text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 }
 
@@ -47,12 +47,12 @@ fn test_style_fill_colour() {
 fn test_style_text_colour() {
     let colour_input = r#"<svg><text xy="0" class="d-text-red">Hello!</text></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#"text.d-text-red, text.d-text-red * { fill: red; }"#;
+    let expected_style = r#"text.d-text-red, text.d-text-red * { fill: red; stroke: white; }"#;
     assert_contains!(output, expected_style);
 
     let colour_input = r#"<svg><text xy="0" class="d-text-black">Hello!</text></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
-    let expected_style = r#"text.d-text-black, text.d-text-black * { fill: black; }"#;
+    let expected_style = r#"text.d-text-black, text.d-text-black * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 }
 
@@ -112,7 +112,7 @@ fn test_style_arrow() {
 #[test]
 fn test_style_shadow() {
     let input = r#"<svg><rect wh="10" class="d-hardshadow" /></svg>"#;
-    let expected_style = r#".d-hardshadow:not(text,tspan) { filter: url(#d-hardshadow); }"#;
+    let expected_style = r#".d-hardshadow { filter: url(#d-hardshadow); }"#;
     let expected_defs = r#"<filter id="d-hardshadow""#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_style);
@@ -121,7 +121,7 @@ fn test_style_shadow() {
     assert_contains!(output, expected_defs);
 
     let input = r#"<svg><rect wh="10" class="d-softshadow" /></svg>"#;
-    let expected_style = r#".d-softshadow:not(text,tspan) { filter: url(#d-softshadow); }"#;
+    let expected_style = r#".d-softshadow { filter: url(#d-softshadow); }"#;
     let expected_defs = r#"<filter id="d-softshadow""#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_style);

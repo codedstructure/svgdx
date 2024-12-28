@@ -46,7 +46,7 @@ fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_
     let font_family = &tb.font_family;
     let font_size = tb.font_size;
     for s in [
-        "* { stroke-linecap: round; stroke-linejoin: round; }".to_string(),
+        "svg * { stroke-linecap: round; stroke-linejoin: round; }".to_string(),
         format!("rect, circle, ellipse, polygon {{ stroke-width: {stroke_width}; fill: {fill}; stroke: {stroke}; }}"),
         format!("line, polyline, path {{ stroke-width: {stroke_width}; fill: none; stroke: {stroke}; }}"),
         format!("text, tspan {{ stroke-width: 0; font-family: {font_family}; font-size: {font_size}px; fill: {stroke}; paint-order: stroke; stroke: {fill}; }}"),
@@ -104,9 +104,10 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
         }
     }
     let text_ol_widths = vec![
+        ("d-text-ol", 0.5),  // Must be first, so other classes can override
         ("d-text-ol-thinner", 0.125),
         ("d-text-ol-thin", 0.25),
-        ("d-text-ol", 0.5),
+        ("d-text-ol-medium", 0.5),  // Default, but include explicitly for completeness
         ("d-text-ol-thick", 1.),
         ("d-text-ol-thicker", 2.),
     ];
