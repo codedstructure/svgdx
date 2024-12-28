@@ -94,6 +94,25 @@ fn test_style_text_attributes() {
 }
 
 #[test]
+fn test_style_text_outline() {
+    let input = r#"<svg><text xy="0" class="d-text-ol">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style = r#"text.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }"#;
+    assert_contains!(output, expected_style);
+
+    let input = r#"<svg><text xy="0" class="d-text-ol-red">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style =
+        r#"text.d-text-ol-red, text.d-text-ol-red * { stroke: red; stroke-width: 0.5; }"#;
+    assert_contains!(output, expected_style);
+
+    let input = r#"<svg><text xy="0" class="d-text-ol-thicker">Hello!</text></svg>"#;
+    let output = transform_str_default(input).unwrap();
+    let expected_style = r#"text.d-text-ol-thicker, text.d-text-ol-thicker * { stroke-width: 2; }"#;
+    assert_contains!(output, expected_style);
+}
+
+#[test]
 fn test_style_arrow() {
     let input = r#"<svg><line xy1="0" xy2="10" class="d-arrow" /></svg>"#;
     let expected_style = r#".d-arrow { marker-end: url(#d-arrow); }"#;

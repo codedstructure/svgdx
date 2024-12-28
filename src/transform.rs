@@ -138,19 +138,19 @@ impl EventGen for OtherElement {
         e.resolve_position(context)?;
         let events = e.element_events(context)?;
         context.update_element(&e);
+        let bb = context.get_element_bbox(&e)?;
+        if bb.is_some() {
+            context.set_prev_element(e.clone());
+        }
         if self.0.name == "point" {
             // "point" elements don't generate any events in the final output,
             // but *do* need to register themselves with update_element()
             return Ok((OutputList::new(), None));
         }
-        let bb = context.get_element_bbox(&e)?;
         if self.0.name == "box" {
             // Similar to "point", "box" elements don't generate events,
             // but unlike "point" they *do* define a bounding box.
             return Ok((OutputList::new(), bb));
-        }
-        if !events.is_empty() && bb.is_some() {
-            context.set_prev_element(e.clone());
         }
         for svg_ev in events {
             let is_empty = matches!(svg_ev, OutputEvent::Empty(_));

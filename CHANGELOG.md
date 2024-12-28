@@ -7,11 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: auto styles for text-outlines. These use the SVG2 `paint-order` attribute
+  to ensure the fill is painted after the stroke, and use `stroke-width` to create
+  an appropriate text outline. This is available through the class `d-text-ol`,
+  which applies a default text outline, as well as the more specific `d-text-ol-[colour]`
+  and `d-text-ol-[width]`, where `colour` is an SVG colour name and `width` is one
+  of `thinner`, `thin`, `medium` (the default), `thick` or `thicker`.
+
+  As part of supporting clean text outlines, `stroke-linecap` and `stroke-linejoin`
+  styles are both set to `round` for everything; this generally results in tidier
+  output where separate line objects join at the same point, compared to the SVG
+  defaults of `butt`/`miter`, but has a noticeable effect on `stroke-dasharray`,
+  so the `d-dot` / `d-dash` / `d-flow` (and a new stroke pattern `d-dot-dash`) have
+  been updated to match. In particular, `d-dot` now renders as a series of circular
+  dots rather than small squares.
+
 - Added: new config option `svg-style` available as `TransformConfig::svg_style`
   or `--svg-style` command line argument, inserted as `style` attribute on the
-  root SVG. Use-case is to provide CSS when embedded in a larger document.
+  root SVG. Use-case is to provide inline style when embedded in a larger document.
 
-- Added: "box" element. Analogous to the "point" element, but defining a
+- Added: `<box>` element. Analogous to the `<point>` element, but defining a
   'phantom' rectangle which may be used for relative positioning.
 
 - Internal: replaced regex with basic string parsing throughout, eliminating
@@ -24,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     previously only supported id-based references, including
     connector `start` / `end` attributes.
   - element id references may use the '-' character
+
+- Fixed: `text-style` values now applied to `<tspan>` as well as `<text>` elements.
+
+- Fixed: avoid use of CSS `:not()` pseudo selector, not supported in many SVG
+  contexts (e.g. Inkscape)
+
+- Fixed: substituting multiple auto-style classes into an element via variable
+  expansion.
 
 ## [0.15.1 - 2024-12-15]
 

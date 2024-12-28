@@ -807,7 +807,7 @@ impl SvgElement {
         let (cx, cy) = bb.center();
         let (x1, y1) = bb.locspec(LocSpec::TopLeft);
         match self.name.as_str() {
-            "rect" => {
+            "rect" | "box" => {
                 self.attrs.insert("x", fstr(x1));
                 self.attrs.insert("y", fstr(y1));
                 self.attrs.insert("width", fstr(width));

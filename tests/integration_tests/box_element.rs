@@ -38,3 +38,18 @@ fn test_box_included_at_toplevel() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_box_prev_element() {
+    // box should affect prev_element, so #z should be
+    // centered horizontally between #r0 and #r1
+    let input = r##"
+<rect id="r0" wh="10"/>
+<rect id="r1" xy="^:h 20" wh="10"/>
+<box id="b0" surround="#r0 #r1"/>
+<rect id="z" xy="^:v" wh="10"/>
+"##;
+    let expected = r#"<rect id="z" x="15" y="10" width="10" height="10"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

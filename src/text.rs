@@ -217,14 +217,21 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         "d-grid",
         "d-grid5",
         "d-grid10",
+        "d-flow",
+        "d-dot",
+        "d-dash",
+        "d-dot-dash",
     ];
+    let text_ignore_class_fns = [|c: &str| c.starts_with("d-flow-")];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
     for class in orig_elem.classes.clone().into_iter() {
         if class.starts_with("d-text-") {
             orig_elem.pop_class(&class);
         }
-        if !text_ignore_classes.contains(&class.as_str()) {
+        if !text_ignore_classes.contains(&class.as_str())
+            && !text_ignore_class_fns.iter().any(|f| f(&class))
+        {
             text_classes.push(class);
         }
     }

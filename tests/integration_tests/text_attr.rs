@@ -394,6 +394,22 @@ fn test_text_style() {
         transform_str_default(input).unwrap().trim(),
         expected.trim()
     );
+
+    // Multi-line - check tspan gets the style
+    let input = r#"
+<rect xy="0" wh="10" text="two\nlines" text-style="font-size: 2em;"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="5" y="5" style="font-size: 2em;" class="d-text">
+<tspan x="5" style="font-size: 2em;" dy="-0.525em">two</tspan><tspan x="5" style="font-size: 2em;" dy="1.05em">lines</tspan>
+</text>
+"#;
+
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
 }
 
 #[test]

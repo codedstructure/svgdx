@@ -1,0 +1,42 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="270mm" height="111mm" viewBox="-5 -5 90 37">
+  <defs>
+    <filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
+      <feOffset dx="1" dy="1"/>
+      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
+    </filter>
+  </defs>
+  <style>
+  <![CDATA[
+    svg { background: #eee8d5; }
+    svg * { stroke-linecap: round; stroke-linejoin: round; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: #fdf6e3; stroke: #657b83; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: #657b83; }
+    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: #657b83; paint-order: stroke; stroke: #fdf6e3; }
+    .d-fill-grey { fill: grey; }
+    text.d-fill-grey, text.d-fill-grey * { fill: white; stroke: black; }
+    .d-darkred { stroke: darkred; }
+    text.d-darkred, text.d-darkred * { fill: darkred; stroke: white; }
+    text.d-text-silver, text.d-text-silver * { fill: silver; stroke: black; }
+    text.d-text-ol-black, text.d-text-ol-black * { stroke: black; stroke-width: 0.5; }
+    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-bold, text.d-text-bold * { font-weight: bold; }
+    text.d-text-italic, text.d-text-italic * { font-style: italic; }
+    text.d-text-small, text.d-text-small * { font-size: 2px; }
+    .d-flow-slow { animation: 2s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }
+    @keyframes d-flow-animation { from {stroke-dashoffset: 5;} to {stroke-dashoffset: 0;} }
+    .d-hardshadow { filter: url(#d-hardshadow); }
+  ]]>
+  </style>
+  <rect id="alice" width="20" height="15" rx="2" class="d-fill-grey d-hardshadow"/>
+  <text x="10" y="7.5" class="d-text d-text-silver d-fill-grey d-text-ol-black d-text-bold">Alice</text>
+  <rect id="bob" x="60" y="0" width="20" height="15" rx="2" class="d-fill-grey d-hardshadow"/>
+  <text x="70" y="7.5" class="d-text d-text-silver d-fill-grey d-text-ol-black d-text-bold">Bob</text>
+  <rect id="eve" x="32.5" y="17" width="15" height="10" rx="2" class="d-fill-grey d-hardshadow"/>
+  <text x="40" y="22" style="fill: darkred; stroke: silver" class="d-text d-text-silver d-fill-grey d-text-ol-black d-text-bold">Eve</text>
+
+  <line x1="40" y1="7.5" x2="40" y2="17" class="d-text-silver d-fill-grey d-text-ol-black d-text-bold d-darkred d-flow-slow"/>
+  <line x1="20" y1="7.5" x2="60" y2="7.5" class="d-fill-grey d-flow-slow"/>
+  <text x="40" y="7.5" class="d-text d-text-silver d-fill-grey d-text-ol-black d-text-bold d-text-italic d-text-small">insecure channel</text>
+</svg>
+
