@@ -623,52 +623,50 @@ impl Transformer {
         tb.build();
         let auto_defs = tb.get_defs();
         let auto_styles = tb.get_styles();
+
+        let indent_line = |n| format!("\n{}", " ".repeat(n));
         if !auto_defs.is_empty() {
-            let indent_line = format!("\n{}", " ".repeat(indent));
-            let mut event_vec = vec![
-                OutputEvent::Text(indent_line.clone()),
+            let mut defs_events = vec![
+                OutputEvent::Text(indent_line(indent)),
                 OutputEvent::Start(SvgElement::new("defs", &[])),
-                OutputEvent::Text("\n".to_owned()),
             ];
+            if self.context.config.debug {
+                defs_events.extend([
+                    OutputEvent::Text(indent_line(indent + 2)),
+                    OutputEvent::Comment(" svgdx-generated auto-style defs ".to_owned()),
+                ]);
+            }
+            defs_events.push(OutputEvent::Text("\n".to_owned()));
             let eee = InputList::from_str(&indent_all(auto_defs, indent + 2).join("\n"))?;
-            event_vec.extend(OutputList::from(eee));
-            event_vec.extend(vec![
-                OutputEvent::Text(indent_line),
+            defs_events.extend(OutputList::from(eee));
+            defs_events.extend(vec![
+                OutputEvent::Text(indent_line(indent)),
                 OutputEvent::End("defs".to_owned()),
             ]);
-            let auto_defs_events = OutputList::from(event_vec);
-            let (before, defs_pivot, after) = events.partition("defs");
-            if let Some(existing_defs) = defs_pivot {
-                before.write_to(writer)?;
-                auto_defs_events.write_to(writer)?;
-                OutputList::from([existing_defs].as_slice()).write_to(writer)?;
-                *events = after;
-            } else {
-                auto_defs_events.write_to(writer)?;
-            }
+            OutputList::from(defs_events).write_to(writer)?;
         }
         if !auto_styles.is_empty() {
-            let auto_styles_events = OutputList::from(vec![
-                OutputEvent::Text(format!("\n{}", " ".repeat(indent))),
+            let mut style_events = vec![
+                OutputEvent::Text(indent_line(indent)),
                 OutputEvent::Start(SvgElement::new("style", &[])),
-                OutputEvent::Text(format!("\n{}", " ".repeat(indent))),
+            ];
+            if self.context.config.debug {
+                style_events.extend([
+                    OutputEvent::Text(indent_line(indent + 2)),
+                    OutputEvent::Comment(" svgdx-generated auto-style CSS ".to_owned()),
+                ]);
+            }
+            style_events.extend(vec![
+                OutputEvent::Text(indent_line(indent + 2)),
                 OutputEvent::CData(format!(
                     "\n{}\n{}",
-                    indent_all(auto_styles, indent + 2).join("\n"),
-                    " ".repeat(indent)
+                    indent_all(auto_styles, indent + 4).join("\n"),
+                    " ".repeat(indent + 2)
                 )),
-                OutputEvent::Text(format!("\n{}", " ".repeat(indent))),
+                OutputEvent::Text(indent_line(indent)),
                 OutputEvent::End("style".to_owned()),
             ]);
-            let (before, style_pivot, after) = events.partition("styles");
-            if let Some(existing_styles) = style_pivot {
-                before.write_to(writer)?;
-                auto_styles_events.write_to(writer)?;
-                OutputList::from([existing_styles].as_slice()).write_to(writer)?;
-                *events = after;
-            } else {
-                auto_styles_events.write_to(writer)?;
-            }
+            OutputList::from(style_events).write_to(writer)?;
         }
         Ok(())
     }

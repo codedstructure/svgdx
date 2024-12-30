@@ -1,20 +1,20 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="95mm" height="95mm" viewBox="-5 -5 95 95">
   <style>
-  <![CDATA[
-    svg { background: none; }
-    svg * { stroke-linecap: round; stroke-linejoin: round; }
-    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-    text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }
-    text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }
-    text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }
-    text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }
-    text.d-text-small, text.d-text-small * { font-size: 2px; }
-    text.d-text-medium, text.d-text-medium * { font-size: 3px; }
-    text.d-text-large, text.d-text-large * { font-size: 4.5px; }
-  ]]>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }
+      text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }
+      text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }
+      text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }
+      text.d-text-small, text.d-text-small * { font-size: 2px; }
+      text.d-text-medium, text.d-text-medium * { font-size: 3px; }
+      text.d-text-large, text.d-text-large * { font-size: 4.5px; }
+    ]]>
   </style>
   <!-- top row -->
   <rect id="top" x="0" y="0" width="25" height="25"/>

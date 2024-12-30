@@ -1,26 +1,26 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="490mm" height="600mm" viewBox="-245 -105 490 600">
   <style>
-  <![CDATA[
-    svg { background: none; }
-    svg * { stroke-linecap: round; stroke-linejoin: round; }
-    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-    .d-fill-gold { fill: gold; }
-    text.d-fill-gold, text.d-fill-gold * { fill: black; stroke: white; }
-    .d-fill-green { fill: green; }
-    text.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
-    .d-fill-khaki { fill: khaki; }
-    text.d-fill-khaki, text.d-fill-khaki * { fill: black; stroke: white; }
-    .d-fill-olive { fill: olive; }
-    text.d-fill-olive, text.d-fill-olive * { fill: white; stroke: black; }
-    .d-fill-skyblue { fill: skyblue; }
-    text.d-fill-skyblue, text.d-fill-skyblue * { fill: black; stroke: white; }
-    .d-gold { stroke: gold; }
-    text.d-gold, text.d-gold * { fill: gold; stroke: black; }
-    .d-none { stroke: none; }
-    .d-thick { stroke-width: 1; }
-  ]]>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      .d-fill-gold { fill: gold; }
+      text.d-fill-gold, text.d-fill-gold * { fill: black; stroke: white; }
+      .d-fill-green { fill: green; }
+      text.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+      .d-fill-khaki { fill: khaki; }
+      text.d-fill-khaki, text.d-fill-khaki * { fill: black; stroke: white; }
+      .d-fill-olive { fill: olive; }
+      text.d-fill-olive, text.d-fill-olive * { fill: white; stroke: black; }
+      .d-fill-skyblue { fill: skyblue; }
+      text.d-fill-skyblue, text.d-fill-skyblue * { fill: black; stroke: white; }
+      .d-gold { stroke: gold; }
+      text.d-gold, text.d-gold * { fill: gold; stroke: black; }
+      .d-none { stroke: none; }
+      .d-thick { stroke-width: 1; }
+    ]]>
   </style>
   <defs>
     <mask id="thing">

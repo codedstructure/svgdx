@@ -1,21 +1,21 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="99mm" height="70mm" viewBox="-5 -5 99 70">
   <style>
-  <![CDATA[
-    svg { background: none; }
-    svg * { stroke-linecap: round; stroke-linejoin: round; }
-    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-    .d-fill-lightgreen { fill: lightgreen; }
-    text.d-fill-lightgreen, text.d-fill-lightgreen * { fill: black; stroke: white; }
-    .d-fill-papayawhip { fill: papayawhip; }
-    text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; stroke: white; }
-    .d-fill-red { fill: red; }
-    text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
-    .d-none { stroke: none; }
-    text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-    text.d-text-left, text.d-text-left * { text-anchor: start; }
-  ]]>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      .d-fill-lightgreen { fill: lightgreen; }
+      text.d-fill-lightgreen, text.d-fill-lightgreen * { fill: black; stroke: white; }
+      .d-fill-papayawhip { fill: papayawhip; }
+      text.d-fill-papayawhip, text.d-fill-papayawhip * { fill: black; stroke: white; }
+      .d-fill-red { fill: red; }
+      text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
+      .d-none { stroke: none; }
+      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-left, text.d-text-left * { text-anchor: start; }
+    ]]>
   </style>
   <style>
   * { font-size: 6px; }

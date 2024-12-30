@@ -1,21 +1,21 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="220mm" height="165mm" viewBox="15 30 220 165">
   <style>
-  <![CDATA[
-    svg { background: none; }
-    svg * { stroke-linecap: round; stroke-linejoin: round; }
-    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-    text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-    .d-fill-lightgrey { fill: lightgrey; }
-    text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
-    .d-fill-lightyellow { fill: lightyellow; }
-    text.d-fill-lightyellow, text.d-fill-lightyellow * { fill: black; stroke: white; }
-    .d-fill-silver { fill: silver; }
-    text.d-fill-silver, text.d-fill-silver * { fill: black; stroke: white; }
-    .d-red { stroke: red; }
-    text.d-red, text.d-red * { fill: red; stroke: white; }
-    .d-thick { stroke-width: 1; }
-  ]]>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      .d-fill-lightgrey { fill: lightgrey; }
+      text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
+      .d-fill-lightyellow { fill: lightyellow; }
+      text.d-fill-lightyellow, text.d-fill-lightyellow * { fill: black; stroke: white; }
+      .d-fill-silver { fill: silver; }
+      text.d-fill-silver, text.d-fill-silver * { fill: black; stroke: white; }
+      .d-red { stroke: red; }
+      text.d-red, text.d-red * { fill: red; stroke: white; }
+      .d-thick { stroke-width: 1; }
+    ]]>
   </style>
   <defs>
     <g id="cube">
