@@ -742,7 +742,7 @@ impl SvgElement {
                     Ok(None)
                 }
             }
-            "path" => Ok(Some(path_bbox(self)?)),
+            "path" => Ok(path_bbox(self)?),
             "circle" => {
                 if let Some(r) = self.attrs.get("r") {
                     let cx = self.attrs.get("cx").unwrap_or(&zstr);

@@ -244,16 +244,14 @@ impl PathParser {
     }
 }
 
-pub fn path_bbox(element: &SvgElement) -> Result<BoundingBox> {
-    let path_data = element.get_attr("d").ok_or_else(|| {
-        SvgdxError::InvalidData("Path element should have 'd' attribute".to_string())
-    })?;
-
-    let mut pp = PathParser::new(&path_data);
-    pp.evaluate()?;
-    pp.get_bbox().ok_or_else(|| {
-        SvgdxError::InvalidData("Path element should have a computable boundingbox".to_string())
-    })
+pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
+    if let Some(path_data) = element.get_attr("d") {
+        let mut pp = PathParser::new(&path_data);
+        pp.evaluate()?;
+        Ok(pp.get_bbox())
+    } else {
+        Ok(None)
+    }
 }
 
 #[cfg(test)]

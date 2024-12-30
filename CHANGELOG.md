@@ -48,6 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: substituting multiple auto-style classes into an element via variable
   expansion.
 
+- Fixed: `<path>` element without `d` attr is no longer an error when computing bbox.
+
 - Editor: limit zoom range
 
 - Editor: add SVG2 help link
