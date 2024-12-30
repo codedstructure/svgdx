@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: substituting multiple auto-style classes into an element via variable
   expansion.
 
+- Editor: limit zoom range
+
+- Editor: add SVG2 help link
+
 ## [0.15.1 - 2024-12-15]
 
 - Changed: '%' operator now computes non-negative result, as in the Python

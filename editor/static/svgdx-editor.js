@@ -80,10 +80,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
 /** Editor updates */
 (function () {
+    // used to preserve viewbox when updating SVG and Auto Fit is disabled,
+    // keeping a changing SVG 'fixed' on screen.
     let last_viewbox = null;
-    let original_viewbox = null;
-    let original_width = null;
-    let original_height = null;
 
     function update_response(svgData) {
         if (document.getElementById('text-output').style.display !== "none") {
@@ -98,11 +97,11 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         }
         // tweak the SVG to make it fill the container
         // save first so we can restore during save operations
-        original_width = svg.width.baseVal.value;
-        original_height = svg.height.baseVal.value;
+        svg.dataset.origWidth = svg.width.baseVal.value;
+        svg.dataset.origHeight = svg.height.baseVal.value;
+        svg.dataset.origViewbox = svg.getAttribute('viewBox');
         svg.width.baseVal.valueAsString = '100%';
         svg.height.baseVal.valueAsString = '100%';
-        original_viewbox = svg.getAttribute('viewBox');
         if (document.getElementById('auto-viewbox').dataset.checked !== "true" && last_viewbox) {
             svg.setAttribute('viewBox', last_viewbox);
         }
@@ -314,7 +313,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     const resetButton = document.getElementById('reset-view');
     resetButton.addEventListener('click', () => {
         const svg = svg_container.querySelector('svg');
-        svg.setAttribute('viewBox', original_viewbox);
+        svg.setAttribute('viewBox', svg.dataset.origViewbox);
     });
 
     const autoViewbox = document.getElementById('auto-viewbox');
@@ -356,9 +355,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const svg = document.querySelector('#svg-output svg');
         const saved_viewbox = svg.getAttribute('viewBox');
         // temporarily set width, height, and viewBox to original values
-        svg.setAttribute('width', original_width);
-        svg.setAttribute('height', original_height);
-        svg.setAttribute('viewBox', original_viewbox);
+        svg.setAttribute('width', svg.dataset.origWidth);
+        svg.setAttribute('height', svg.dataset.origHeight);
+        svg.setAttribute('viewBox', svg.dataset.origViewbox);
         // trigger download
         const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
@@ -409,9 +408,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         // Since we're async, clone the SVG to avoid glitching on resize
         const svg = document.querySelector('#svg-output svg').cloneNode(true);
         // temporarily set width, height, and viewBox to original values
-        svg.setAttribute('width', original_width);
-        svg.setAttribute('height', original_height);
-        svg.setAttribute('viewBox', original_viewbox);
+        svg.setAttribute('width', svg.dataset.origWidth);
+        svg.setAttribute('height', svg.dataset.origHeight);
+        svg.setAttribute('viewBox', svg.dataset.origViewbox);
 
         // scale to the given resolution in the maximum dimension
         let pxWidth = svg.width.baseVal.value;
@@ -456,9 +455,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const svg = document.querySelector('#svg-output svg');
         const saved_viewbox = svg.getAttribute('viewBox');
         // temporarily set width, height, and viewBox to original values
-        svg.setAttribute('width', original_width);
-        svg.setAttribute('height', original_height);
-        svg.setAttribute('viewBox', original_viewbox);
+        svg.setAttribute('width', svg.dataset.origWidth);
+        svg.setAttribute('height', svg.dataset.origHeight);
+        svg.setAttribute('viewBox', svg.dataset.origViewbox);
         // encode as base64
         const base64 = btoa(Array.from(new TextEncoder().encode(svg.outerHTML), (byte) =>
             String.fromCodePoint(byte),
@@ -551,6 +550,22 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         // calculate new viewBox
         const newWidth = width * (1 + factor);
         const newHeight = height * (1 + factor);
+
+        // Limit zoom-in to 1 user-space unit regardless of original size
+        if (newWidth < 1 || newHeight < 1) {
+            return;
+        }
+        // Limit zoom-out to 1/10 original size
+        const MAX_ZOOM_OUT = 10;
+        let original_width = svg.dataset.origWidth ? parseFloat(svg.dataset.origWidth) : null;
+        let original_height = svg.dataset.origHeight ? parseFloat(svg.dataset.origHeight) : null;
+        if (original_width === null ||
+             original_height === null ||
+             newWidth > original_width * MAX_ZOOM_OUT ||
+             newHeight > original_height * MAX_ZOOM_OUT) {
+            return;
+        }
+
         const newX = x - (newWidth - width) * ((eventPos.x - x) / width);
         const newY = y - (newHeight - height) * ((eventPos.y - y) / height);
 
