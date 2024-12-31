@@ -7,6 +7,7 @@ use axum::{
     Router,
 };
 use serde_derive::Deserialize;
+use tokio::sync::mpsc::Sender;
 
 use crate::errors::SvgdxError;
 use crate::{transform_str, TransformConfig};
@@ -158,7 +159,7 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
     }
 }
 
-pub async fn start_server(listen_addr: Option<&str>) {
+pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) {
     let addr = listen_addr.unwrap_or("127.0.0.1:3003");
     let app = Router::new()
         .route("/", get(index))
@@ -168,5 +169,8 @@ pub async fn start_server(listen_addr: Option<&str>) {
         .route("/api/transform", post(transform));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{}", addr);
+    if let Some(ready) = ready {
+        ready.send(()).await.unwrap();
+    }
     axum::serve(listener, app).await.unwrap();
 }
