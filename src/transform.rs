@@ -136,11 +136,10 @@ impl EventGen for OtherElement {
         e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
         e.transmute(context)?;
         e.resolve_position(context)?;
-        let events = e.element_events(context)?;
         context.update_element(&e);
         let bb = context.get_element_bbox(&e)?;
         if bb.is_some() {
-            context.set_prev_element(e.clone());
+            context.set_prev_element(&e);
         }
         if self.0.name == "point" {
             // "point" elements don't generate any events in the final output,
@@ -152,6 +151,7 @@ impl EventGen for OtherElement {
             // but unlike "point" they *do* define a bounding box.
             return Ok((OutputList::new(), bb));
         }
+        let events = e.element_events(context)?;
         for svg_ev in events {
             let is_empty = matches!(svg_ev, OutputEvent::Empty(_));
             let adapted = if let OutputEvent::Empty(e) | OutputEvent::Start(e) = svg_ev {
@@ -226,6 +226,7 @@ impl EventGen for GroupElement {
         let mut new_el = self.0.clone();
         new_el.content_bbox = content_bb;
         context.update_element(&new_el);
+        context.set_prev_element(&new_el);
 
         let result_bb = if self.0.name == "symbol" {
             // symbols have a size which needs storing in context for evaluating

@@ -247,8 +247,8 @@ impl TransformerContext {
         self.element_stack.last().cloned()
     }
 
-    pub fn set_prev_element(&mut self, el: SvgElement) {
-        self.prev_element = Some(el);
+    pub fn set_prev_element(&mut self, el: &SvgElement) {
+        self.prev_element = Some(el.clone());
     }
 
     pub fn update_element(&mut self, el: &SvgElement) {

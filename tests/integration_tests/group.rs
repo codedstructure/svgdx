@@ -131,13 +131,33 @@ fn test_group_transform_bbox() {
   <g>
    <rect wh="10"/>
   </g>
-  <g id="a" transform="translate(15)">
+  <g transform="translate(15)">
     <rect wh="10"/>
   </g>
-  <rect surround="#a"/>
 </svg>
 "##;
     let expected = r#"viewBox="0 0 25 10""#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
+}
+
+#[test]
+fn test_group_transform_prev() {
+    let input = r##"
+<g>
+ <rect wh="10"/>
+ <rect xy="^:V" wh="10"/>
+</g>
+<text id="z1" xy="^:v">Hello</text>
+<g transform="translate(15)">
+  <rect wh="10"/>
+  <rect xy="^:V" wh="10"/>
+</g>
+<text id="z2" xy="^:v">World</text>
+"##;
+    let expected1 = r#"id="z1" x="5" y="11""#;
+    let expected2 = r#"id="z2" x="20" y="11""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
 }
