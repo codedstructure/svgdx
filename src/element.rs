@@ -8,6 +8,7 @@ use crate::position::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
 };
 use crate::text::process_text_attr;
+use crate::transform_attr::TransformAttr;
 use crate::types::{
     attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
 };
@@ -29,7 +30,7 @@ pub struct SvgElement {
     pub indent: usize,
     pub src_line: usize,
     pub event_range: Option<(usize, usize)>,
-    pub computed_bbox: Option<BoundingBox>,
+    pub content_bbox: Option<BoundingBox>,
 }
 
 impl Display for SvgElement {
@@ -156,7 +157,7 @@ impl SvgElement {
             indent: 0,
             src_line: 0,
             event_range: None,
-            computed_bbox: None,
+            content_bbox: None,
         }
     }
 
@@ -636,9 +637,6 @@ impl SvgElement {
     }
 
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
-        if let Some(comp_bbox) = self.computed_bbox {
-            return Ok(Some(comp_bbox));
-        }
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
@@ -654,7 +652,8 @@ impl SvgElement {
             strp(value).is_err()
                 && !(value.contains('$') || value.contains('#') || value.contains('^'))
         }
-        match self.name.as_str() {
+        let mut el_bbox = match self.name.as_str() {
+            "g" | "symbol" => self.content_bbox,
             "point" | "text" => {
                 let x = self.attrs.get("x").unwrap_or(&zstr);
                 let y = self.attrs.get("y").unwrap_or(&zstr);
@@ -663,7 +662,7 @@ impl SvgElement {
                 }
                 let x = strp(x)?;
                 let y = strp(y)?;
-                Ok(Some(BoundingBox::new(x, y, x, y)))
+                Some(BoundingBox::new(x, y, x, y))
             }
             "box" | "rect" | "image" | "svg" | "foreignObject" => {
                 if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
@@ -676,9 +675,9 @@ impl SvgElement {
                     let y = strp(y)?;
                     let w = strp(w)?;
                     let h = strp(h)?;
-                    Ok(Some(BoundingBox::new(x, y, x + w, y + h)))
+                    Some(BoundingBox::new(x, y, x + w, y + h))
                 } else {
-                    Ok(None)
+                    None
                 }
             }
             "line" => {
@@ -693,12 +692,12 @@ impl SvgElement {
                 let y1 = strp(y1)?;
                 let x2 = strp(x2)?;
                 let y2 = strp(y2)?;
-                Ok(Some(BoundingBox::new(
+                Some(BoundingBox::new(
                     x1.min(x2),
                     y1.min(y2),
                     x1.max(x2),
                     y1.max(y2),
-                )))
+                ))
             }
             "polyline" | "polygon" => {
                 let mut min_x = f32::MAX;
@@ -732,17 +731,15 @@ impl SvgElement {
                         }
                     }
                     if has_x && has_y {
-                        Ok(Some(BoundingBox::new(min_x, min_y, max_x, max_y)))
+                        Some(BoundingBox::new(min_x, min_y, max_x, max_y))
                     } else {
-                        Err(SvgdxError::InvalidData(
-                            "Insufficient points for bbox".to_owned(),
-                        ))
+                        None // Insufficient points for bbox
                     }
                 } else {
-                    Ok(None)
+                    None
                 }
             }
-            "path" => Ok(path_bbox(self)?),
+            "path" => path_bbox(self)?,
             "circle" => {
                 if let Some(r) = self.attrs.get("r") {
                     let cx = self.attrs.get("cx").unwrap_or(&zstr);
@@ -753,9 +750,9 @@ impl SvgElement {
                     let cx = strp(cx)?;
                     let cy = strp(cy)?;
                     let r = strp(r)?;
-                    Ok(Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r)))
+                    Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r))
                 } else {
-                    Ok(None)
+                    None
                 }
             }
             "ellipse" => {
@@ -769,13 +766,19 @@ impl SvgElement {
                     let cy = strp(cy)?;
                     let rx = strp(rx)?;
                     let ry = strp(ry)?;
-                    Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))
+                    Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry))
                 } else {
-                    Ok(None)
+                    None
                 }
             }
-            _ => Ok(None),
+            _ => None,
+        };
+        // apply any `transform` attr transformations to the bbox
+        if let (Some(transform), Some(ref mut bbox)) = (self.get_attr("transform"), &mut el_bbox) {
+            let transform: TransformAttr = transform.parse()?;
+            el_bbox = Some(transform.apply(bbox));
         }
+        Ok(el_bbox)
     }
 
     fn translated(&self, dx: f32, dy: f32) -> Result<Self> {

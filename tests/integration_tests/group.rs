@@ -122,3 +122,22 @@ fn test_group_nested_bbox() {
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 }
+
+#[test]
+fn test_group_transform_bbox() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <g>
+   <rect wh="10"/>
+  </g>
+  <g id="a" transform="translate(15)">
+    <rect wh="10"/>
+  </g>
+  <rect surround="#a"/>
+</svg>
+"##;
+    let expected = r#"viewBox="0 0 25 10""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

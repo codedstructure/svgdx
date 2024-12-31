@@ -53,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: merging auto-style defs/style elements with any existing such elements was
   broken, and has been abandoned as not worth the hassle.
 
+- Fixed: bbox calculation for `<g>` elements with `transform` attributes.
+
 - Editor: limit zoom range
 
 - Editor: add SVG2 help link

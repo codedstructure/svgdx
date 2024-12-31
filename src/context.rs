@@ -3,7 +3,6 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
-use crate::transform_attr::TransformAttr;
 use crate::types::{strp, ElRef};
 use crate::TransformConfig;
 
@@ -113,6 +112,7 @@ impl ElementMap for TransformerContext {
             } else {
                 el.bbox()?
             };
+            // TODO: move following to element::bbox() ?
             if el.name == "use" || el.name == "reuse" {
                 let translate_x = el.get_attr("x").map(|x| eval_attr(&x, ctx));
                 let translate_y = el.get_attr("y").map(|y| eval_attr(&y, ctx));
@@ -123,12 +123,6 @@ impl ElementMap for TransformerContext {
                             translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
                         ));
                     }
-                }
-            }
-            if let Some(transform) = el.get_attr("transform") {
-                let transform: TransformAttr = transform.parse()?;
-                if let Some(ref mut bbox) = &mut el_bbox {
-                    el_bbox = Some(transform.apply(bbox));
                 }
             }
             Ok(el_bbox)

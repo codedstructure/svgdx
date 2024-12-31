@@ -202,9 +202,7 @@ impl EventGen for GroupElement {
         // push variables onto the stack
         context.push_element(&self.0);
 
-        // should remove any attrs except id and classes...
-
-        let mut result_bb = None;
+        let mut content_bb = None;
         let mut events = OutputList::new();
         if self.0.is_empty_element() {
             events.push(OutputEvent::Empty(new_el));
@@ -214,7 +212,7 @@ impl EventGen for GroupElement {
 
             if let Some(inner_events) = self.0.inner_events(context) {
                 let (ev_list, bb) = process_events(inner_events, context)?;
-                result_bb = bb;
+                content_bb = bb;
                 events.extend(&ev_list);
             }
 
@@ -226,14 +224,18 @@ impl EventGen for GroupElement {
 
         // Messy! should probably have a id->bbox map in context
         let mut new_el = self.0.clone();
-        new_el.computed_bbox = result_bb;
+        new_el.content_bbox = content_bb;
         context.update_element(&new_el);
-        if self.0.name == "symbol" {
+
+        let result_bb = if self.0.name == "symbol" {
             // symbols have a size which needs storing in context for evaluating
             // bbox of 'use' elements referencing them, but they don't contribute
             // to the parent bbox.
-            result_bb = None;
-        }
+            None
+        } else {
+            // this handles any `transform` attr. Assumes .content_bbox is set.
+            new_el.bbox()?
+        };
         Ok((events, result_bb))
     }
 }

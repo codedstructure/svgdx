@@ -5,7 +5,6 @@ use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::{process_events, EventGen};
-use crate::transform_attr::TransformAttr;
 use crate::types::ElRef;
 
 use itertools::Itertools;
@@ -109,9 +108,6 @@ impl EventGen for ReuseElement {
             // so we create a new list including that and process it.
             let mut new_events = InputList::new();
             let tag_name = instance_element.name.clone();
-            let xfrm = instance_element
-                .get_attr("transform")
-                .and_then(|a| a.parse::<TransformAttr>().ok());
             let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
             start_ev.index = start;
             start_ev.alt_idx = Some(end);
@@ -121,17 +117,8 @@ impl EventGen for ReuseElement {
             end_ev.index = end;
             end_ev.alt_idx = Some(start);
             new_events.push(end_ev);
-            process_events(new_events, context).map(|(ev, bb)| {
-                // we need to apply any transform to the bbox of the containing instance element
-                if let (Some(xfrm), Some(bb)) = (xfrm, bb) {
-                    let bb = xfrm.apply(&bb);
-                    (ev, Some(bb))
-                } else {
-                    (ev, bb)
-                }
-            })
+            process_events(new_events, context)
         } else {
-            // for single elements any transform is already applied
             instance_element.generate_events(context)
         };
         context.pop_element();

@@ -196,10 +196,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     if let Some(ref style) = text_style {
         text_elem.set_attr("style", style);
     }
-    // Generated text elements inherit any transform from the original element.
-    if let Some(transform) = orig_elem.get_attr("transform") {
-        text_elem.set_attr("transform", &transform);
-    }
 
     // The following should *not* be inherited by the text element.
     // Ideally we'd just have a list of classes to *include*, but this would
