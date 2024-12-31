@@ -55,6 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: bbox calculation for `<g>` elements with `transform` attributes.
 
+- svgdx-server: add basic CLI options, including `--open`
+
 - Editor: limit zoom range
 
 - Editor: add SVG2 help link
