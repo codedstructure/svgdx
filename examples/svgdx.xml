@@ -1,11 +1,13 @@
 <svg>
-    <style>text {font-weight: bold; font-size:4px}</style>
-    <rect surround="#input #svgdx #output" margin="10" class="d-fill-papayawhip"/>
-    <rect surround="#input #svgdx" margin="4" dy="-1" class="d-dash d-fill-red" opacity="0.5"/>
-    <rect surround="#svgdx #output" margin="4" dy="1" class="d-dot d-fill-green" opacity="0.5"/>
-    <rect id="svgdx" wh="30 10" text="svgdx" class="d-fill-orange"/>
-    <rect id="input" xy="#svgdx|H 10" wh="30 10" text="svgdx.xml" rx="3" class="d-fill-red"/>
-    <rect id="output" xy="#svgdx|h 10" wh="30 10" text="svgdx.svg" rx="3" class="d-fill-green"/>
-    <line start="#input" end="#svgdx" class="d-arrow"/>
-    <line start="#svgdx" end="#output" class="d-arrow"/>
+  <style>text {font-weight: bold; font-size:4px}</style>
+  <rect surround="#input #svgdx #output" margin="10" class="d-fill-darkgrey"/>
+  <rect surround="#input #svgdx" margin="7 4" opacity="0.5" class="d-dash d-fill-cornflowerblue d-text-small" text="svgdx" text-loc="tl"/>
+  <rect surround="#svgdx #output" margin="4 4" opacity="0.5" class="d-dot d-fill-green d-text-small" text="svg" text-loc="tr"/>
+
+  <rect id="svgdx" wh="30 10" text="svgdx" class="d-fill-teal d-text-ol"/>
+  <rect id="input" xy="#svgdx|H 10" wh="30 10" text="input.xml" rx="3" class="d-fill-cornflowerblue d-text-ol"/>
+  <rect id="output" xy="#svgdx|h 10" wh="30 10" text="diagram.svg" rx="3" class="d-fill-green d-text-ol"/>
+
+  <line start="#input" end="#svgdx" class="d-arrow"/>
+  <line start="#svgdx" end="#output" class="d-arrow"/>
 </svg>
