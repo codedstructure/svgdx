@@ -120,7 +120,7 @@ impl EventGen for Container {
                 }
 
                 if bbox.is_some() {
-                    context.set_prev_element(new_el);
+                    context.set_prev_element(&new_el);
                 }
                 Ok((events, bbox))
             }

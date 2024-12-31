@@ -162,6 +162,7 @@ fn test_group_transform_prev() {
     assert_contains!(output, expected2);
 }
 
+#[test]
 fn test_g_previous() {
     let input = r##"
 <g>
