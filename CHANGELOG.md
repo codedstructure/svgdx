@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0 - 2024-12-31]
+
 - Added: auto styles for text-outlines. These use the SVG2 `paint-order` attribute
   to ensure the fill is painted after the stroke, and use `stroke-width` to create
   an appropriate text outline. This is available through the class `d-text-ol`,
