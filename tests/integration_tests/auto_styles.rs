@@ -166,3 +166,35 @@ fn test_style_flow() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, "animation-direction: reverse");
 }
+
+#[test]
+fn test_style_grid() {
+    let input = r#"<svg><rect wh="10" class="d-grid" /></svg>"#;
+    let expected1 = r#".d-grid {"#;
+    let expected2 = r#"url(#grid)"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r#"<svg><rect wh="10" class="d-grid-15" /></svg>"#;
+    let expected1 = r#".d-grid-15 {"#;
+    let expected2 = r#"url(#grid15)"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r#"<svg><rect wh="10" class="d-grid-100" /></svg>"#;
+    let expected1 = r#".d-grid-100 {"#;
+    let expected2 = r#"url(#grid100)"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    // Should only match values up to 100
+    let input = r#"<svg><rect wh="10" class="d-grid-101" /></svg>"#;
+    let expected1 = r#".d-grid-101 {"#;
+    let expected2 = r#"url(#grid101)"#;
+    let output = transform_str_default(input).unwrap();
+    assert_not_contains!(output, expected1);
+    assert_not_contains!(output, expected2);
+}

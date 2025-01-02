@@ -1,7 +1,7 @@
 <svg>
   <config theme="dark"/>
-  <rect xy="0" wh="100" class="d-red d-grid10"/>
-  <rect xy="20" wh="60" class="d-grid5 d-blue"/>
+  <rect xy="0" wh="100" class="d-red d-grid-10"/>
+  <rect xy="20" wh="60" class="d-grid-5 d-blue"/>
   <rect xy="40" wh="20" class="d-grid d-green"/>
   <circle cxy="50" r="5" class="d-gold"/>
 </svg>

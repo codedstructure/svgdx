@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: grid auto-styles are now parameterized; `d-grid5` / `d-grid10` are gone
+  (`d-grid` remains as-is) and new `d-grid-N` where N is any integer from 1 to 100
+  creates an appropriately dimensioned grid.
+
 ## [0.16.0 - 2024-12-31]
 
 - Added: auto styles for text-outlines. These use the SVG2 `paint-order` attribute

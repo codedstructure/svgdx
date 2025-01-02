@@ -109,9 +109,9 @@ of the shadow can be observed in some cases as a result.
 
 ## Patterns
 
-### `d-grid` / `d-grid5` / `d-grid10`
+### `d-grid` / `d-grid-N`
 These classes define a fill for the associated object which draw thin grid lines at
-gaps of 1, 5, or 10 respectively. This can be useful when debugging a diagram.
+gaps of 1, or N (1-100) respectively. This can be useful when debugging a diagram.
 
 ### `d-stipple` / `d-hatch` / `d-crosshatch`
 These classes provide various fill patterns.

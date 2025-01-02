@@ -298,39 +298,42 @@ r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate
     ));
 }
 
-// TODO: would be good to parameterise the various d-grid* patterns, but the current
-// generic interface just has stroke colour passed in.
-fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid {fill: url(#grid)}");
+fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str, class: &str, grid_size: u32) {
+    let sw = fstr((grid_size as f32).sqrt() / 10.);
+    let grid_id = if grid_size > 1 {
+        &format!("grid{}", grid_size)
+    } else {
+        "grid"
+    };
+    tb.add_style(&format!(".{class} {{fill: url(#{grid_id})}}"));
     tb.add_defs(&format!(
-        r#"<pattern id="grid" x="0" y="0" width="1" height="1" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
-  <line x1="0" y1="0" x2="0" y2="1" style="stroke-width: 0.1; stroke: {t_stroke}"/>
+        r#"<pattern id="{grid_id}" x="0" y="0" width="{grid_size}" height="{grid_size}" patternUnits="userSpaceOnUse" >
+  <rect width="100%" height="100%" style="stroke: none;"/>
+  <line x1="0" y1="0" x2="{grid_size}" y2="0" style="stroke-width: {sw}; stroke: {t_stroke}"/>
+  <line x1="0" y1="0" x2="0" y2="{grid_size}" style="stroke-width: {sw}; stroke: {t_stroke}"/>
 </pattern>"#,
     ));
 }
 
-fn d_grid5(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid5 {fill: url(#grid5)}");
-    tb.add_defs(&format!(
-        r#"<pattern id="grid5" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <line x1="0" y1="0" x2="5" y2="0" style="stroke-width: 0.2; stroke: {t_stroke}"/>
-  <line x1="0" y1="0" x2="0" y2="5" style="stroke-width: 0.2; stroke: {t_stroke}"/>
-</pattern>"#,
-    ));
-}
-
-fn d_grid10(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-grid10 {fill: url(#grid10)}");
-    tb.add_defs(&format!(
-        r#"<pattern id="grid10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <line x1="0" y1="0" x2="10" y2="0" style="stroke-width: 0.4; stroke: {t_stroke}"/>
-  <line x1="0" y1="0" x2="0" y2="10" style="stroke-width: 0.4; stroke: {t_stroke}"/>
-</pattern>"#,
-    ));
+fn append_grid_styles(tb: &mut ThemeBuilder, t_stroke: &str) {
+    fn grid_match(c: &str) -> Option<&str> {
+        if c.starts_with("d-grid-")
+            && c["d-grid-".len()..].parse::<u32>().map(|n| n <= 100) == Ok(true)
+        {
+            Some(c)
+        } else {
+            None
+        }
+    }
+    if tb.has_class("d-grid") {
+        d_grid(tb, t_stroke, "d-grid", 1);
+    }
+    for class in tb.class_matches(grid_match) {
+        let grid_size = class["d-grid-".len()..].parse::<u32>();
+        if let Ok(grid_size) = grid_size {
+            d_grid(tb, t_stroke, &class, grid_size);
+        }
+    }
 }
 
 fn d_softshadow(tb: &mut ThemeBuilder, _: &str) {
@@ -404,6 +407,7 @@ trait Theme: Clone {
 
         append_arrow_styles(tb);
         append_dash_styles(tb);
+        append_grid_styles(tb, &self.default_stroke());
 
         type Tfn = dyn Fn(&mut ThemeBuilder, &str);
         for (class, build_fn) in [
@@ -412,9 +416,6 @@ trait Theme: Clone {
             ("d-stipple", &d_stipple as &Tfn),
             ("d-hatch", &d_hatch as &Tfn),
             ("d-crosshatch", &d_crosshatch as &Tfn),
-            ("d-grid", &d_grid as &Tfn),
-            ("d-grid5", &d_grid5 as &Tfn),
-            ("d-grid10", &d_grid10 as &Tfn),
         ] {
             if tb.has_class(class) {
                 build_fn(tb, &self.default_stroke());
@@ -500,6 +501,13 @@ impl ThemeBuilder {
     }
     pub fn get_styles(&self) -> Vec<String> {
         self.styles.clone()
+    }
+    pub fn class_matches(&self, f: fn(&str) -> Option<&str>) -> Vec<String> {
+        self.classes
+            .iter()
+            .filter_map(|c| f(c))
+            .map(|s| s.to_string())
+            .collect()
     }
 }
 
