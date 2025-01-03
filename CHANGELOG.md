@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`d-grid` remains as-is) and new `d-grid-N` where N is any integer from 1 to 100
   creates an appropriately dimensioned grid.
 
+- Editor: Fixed SVG download button to make a fresh request without metadata for
+  a cleaner download file. Also removed the base64 data URI copy, replacing with
+  simple copy of the generated SVG.
+
 ## [0.16.0 - 2024-12-31]
 
 - Added: auto styles for text-outlines. These use the SVG2 `paint-order` attribute

@@ -124,11 +124,11 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         return document.getElementById('svg-output').style.display !== "none";
     }
 
-    async function svgdx_transform_server(svgdx_input) {
+    async function svgdx_transform_server(svgdx_input, add_metadata) {
         try {
             statusbar.style.opacity = "0.3";
-            let add_metadata = want_metadata() ? "true" : "false";
-            const response = await fetch(`api/transform?add_metadata=${add_metadata}`, {
+            let md_param = add_metadata ? "true" : "false";
+            const response = await fetch(`api/transform?add_metadata=${md_param}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'text/xml'
@@ -146,7 +146,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         }
     }
 
-    function svgdx_transform_local(svgdx_input) {
+    function svgdx_transform_local(svgdx_input, add_metadata) {
         let result, ok;
         try {
             if (!window.hasOwnProperty('svgdx_transform')) {
@@ -154,7 +154,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 ok = false;
                 setTimeout(update, 100);
             } else {
-                result = svgdx_transform(svgdx_input, want_metadata());
+                result = svgdx_transform(svgdx_input, add_metadata);
                 ok = true;
             }
         } catch (e) {
@@ -217,6 +217,14 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         };
     }
 
+    async function get_transform(input, add_metadata) {
+        if (window.svgdx_use_server) {
+            return await svgdx_transform_server(input, add_metadata);
+        } else {
+            return await svgdx_transform_local(input, add_metadata);
+        }
+    }
+
     async function update() {
         // svgdx-bootstrap.js sets svgdx_use_server as appropriate
         // to toggle between local (WASM) and server-side transform
@@ -232,12 +240,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             // save editor content to localStorage
             localStorage.setItem(`svgdx-editor-value-${activeTab()}`, svgdx_input);
 
-            let result;
-            if (window.svgdx_use_server) {
-                result = await svgdx_transform_server(svgdx_input);
-            } else {
-                result = await svgdx_transform_local(svgdx_input);
-            }
+            let result = await get_transform(svgdx_input, want_metadata());
 
             const responseOk = result[0];
             const responseText = result[1];
@@ -344,32 +347,55 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `svgdx-editor-${getTimestamp()}.svgdx`;
+        a.download = `svgdx-editor-${getTimestamp()}.xml`;
         a.click();
         URL.revokeObjectURL(url);
     });
 
     // save output button
-    document.getElementById('save-output').addEventListener('click', () => {
+    document.getElementById('save-output').addEventListener('click', async () => {
         // download svg as file
-        const svg = document.querySelector('#svg-output svg');
-        const saved_viewbox = svg.getAttribute('viewBox');
-        // temporarily set width, height, and viewBox to original values
-        svg.setAttribute('width', svg.dataset.origWidth);
-        svg.setAttribute('height', svg.dataset.origHeight);
-        svg.setAttribute('viewBox', svg.dataset.origViewbox);
+        // start by getting a fresh output without metadata
+        const svgdx_input = editor.getValue();
+        let [ok, svg_output] = await get_transform(svgdx_input, false);
+        if (!ok) {
+            // update status bar with error message
+            statusbar.style.color = "darkred";
+            statusbar.innerText = `Error saving SVG output ${svg_output}`;
+            return;
+        }
         // trigger download
-        const blob = new Blob([svg.outerHTML], { type: 'image/svg+xml' });
+        const blob = new Blob([svg_output], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `svgdx-output-${getTimestamp()}.svg`;
         a.click();
         URL.revokeObjectURL(url);
-        // and back to our 'normal'
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', '100%');
-        svg.setAttribute('viewBox', saved_viewbox);
+    });
+
+    // copy SVG output
+    document.getElementById('copy-output').addEventListener('click', async () => {
+        // start by getting a fresh output without metadata
+        const svgdx_input = editor.getValue();
+        let [ok, svg_output] = await get_transform(svgdx_input, false);
+        if (!ok) {
+            // update status bar with error message
+            statusbar.style.color = "darkred";
+            statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
+            return;
+        }
+        // copy to clipboard
+        try {
+            await navigator.clipboard.writeText(svg_output);
+        } catch (e) {
+            console.error('Error copying SVG to clipboard', e);
+            statusbar.style.color = "darkred";
+            statusbar.innerText = "Error copying SVG to clipboard";
+            return;
+        }
+        statusbar.style.color = null;
+        statusbar.innerText = "SVG output copied to clipboard";
     });
 
     // copy PNG buttons
@@ -449,28 +475,6 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
         return pngBlob;
     }
-
-    // copy as base64 button
-    document.getElementById('copy-base64').addEventListener('click', () => {
-        const svg = document.querySelector('#svg-output svg');
-        const saved_viewbox = svg.getAttribute('viewBox');
-        // temporarily set width, height, and viewBox to original values
-        svg.setAttribute('width', svg.dataset.origWidth);
-        svg.setAttribute('height', svg.dataset.origHeight);
-        svg.setAttribute('viewBox', svg.dataset.origViewbox);
-        // encode as base64
-        const base64 = btoa(Array.from(new TextEncoder().encode(svg.outerHTML), (byte) =>
-            String.fromCodePoint(byte),
-        ).join(""));
-        // create data-uri and copy to clipboard
-        const dataUri = `data:image/svg+xml;base64,${base64}`;
-        // copy to clipboard
-        navigator.clipboard.writeText(dataUri);
-        // restore original values
-        svg.setAttribute('width', '100%');
-        svg.setAttribute('height', '100%');
-        svg.setAttribute('viewBox', saved_viewbox);
-    });
 
     // toggle layout between horizontal and vertical
     const layoutButton = document.getElementById('toggle-layout');
@@ -634,7 +638,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             "reset-view": "Resize and center the SVG",
             "save-input": "Download the input",
             "save-output": "Download the SVG",
-            "copy-base64": "Copy the SVG as base64 to clipboard",
+            "copy-output": "Copy the SVG to clipboard",
             "copy-png": "Copy as PNG to clipboard",
             "help": "Show help links"
         };
