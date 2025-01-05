@@ -1,9 +1,43 @@
-use std::net::IpAddr;
+use std::{net::IpAddr, str::FromStr};
 
 use svgdx::server;
 
 use clap::Parser;
 use tokio::sync::mpsc::channel;
+
+#[derive(Clone, Debug)]
+struct Hostname(String);
+
+impl FromStr for Hostname {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let orig = s;
+        let mut s = s;
+        // must not be empty
+        if s.is_empty() {
+            return Err("Empty hostname".to_string());
+        }
+        // Allow leading wildcard
+        if s.starts_with("*.") {
+            s = &s[2..];
+        }
+        let parts = s.split('.').collect::<Vec<_>>();
+        if parts.is_empty() {
+            return Err("Empty hostname".to_string());
+        }
+        for part in &parts {
+            // Each part must alphanumeric + '-', and non-empty
+            if part.is_empty() {
+                return Err("Empty hostname part".to_string());
+            }
+            if !part.chars().all(|c| c.is_alphanumeric() || c == '-') {
+                return Err(format!("Invalid character in hostname part: {}", part));
+            }
+        }
+        Ok(Self(orig.to_string()))
+    }
+}
 
 /// Command line arguments
 #[derive(Parser)]
@@ -20,6 +54,10 @@ struct Arguments {
     /// Open browser on startup
     #[arg(long)]
     open: bool,
+
+    /// Additional allowed image sources for CSP.
+    #[arg(long, number_of_values = 1)]
+    img_src: Vec<Hostname>,
 }
 
 #[tokio::main]
