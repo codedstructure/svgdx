@@ -9,8 +9,8 @@ use axum::{
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::Sender;
 
-use crate::errors::SvgdxError;
-use crate::{transform_str, TransformConfig};
+use svgdx::errors::SvgdxError;
+use svgdx::{transform_str, TransformConfig};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
 // but otherwise restrict to same-origin resources.
@@ -69,10 +69,10 @@ macro_rules! include_or_read {
         // If configured as a release build, use include_bytes! to embed the file.
         #[cfg(not(debug_assertions))]
         let content =
-            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/editor/", $path)).as_ref();
+            include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "../editor/", $path)).as_ref();
         // During development it's useful to have it re-read each request.
         #[cfg(debug_assertions)]
-        let content = tokio::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/editor/", $path))
+        let content = tokio::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "../editor/", $path))
             .await
             .unwrap();
 

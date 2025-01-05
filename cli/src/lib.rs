@@ -4,9 +4,15 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 
-use crate::errors::{Result, SvgdxError};
-use crate::themes::ThemeType;
-use crate::{transform_file, TransformConfig};
+use svgdx::errors::{Result, SvgdxError};
+use svgdx::themes::ThemeType;
+use svgdx::{transform_stream, TransformConfig};
+// #[cfg(feature = "cli")]
+use std::fs::{self, File};
+// #[cfg(feature = "cli")]
+use std::io::{BufReader, IsTerminal, Read, BufRead, Cursor};
+// #[cfg(feature = "cli")]
+use tempfile::NamedTempFile;
 
 /// Command line arguments
 #[derive(Parser)]
@@ -84,9 +90,9 @@ struct Arguments {
     #[arg(long, default_value = "sans-serif")]
     font_family: String,
 
-    /// Theme to use
-    #[arg(long, default_value = "default")]
-    theme: ThemeType,
+    // /// Theme to use
+    // #[arg(long, default_value = "default")]
+    // theme: ThemeType,
 
     /// Optional style to apply to SVG root element
     #[arg(long)]
@@ -153,7 +159,7 @@ impl Config {
                 depth_limit: args.depth_limit,
                 font_size: args.font_size,
                 font_family: args.font_family,
-                theme: args.theme,
+                theme: ThemeType::Default, //args.theme,
                 svg_style: args.svg_style,
             },
         })
@@ -174,6 +180,45 @@ impl Config {
 pub fn get_config() -> Result<Config> {
     let args = Arguments::parse();
     Config::from_args(args)
+}
+
+/// Read file from `input` ('-' for stdin), process the result,
+/// and write to file given by `output` ('-' for stdout).
+///
+/// The transform can be modified by providing a suitable `TransformConfig` value.
+pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
+    let mut in_reader = if input == "-" {
+        let mut stdin = std::io::stdin().lock();
+        if stdin.is_terminal() {
+            // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
+            // enough to signal end-of-input, even when given at the start of a line.
+            // Work around this by reading entire input, then wrapping in a Cursor to
+            // provide a buffered reader.
+            // It would be nice to improve this.
+            let mut buf = Vec::new();
+            stdin
+                .read_to_end(&mut buf)
+                .expect("stdin should be readable to EOF");
+            Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
+        } else {
+            Box::new(stdin) as Box<dyn BufRead>
+        }
+    } else {
+        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
+    };
+
+    if output == "-" {
+        transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
+    } else {
+        let mut out_temp = NamedTempFile::new()?;
+        transform_stream(&mut in_reader, &mut out_temp, cfg)?;
+        // Copy content rather than rename (by .persist()) since this
+        // could cross filesystems; some apps (e.g. eog) also fail to
+        // react to 'moved-over' files.
+        fs::copy(out_temp.path(), output)?;
+    }
+
+    Ok(())
 }
 
 /// Run the `svgdx` program with a given `Config`.

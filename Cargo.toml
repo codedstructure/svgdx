@@ -1,5 +1,16 @@
-[package]
-name = "svgdx"
+[workspace]
+resolver = "2"
+members = [
+    "svgdx",
+    "cli",
+    "server",
+]
+
+[profile.release]
+lto = true
+opt-level = 's'
+
+[workspace.package]
 version = "0.16.0"
 description = "create SVG diagrams easily"
 authors = ["Ben Bass <benbass@codedstructure.net>"]
@@ -7,62 +18,3 @@ repository = "https://github.com/codedstructure/svgdx"
 keywords = ["svg", "diagrams"]
 license = "MIT"
 edition = "2021"
-default-run = "svgdx"
-
-[features]
-default = ["cli", "server"]
-cli = ["shlex", "notify", "notify-debouncer-mini", "clap", "tempfile"]
-server = ["axum", "clap", "hyper", "serde", "serde_derive", "tokio", "webbrowser"]
-
-[dependencies]
-quick-xml = "0.37.2"
-itertools = "0.14.0"
-rand = { version = "0.8.5", default-features = false }
-rand_pcg = "0.3.1"
-
-tempfile = { version = "3.9.0", optional = true }
-shlex = { version = "1.3.0", optional = true }
-notify = { version = "7.0.0", optional = true }
-notify-debouncer-mini = { version = "0.5.0", optional = true }
-clap = { version = "4.5.17", features = ["derive"], optional = true }
-
-axum = { version = "0.7", optional = true }
-hyper = { version = "1.3", optional = true }
-serde = { version = "1.0", optional = true }
-serde_derive = { version = "1.0", optional = true }
-tokio = { version = "1.40", features = ["macros", "rt-multi-thread", "fs"], optional = true }
-webbrowser = { version = "1.0.3", features = ["hardened", "disable-wsl"], optional = true }
-
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "0.2"
-
-[dev-dependencies]
-assertables = "9.5.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-assert_cmd = "2.0.12"
-
-[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-wasm-bindgen-test = "0.3"
-
-[[bin]]
-name = "svgdx-server"
-path = "src/bin/svgdx_server.rs"
-required-features = ["server"]
-
-[[bin]]
-name = "svgdx"
-path = "src/bin/svgdx.rs"
-required-features = ["cli"]
-
-[profile.release]
-lto = true
-opt-level = 's'
-
-# wasm-pack docs imply that `profiling` profile should include debug info,
-# but it doesn't seem to. (Useful e.g. for minimizing size with `twiggy`)
-[package.metadata.wasm-pack.profile.profiling]
-wasm-opt = ['-g', '-O']

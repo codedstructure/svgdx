@@ -11,7 +11,7 @@ use std::{collections::HashSet, str::FromStr};
 use crate::colours::{COLOUR_LIST, DARK_COLOURS};
 
 #[derive(Default, Debug, Clone)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+// #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ThemeType {
     #[default]
     Default,

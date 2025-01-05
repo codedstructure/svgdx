@@ -30,23 +30,17 @@ use themes::ThemeType;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(feature = "cli")]
-use std::fs::{self, File};
-#[cfg(feature = "cli")]
-use std::io::{BufReader, IsTerminal, Read};
 
 use std::io::{BufRead, Cursor, Write};
 
-#[cfg(feature = "cli")]
-use tempfile::NamedTempFile;
 
-#[cfg(feature = "cli")]
-pub mod cli;
+// #[cfg(feature = "cli")]
+// pub mod cli;
 mod colours;
 mod connector;
 mod context;
 mod element;
-mod errors;
+pub mod errors;
 mod events;
 mod expression;
 mod functions;
@@ -54,15 +48,15 @@ mod loop_el;
 mod path;
 mod position;
 mod reuse;
-#[cfg(feature = "server")]
-pub mod server;
+// #[cfg(feature = "server")]
+// pub mod server;
 mod text;
-mod themes;
+pub mod themes;
 mod transform;
 mod transform_attr;
 mod types;
 
-pub use errors::Result;
+pub use errors::{Result, SvgdxError};
 use transform::Transformer;
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used
@@ -141,46 +135,6 @@ pub fn transform_stream(
 ) -> Result<()> {
     let mut t = Transformer::from_config(config);
     t.transform(reader, writer)
-}
-
-/// Read file from `input` ('-' for stdin), process the result,
-/// and write to file given by `output` ('-' for stdout).
-///
-/// The transform can be modified by providing a suitable `TransformConfig` value.
-#[cfg(feature = "cli")]
-pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
-    let mut in_reader = if input == "-" {
-        let mut stdin = std::io::stdin().lock();
-        if stdin.is_terminal() {
-            // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
-            // enough to signal end-of-input, even when given at the start of a line.
-            // Work around this by reading entire input, then wrapping in a Cursor to
-            // provide a buffered reader.
-            // It would be nice to improve this.
-            let mut buf = Vec::new();
-            stdin
-                .read_to_end(&mut buf)
-                .expect("stdin should be readable to EOF");
-            Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
-        } else {
-            Box::new(stdin) as Box<dyn BufRead>
-        }
-    } else {
-        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
-    };
-
-    if output == "-" {
-        transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
-    } else {
-        let mut out_temp = NamedTempFile::new()?;
-        transform_stream(&mut in_reader, &mut out_temp, cfg)?;
-        // Copy content rather than rename (by .persist()) since this
-        // could cross filesystems; some apps (e.g. eog) also fail to
-        // react to 'moved-over' files.
-        fs::copy(out_temp.path(), output)?;
-    }
-
-    Ok(())
 }
 
 /// Transform `input` provided as a string, returning the result as a string.

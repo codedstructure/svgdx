@@ -1,6 +1,6 @@
 use svgdx::Result;
 
-use svgdx::cli::{get_config, run};
+use svgdx_cli::{get_config, run};
 
 fn main() -> Result<()> {
     run(get_config()?)?;

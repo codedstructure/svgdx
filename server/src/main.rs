@@ -1,6 +1,6 @@
 use std::{net::IpAddr, str::FromStr};
 
-use svgdx::server;
+mod server;
 
 use clap::Parser;
 use tokio::sync::mpsc::channel;

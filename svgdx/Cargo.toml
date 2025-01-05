@@ -1,0 +1,40 @@
+[package]
+name = "svgdx"
+version.workspace = true
+description.workspace = true
+authors.workspace = true
+repository.workspace = true
+keywords.workspace = true
+license.workspace = true
+edition.workspace = true
+
+#   [features]
+#   default = ["cli", "server"]
+#   cli = ["shlex", "notify", "notify-debouncer-mini", "clap", "tempfile"]
+#   server = ["axum", "clap", "hyper", "serde", "serde_derive", "tokio", "webbrowser"]
+
+[dependencies]
+quick-xml = "0.37.2"
+itertools = "0.14.0"
+rand = { version = "0.8.5", default-features = false }
+rand_pcg = "0.3.1"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+assertables = "9.5.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+assert_cmd = "2.0.12"
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+# wasm-pack docs imply that `profiling` profile should include debug info,
+# but it doesn't seem to. (Useful e.g. for minimizing size with `twiggy`)
+[package.metadata.wasm-pack.profile.profiling]
+wasm-opt = ['-g', '-O']
