@@ -1,19 +1,19 @@
 use assert_cmd::{crate_name, Command};
 use assertables::assert_contains;
 use std::io::Write;
-use svgdx::cli::Config;
+use svgdx_cli::Config;
 use tempfile::NamedTempFile;
 
 #[test]
 fn test_cmdline_bad_args() {
-    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    let mut cmd = Command::cargo_bin("svgdx").unwrap();
     // -w without an input file should fail
     cmd.arg("-w").assert().failure().code(2);
 }
 
 #[test]
 fn test_cmdline_help() {
-    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    let mut cmd = Command::cargo_bin("svgdx").unwrap();
     let output = String::from_utf8(cmd.arg("-h").assert().success().get_output().stdout.clone())
         .expect("non-UTF8");
     assert_contains!(output, "Usage");
@@ -32,7 +32,7 @@ fn test_cmdline_config() {
         tmpfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::cli::run(config).expect("run failed");
+    svgdx_cli::run(config).expect("run failed");
 
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
@@ -44,7 +44,7 @@ fn test_cmdline_config() {
         tmpfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::cli::run(config).expect("run failed");
+    svgdx_cli::run(config).expect("run failed");
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn test_cmdline_same_file() {
     let filename = tmpfile.path().file_name().unwrap();
 
     // Different files: should succeed
-    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    let mut cmd = Command::cargo_bin("svgdx").unwrap();
     cmd.current_dir(cwd)
         .args([
             filename.to_str().unwrap(),
@@ -67,7 +67,7 @@ fn test_cmdline_same_file() {
         .success();
 
     // Same file (even with different 'spelling') - should fail.
-    let mut cmd = Command::cargo_bin(crate_name!()).unwrap();
+    let mut cmd = Command::cargo_bin("svgdx").unwrap();
     cmd.current_dir(cwd)
         .args([
             filename.to_str().unwrap(),

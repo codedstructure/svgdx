@@ -1,8 +1,6 @@
 mod attr_expansion;
 mod auto_styles;
 mod box_element;
-#[cfg(feature = "cli")]
-mod cmdline;
 mod comments;
 mod config;
 mod connector;

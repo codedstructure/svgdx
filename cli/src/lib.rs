@@ -7,11 +7,8 @@ use std::{path::Path, sync::mpsc::channel, time::Duration};
 use svgdx::errors::{Result, SvgdxError};
 use svgdx::themes::ThemeType;
 use svgdx::{transform_stream, TransformConfig};
-// #[cfg(feature = "cli")]
 use std::fs::{self, File};
-// #[cfg(feature = "cli")]
 use std::io::{BufReader, IsTerminal, Read, BufRead, Cursor};
-// #[cfg(feature = "cli")]
 use tempfile::NamedTempFile;
 
 /// Command line arguments
