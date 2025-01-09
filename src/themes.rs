@@ -267,71 +267,89 @@ fn append_dash_styles(tb: &mut ThemeBuilder) {
     }
 }
 
-fn d_stipple(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-stipple {fill: url(#stipple)}");
-    tb.add_defs(&format!(
-r#"<pattern id="stipple" x="0" y="0" width="1" height="1" patternTransform="rotate(45)" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <circle cx="0.5" cy="0.5" r="0.1" style="stroke: none; fill: {t_stroke}"/>
-</pattern>"#,
-    ));
+#[derive(Debug, Clone, Copy)]
+enum PatternType {
+    Horizontal,
+    Vertical,
+    Grid,
+    Stipple,
 }
 
-fn d_crosshatch(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-crosshatch {fill: url(#crosshatch)}");
-    tb.add_defs(&format!(
-r#"<pattern id="crosshatch" x="0" y="0" width="1" height="1" patternTransform="rotate(75)" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
-  <line x1="0" y1="0" x2="0" y2="1" style="stroke-width: 0.1; stroke: {t_stroke}"/>
-</pattern>"#,
-    ));
-}
-
-fn d_hatch(tb: &mut ThemeBuilder, t_stroke: &str) {
-    tb.add_style(".d-hatch {fill: url(#hatch)}");
-    tb.add_defs(&format!(
-r#"<pattern id="hatch" x="0" y="0" width="1" height="1" patternTransform="rotate(120)" patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none"/>
-  <line x1="0" y1="0" x2="1" y2="0" style="stroke-width: 0.1; stroke: {t_stroke}"/>
-</pattern>"#,
-    ));
-}
-
-fn d_grid(tb: &mut ThemeBuilder, t_stroke: &str, class: &str, grid_size: u32) {
-    let sw = fstr((grid_size as f32).sqrt() / 10.);
-    let grid_id = if grid_size > 1 {
-        &format!("grid{}", grid_size)
+fn pattern_defs(
+    tb: &mut ThemeBuilder,
+    t_stroke: &str,
+    class: &str,
+    spacing: u32,
+    direction: PatternType,
+    rotate: Option<i32>,
+) {
+    let rotate = if let Some(r) = rotate {
+        format!(" patternTransform=\"rotate({r})\"")
     } else {
-        "grid"
+        String::new()
     };
-    tb.add_style(&format!(".{class} {{fill: url(#{grid_id})}}"));
+    // This is fairly hacky, but a bigger spacing *probably* means
+    // covering a larger area and a thicker stroke width is appropriate.
+    let sw = fstr((spacing as f32).sqrt() / 10.);
+    let ptn_id = class.trim_start_matches("d-");
+    tb.add_style(&format!(".{class} {{fill: url(#{ptn_id})}}"));
+    let mut lines = String::new();
+    if let PatternType::Horizontal | PatternType::Grid = direction {
+        lines.push_str(&format!(
+            r#"<line x1="0" y1="0" x2="{spacing}" y2="0" style="stroke-width: {sw}; stroke: {t_stroke}"/>"#
+        ));
+    }
+    if let PatternType::Vertical | PatternType::Grid = direction {
+        lines.push_str(&format!(
+            r#"<line x1="0" y1="0" x2="0" y2="{spacing}" style="stroke-width: {sw}; stroke: {t_stroke}"/>"#
+        ));
+    }
+    if let PatternType::Stipple = direction {
+        let gs = fstr(spacing as f32 / 2.);
+        let r = fstr((spacing as f32).sqrt() / 5.);
+        lines.push_str(&format!(
+            r#"<circle cx="{gs}" cy="{gs}" r="{r}" style="stroke: none; fill: {t_stroke}"/>"#
+        ));
+    }
     tb.add_defs(&format!(
-        r#"<pattern id="{grid_id}" x="0" y="0" width="{grid_size}" height="{grid_size}" patternUnits="userSpaceOnUse" >
+        r#"<pattern id="{ptn_id}" x="0" y="0" width="{spacing}" height="{spacing}"{rotate} patternUnits="userSpaceOnUse" >
   <rect width="100%" height="100%" style="stroke: none;"/>
-  <line x1="0" y1="0" x2="{grid_size}" y2="0" style="stroke-width: {sw}; stroke: {t_stroke}"/>
-  <line x1="0" y1="0" x2="0" y2="{grid_size}" style="stroke-width: {sw}; stroke: {t_stroke}"/>
+  {lines}
 </pattern>"#,
     ));
 }
 
-fn append_grid_styles(tb: &mut ThemeBuilder, t_stroke: &str) {
-    fn grid_match(c: &str) -> Option<&str> {
-        if c.starts_with("d-grid-")
-            && c["d-grid-".len()..].parse::<u32>().map(|n| n <= 100) == Ok(true)
-        {
-            Some(c)
-        } else {
-            None
+fn append_pattern_styles(tb: &mut ThemeBuilder, t_stroke: &str) {
+    for (ptn_class, ptn_type, ptn_rotate) in [
+        ("d-grid", PatternType::Grid, None),
+        ("d-grid-h", PatternType::Horizontal, None),
+        ("d-grid-v", PatternType::Vertical, None),
+        ("d-hatch", PatternType::Horizontal, Some(-45)),
+        ("d-crosshatch", PatternType::Grid, Some(75)),
+        ("d-stipple", PatternType::Stipple, Some(45)),
+    ] {
+        fn get_spacing(prefix: &str, c: &str) -> Option<u32> {
+            if let Some(suffix) = c.strip_prefix(prefix) {
+                suffix.parse::<u32>().ok().filter(|&n| n <= 100)
+            } else {
+                None
+            }
         }
-    }
-    if tb.has_class("d-grid") {
-        d_grid(tb, t_stroke, "d-grid", 1);
-    }
-    for class in tb.class_matches(grid_match) {
-        let grid_size = class["d-grid-".len()..].parse::<u32>();
-        if let Ok(grid_size) = grid_size {
-            d_grid(tb, t_stroke, &class, grid_size);
+        if tb.has_class(ptn_class) {
+            pattern_defs(tb, t_stroke, ptn_class, 1, ptn_type, ptn_rotate);
+        }
+        let spec_class = format!("{}-", ptn_class);
+
+        let classes: Vec<_> = tb
+            .classes
+            .iter()
+            .filter(|c| c.starts_with(&spec_class))
+            .cloned()
+            .collect();
+        for class in classes {
+            if let Some(grid_size) = get_spacing(&spec_class, &class) {
+                pattern_defs(tb, t_stroke, &class, grid_size, ptn_type, ptn_rotate);
+            }
         }
     }
 }
@@ -407,15 +425,12 @@ trait Theme: Clone {
 
         append_arrow_styles(tb);
         append_dash_styles(tb);
-        append_grid_styles(tb, &self.default_stroke());
+        append_pattern_styles(tb, &self.default_stroke());
 
         type Tfn = dyn Fn(&mut ThemeBuilder, &str);
         for (class, build_fn) in [
             ("d-softshadow", &d_softshadow as &Tfn),
             ("d-hardshadow", &d_hardshadow as &Tfn),
-            ("d-stipple", &d_stipple as &Tfn),
-            ("d-hatch", &d_hatch as &Tfn),
-            ("d-crosshatch", &d_crosshatch as &Tfn),
         ] {
             if tb.has_class(class) {
                 build_fn(tb, &self.default_stroke());
@@ -501,13 +516,6 @@ impl ThemeBuilder {
     }
     pub fn get_styles(&self) -> Vec<String> {
         self.styles.clone()
-    }
-    pub fn class_matches(&self, f: fn(&str) -> Option<&str>) -> Vec<String> {
-        self.classes
-            .iter()
-            .filter_map(|c| f(c))
-            .map(|s| s.to_string())
-            .collect()
     }
 }
 

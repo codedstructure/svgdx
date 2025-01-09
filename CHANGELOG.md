@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improved: grid auto-styles are now parameterized; `d-grid5` / `d-grid10` are gone
   (`d-grid` remains as-is) and new `d-grid-N` where N is any integer from 1 to 100
-  creates an appropriately dimensioned grid.
+  creates an appropriately dimensioned grid. The `d-hatch`, `d-crosshatch` and
+  `d-stipple` classes are parameterized in the same way. New classes `d-grid-v` and
+  `d-grid-h` (also parameterizable) provide vertical / horizontal grid lines.
 
 - Editor: Fixed SVG download button to make a fresh request without metadata for
   a cleaner download file. Also removed the base64 data URI copy, replacing with

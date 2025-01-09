@@ -206,11 +206,11 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_ignore_classes = [
         "d-softshadow",
         "d-hardshadow",
-        "d-stipple",
-        "d-crosshatch",
-        "d-hatch",
-        "d-surround",
         "d-grid",
+        "d-hatch",
+        "d-crosshatch",
+        "d-stipple",
+        "d-surround",
         "d-flow",
         "d-dot",
         "d-dash",
@@ -219,6 +219,9 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_ignore_class_fns = [
         |c: &str| c.starts_with("d-flow-"),
         |c: &str| c.starts_with("d-grid-"),
+        |c: &str| c.starts_with("d-crosshatch-"),
+        |c: &str| c.starts_with("d-hatch-"),
+        |c: &str| c.starts_with("d-stipple-"),
     ];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
