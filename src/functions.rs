@@ -103,8 +103,14 @@ pub enum Function {
     In,
     /// split(sep, a) - split string a into list of substrings using sep
     Split,
+    /// splitw(a) - split string on whitespace
+    Splitw,
+    /// Trim(a) - remove leading and trailing whitespace
+    Trim,
     /// join(sep, a, ...) - join list of strings into a single string
     Join,
+    /// _(a) - return a as text
+    Text,
 }
 
 impl FromStr for Function {
@@ -160,7 +166,10 @@ impl FromStr for Function {
             "count" => Self::Count,
             "in" => Self::In,
             "split" => Self::Split,
+            "splitw" => Self::Splitw,
+            "trim" => Self::Trim,
             "join" => Self::Join,
+            "_" => Self::Text,
             _ => return Err(SvgdxError::ParseError(format!("Unknown function: {value}"))),
         })
     }
@@ -457,6 +466,18 @@ pub fn eval_function(
                     .collect(),
             ));
         }
+        Function::Splitw => {
+            let a = args.one_string()?;
+            return Ok(ExprValue::List(
+                a.split_ascii_whitespace()
+                    .map(|s| ExprValue::String(s.to_owned()))
+                    .collect(),
+            ));
+        }
+        Function::Trim => {
+            let a = args.one_string()?;
+            return Ok(ExprValue::String(a.trim().to_owned()));
+        }
         Function::Join => {
             if let Some((sep, rest)) = args.string_list()?.split_first() {
                 let combined = rest.iter().join(sep);
@@ -466,6 +487,10 @@ pub fn eval_function(
                     "join() requires at least one argument".to_string(),
                 ));
             }
+        }
+        Function::Text => {
+            let a = args.one_string()?;
+            return Ok(ExprValue::Text(a));
         }
     };
     Ok(e.into())

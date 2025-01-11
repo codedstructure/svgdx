@@ -13,6 +13,7 @@ use crate::types::fstr;
 pub enum ExprValue {
     Number(f32),
     String(String),
+    Text(String),
     List(Vec<ExprValue>),
 }
 
@@ -46,6 +47,19 @@ impl From<&[ExprValue]> for ExprValue {
     }
 }
 
+fn escape(input: &str) -> String {
+    let mut result = String::new();
+    for ch in input.chars() {
+        match ch {
+            '\\' => result.push_str("\\\\"),
+            '\n' => result.push_str("\\n"),
+            '\'' => result.push_str("\\'"),
+            _ => result.push(ch),
+        }
+    }
+    result
+}
+
 impl Display for ExprValue {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         // Note use of `, ` rather than just ` ` to allow use
@@ -53,7 +67,8 @@ impl Display for ExprValue {
         // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
         match self {
             Self::Number(n) => write!(f, "{}", fstr(*n)),
-            Self::String(s) => write!(f, "'{}'", s),
+            Self::String(s) => write!(f, "'{}'", escape(s)),
+            Self::Text(t) => write!(f, "{}", t),
             Self::List(_) => {
                 write!(f, "{}", self.flatten().into_iter().join(", "))
             }
@@ -69,7 +84,7 @@ impl ExprValue {
     pub fn len(&self) -> usize {
         match self {
             Self::Number(_) => 1,
-            Self::String(_) => 1,
+            Self::String(_) | Self::Text(_) => 1,
             Self::List(v) => v.len(),
         }
     }
@@ -82,7 +97,7 @@ impl ExprValue {
     pub fn flatten(&self) -> Vec<ExprValue> {
         match self {
             Self::Number(_) => vec![self.clone()],
-            Self::String(_) => vec![self.clone()],
+            Self::String(_) | Self::Text(_) => vec![self.clone()],
             Self::List(v) => {
                 let mut out = Vec::new();
                 for e in v {
@@ -111,7 +126,7 @@ impl ExprValue {
             Self::Number(_) => Err(SvgdxError::ParseError(
                 "Expected a list of strings".to_owned(),
             )),
-            Self::String(s) => Ok(vec![s.clone()]),
+            Self::String(s) | Self::Text(s) => Ok(vec![s.clone()]),
             Self::List(v) => {
                 let mut out = Vec::new();
                 for e in v {
@@ -124,6 +139,29 @@ impl ExprValue {
                     }
                 }
                 Ok(out)
+            }
+        }
+    }
+
+    pub fn one_string(&self) -> Result<String> {
+        match self {
+            Self::Number(_) => Err(SvgdxError::ParseError(
+                "Expected a string, got a number".to_owned(),
+            )),
+            Self::String(s) | Self::Text(s) => Ok(s.clone()),
+            Self::List(l) => {
+                if l.len() != 1 {
+                    return Err(SvgdxError::ParseError(
+                        "Expected exactly one argument".to_owned(),
+                    ));
+                }
+                if let Self::String(s) = &l[0] {
+                    Ok(s.clone())
+                } else {
+                    Err(SvgdxError::ParseError(
+                        "Expected a single string argument".to_owned(),
+                    ))
+                }
             }
         }
     }
@@ -141,7 +179,7 @@ impl ExprValue {
     pub fn number_list(&self) -> Result<Vec<f32>> {
         match self {
             Self::Number(v) => Ok(vec![*v]),
-            Self::String(s) => Err(SvgdxError::ParseError(format!(
+            Self::String(s) | Self::Text(s) => Err(SvgdxError::ParseError(format!(
                 "Expected a list of numbers, got '{}'",
                 s
             ))),
@@ -164,7 +202,7 @@ impl ExprValue {
     pub fn one_number(&self) -> Result<f32> {
         match self {
             ExprValue::Number(n) => Ok(*n),
-            ExprValue::String(s) => Err(SvgdxError::ParseError(format!(
+            ExprValue::String(s) | ExprValue::Text(s) => Err(SvgdxError::ParseError(format!(
                 "Expected a number, got '{}'",
                 s
             ))),
@@ -289,16 +327,30 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     let mut in_elref_id = false;
     let mut in_quote = None;
 
+    let mut string_escape = false;
     for ch in input.chars() {
         if let Some(qt) = in_quote {
             // Avoid considering other tokens within a string
-            // TODO: allow escaped quotes
-            if ch == qt {
-                tokens.push(Token::String(buffer.iter().collect::<String>()));
-                buffer.clear();
-                in_quote = None;
-            } else {
-                buffer.push(ch);
+            // Strings are surrounded with either ' or " and may contain
+            // escaped quotes, newlines as '\n', and backslashes as '\\'.
+            match (ch, string_escape) {
+                (x, false) if x == qt => {
+                    tokens.push(Token::String(buffer.iter().collect::<String>()));
+                    buffer.clear();
+                    in_quote = None;
+                    string_escape = false;
+                }
+                ('\\', false) => {
+                    string_escape = true;
+                }
+                ('n', true) => {
+                    buffer.push('\n');
+                    string_escape = false;
+                }
+                _ => {
+                    buffer.push(ch);
+                    string_escape = false;
+                }
             }
             continue;
         }
@@ -1493,10 +1545,35 @@ mod tests {
             ("{{split('xyz', 'abc:def:ghi')}}", "'abc:def:ghi'"),
             ("{{split('a', 'abc:def:ghi')}}", "'', 'bc:def:ghi'"),
             ("{{split('i', 'abc:def:ghi')}}", "'abc:def:gh', ''"),
+            (
+                "{{splitw('  some words  with spaces')}}",
+                "'some', 'words', 'with', 'spaces'",
+            ),
+            ("{{splitw('  ')}}", ""),
+            ("{{trim('   a text blob ')}}", "'a text blob'"),
+            ("{{trim('  ')}}", "''"),
             ("{{join(':', '01', '02', '03')}}", "'01:02:03'"),
             ("{{join('::', 'base', 'target')}}", "'base::target'"),
             ("{{join('', 'base', 'target')}}", "'basetarget'"),
             ("{{join('* -')}}", "''"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+        }
+    }
+
+    #[test]
+    fn test_string_escape() {
+        let ctx = TestContext::new();
+        for (expr, expected) in [
+            ("{{'abc'}}", "'abc'"),
+            ("{{'a\'bc'}}", "'a'bc'"),
+            (r#"{{'a\', \'bc'}}"#, r#"'a\', \'bc'"#),
+            (r#"{{_('abc')}}"#, r#"abc"#),
+            (r#"{{_('a\', \'bc')}}"#, r#"a', 'bc"#),
+            (r#"{{'a\nb'}}"#, r#"'a\nb'"#),
+            (r#"{{'a\\b'}}"#, r#"'a\\b'"#),
+            (r#"{{_('a\nb')}}"#, "a\nb"),
+            (r#"{{_('a\\b')}}"#, "a\\b"),
         ] {
             assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
         }
