@@ -209,10 +209,12 @@ impl SvgElement {
 
     pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
         if let Some((start, end)) = self.event_range {
-            Some(InputList::from(&context.events[start + 1..end]))
-        } else {
-            None
+            // empty events will have end == start
+            if end > start {
+                return Some(InputList::from(&context.events[start + 1..end]));
+            }
         }
+        None
     }
 
     pub fn all_events(&self, context: &TransformerContext) -> InputList {
