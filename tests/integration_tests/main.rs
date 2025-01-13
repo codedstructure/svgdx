@@ -7,6 +7,7 @@ mod comments;
 mod config;
 mod connector;
 mod containment;
+mod defaults;
 mod error_handling;
 mod eval_locs;
 mod expression;

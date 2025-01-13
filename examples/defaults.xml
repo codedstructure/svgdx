@@ -1,0 +1,37 @@
+<svg>
+  <defaults>
+    <rect match=".ip" wh="20 5" rx="2" class="d-text-monospace d-text-small d-thin"/>
+    <circle match=".port" wh="4" r="2" class="d-text-small d-thin d-fill-lightgrey"/>
+    <line class="d-thin"/>
+  </defaults>
+  <rect id="box" wh="50 30" text="NAT" text-loc="tr"/>
+  <rect id="wan" cxy="#box@l" text="10.1.2.3" class="ip d-fill-gold"/>
+  <rect id="lan" cxy="#box@r" text="192.168.1.2" class="ip d-fill-green"/>
+  <g>
+   <defaults>
+     <circle cx="#box@t:40%"/>
+     <line start="#wan@r" end="^@l"/>
+    </defaults>
+    <circle id="w1" cy="#box@l:20%" text="1" class="port"/><line/>
+    <circle id="w2" cy="#box@l:40%" text="2" class="port"/><line/>
+    <circle id="w3" cy="#box@l:60%" text="3" class="port"/><line/>
+    <circle id="w4" cy="#box@l:80%" text="4" class="port"/><line/>
+  </g>
+  <g>
+   <defaults>
+     <circle cx="#box@t:60%"/>
+     <line start="^@r" end="#lan@l"/>
+    </defaults>
+    <circle id="l1" cy="#box@l:20%" text="5" class="port"/><line/>
+    <circle id="l2" cy="#box@l:40%" text="6" class="port"/><line/>
+    <circle id="l3" cy="#box@l:60%" text="7" class="port"/><line/>
+    <circle id="l4" cy="#box@l:80%" text="8" class="port"/><line/>
+  </g>
+  <defaults>
+    <line class="d-dash"/>
+  </defaults>
+  <line start="#w1" end="#l1"/>
+  <line start="#w2" end="#l2"/>
+  <line start="#w3" end="#l3"/>
+  <line start="#w4" end="#l4"/>
+</svg>

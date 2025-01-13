@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `<defaults>` container element to provide attribute and class defaults for
+  matching elements. See [examples/defaults.xml](examples/defaults.xml) and the
+  [docs](docs/elements.md#defaults) for more information.
+
 - Improved: grid auto-styles are now parameterized; `d-grid5` / `d-grid10` are gone
   (`d-grid` remains as-is) and new `d-grid-N` where N is any integer from 1 to 100
   creates an appropriately dimensioned grid. The `d-hatch`, `d-crosshatch` and
