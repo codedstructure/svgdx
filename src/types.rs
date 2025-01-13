@@ -166,6 +166,12 @@ impl AttrMap {
         self.attrs.insert((index, key), value);
     }
 
+    pub fn update(&mut self, other: &Self) {
+        for (k, v) in other.iter() {
+            self.insert(k.clone(), v.clone());
+        }
+    }
+
     pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
         if !self.contains_key(&key) {
@@ -269,6 +275,12 @@ impl ClassList {
             self.next_index
         });
         self.classes.insert((index, class));
+    }
+
+    pub fn extend(&mut self, other: &Self) {
+        for class in other.iter() {
+            self.insert(class.clone());
+        }
     }
 
     pub fn contains(&self, class: impl Into<String>) -> bool {

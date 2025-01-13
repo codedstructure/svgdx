@@ -32,6 +32,36 @@ The following configuration settings can be applied using this element. These co
 | depth-limit | integer | `depth-limit="10000"` |
 | svg-style | string | `max-width: 100%; height: auto;` |
 
+### `defaults`
+
+The `defaults` element is a container for providing element defaults.
+Elements within the `defaults` block do not directly contribute to the final output, but provide default _attributes_ and _classes_ for matched elements.
+
+Note that default value substitution happens early in the transformation process, and no attribute processing (e.g. variable lookup,
+compound attribute expansion) is performed prior to populating a matching element.
+
+Matches are controlled from two sources:
+
+* The element name, or the element name '`_`' to match on any element type
+* The `match` attribute, which is the sole attribute excluded from being a 'default'. This attribute is first split on comma-whitespace,
+  and then used as selectors similar to (basic) CSS selectors, e.g. `rect` to match `<rect>` elements, `.my-class` to match elements with
+  `my-class` as a class, and `circle.small` to match `<circle>` elements which also have the `small` class. No other selector types are
+  supported at this point.
+
+Any attributes on the matched element have priority over defaults.
+
+If multiple matches occur, later matches override (in the case of attributes) or augment (for classes) earlier matches.
+
+Two flag values can be provided in the `match` attribute:
+
+* `init` causes any previous match information to be ignored, and this to be the starting point
+* `final` prevents any further matching
+
+Note both these flags only apply once a match has otherwise been made.
+
+Note that defaults are scoped, typically through the use of the `<g>` element. More local scopes will take priority over outer scopes,
+but do not replace them (though `<_ match="init"/>` at the start of a local `<defaults>` container would do this).
+
 ### `var`
 
 This element allows one or more variables to be set. These values can be referenced later in [expressions](expressions#variables).
