@@ -3,7 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
-use crate::types::{strp, ElRef};
+use crate::types::{attr_split, strp, AttrMap, ClassList, ElRef};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -12,6 +12,89 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
+
+#[derive(Debug, Clone)]
+struct ElementMatch {
+    element: Option<String>,
+    matches: Vec<String>,
+    is_init: bool,
+    is_final: bool,
+}
+
+impl ElementMatch {
+    fn is_init(&self) -> bool {
+        self.is_init
+    }
+    fn is_final(&self) -> bool {
+        self.is_final
+    }
+    fn matches(&self, el: &SvgElement) -> bool {
+        // early reject if element name doesn't match
+        if let Some(match_el) = &self.element {
+            if el.name != *match_el {
+                return false;
+            }
+        }
+        // early accept if there are no matches
+        if self.matches.is_empty() {
+            return true;
+        }
+        // otherwise iterate through matches
+        for m in self.matches.iter() {
+            if let Some((elem, class)) = m.split_once('.') {
+                if (elem.is_empty() || elem == el.name) && el.has_class(class) {
+                    return true;
+                }
+            } else if *m == el.name {
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl From<&SvgElement> for ElementMatch {
+    fn from(el: &SvgElement) -> Self {
+        let element = if el.name == "_" {
+            None
+        } else {
+            Some(el.name.clone())
+        };
+        let mut matches = Vec::new();
+        let mut is_final = false;
+        let mut is_init = false;
+        if let Some(m) = el.get_attr("match") {
+            for m in attr_split(&m) {
+                match m.as_str() {
+                    "final" => is_final = true,
+                    "init" => is_init = true,
+                    _ => matches.push(m.to_string()),
+                }
+            }
+        }
+        Self {
+            element,
+            matches,
+            is_init,
+            is_final,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+struct Scope {
+    vars: HashMap<String, String>,
+    defaults: Vec<(ElementMatch, SvgElement)>,
+}
+
+impl Scope {
+    fn with_vars(vars: HashMap<String, String>) -> Self {
+        Self {
+            vars,
+            ..Default::default()
+        }
+    }
+}
 
 pub struct TransformerContext {
     /// Current state of given element; may be updated as processing continues
@@ -26,8 +109,8 @@ pub struct TransformerContext {
     element_stack: Vec<SvgElement>,
     /// The element which `^` refers to; some elements are ignored as 'previous'
     prev_element: Option<SvgElement>,
-    /// Stack of scoped variable mappings
-    var_stack: Vec<HashMap<String, String>>,
+    /// Stack of scoped variables etc
+    scope_stack: Vec<Scope>,
     /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
     /// Current recursion depth
@@ -51,7 +134,7 @@ impl Default for TransformerContext {
             original_map: HashMap::new(),
             element_stack: Vec::new(),
             prev_element: None,
-            var_stack: Vec::new(),
+            scope_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             local_style_id: None,
             current_depth: 0,
@@ -140,7 +223,7 @@ impl VariableMap for TransformerContext {
         // so we can access variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
         // requires that when evaluating `x="$x"` we don't look up `x` in the
         // `rect` element itself.
-        for var_scope in self.var_stack.iter().rev() {
+        for var_scope in self.scope_stack.iter().rev().map(|s| &s.vars) {
             if let Some(value) = var_scope.get(name) {
                 return Some(value.to_string());
             }
@@ -201,25 +284,68 @@ impl TransformerContext {
         self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }
 
-    pub fn set_var(&mut self, name: &str, value: &str) {
-        if let Some(scope) = self.var_stack.last_mut() {
-            // There's no scope yet; create one
-            scope.insert(name.into(), value.into());
-        } else {
-            let mut scope = HashMap::new();
-            scope.insert(name.into(), value.into());
-            self.var_stack.push(scope);
+    fn ensure_scope(&mut self) -> &mut Scope {
+        if self.scope_stack.is_empty() {
+            let scope = Scope::default();
+            self.scope_stack.push(scope);
         }
+
+        self.scope_stack
+            .last_mut()
+            .expect("Scope-stack should be non-empty")
+    }
+
+    pub fn set_element_default(&mut self, el: &SvgElement) {
+        let scope = self.ensure_scope();
+        scope.defaults.push((el.into(), el.without_attr("match")));
+    }
+
+    pub fn apply_defaults(&mut self, el: &mut SvgElement) {
+        // Build up the default element we're going to apply until
+        // we hit a `final` match.
+        // Later attribute values override earlier ones; classes
+        // are appended to existing classes.
+        let mut classes = ClassList::new();
+        let mut attrs = AttrMap::new();
+        // Note we iterate through all scopes from outer inwards, updating
+        // attributes as we go so the most local scope has highest priority.
+        'outer: for scope in self.scope_stack.iter() {
+            for (default, default_el) in &scope.defaults {
+                if default.matches(el) {
+                    if default.is_init() {
+                        classes = default_el.classes.clone();
+                        attrs = default_el.attrs.clone();
+                    } else {
+                        classes.extend(&default_el.classes);
+                        attrs.update(&default_el.attrs);
+                    }
+                    if default.is_final() {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+
+        for (key, value) in &attrs {
+            el.set_default_attr(key, value);
+        }
+        el.add_classes(&classes);
+    }
+
+    pub fn set_var(&mut self, name: &str, value: &str) {
+        let scope = self.ensure_scope();
+        scope.vars.insert(name.into(), value.into());
     }
 
     pub fn push_element(&mut self, el: &SvgElement) {
         let attrs = el.get_attrs();
         self.element_stack.push(el.clone());
-        self.var_stack.push(attrs);
+        let scope = Scope::with_vars(attrs);
+        self.scope_stack.push(scope);
     }
 
     pub fn pop_element(&mut self) -> Option<SvgElement> {
-        self.var_stack.pop();
+        self.scope_stack.pop();
         self.element_stack.pop()
     }
 

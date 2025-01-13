@@ -39,6 +39,7 @@ impl EventGen for SvgElement {
             "specs" => SpecsElement(self.clone()).generate_events(context),
             "var" => VarElement(self.clone()).generate_events(context),
             "if" => IfElement(self.clone()).generate_events(context),
+            "defaults" => DefaultsElement(self.clone()).generate_events(context),
             "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
             _ => {
                 if let Some((start, end)) = self.event_range {
@@ -51,6 +52,24 @@ impl EventGen for SvgElement {
         };
         context.dec_depth()?;
         res
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DefaultsElement(SvgElement);
+
+impl EventGen for DefaultsElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        for ev in self.0.inner_events(context).unwrap_or_default() {
+            // we only care about Element-generating (i.e. start/empty) events
+            if let Ok(el) = SvgElement::try_from(ev.clone()) {
+                context.set_element_default(&el);
+            }
+        }
+        Ok((OutputList::new(), None))
     }
 }
 
@@ -399,6 +418,8 @@ impl EventGen for Tag {
                 }
             }
             Tag::Leaf(el, tail) => {
+                let mut el = el.clone();
+                context.apply_defaults(&mut el);
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
