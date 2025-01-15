@@ -242,3 +242,46 @@ fn test_defaults_init_reset() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_defaults_style() {
+    let input = r##"
+<defaults>
+<rect style="fill: blue; stroke: red"/>
+<_ style="stroke-width: 0.2"/>
+</defaults>
+<rect style="fill: green" />
+"##;
+    let expected = r#"<rect style="fill: blue; stroke: red; stroke-width: 0.2; fill: green"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_defaults_text_style() {
+    let input = r##"
+<defaults>
+<rect wh="20" text-style="fill: blue; stroke: red"/>
+<_ text-style="stroke-width: 0.2"/>
+</defaults>
+<rect text-style="fill: green" text="hi"/>
+"##;
+    let expected = r#"<text x="10" y="10" style="fill: blue; stroke: red; stroke-width: 0.2; fill: green" class="d-text">hi</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_defaults_transform() {
+    let input = r##"
+<defaults>
+<rect wh="20" transform="rotate(90)"/>
+<_ transform="scale(2)"/>
+</defaults>
+<rect transform="translate(10, 10)"/>
+"##;
+    let expected =
+        r#"<rect width="20" height="20" transform="rotate(90) scale(2) translate(10, 10)"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

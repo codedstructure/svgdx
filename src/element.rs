@@ -452,15 +452,6 @@ impl SvgElement {
         self.attrs.insert(key, value);
     }
 
-    pub fn set_defaults(&mut self, from: &SvgElement) {
-        for (key, value) in &from.attrs {
-            self.set_default_attr(key, value);
-        }
-        for class in &from.classes {
-            self.add_class(class);
-        }
-    }
-
     /// set an attribute key/value if the key does not already exist
     pub fn set_default_attr(&mut self, key: &str, value: &str) {
         if !self.has_attr(key) {

@@ -62,6 +62,12 @@ Note both these flags only apply once a match has otherwise been made.
 Note that defaults are scoped, typically through the use of the `<g>` element. More local scopes will take priority over outer scopes,
 but do not replace them (though `<_ match="init"/>` at the start of a local `<defaults>` container would do this).
 
+Note that the 'id' attribute cannot be defaulted.
+
+Attributes which are effectively 'lists' are 'augmented', i.e. a local value or later matched element attribute is appended to earlier
+ones, rather than replacing them. Augmented attributes include "class", "transform", "style", and "text-style". There is no attempt
+at de-duplication except in the case of "class", which is special-cased throughout `svgdx`.
+
 ### `var`
 
 This element allows one or more variables to be set. These values can be referenced later in [expressions](expressions#variables).

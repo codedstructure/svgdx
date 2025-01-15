@@ -297,7 +297,12 @@ impl TransformerContext {
 
     pub fn set_element_default(&mut self, el: &SvgElement) {
         let scope = self.ensure_scope();
-        scope.defaults.push((el.into(), el.without_attr("match")));
+        let el_match = ElementMatch::from(el);
+        let mut mod_el = el.clone();
+        for unwanted in &["id", "match"] {
+            mod_el.pop_attr(unwanted);
+        }
+        scope.defaults.push((el_match, mod_el));
     }
 
     pub fn apply_defaults(&mut self, el: &mut SvgElement) {
@@ -307,11 +312,30 @@ impl TransformerContext {
         // are appended to existing classes.
         let mut classes = ClassList::new();
         let mut attrs = AttrMap::new();
+
+        // For style, text-style and transform attributes we augment rather than
+        // replace the existing value, similar to the behaviour of classes.
+        let mut style_list = Vec::new();
+        let mut text_style_list = Vec::new();
+        let mut transform_list = Vec::new();
+        let augment_types = &mut [
+            // attribute name, value list, separator
+            ("style", &mut style_list, "; "),
+            ("text-style", &mut text_style_list, "; "),
+            ("transform", &mut transform_list, " "),
+        ];
+
         // Note we iterate through all scopes from outer inwards, updating
         // attributes as we go so the most local scope has highest priority.
         'outer: for scope in self.scope_stack.iter() {
             for (default, default_el) in &scope.defaults {
                 if default.matches(el) {
+                    let mut default_el = default_el.clone();
+                    for (a_name, ref mut a_list, _) in &mut *augment_types {
+                        if let Some(local) = default_el.pop_attr(a_name) {
+                            a_list.push(local);
+                        }
+                    }
                     if default.is_init() {
                         classes = default_el.classes.clone();
                         attrs = default_el.attrs.clone();
@@ -330,6 +354,19 @@ impl TransformerContext {
             el.set_default_attr(key, value);
         }
         el.add_classes(&classes);
+
+        // join style/transform attributes with the most local last
+        for (a_name, ref mut a_list, sep) in augment_types {
+            if !a_list.is_empty() {
+                if let Some(local) = el.pop_attr(a_name) {
+                    a_list.push(local);
+                }
+                let value = a_list.join(sep);
+                // Note set_attr rather than set_default_attr as we replace
+                // with newly constructed value
+                el.set_attr(a_name, &value);
+            }
+        }
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {
