@@ -17,6 +17,8 @@ pub enum Function {
     Fract,
     /// sign(x) - -1 for x < 0, 0 for x == 0, 1 for x > 0
     Sign,
+    /// divmod(x, n) - x // n, x % n
+    DivMod,
     /// sqrt(x) - square root of x
     Sqrt,
     /// log(x) - (natural) log of x
@@ -123,6 +125,7 @@ impl FromStr for Function {
             "floor" => Self::Floor,
             "fract" => Self::Fract,
             "sign" => Self::Sign,
+            "divmod" => Self::DivMod,
             "sqrt" => Self::Sqrt,
             "log" => Self::Log,
             "exp" => Self::Exp,
@@ -303,6 +306,12 @@ pub fn eval_function(
                 e.signum()
             }
         }
+        Function::DivMod => {
+            let (x, n) = args.number_pair()?;
+            let div = x.div_euclid(n);
+            let rem = x.rem_euclid(n);
+            return Ok([div, rem].as_slice().into());
+        }
         Function::Sqrt => args.one_number()?.sqrt(),
         Function::Log => args.one_number()?.ln(),
         Function::Exp => args.one_number()?.exp(),
@@ -418,12 +427,16 @@ pub fn eval_function(
             }
         }
         Function::If => {
-            let (cond, a, b) = args.number_triple()?;
-            if cond != 0. {
-                a
-            } else {
-                b
+            if let [cond, a, b] = &args.flatten()[..] {
+                if cond.one_number()? != 0. {
+                    return Ok(a.clone());
+                } else {
+                    return Ok(b.clone());
+                }
             }
+            return Err(SvgdxError::ParseError(
+                "if() requires three arguments".to_string(),
+            ));
         }
         Function::Not => {
             if args.one_number()? == 0. {

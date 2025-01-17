@@ -1540,6 +1540,8 @@ mod tests {
             ("{{tail('a', 'b', 'c')}}", "'b', 'c'"),
             ("{{in('c', 'a', 'b', 'c')}}", "1"),
             ("{{in('d', 'a', 'b', 'c')}}", "0"),
+            ("{{if(eq('t1', 't2'), 'yes', 'no')}}", "'no'"),
+            ("{{if(ne('t1', 't2'), 'yes', 'no')}}", "'yes'"),
             ("{{split(':', 'abc:def:ghi')}}", "'abc', 'def', 'ghi'"),
             ("{{split('def', 'abc:def:ghi')}}", "'abc:', ':ghi'"),
             ("{{split('xyz', 'abc:def:ghi')}}", "'abc:def:ghi'"),
