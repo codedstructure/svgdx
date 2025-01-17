@@ -123,9 +123,7 @@ impl ExprValue {
 
     pub fn string_list(&self) -> Result<Vec<String>> {
         match self {
-            Self::Number(_) => Err(SvgdxError::ParseError(
-                "Expected a list of strings".to_owned(),
-            )),
+            Self::Number(n) => Ok(vec![fstr(*n)]),
             Self::String(s) | Self::Text(s) => Ok(vec![s.clone()]),
             Self::List(v) => {
                 let mut out = Vec::new();
@@ -770,6 +768,21 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
         .parse::<f32>()
         .map(|v| v != 0.)
         .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
+}
+
+pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>> {
+    // Lists don't need surrounding by {{...}} since they always evaluate to
+    // a list of Strings, but allow for consistency with other attr values.
+    let mut value = value;
+    if let Some(inner) = value.strip_prefix("{{") {
+        value = inner
+            .strip_suffix("}}")
+            .ok_or(SvgdxError::ParseError(format!(
+                "Expected closing '}}': '{value}'"
+            )))?;
+    }
+    let tokens = tokenize(value)?;
+    evaluate(tokens, context)?.string_list()
 }
 
 #[cfg(test)]
