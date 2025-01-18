@@ -164,7 +164,7 @@ pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) 
     let app = Router::new()
         .route("/", get(index))
         .route("/favicon.ico", get(favicon))
-        .route("/static/*path", get(static_file))
+        .route("/static/{*path}", get(static_file))
         .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/api/transform", post(transform));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();

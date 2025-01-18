@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0 - 2025-01-18]
+
 - Added: `<for>` loops: `<for data="$list" var="n" [idx-var="idx"]>`, where the
   `var` variable is updated with each entry in `list` at each iteration.
   See the [for-loop.xml](examples/for-loop.xml) example.
@@ -34,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Editor: Fixed SVG download button to make a fresh request without metadata for
   a cleaner download file. Also removed the base64 data URI copy, replacing with
   simple copy of the generated SVG.
+
+- svgdx-server: update axum package to 0.8.1
 
 ## [0.16.0 - 2024-12-31]
 
