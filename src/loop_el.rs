@@ -2,7 +2,7 @@ use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::OutputList;
-use crate::expression::{eval_attr, eval_condition};
+use crate::expression::{eval_attr, eval_condition, eval_list};
 use crate::position::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, EventGen};
 
@@ -57,7 +57,7 @@ impl TryFrom<&SvgElement> for LoopDef {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoopElement(pub SvgElement); // LoopDef);
+pub struct LoopElement(pub SvgElement);
 
 impl EventGen for LoopElement {
     fn generate_events(
@@ -121,5 +121,73 @@ impl EventGen for LoopElement {
             }
         }
         Ok((gen_events, bbox.build()))
+    }
+}
+
+struct ForDef {
+    var_name: String,
+    idx_name: Option<String>,
+    data: String,
+}
+
+impl TryFrom<&SvgElement> for ForDef {
+    type Error = SvgdxError;
+
+    fn try_from(element: &SvgElement) -> Result<Self> {
+        let var_name = element
+            .get_attr("var")
+            .ok_or_else(|| SvgdxError::MissingAttribute("var".to_string()))?;
+        let idx_name = element.get_attr("idx-var");
+        let data = element
+            .get_attr("data")
+            .ok_or_else(|| SvgdxError::MissingAttribute("data".to_string()))?;
+        Ok(Self {
+            var_name,
+            idx_name,
+            data,
+        })
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ForElement(pub SvgElement);
+
+impl EventGen for ForElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        let event_element = &self.0;
+        let mut gen_events = OutputList::new();
+        let mut bbox = BoundingBoxBuilder::new();
+        let mut idx = 0;
+        if let (Ok(for_def), Some(inner_events)) = (
+            ForDef::try_from(event_element),
+            event_element.inner_events(context),
+        ) {
+            let data_list: Vec<_> = eval_list(&for_def.data, context)?;
+            let idx_name = for_def.idx_name.clone();
+
+            // TODO: should a new context be created for for loops, so
+            // loop & idx vars don't leak out / override existing vars?
+            for item in data_list {
+                context.set_var(&for_def.var_name, &item);
+                if let Some(ref idx_name) = idx_name {
+                    context.set_var(idx_name, &idx.to_string());
+                }
+                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
+                gen_events.extend(&ev_list);
+                if let Some(bb) = ev_bbox {
+                    bbox.extend(bb);
+                }
+                idx += 1;
+                if idx > context.config.loop_limit {
+                    return Err(SvgdxError::LoopLimitError(idx, context.config.loop_limit));
+                }
+            }
+            Ok((gen_events, bbox.build()))
+        } else {
+            Err(SvgdxError::InvalidData("Invalid <for> element".to_string()))
+        }
     }
 }

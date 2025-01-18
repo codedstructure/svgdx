@@ -12,7 +12,9 @@ use crate::types::fstr;
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {
     Number(f32),
-    NumberList(Vec<f32>),
+    String(String),
+    Text(String),
+    List(Vec<ExprValue>),
 }
 
 impl From<f32> for ExprValue {
@@ -23,14 +25,39 @@ impl From<f32> for ExprValue {
 
 impl From<Vec<f32>> for ExprValue {
     fn from(v: Vec<f32>) -> Self {
-        Self::NumberList(v)
+        Self::List(v.into_iter().map(ExprValue::Number).collect())
     }
 }
 
 impl From<&[f32]> for ExprValue {
     fn from(v: &[f32]) -> Self {
-        Self::NumberList(v.to_vec())
+        Self::List(v.iter().copied().map(ExprValue::Number).collect())
     }
+}
+
+impl From<Vec<ExprValue>> for ExprValue {
+    fn from(v: Vec<ExprValue>) -> Self {
+        Self::List(v)
+    }
+}
+
+impl From<&[ExprValue]> for ExprValue {
+    fn from(v: &[ExprValue]) -> Self {
+        Self::List(v.to_vec())
+    }
+}
+
+fn escape(input: &str) -> String {
+    let mut result = String::new();
+    for ch in input.chars() {
+        match ch {
+            '\\' => result.push_str("\\\\"),
+            '\n' => result.push_str("\\n"),
+            '\'' => result.push_str("\\'"),
+            _ => result.push(ch),
+        }
+    }
+    result
 }
 
 impl Display for ExprValue {
@@ -38,22 +65,27 @@ impl Display for ExprValue {
         // Note use of `, ` rather than just ` ` to allow use
         // in contexts which require comma-separated values
         // such as rgb colour: `fill="rgb({{255 * $r, 255 * $g, 255 * $b}})"`
-        write!(f, "{}", self.iter().map(fstr).join(", "))
+        match self {
+            Self::Number(n) => write!(f, "{}", fstr(*n)),
+            Self::String(s) => write!(f, "'{}'", escape(s)),
+            Self::Text(t) => write!(f, "{}", t),
+            Self::List(_) => {
+                write!(f, "{}", self.flatten().into_iter().join(", "))
+            }
+        }
     }
 }
 
 impl ExprValue {
-    pub fn iter(&self) -> impl Iterator<Item = f32> + '_ {
-        match self {
-            Self::Number(v) => Box::new(std::iter::once(*v)),
-            Self::NumberList(v) => Box::new(v.iter().copied()) as Box<dyn Iterator<Item = f32>>,
-        }
+    pub fn new() -> Self {
+        Self::List(Vec::new())
     }
 
     pub fn len(&self) -> usize {
         match self {
             Self::Number(_) => 1,
-            Self::NumberList(v) => v.len(),
+            Self::String(_) | Self::Text(_) => 1,
+            Self::List(v) => v.len(),
         }
     }
 
@@ -61,45 +93,153 @@ impl ExprValue {
         self.len() == 0
     }
 
-    pub fn number_list(&self) -> Vec<f32> {
+    /// flatten potentially nested list into a single list of ExprValue items
+    pub fn flatten(&self) -> Vec<ExprValue> {
         match self {
-            Self::Number(v) => vec![*v],
-            Self::NumberList(v) => v.clone(),
-        }
-    }
-
-    pub fn one_number(&self) -> Result<f32> {
-        match self {
-            ExprValue::Number(n) => Ok(*n),
-            ExprValue::NumberList(l) => {
-                if l.len() != 1 {
-                    return Err(SvgdxError::ParseError(
-                        "Expected exactly one argument".to_owned(),
-                    ));
+            Self::Number(_) => vec![self.clone()],
+            Self::String(_) | Self::Text(_) => vec![self.clone()],
+            Self::List(v) => {
+                let mut out = Vec::new();
+                for e in v {
+                    match e {
+                        Self::List(_) => out.extend(e.flatten()),
+                        _ => out.push(e.clone()),
+                    }
                 }
-                Ok(l[0])
+                out
             }
         }
     }
 
-    pub fn number_pair(&self) -> Result<(f32, f32)> {
-        let nl = self.number_list();
-        if nl.len() == 2 {
-            return Ok((nl[0], nl[1]));
+    /// return a pair of values of any type, iff we are a list of exactly two values
+    pub fn pair(&self) -> Result<(ExprValue, ExprValue)> {
+        if let [a, b] = &self.flatten().as_slice() {
+            Ok((a.to_owned(), b.to_owned()))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly two arguments".to_owned(),
-        ))
+    }
+
+    /// convert each element to its raw string representation
+    pub fn to_string_vec(&self) -> Vec<String> {
+        match self {
+            Self::Number(n) => vec![fstr(*n)],
+            Self::String(s) | Self::Text(s) => vec![s.clone()],
+            Self::List(v) => {
+                let mut out = Vec::new();
+                for e in v {
+                    // slight optimisation for single depth list over fully recursive approach
+                    match e {
+                        Self::Number(n) => out.push(fstr(*n)),
+                        Self::String(s) | Self::Text(s) => out.push(s.clone()),
+                        _ => out.extend(e.to_string_vec()),
+                    }
+                }
+                out
+            }
+        }
+    }
+
+    /// return list of strings, iff we are a list of string/text values
+    pub fn string_list(&self) -> Result<Vec<String>> {
+        match self {
+            Self::Number(_) => Err(SvgdxError::ParseError(
+                "Expected a list of strings, got a number".to_owned(),
+            )),
+            Self::String(s) | Self::Text(s) => Ok(vec![s.clone()]),
+            Self::List(v) => {
+                let mut out = Vec::new();
+                for e in v {
+                    match e {
+                        Self::String(s) | Self::Text(s) => out.push(s.clone()),
+                        _ => {
+                            return Err(SvgdxError::ParseError(
+                                "Expected a list of strings".to_owned(),
+                            ))
+                        }
+                    }
+                }
+                Ok(out)
+            }
+        }
+    }
+
+    /// return single string, iff we are a single string/text value
+    pub fn one_string(&self) -> Result<String> {
+        if let [nl] = &self.string_list()?.as_slice() {
+            Ok(nl.clone())
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected a single string argument".to_owned(),
+            ))
+        }
+    }
+
+    /// return pair of strings, iff we are a list of exactly two string/text values
+    pub fn string_pair(&self) -> Result<(String, String)> {
+        if let [a, b] = &self.string_list()?.as_slice() {
+            Ok((a.clone(), b.clone()))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two string arguments".to_owned(),
+            ))
+        }
+    }
+
+    /// return list of numbers, iff we are a list of numeric values
+    pub fn number_list(&self) -> Result<Vec<f32>> {
+        match self {
+            Self::Number(v) => Ok(vec![*v]),
+            Self::String(s) | Self::Text(s) => Err(SvgdxError::ParseError(format!(
+                "Expected a list of numbers, got '{}'",
+                s
+            ))),
+            Self::List(v) => {
+                let mut out = Vec::new();
+                for e in v {
+                    if let Self::Number(n) = e {
+                        out.push(*n);
+                    } else {
+                        return Err(SvgdxError::ParseError(
+                            "Expected a list of numbers".to_owned(),
+                        ));
+                    }
+                }
+                Ok(out)
+            }
+        }
+    }
+
+    pub fn one_number(&self) -> Result<f32> {
+        if let [a] = self.number_list()?.as_slice() {
+            Ok(*a)
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected a single numeric argument".to_owned(),
+            ))
+        }
+    }
+
+    pub fn number_pair(&self) -> Result<(f32, f32)> {
+        if let [a, b] = self.number_list()?.as_slice() {
+            Ok((*a, *b))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two numeric arguments".to_owned(),
+            ))
+        }
     }
 
     pub fn number_triple(&self) -> Result<(f32, f32, f32)> {
-        let nl = self.number_list();
-        if nl.len() == 3 {
-            return Ok((nl[0], nl[1], nl[2]));
+        if let [a, b, c] = self.number_list()?.as_slice() {
+            Ok((*a, *b, *c))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly three numeric arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly three arguments".to_owned(),
-        ))
     }
 }
 
@@ -111,6 +251,8 @@ enum Token {
     Var(String),
     /// Reference to an element-derived value, beginning with '#'
     ElementRef(String),
+    /// String surrounded by single or double quotes
+    String(String),
     /// A function reference
     FnRef(Function),
     /// A literal '('
@@ -182,8 +324,35 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     let mut buffer = Vec::new();
     // hack to allow '-' in id-based element references
     let mut in_elref_id = false;
+    let mut in_quote = None;
 
+    let mut string_escape = false;
     for ch in input.chars() {
+        if let Some(qt) = in_quote {
+            // Avoid considering other tokens within a string
+            // Strings are surrounded with either ' or " and may contain
+            // escaped quotes, newlines as '\n', and backslashes as '\\'.
+            match (ch, string_escape) {
+                (x, false) if x == qt => {
+                    tokens.push(Token::String(buffer.iter().collect::<String>()));
+                    buffer.clear();
+                    in_quote = None;
+                    string_escape = false;
+                }
+                ('\\', false) => {
+                    string_escape = true;
+                }
+                ('n', true) => {
+                    buffer.push('\n');
+                    string_escape = false;
+                }
+                _ => {
+                    buffer.push(ch);
+                    string_escape = false;
+                }
+            }
+            continue;
+        }
         let next_token = match ch {
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
@@ -194,6 +363,10 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             '%' => Token::Mod,
             ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
+            '\'' | '"' => {
+                in_quote = Some(ch);
+                continue;
+            }
             '#' => {
                 in_elref_id = true;
                 Token::Other
@@ -290,7 +463,7 @@ impl<'a> EvalState<'a> {
         let result = if let Some(inner) = self.context.get_var(v) {
             let tokens = tokenize(&inner)?;
             if tokens.is_empty() {
-                Ok(ExprValue::NumberList(Vec::new()))
+                Ok(ExprValue::List(Vec::new()))
             } else {
                 let mut es = EvalState::new(tokens, self.context, &self.checked_vars);
                 let e = expr_list(&mut es);
@@ -368,7 +541,7 @@ fn evaluate_inner(
 }
 
 fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
-    let mut out = Vec::new();
+    let mut out: Vec<ExprValue> = Vec::new();
     if let (Some(Token::OpenParen), Some(Token::CloseParen)) =
         (eval_state.prev(), eval_state.peek())
     {
@@ -377,10 +550,7 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
     loop {
         let e = expr(eval_state)?;
-        match e {
-            ExprValue::Number(n) => out.push(n),
-            ExprValue::NumberList(nl) => out.extend(nl.iter()),
-        }
+        out.extend(e.flatten());
         match eval_state.peek() {
             Some(Token::Comma) => {
                 eval_state.advance();
@@ -450,6 +620,7 @@ fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
 fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
     match eval_state.next() {
         Some(Token::Number(x)) => Ok(ExprValue::Number(x)),
+        Some(Token::String(s)) => Ok(ExprValue::String(s)),
         Some(Token::Var(v)) => eval_state.lookup(&v),
         Some(Token::ElementRef(v)) => eval_state.element_ref(&v),
         Some(Token::OpenParen) => {
@@ -600,6 +771,21 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
         .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
 }
 
+pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>> {
+    // Lists don't need surrounding by {{...}} since they always evaluate to
+    // a list of Strings, but allow for consistency with other attr values.
+    let mut value = value;
+    if let Some(inner) = value.strip_prefix("{{") {
+        value = inner
+            .strip_suffix("}}")
+            .ok_or(SvgdxError::ParseError(format!(
+                "Expected closing '}}': '{value}'"
+            )))?;
+    }
+    let tokens = tokenize(value)?;
+    Ok(evaluate(tokens, context)?.to_string_vec())
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
@@ -693,10 +879,10 @@ mod tests {
         ]);
         for (expr, expected) in [
             ("2 * 2", Some(ExprValue::Number(4.))),
-            ("swap(2, 1)", Some(ExprValue::NumberList(vec![1., 2.]))),
+            ("swap(2, 1)", Some(vec![1., 2.].into())),
             ("2 * 2, 5", Some(ExprValue::Number(4.))),
             ("$mega", Some(ExprValue::Number(1000000.))),
-            ("$list", Some(ExprValue::NumberList(vec![1., 2., 3.]))),
+            ("$list", Some(vec![1., 2., 3.].into())),
         ] {
             assert_eq!(
                 expr_check(tokenize(expr).expect("test"), &ctx).ok(),
@@ -1089,6 +1275,10 @@ mod tests {
             "$abc-${thing}",
             "${abcthing}",
             "$abc 1",
+            "'- -'",
+            "'thing'",
+            "\"thing\"",
+            "\"one\", 'two', 3",
         ] {
             assert!(tokenize(expr).is_ok(), "Should succeed: {expr}");
         }
@@ -1106,6 +1296,11 @@ mod tests {
             "${abc-thing}",
             "${abc-thing}",
             "234#",
+            "thing",
+            "'thing",
+            "\"thing",
+            "thing'",
+            "'thing\"",
         ] {
             assert!(tokenize(expr).is_err(), "Should have failed: {expr}");
         }
@@ -1254,6 +1449,9 @@ mod tests {
             ("{{(r2p(1, 1))}}", "1.414, 45"),
             ("{{select(0, 1, 2, 3)}}", "1"),
             ("{{select(2, 1, 2, 3)}}", "3"),
+            ("{{divmod(3, 2)}}", "1, 1"),
+            ("{{divmod(3, 8)}}", "0, 3"),
+            ("{{divmod(28, 8)}}", "3, 4"),
         ] {
             assert_eq!(eval_attr(expr, &ctx), expected);
         }
@@ -1341,6 +1539,60 @@ mod tests {
             ("{{count($blank, 4, $blank)}}", "1"),
             ("{{$choice}}", "2"),
             ("{{$choice + 1}}", "3"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+        }
+    }
+
+    #[test]
+    fn test_string_functions() {
+        let ctx = TestContext::new();
+        for (expr, expected) in [
+            ("{{count('a', 'b', 'c')}}", "3"),
+            ("{{select(1, 'a', 'b', 'c', 4, 'd', 9)}}", "'b'"),
+            ("{{select(5, 'a', 'b', 'c', 4, 'd', 9)}}", "9"),
+            ("{{swap('a', 'b')}}", "'b', 'a'"),
+            ("{{swap('a', 1)}}", "1, 'a'"),
+            ("{{head('a', 'b', 'c')}}", "'a'"),
+            ("{{tail('a', 'b', 'c')}}", "'b', 'c'"),
+            ("{{in('c', 'a', 'b', 'c')}}", "1"),
+            ("{{in('d', 'a', 'b', 'c')}}", "0"),
+            ("{{if(eq('t1', 't2'), 'yes', 'no')}}", "'no'"),
+            ("{{if(ne('t1', 't2'), 'yes', 'no')}}", "'yes'"),
+            ("{{split(':', 'abc:def:ghi')}}", "'abc', 'def', 'ghi'"),
+            ("{{split('def', 'abc:def:ghi')}}", "'abc:', ':ghi'"),
+            ("{{split('xyz', 'abc:def:ghi')}}", "'abc:def:ghi'"),
+            ("{{split('a', 'abc:def:ghi')}}", "'', 'bc:def:ghi'"),
+            ("{{split('i', 'abc:def:ghi')}}", "'abc:def:gh', ''"),
+            (
+                "{{splitw('  some words  with spaces')}}",
+                "'some', 'words', 'with', 'spaces'",
+            ),
+            ("{{splitw('  ')}}", ""),
+            ("{{trim('   a text blob ')}}", "'a text blob'"),
+            ("{{trim('  ')}}", "''"),
+            ("{{join(':', '01', '02', '03')}}", "'01:02:03'"),
+            ("{{join('::', 'base', 'target')}}", "'base::target'"),
+            ("{{join('', 'base', 'target')}}", "'basetarget'"),
+            ("{{join('* -')}}", "''"),
+        ] {
+            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+        }
+    }
+
+    #[test]
+    fn test_string_escape() {
+        let ctx = TestContext::new();
+        for (expr, expected) in [
+            ("{{'abc'}}", "'abc'"),
+            ("{{'a\'bc'}}", "'a'bc'"),
+            (r#"{{'a\', \'bc'}}"#, r#"'a\', \'bc'"#),
+            (r#"{{_('abc')}}"#, r#"abc"#),
+            (r#"{{_('a\', \'bc')}}"#, r#"a', 'bc"#),
+            (r#"{{'a\nb'}}"#, r#"'a\nb'"#),
+            (r#"{{'a\\b'}}"#, r#"'a\\b'"#),
+            (r#"{{_('a\nb')}}"#, "a\nb"),
+            (r#"{{_('a\\b')}}"#, "a\\b"),
         ] {
             assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
         }

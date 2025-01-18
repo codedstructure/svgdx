@@ -3,7 +3,7 @@ use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::expression::{eval_attr, eval_condition};
-use crate::loop_el::LoopElement;
+use crate::loop_el::{ForElement, LoopElement};
 use crate::position::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::reuse::ReuseElement;
 use crate::themes::ThemeBuilder;
@@ -40,6 +40,7 @@ impl EventGen for SvgElement {
             "var" => VarElement(self.clone()).generate_events(context),
             "if" => IfElement(self.clone()).generate_events(context),
             "defaults" => DefaultsElement(self.clone()).generate_events(context),
+            "for" => ForElement(self.clone()).generate_events(context),
             "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
             _ => {
                 if let Some((start, end)) = self.event_range {

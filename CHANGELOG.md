@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `<for>` loops: `<for data="$list" var="n" [idx-var="idx"]>`, where the
+  `var` variable is updated with each entry in `list` at each iteration.
+  See the [for-loop.xml](examples/for-loop.xml) example.
+
+- Added: expression lists now support string values as well as numbers, and various
+  string functions have been added, including `split`, `splitw`, `join`, `trim`.
+  Existing functions such as `if`, `select`, `eq`/`ne` which previously only worked
+  on numbers now also support strings where appropriate. Note that string values will
+  be surrounded by single quotes - to remove these and unescape things when using as
+  e.g. `text` attribute, use the `_(...)` function, which converts the 'string' value
+  into normal text.
+
+- Added: `divmod(x, y)` function. Returns the pair (x // y, x % y).
+
 - Added: `<defaults>` container element to provide attribute and class defaults for
   matching elements. See [examples/defaults.xml](examples/defaults.xml) and the
   [docs](docs/elements.md#defaults) for more information.

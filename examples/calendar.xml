@@ -1,19 +1,20 @@
 <svg>
   <!-- 2024 Calendar -->
-  <var m1="January" m2="February" m3="March" m4="April" m5="May" m6="June"
-       m7="July" m8="August" m9="September" m10="October" m11="November" m12="December"/>
-  <var monthdata="31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31" _="Note: 2024 is a leapyear"/>
+  <var monthdata="'January:31 February:29 March:31 April:30 May:31 June:30
+          July:31 August:31 September:30 October:31 November:30 December:31'"
+       _="Note: 2024 is a leapyear"/>
   <var dayclass0="d-fill-white" dayclass1="d-fill-lightgrey"/>
   <var size="30, 8" gap="3"/>
 
   <var weekday="2" _="Corresponds to 1st January being a Monday"/>
-  <loop count="{{count($monthdata)}}" loop-var="month">
-    <rect xy="{{$month * (head($size) + $gap)}} 0" wh="$size" text="$m{{$month + 1}}" class="d-fill-lightblue d-text-large"/>
-    <var m_days="{{select($month, $monthdata)}}"/>
-    <loop count="$m_days" loop-var="date" start="1">
+  <for data="{{splitw($monthdata)}}" var="month" idx-var="idx">
+    <var name="{{_(select(0, split(':', '$month')))}}"/>
+    <var days="{{_(select(1, split(':', '$month')))}}"/>
+    <rect xy="{{$idx * (head($size) + $gap)}} 0" wh="$size" text="$name" class="d-fill-lightblue d-text-large"/>
+    <loop count="$days" loop-var="date" start="1">
       <var day_class="$dayclass{{if(lt($weekday % 7, 2), 1, 0)}}"/>
       <rect xy="^:v" wh="^" text="$date" text-loc="tl" class="$day_class"/>
       <var weekday="{{$weekday + 1}}"/>
     </loop>
-  </loop>
+  </for>
 </svg>
