@@ -81,7 +81,13 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     let word_break = |c: char| {
         !(
             // not ideal, e.g. a second '.' *would* be a word break.
-            c.is_alphanumeric() || c == '_' || c == '-' || c == '.' || c == ':' || c == '@'
+            c.is_alphanumeric()
+                || c == '_'
+                || c == '-'
+                || c == '.'
+                || c == ':'
+                || c == '@'
+                || c == '%'
         )
     };
     let mut result = String::new();
