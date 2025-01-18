@@ -241,14 +241,14 @@ pub fn eval_function(
         Function::Head => {
             let args = args.flatten();
             if args.is_empty() {
-                return Ok(ExprValue::empty());
+                return Ok(ExprValue::new());
             }
             return Ok(args[0].to_owned());
         }
         Function::Tail => {
             let args = args.flatten();
             if args.len() < 2 {
-                return Ok(ExprValue::empty());
+                return Ok(ExprValue::new());
             }
             return Ok(args[1..args.len()].to_owned().into());
         }

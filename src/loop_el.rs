@@ -134,13 +134,13 @@ impl TryFrom<&SvgElement> for ForDef {
     type Error = SvgdxError;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
-        let var_name = element.get_attr("var").ok_or_else(|| {
-            SvgdxError::MissingAttribute("var".to_string())
-        })?;
+        let var_name = element
+            .get_attr("var")
+            .ok_or_else(|| SvgdxError::MissingAttribute("var".to_string()))?;
         let idx_name = element.get_attr("idx-var");
-        let data = element.get_attr("data").ok_or_else(|| {
-            SvgdxError::MissingAttribute("data".to_string())
-        })?;
+        let data = element
+            .get_attr("data")
+            .ok_or_else(|| SvgdxError::MissingAttribute("data".to_string()))?;
         Ok(Self {
             var_name,
             idx_name,
@@ -151,7 +151,6 @@ impl TryFrom<&SvgElement> for ForDef {
 
 #[derive(Debug, Clone)]
 pub struct ForElement(pub SvgElement);
-
 
 impl EventGen for ForElement {
     fn generate_events(
@@ -174,7 +173,7 @@ impl EventGen for ForElement {
             for item in data_list {
                 context.set_var(&for_def.var_name, &item);
                 if let Some(ref idx_name) = idx_name {
-                    context.set_var(&idx_name, &idx.to_string());
+                    context.set_var(idx_name, &idx.to_string());
                 }
                 let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
                 gen_events.extend(&ev_list);
@@ -183,17 +182,12 @@ impl EventGen for ForElement {
                 }
                 idx += 1;
                 if idx > context.config.loop_limit {
-                    return Err(SvgdxError::LoopLimitError(
-                        idx,
-                        context.config.loop_limit,
-                    ));
+                    return Err(SvgdxError::LoopLimitError(idx, context.config.loop_limit));
                 }
             }
             Ok((gen_events, bbox.build()))
         } else {
-            Err(SvgdxError::InvalidData(
-                "Invalid <for> element".to_string(),
-            ))
+            Err(SvgdxError::InvalidData("Invalid <for> element".to_string()))
         }
     }
 }

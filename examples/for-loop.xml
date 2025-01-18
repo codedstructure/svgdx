@@ -1,0 +1,12 @@
+<svg>
+  <title>The first few named SVG colours</title>
+  <var d="{{splitw('
+aliceblue antiquewhite aqua aquamarine azure
+beige bisque black blanchedalmond blue blueviolet brown burlywood
+cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan
+darkblue darkcyan darkgoldenrod darkgray
+')}}"/>
+  <for data="$d" var="z" idx-var="idx">
+    <rect wh="28" xy="{{scalev(30, swap(divmod($idx, 5)))}}" class="d-fill-$z d-text-ol d-text-bold" text="$z"/>
+  </for>
+</svg>

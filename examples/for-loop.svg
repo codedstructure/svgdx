@@ -1,0 +1,141 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="158mm" height="158mm" viewBox="-5 -5 158 158">
+  <style>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      .d-fill-aliceblue { fill: aliceblue; }
+      text.d-fill-aliceblue, text.d-fill-aliceblue * { fill: black; stroke: white; }
+      .d-fill-antiquewhite { fill: antiquewhite; }
+      text.d-fill-antiquewhite, text.d-fill-antiquewhite * { fill: black; stroke: white; }
+      .d-fill-aqua { fill: aqua; }
+      text.d-fill-aqua, text.d-fill-aqua * { fill: black; stroke: white; }
+      .d-fill-aquamarine { fill: aquamarine; }
+      text.d-fill-aquamarine, text.d-fill-aquamarine * { fill: black; stroke: white; }
+      .d-fill-azure { fill: azure; }
+      text.d-fill-azure, text.d-fill-azure * { fill: black; stroke: white; }
+      .d-fill-beige { fill: beige; }
+      text.d-fill-beige, text.d-fill-beige * { fill: black; stroke: white; }
+      .d-fill-bisque { fill: bisque; }
+      text.d-fill-bisque, text.d-fill-bisque * { fill: black; stroke: white; }
+      .d-fill-black { fill: black; }
+      text.d-fill-black, text.d-fill-black * { fill: white; stroke: black; }
+      .d-fill-blanchedalmond { fill: blanchedalmond; }
+      text.d-fill-blanchedalmond, text.d-fill-blanchedalmond * { fill: black; stroke: white; }
+      .d-fill-blue { fill: blue; }
+      text.d-fill-blue, text.d-fill-blue * { fill: white; stroke: black; }
+      .d-fill-blueviolet { fill: blueviolet; }
+      text.d-fill-blueviolet, text.d-fill-blueviolet * { fill: white; stroke: black; }
+      .d-fill-brown { fill: brown; }
+      text.d-fill-brown, text.d-fill-brown * { fill: white; stroke: black; }
+      .d-fill-burlywood { fill: burlywood; }
+      text.d-fill-burlywood, text.d-fill-burlywood * { fill: black; stroke: white; }
+      .d-fill-cadetblue { fill: cadetblue; }
+      text.d-fill-cadetblue, text.d-fill-cadetblue * { fill: white; stroke: black; }
+      .d-fill-chartreuse { fill: chartreuse; }
+      text.d-fill-chartreuse, text.d-fill-chartreuse * { fill: black; stroke: white; }
+      .d-fill-chocolate { fill: chocolate; }
+      text.d-fill-chocolate, text.d-fill-chocolate * { fill: white; stroke: black; }
+      .d-fill-coral { fill: coral; }
+      text.d-fill-coral, text.d-fill-coral * { fill: white; stroke: black; }
+      .d-fill-cornflowerblue { fill: cornflowerblue; }
+      text.d-fill-cornflowerblue, text.d-fill-cornflowerblue * { fill: white; stroke: black; }
+      .d-fill-cornsilk { fill: cornsilk; }
+      text.d-fill-cornsilk, text.d-fill-cornsilk * { fill: black; stroke: white; }
+      .d-fill-crimson { fill: crimson; }
+      text.d-fill-crimson, text.d-fill-crimson * { fill: white; stroke: black; }
+      .d-fill-cyan { fill: cyan; }
+      text.d-fill-cyan, text.d-fill-cyan * { fill: black; stroke: white; }
+      .d-fill-darkblue { fill: darkblue; }
+      text.d-fill-darkblue, text.d-fill-darkblue * { fill: white; stroke: black; }
+      .d-fill-darkcyan { fill: darkcyan; }
+      text.d-fill-darkcyan, text.d-fill-darkcyan * { fill: white; stroke: black; }
+      .d-fill-darkgoldenrod { fill: darkgoldenrod; }
+      text.d-fill-darkgoldenrod, text.d-fill-darkgoldenrod * { fill: white; stroke: black; }
+      .d-fill-darkgray { fill: darkgray; }
+      text.d-fill-darkgray, text.d-fill-darkgray * { fill: white; stroke: black; }
+      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-bold, text.d-text-bold * { font-weight: bold; }
+      text.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
+    ]]>
+  </style>
+  <title>The first few named SVG colours</title>
+
+    <rect x="0" y="0" width="28" height="28" class="d-fill-aliceblue"/>
+    <text x="14" y="14" class="d-text d-fill-aliceblue d-text-ol d-text-bold">aliceblue</text>
+
+    <rect x="30" y="0" width="28" height="28" class="d-fill-antiquewhite"/>
+    <text x="44" y="14" class="d-text d-fill-antiquewhite d-text-ol d-text-bold">antiquewhite</text>
+
+    <rect x="60" y="0" width="28" height="28" class="d-fill-aqua"/>
+    <text x="74" y="14" class="d-text d-fill-aqua d-text-ol d-text-bold">aqua</text>
+
+    <rect x="90" y="0" width="28" height="28" class="d-fill-aquamarine"/>
+    <text x="104" y="14" class="d-text d-fill-aquamarine d-text-ol d-text-bold">aquamarine</text>
+
+    <rect x="120" y="0" width="28" height="28" class="d-fill-azure"/>
+    <text x="134" y="14" class="d-text d-fill-azure d-text-ol d-text-bold">azure</text>
+
+    <rect x="0" y="30" width="28" height="28" class="d-fill-beige"/>
+    <text x="14" y="44" class="d-text d-fill-beige d-text-ol d-text-bold">beige</text>
+
+    <rect x="30" y="30" width="28" height="28" class="d-fill-bisque"/>
+    <text x="44" y="44" class="d-text d-fill-bisque d-text-ol d-text-bold">bisque</text>
+
+    <rect x="60" y="30" width="28" height="28" class="d-fill-black"/>
+    <text x="74" y="44" class="d-text d-fill-black d-text-ol d-text-bold">black</text>
+
+    <rect x="90" y="30" width="28" height="28" class="d-fill-blanchedalmond"/>
+    <text x="104" y="44" class="d-text d-fill-blanchedalmond d-text-ol d-text-bold">blanchedalmond</text>
+
+    <rect x="120" y="30" width="28" height="28" class="d-fill-blue"/>
+    <text x="134" y="44" class="d-text d-fill-blue d-text-ol d-text-bold">blue</text>
+
+    <rect x="0" y="60" width="28" height="28" class="d-fill-blueviolet"/>
+    <text x="14" y="74" class="d-text d-fill-blueviolet d-text-ol d-text-bold">blueviolet</text>
+
+    <rect x="30" y="60" width="28" height="28" class="d-fill-brown"/>
+    <text x="44" y="74" class="d-text d-fill-brown d-text-ol d-text-bold">brown</text>
+
+    <rect x="60" y="60" width="28" height="28" class="d-fill-burlywood"/>
+    <text x="74" y="74" class="d-text d-fill-burlywood d-text-ol d-text-bold">burlywood</text>
+
+    <rect x="90" y="60" width="28" height="28" class="d-fill-cadetblue"/>
+    <text x="104" y="74" class="d-text d-fill-cadetblue d-text-ol d-text-bold">cadetblue</text>
+
+    <rect x="120" y="60" width="28" height="28" class="d-fill-chartreuse"/>
+    <text x="134" y="74" class="d-text d-fill-chartreuse d-text-ol d-text-bold">chartreuse</text>
+
+    <rect x="0" y="90" width="28" height="28" class="d-fill-chocolate"/>
+    <text x="14" y="104" class="d-text d-fill-chocolate d-text-ol d-text-bold">chocolate</text>
+
+    <rect x="30" y="90" width="28" height="28" class="d-fill-coral"/>
+    <text x="44" y="104" class="d-text d-fill-coral d-text-ol d-text-bold">coral</text>
+
+    <rect x="60" y="90" width="28" height="28" class="d-fill-cornflowerblue"/>
+    <text x="74" y="104" class="d-text d-fill-cornflowerblue d-text-ol d-text-bold">cornflowerblue</text>
+
+    <rect x="90" y="90" width="28" height="28" class="d-fill-cornsilk"/>
+    <text x="104" y="104" class="d-text d-fill-cornsilk d-text-ol d-text-bold">cornsilk</text>
+
+    <rect x="120" y="90" width="28" height="28" class="d-fill-crimson"/>
+    <text x="134" y="104" class="d-text d-fill-crimson d-text-ol d-text-bold">crimson</text>
+
+    <rect x="0" y="120" width="28" height="28" class="d-fill-cyan"/>
+    <text x="14" y="134" class="d-text d-fill-cyan d-text-ol d-text-bold">cyan</text>
+
+    <rect x="30" y="120" width="28" height="28" class="d-fill-darkblue"/>
+    <text x="44" y="134" class="d-text d-fill-darkblue d-text-ol d-text-bold">darkblue</text>
+
+    <rect x="60" y="120" width="28" height="28" class="d-fill-darkcyan"/>
+    <text x="74" y="134" class="d-text d-fill-darkcyan d-text-ol d-text-bold">darkcyan</text>
+
+    <rect x="90" y="120" width="28" height="28" class="d-fill-darkgoldenrod"/>
+    <text x="104" y="134" class="d-text d-fill-darkgoldenrod d-text-ol d-text-bold">darkgoldenrod</text>
+
+    <rect x="120" y="120" width="28" height="28" class="d-fill-darkgray"/>
+    <text x="134" y="134" class="d-text d-fill-darkgray d-text-ol d-text-bold">darkgray</text>
+
+</svg>

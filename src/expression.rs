@@ -77,7 +77,7 @@ impl Display for ExprValue {
 }
 
 impl ExprValue {
-    pub fn empty() -> Self {
+    pub fn new() -> Self {
         Self::List(Vec::new())
     }
 
@@ -111,29 +111,54 @@ impl ExprValue {
         }
     }
 
+    /// return a pair of values of any type, iff we are a list of exactly two values
     pub fn pair(&self) -> Result<(ExprValue, ExprValue)> {
-        let nl = self.flatten();
-        if nl.len() == 2 {
-            return Ok((nl[0].to_owned(), nl[1].to_owned()));
+        if let [a, b] = &self.flatten().as_slice() {
+            Ok((a.to_owned(), b.to_owned()))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly two arguments".to_owned(),
-        ))
     }
 
+    /// convert each element to its raw string representation
+    pub fn to_string_vec(&self) -> Vec<String> {
+        match self {
+            Self::Number(n) => vec![fstr(*n)],
+            Self::String(s) | Self::Text(s) => vec![s.clone()],
+            Self::List(v) => {
+                let mut out = Vec::new();
+                for e in v {
+                    // slight optimisation for single depth list over fully recursive approach
+                    match e {
+                        Self::Number(n) => out.push(fstr(*n)),
+                        Self::String(s) | Self::Text(s) => out.push(s.clone()),
+                        _ => out.extend(e.to_string_vec()),
+                    }
+                }
+                out
+            }
+        }
+    }
+
+    /// return list of strings, iff we are a list of string/text values
     pub fn string_list(&self) -> Result<Vec<String>> {
         match self {
-            Self::Number(n) => Ok(vec![fstr(*n)]),
+            Self::Number(_) => Err(SvgdxError::ParseError(
+                "Expected a list of strings, got a number".to_owned(),
+            )),
             Self::String(s) | Self::Text(s) => Ok(vec![s.clone()]),
             Self::List(v) => {
                 let mut out = Vec::new();
                 for e in v {
-                    if let Self::String(s) = e {
-                        out.push(s.clone());
-                    } else {
-                        return Err(SvgdxError::ParseError(
-                            "Expected a list of strings".to_owned(),
-                        ));
+                    match e {
+                        Self::String(s) | Self::Text(s) => out.push(s.clone()),
+                        _ => {
+                            return Err(SvgdxError::ParseError(
+                                "Expected a list of strings".to_owned(),
+                            ))
+                        }
                     }
                 }
                 Ok(out)
@@ -141,39 +166,29 @@ impl ExprValue {
         }
     }
 
+    /// return single string, iff we are a single string/text value
     pub fn one_string(&self) -> Result<String> {
-        match self {
-            Self::Number(_) => Err(SvgdxError::ParseError(
-                "Expected a string, got a number".to_owned(),
-            )),
-            Self::String(s) | Self::Text(s) => Ok(s.clone()),
-            Self::List(l) => {
-                if l.len() != 1 {
-                    return Err(SvgdxError::ParseError(
-                        "Expected exactly one argument".to_owned(),
-                    ));
-                }
-                if let Self::String(s) = &l[0] {
-                    Ok(s.clone())
-                } else {
-                    Err(SvgdxError::ParseError(
-                        "Expected a single string argument".to_owned(),
-                    ))
-                }
-            }
+        if let [nl] = &self.string_list()?.as_slice() {
+            Ok(nl.clone())
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected a single string argument".to_owned(),
+            ))
         }
     }
 
+    /// return pair of strings, iff we are a list of exactly two string/text values
     pub fn string_pair(&self) -> Result<(String, String)> {
-        let nl = self.string_list()?;
-        if nl.len() == 2 {
-            return Ok((nl[0].clone(), nl[1].clone()));
+        if let [a, b] = &self.string_list()?.as_slice() {
+            Ok((a.clone(), b.clone()))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two string arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly two arguments".to_owned(),
-        ))
     }
 
+    /// return list of numbers, iff we are a list of numeric values
     pub fn number_list(&self) -> Result<Vec<f32>> {
         match self {
             Self::Number(v) => Ok(vec![*v]),
@@ -198,47 +213,33 @@ impl ExprValue {
     }
 
     pub fn one_number(&self) -> Result<f32> {
-        match self {
-            ExprValue::Number(n) => Ok(*n),
-            ExprValue::String(s) | ExprValue::Text(s) => Err(SvgdxError::ParseError(format!(
-                "Expected a number, got '{}'",
-                s
-            ))),
-            ExprValue::List(l) => {
-                if l.len() != 1 {
-                    return Err(SvgdxError::ParseError(
-                        "Expected exactly one argument".to_owned(),
-                    ));
-                }
-                if let ExprValue::Number(n) = &l[0] {
-                    Ok(*n)
-                } else {
-                    Err(SvgdxError::ParseError(
-                        "Expected a single numeric argument".to_owned(),
-                    ))
-                }
-            }
+        if let [a] = self.number_list()?.as_slice() {
+            Ok(*a)
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected a single numeric argument".to_owned(),
+            ))
         }
     }
 
     pub fn number_pair(&self) -> Result<(f32, f32)> {
-        let nl = self.number_list()?;
-        if nl.len() == 2 {
-            return Ok((nl[0], nl[1]));
+        if let [a, b] = self.number_list()?.as_slice() {
+            Ok((*a, *b))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly two numeric arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly two arguments".to_owned(),
-        ))
     }
 
     pub fn number_triple(&self) -> Result<(f32, f32, f32)> {
-        let nl = self.number_list()?;
-        if nl.len() == 3 {
-            return Ok((nl[0], nl[1], nl[2]));
+        if let [a, b, c] = self.number_list()?.as_slice() {
+            Ok((*a, *b, *c))
+        } else {
+            Err(SvgdxError::ParseError(
+                "Expected exactly three numeric arguments".to_owned(),
+            ))
         }
-        Err(SvgdxError::ParseError(
-            "Expected exactly three arguments".to_owned(),
-        ))
     }
 }
 
@@ -782,7 +783,7 @@ pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>>
             )))?;
     }
     let tokens = tokenize(value)?;
-    evaluate(tokens, context)?.string_list()
+    Ok(evaluate(tokens, context)?.to_string_vec())
 }
 
 #[cfg(test)]
@@ -1448,6 +1449,9 @@ mod tests {
             ("{{(r2p(1, 1))}}", "1.414, 45"),
             ("{{select(0, 1, 2, 3)}}", "1"),
             ("{{select(2, 1, 2, 3)}}", "3"),
+            ("{{divmod(3, 2)}}", "1, 1"),
+            ("{{divmod(3, 8)}}", "0, 3"),
+            ("{{divmod(28, 8)}}", "3, 4"),
         ] {
             assert_eq!(eval_attr(expr, &ctx), expected);
         }

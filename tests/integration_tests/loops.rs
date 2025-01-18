@@ -231,3 +231,32 @@ fn test_loop_limit() {
 "#;
     assert!(transform_str_default(input).is_err());
 }
+
+#[test]
+fn test_for_loop() {
+    let input = r#"
+<for data="0, 1, 2" var="pos">
+<rect wh="1" xy="$pos"/>
+</for>
+"#;
+    let expected1 = r#"<rect x="0" y="0" width="1" height="1"/>"#;
+    let expected2 = r#"<rect x="1" y="1" width="1" height="1"/>"#;
+    let expected3 = r#"<rect x="2" y="2" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+
+    let input = r#"
+<for data="'a', 'b', 'c'" var="d" idx-var="idx">
+<rect id="$d" wh="1" xy="$idx"/>
+</for>
+"#;
+    let expected1 = r#"<rect id="a" x="0" y="0" width="1" height="1"/>"#;
+    let expected2 = r#"<rect id="b" x="1" y="1" width="1" height="1"/>"#;
+    let expected3 = r#"<rect id="c" x="2" y="2" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
