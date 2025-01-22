@@ -1067,12 +1067,37 @@ impl SvgElement {
                     DirSpec::InFront => (gap, -this_height / 2.),
                     DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
                 };
-                self.pop_attr("xy"); // don't need this anymore
-                self.set_attr("x", &fstr(x + dx));
-                self.set_attr("y", &fstr(y + dy));
+                self.pop_attr("xy"); // don't need xy anymore
+                self.place_at(ctx, x + dx, y + dy)?;
             }
         }
 
+        Ok(())
+    }
+
+    fn place_at(&mut self, ctx: &impl ContextView, x: f32, y: f32) -> Result<()> {
+        match self.name.as_str() {
+            "use" => {
+                // Need to determine top-left corner of the target bbox which
+                // may not be (0, 0), and offset by the equivalent amount.
+                let target = self.get_attr("href").unwrap_or_default();
+                let elref = target.parse()?;
+                if let Some(bbox) = ctx
+                    .get_element(&elref)
+                    .and_then(|el| ctx.get_element_bbox(el).ok().flatten())
+                {
+                    let (dx, dy) = bbox.locspec(LocSpec::TopLeft);
+                    self.set_attr("x", &fstr(x - dx));
+                    self.set_attr("y", &fstr(y - dy));
+                } else {
+                    return Err(SvgdxError::ReferenceError(elref));
+                }
+            }
+            _ => {
+                self.set_attr("x", &fstr(x));
+                self.set_attr("y", &fstr(y));
+            }
+        }
         Ok(())
     }
 

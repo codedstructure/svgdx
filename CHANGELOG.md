@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: relative positioning of `<use>` elements where the target bbox was not at
+  the origin.
+
 ## [0.17.0 - 2025-01-18]
 
 - Added: `<for>` loops: `<for data="$list" var="n" [idx-var="idx"]>`, where the

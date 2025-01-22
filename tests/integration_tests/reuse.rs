@@ -358,3 +358,18 @@ fn test_use_symbol() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_use_relpos() {
+    let input = r##"
+<defs>
+  <rect id="abc" wh="3" xy="-5"/>
+  <rect id="pqr" wh="7" xy="-3"/>
+</defs>
+<use id="u1" href="#abc"/>
+<use id="u2" href="#pqr" xy="^:v"/>
+"##;
+    let expected = r##"<use id="u2" href="#pqr" x="-4" y="1"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
