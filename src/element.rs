@@ -263,9 +263,14 @@ impl SvgElement {
             events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
+        // Some elements don't generate text themselves, but can have
+        // associated text.
+        // TODO: refactor this method to handle text event gen better
+        let phantom = matches!(self.name.as_str(), "point" | "box");
+
         if self.has_attr("text") {
             let (orig_elem, text_elements) = process_text_attr(self)?;
-            if orig_elem.name != "text" {
+            if orig_elem.name != "text" && !phantom {
                 // We only care about the original element if it wasn't a text element
                 // (otherwise we generate a useless empty text element for the original)
                 events.push(OutputEvent::Empty(orig_elem));
@@ -307,10 +312,12 @@ impl SvgElement {
                     events.push(OutputEvent::End("text".to_string()));
                 }
             }
-        } else if self.is_empty_element() {
-            events.push(OutputEvent::Empty(self.clone()));
-        } else {
-            events.push(OutputEvent::Start(self.clone()));
+        } else if !phantom {
+            if self.is_empty_element() {
+                events.push(OutputEvent::Empty(self.clone()));
+            } else {
+                events.push(OutputEvent::Start(self.clone()));
+            }
         }
 
         Ok(events)

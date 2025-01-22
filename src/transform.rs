@@ -157,19 +157,9 @@ impl EventGen for OtherElement {
         e.transmute(context)?;
         e.resolve_position(context)?;
         context.update_element(&e);
-        let bb = context.get_element_bbox(&e)?;
+        let mut bb = context.get_element_bbox(&e)?;
         if bb.is_some() {
             context.set_prev_element(&e);
-        }
-        if self.0.name == "point" {
-            // "point" elements don't generate any events in the final output,
-            // but *do* need to register themselves with update_element()
-            return Ok((OutputList::new(), None));
-        }
-        if self.0.name == "box" {
-            // Similar to "point", "box" elements don't generate events,
-            // but unlike "point" they *do* define a bounding box.
-            return Ok((OutputList::new(), bb));
         }
         let events = e.element_events(context)?;
         for svg_ev in events {
@@ -201,6 +191,12 @@ impl EventGen for OtherElement {
             };
 
             output.push(adapted);
+        }
+        if self.0.name == "point" {
+            // point elements have no bounding box, and are primarily used for
+            // update_element() side-effects, e.g. setting prev_element.
+            // (They can generate text though, so not rejected earlier.
+            bb = None;
         }
         Ok((output, bb))
     }

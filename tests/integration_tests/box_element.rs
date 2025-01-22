@@ -53,3 +53,15 @@ fn test_box_prev_element() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_box_text() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="^:v 5" wh="10"/>
+<box surround="#a #b" text="hello"/>
+"##;
+    let expected = r#"<text x="5" y="12.5" class="d-text">hello</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

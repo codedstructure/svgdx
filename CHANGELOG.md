@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `text` attributes now processed for `<box>` and `<point>` elements.
+
 - Fixed: relative positioning of `<use>` elements where the target bbox was not at
   the origin.
 
