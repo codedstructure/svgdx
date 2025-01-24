@@ -17,10 +17,10 @@ The simple cases of 'after the previous element' and 'below the previous element
 
 | `xy` attribute value | meaning |
 |---|---|
-| `"^:h"` | to the right of ('horizontally after') the previous element |
-| `"^:H"` | to the left of ('horizontally before') the previous element |
-| `"^:v"` | below ('vertically after') the previous element |
-| `"^:V"` | above ('vertically before') the previous element |
+| "^\|h" | to the right of ('horizontally after') the previous element |
+| "^\|H" | to the left of ('horizontally before') the previous element |
+| "^\|v" | below ('vertically after') the previous element |
+| "^\|V" | above ('vertically before') the previous element |
 
 For each of these, a further numeric value can be given which provides the 'margin' before the next element starts.
 
@@ -29,9 +29,9 @@ So we can have:
 ```svgdx-xml-inline
 <svg>
  <rect xy="0" wh="20" text="a"/>
- <rect xy="^:h" wh="20" text="b"/>
- <rect xy="^:v" wh="20" text="c"/>
- <rect xy="^:h" wh="20" text="d"/>
+ <rect xy="^|h" wh="20" text="b"/>
+ <rect xy="^|v" wh="20" text="c"/>
+ <rect xy="^|h" wh="20" text="d"/>
 </svg>
 ```
 
@@ -40,9 +40,9 @@ or:
 ```svgdx-xml-inline
 <svg>
  <rect xy="0" wh="20" text="A"/>
- <rect xy="^:h 10" wh="20" text="B"/>
- <rect xy="^:V 5" wh="20" text="C"/>
- <rect xy="^:H 10" wh="20" text="D"/>
+ <rect xy="^|h 10" wh="20" text="B"/>
+ <rect xy="^|V 5" wh="20" text="C"/>
+ <rect xy="^|H 10" wh="20" text="D"/>
 </svg>
 ```
 
@@ -71,17 +71,17 @@ Each bounding box has nine 'locations' which can be used as relative positioning
 ```svgdx
 <svg>
 <config font-size="4" font-family="monospace"/>
-<style>circle {stroke:none}</style>
+<defaults><circle style="stroke: none; opacity:0.9;" r="3"/></defaults>
 <rect id="r1" wh="50" class="d-fill-beige"/>
-<circle r="5" cxy="#r1@tl" text="tl"/>
-<circle r="5" cxy="#r1@t" text="t"/>
-<circle r="5" cxy="#r1@tr" text="tr"/>
-<circle r="5" cxy="#r1@r" text="r"/>
-<circle r="5" cxy="#r1@br" text="br"/>
-<circle r="5" cxy="#r1@b" text="b"/>
-<circle r="5" cxy="#r1@bl" text="bl"/>
-<circle r="5" cxy="#r1@l" text="l"/>
-<circle r="5" cxy="#r1@c" text="c"/>
+<circle cxy="#r1@tl" text="tl"/>
+<circle cxy="#r1@t" text="t"/>
+<circle cxy="#r1@tr" text="tr"/>
+<circle cxy="#r1@r" text="r"/>
+<circle cxy="#r1@br" text="br"/>
+<circle cxy="#r1@b" text="b"/>
+<circle cxy="#r1@bl" text="bl"/>
+<circle cxy="#r1@l" text="l"/>
+<circle cxy="#r1@c" text="c"/>
 </svg>
 ```
 

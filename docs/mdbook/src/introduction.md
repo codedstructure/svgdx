@@ -1,5 +1,21 @@
 # Introduction
 
+```svgdx
+<svg>
+  <style>text {font-weight: bold; font-size:4px}</style>
+  <rect surround="#input #svgdx #output" margin="10" class="d-fill-darkgrey"/>
+  <rect surround="#input #svgdx" margin="7 4" opacity="0.5" class="d-dash d-fill-cornflowerblue d-text-small" text="svgdx" text-loc="tl"/>
+  <rect surround="#svgdx #output" margin="4 4" opacity="0.5" class="d-dot d-fill-green d-text-small" text="svg" text-loc="tr"/>
+
+  <rect id="svgdx" wh="30 10" text="svgdx" class="d-fill-teal d-text-ol"/>
+  <rect id="input" xy="#svgdx|H 10" wh="30 10" text="input.xml" rx="3" class="d-fill-cornflowerblue d-text-ol"/>
+  <rect id="output" xy="#svgdx|h 10" wh="30 10" text="diagram.svg" rx="3" class="d-fill-green d-text-ol"/>
+
+  <line start="#input" end="#svgdx" class="d-arrow"/>
+  <line start="#svgdx" end="#output" class="d-arrow"/>
+</svg>
+```
+
 ## The Goal
 
 In my computing life, my happy place is the terminal. I _enjoy_ typing - pressing each of those little buttons on the keyboard in front of me, the steady 'duh-duh-duh-duh' as I type, the appearance of glyphs on the screen in response. I might use a keyboard and read from a monitor, but it can feel my mind is connected to the machine.
@@ -32,3 +48,28 @@ To answer the second point first, no - there's nothing wrong with it. But it doe
 
 [Cppfront](https://hsutter.github.io/cppfront/)
 * same semantics as C++, new syntax.
+
+
+## Comparison with alternatives
+
+```svgdx
+<svg>
+  <g id="others">
+    <rect wh="30 10" text="idea" class="d-fill-black"/>
+    <rect wh="30 3" xy="^|v" text="thinking" class="d-text-italic d-text-gold d-fill-dimgrey d-text-small"/>
+    <rect wh="30 10" xy="^|v" text="most DaC\nlanguages" class="d-fill-darkgrey d-text-ol"/>
+    <rect wh="30 20" xy="^|v" text="automation\nmagic" class="d-text-italic d-text-red d-fill-silver"/>
+    <rect wh="30 10" xy="^|v" text="SVG output" class="d-fill-whitesmoke"/>
+  </g>
+  <text xy="^@b">Most DaC languages\nlive close to the domain</text>
+
+  <g transform="translate(40)">
+    <rect wh="30 10" text="idea" class="d-fill-black"/>
+    <rect wh="30 20" xy="^|v" text="thinking,\npencil &amp; paper,\ntrial-and-error" class="d-text-italic d-text-gold d-fill-dimgrey"/>
+    <rect wh="30 10" xy="^|v" text="svgdx" class="d-text-ol d-text-white d-text-bold d-fill-darkgrey"/>
+    <rect wh="30 3" xy="^|v" text="automation" class="d-text-italic d-text-red d-fill-silver d-text-small"/>
+    <rect wh="30 10" xy="^|v" text="SVG output" class="d-fill-whitesmoke"/>
+  </g>
+  <text xy="^@b">svgdx provides\nmore control</text>
+</svg>
+```

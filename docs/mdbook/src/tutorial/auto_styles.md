@@ -89,6 +89,18 @@ Renders an arrowhead at the 'end' of a `line` or `polyline` element. When used o
 connector element (line or polyline with `start` and `end` attributes) the arrowhead
 appears at the point pointing toward the `end` point.
 
+### `d-flow`
+Animates (using CSS) the `stroke-dashoffset` property, to provide the appearance of
+flowing lines. The simple `d-flow` property adds the equivalent of `d-dash` by default,
+but providing the `d-dot` property will override this.
+
+Different speeds can be provided by using the suffixes `slower`, `slow`, `fast` or
+`faster`, and the direction can be reversed by providing the *additional* class
+`d-flow-rev`. For a 'dotted fast reverse flow', use `class="d-dot d-flow-fast d-flow-rev"`.
+
+This style provides interesting effects beyond lines - try on circles with radius a
+multiple of pi.
+
 ## Shadows and gradients
 
 ### `d-softshadow` / `d-hardshadow`
@@ -97,5 +109,15 @@ shadow with a blurred boundary; `d-hardshadow` has more defined boundaries.
 
 Note shadows will extend beyond the bounding-box of an element, and unwanted clipping
 of the shadow can be observed in some cases as a result.
+
+## Patterns
+
+### `d-grid` / `d-grid-N`
+These classes define a fill for the associated object which draw thin grid lines at
+gaps of 1, or N (1-100) respectively. This can be useful when debugging a diagram.
+
+### `d-stipple` / `d-hatch` / `d-crosshatch`
+These classes provide various fill patterns.
+
 
 TODO: gradients
