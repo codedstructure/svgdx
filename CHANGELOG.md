@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   [svgdx.net](svgdx.net). Tagging format has changed from `0.0.1` to `v0.0.1` to
   support this (i.e. allow non-release tags to avoid pushing to github pages...)
 
+- Docs are now in mdbook format. Note they rely on [mdbook-svgdx](https://github.com/codedstructure/mdbook-svgdx)
+  for rendering embedded diagrams; see [docs/mdbook/README.md](docs/mdbook/README.md)
+  for more info.
+
 ## [0.17.1 - 2025-01-24]
 
 - Added: `text` attributes now processed for `<box>` and `<point>` elements.
