@@ -491,7 +491,7 @@ impl<'a> EvalState<'a> {
 
     /// Extract a single numeric value according to the given spec.
     ///
-    /// Example: `#abc.h` - height of element #abc
+    /// Example: `#abc~h` - height of element #abc
     ///
     /// The following values are available; all assuming a bounding box:
     /// t - the y coordinate of the top of the element

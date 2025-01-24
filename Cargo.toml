@@ -8,6 +8,7 @@ keywords = ["svg", "diagrams"]
 license = "MIT"
 edition = "2021"
 default-run = "svgdx"
+exclude = ["/examples", "/docs"]
 
 [features]
 default = ["cli", "server"]
