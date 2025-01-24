@@ -1,6 +1,6 @@
-pub const RELPOS_SEP: char = ':';
+pub const RELPOS_SEP: char = '|';
 pub const LOCSPEC_SEP: char = '@';
-pub const SCALARSPEC_SEP: char = '.';
+pub const SCALARSPEC_SEP: char = '~';
 pub const EDGESPEC_SEP: char = ':';
 
 pub const ELREF_PREVIOUS: char = '^';

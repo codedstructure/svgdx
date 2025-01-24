@@ -1,9 +1,9 @@
 <svg>
   <!-- if it fails on an element it needs to just carry on... -->
-  <rect id="a" xy="#b:h" text="a" wh="5"/>
-  <rect id="b" xy="#c:h" text="b" wh="5"/>
-  <rect id="c" xy="#d:h" text="c" wh="5"/>
-  <rect id="d" xy="#e:h" text="d" wh="5"/>
-  <rect id="e" xy="#f:h" text="e" wh="5"/>
+  <rect id="a" xy="#b|h" text="a" wh="5"/>
+  <rect id="b" xy="#c|h" text="b" wh="5"/>
+  <rect id="c" xy="#d|h" text="c" wh="5"/>
+  <rect id="d" xy="#e|h" text="d" wh="5"/>
+  <rect id="e" xy="#f|h" text="e" wh="5"/>
   <rect id="f" xy="0" text="f" wh="5"/>
 </svg>

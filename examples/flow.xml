@@ -6,7 +6,7 @@
   <rect id="return" cxy="#base@t:70%" wh="$ps" text="return" class="d-fill-grey"/>
   <rect id="out" cxy="#base@r" wh="$ps" text="out" class="d-fill-red"/>
 
-  <rect id="effect" xy="#base:V 20" wh="20 8" text="effect" class="d-fill-darkmagenta"/>
+  <rect id="effect" xy="#base|V 20" wh="20 8" text="effect" class="d-fill-darkmagenta"/>
 
   <line start="#send" end="#effect" edge-type="v" class="d-arrow d-dash"/>
   <line start="#effect" end="#return" edge-type="v" class="d-arrow d-dash"/>

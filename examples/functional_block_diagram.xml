@@ -1,8 +1,8 @@
 <svg>
   <config background="white"/>
   <rect id="ace" xy="0" wh="25 15" text="ATTITUDE\nCONTROL\nELECTRONICS\n(ACE)" />
-  <rect id="prgp" xy="#ace:v 18" wh="25 12" text="PRIMARY\nRATE GYRO\nPACKAGE" />
-  <rect id="srgp" xy="#prgp:v 7" wh="25 12" text="SECONDARY\nRATE GYRO\nPACKAGE" />
+  <rect id="prgp" xy="#ace|v 18" wh="25 12" text="PRIMARY\nRATE GYRO\nPACKAGE" />
+  <rect id="srgp" xy="#prgp|v 7" wh="25 12" text="SECONDARY\nRATE GYRO\nPACKAGE" />
 
   <rect id="oame" xy="#ace@r" xy-loc="c" dx="62" wh="27 15" text="ORBIT ATTITUDE\nAND MANEUVER\nELECTRONICS\n(OAME)" />
   <rect id="pi" xy="#prgp@r" xy-loc="c" dx="62" wh="22 12" text="POWER\nINVERTER" />
@@ -10,7 +10,7 @@
   <rect id="ms" xy="#ace@tl" xy-loc="br" dxy="-16 -9" wh="18 7" text="MODE\nSELECTION" text-loc="l" class="d-none"/>
   <rect id="as" xy="#ace@tl" xy-loc="tr" dx="-16" wh="16 7" text="ATTITUDE\nSIGNALS" text-loc="l" class="d-none"/>
   <rect id="rrcs" xy="#oame@tr" xy-loc="bl" dxy="10 -5" wh="18 15" text="REENTRY\nREACTION\nCONTROL\nSYSTEM" text-loc="l" class="d-none"/>
-  <rect id="oaamrcs" xy="#oame:h 10" wh="35 15" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="d-none"/>
+  <rect id="oaamrcs" xy="#oame|h 10" wh="35 15" text="ORBIT ATTITUDE\nAND MANEUVER\nREACTION CONTROL\nSYSTEM" text-loc="l" class="d-none"/>
 
   <circle id="ppi" r="0.75" cxy="#prgp@r" dx="10" class="d-fill-black"/>
   <circle id="jfc" r="0.75" cxy="#ace@r" dx="24" class="d-fill-black"/>

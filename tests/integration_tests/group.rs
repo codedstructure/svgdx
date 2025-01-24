@@ -83,7 +83,7 @@ fn test_group_reuse() {
 fn test_group_rel_pos() {
     let rel_h_input = r##"
 <g id="a"><rect x="0" y="0" width="10" height="10" /></g>
-<rect xy="#a:h 5" wh="10" id="z"/>
+<rect xy="#a|h 5" wh="10" id="z"/>
 "##;
     let expected_rect = r#"<rect id="z" x="15" y="0" width="10" height="10"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -95,10 +95,10 @@ fn test_group_bbox() {
     let rel_h_input = r##"
 <g id="a">
  <rect wh="10"/>
- <rect xy="^:h" wh="10"/>
- <rect xy="^:h" wh="10"/>
+ <rect xy="^|h" wh="10"/>
+ <rect xy="^|h" wh="10"/>
 </g>
-<rect xy="#a:h 5" wh="10" id="z"/>
+<rect xy="#a|h 5" wh="10" id="z"/>
 "##;
     let expected_rect = r#"<rect id="z" x="35" y="0" width="10" height="10"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -110,13 +110,13 @@ fn test_group_nested_bbox() {
     let rel_h_input = r##"
 <g id="a">
  <rect wh="10"/>
- <rect xy="^:h" wh="10"/>
+ <rect xy="^|h" wh="10"/>
  <g id="b">
   <rect x="20" wh="10"/>
-  <rect xy="^:v" wh="10"/>
+  <rect xy="^|v" wh="10"/>
  </g>
 </g>
-<rect xy="#a:h 5" wh="10" id="z"/>
+<rect xy="#a|h 5" wh="10" id="z"/>
 "##;
     let expected_rect = r#"<rect id="z" x="35" y="5" width="10" height="10"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -146,14 +146,14 @@ fn test_group_transform_prev() {
     let input = r##"
 <g>
  <rect wh="10"/>
- <rect xy="^:V" wh="10"/>
+ <rect xy="^|V" wh="10"/>
 </g>
-<text id="z1" xy="^:v">Hello</text>
+<text id="z1" xy="^|v">Hello</text>
 <g transform="translate(15)">
   <rect wh="10"/>
-  <rect xy="^:V" wh="10"/>
+  <rect xy="^|V" wh="10"/>
 </g>
-<text id="z2" xy="^:v">World</text>
+<text id="z2" xy="^|v">World</text>
 "##;
     let expected1 = r#"id="z1" x="5" y="11""#;
     let expected2 = r#"id="z2" x="20" y="11""#;

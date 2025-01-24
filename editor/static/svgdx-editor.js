@@ -51,9 +51,9 @@ function resetLayout() {
 const DEFAULT_CONTENT = `<svg>
   <!-- Example svgdx document -->
   <rect id="in" wh="20 10" text="input" class="d-softshadow d-fill-azure"/>
-  <!-- Try changing the ':h 10' below to ':v 30' or ':V 5' -->
-  <rect id="proc" xy="^:h 10" wh="^" text="process" class="d-softshadow d-fill-silver"/>
-  <rect id="out" xy="^:h 10" wh="^" text="output" class="d-softshadow d-fill-skyblue"/>
+  <!-- Try changing the '|h 10' below to '|v 30' or '|V 5' -->
+  <rect id="proc" xy="^|h 10" wh="^" text="process" class="d-softshadow d-fill-silver"/>
+  <rect id="out" xy="^|h 10" wh="^" text="output" class="d-softshadow d-fill-skyblue"/>
 
   <line start="#in" end="#proc" class="d-arrow"/>
   <line start="#proc" end="#out" class="d-arrow"/>

@@ -110,7 +110,7 @@ relspec  := elref [dirspec | locspec]
 Following the `relspec` as defined above, additional values may be given to define
 margins or deltas.
 
-When used as part of a dirspec (e.g. `#abc:H`), a single value defines the 'gap'
+When used as part of a dirspec (e.g. `#abc|H`), a single value defines the 'gap'
 between the referenced element and the one being positioned.
 
 When used as part of a locspec (e.g. `@tl`), a pair of values may be provided which
@@ -118,11 +118,11 @@ define the `dx` and `dy` offsets to apply.
 
 Some simple examples:
 
-* `xy="#abc:h 5"` - position this element 5 units to the right of the element
+* `xy="#abc|h 5"` - position this element 5 units to the right of the element
   with `id="abc"`.
 * `cxy="^"` - position this element to have its center on the center of the
   previous element.
-* `xy="^:V"` - position this element directly above the previous element.
+* `xy="^|V"` - position this element directly above the previous element.
 * `xy="^@br"` - position this element at the bottom-right of the
   previous element.
 * `xy="#thing@tr 5 10"` - position this element at the top-right of

@@ -23,7 +23,7 @@ fn test_loop_trivial() {
 fn test_loop_simple() {
     let input = r##"
 <rect xy="0" wh="2"/>
-<loop count="3"><rect xy="^:h" wh="2"/>
+<loop count="3"><rect xy="^|h" wh="2"/>
 </loop>
 "##;
     let expected = r#"

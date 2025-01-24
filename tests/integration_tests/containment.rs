@@ -79,8 +79,8 @@ fn test_surround_recursive() {
 <rect id="a" xy="0" wh="5" />
 <rect id="b" xy="2" wh="2 10" />
 <rect id="c" surround="#p #q" margin="4" />
-<rect id="p" xy="#b:h 3" wh="5" />
-<rect id="q" xy="#b:v 3" wh="5" />
+<rect id="p" xy="#b|h 3" wh="5" />
+<rect id="q" xy="#b|v 3" wh="5" />
 "##;
     let expected = r#"<rect id="s" x="-3.5" y="0" width="19.5" height="24" class="d-surround"/>"#;
     let output = transform_str_default(input).unwrap();
@@ -95,8 +95,8 @@ fn test_surround_connectors() {
 <rect id="a" xy="0" wh="5" />
 <rect id="b" xy="2" wh="2 10" />
 <rect id="s2" surround="#p #q" margin="2" />
-<rect id="p" xy="#b:h 20" wh="5" />
-<rect id="q" xy="#p:v 3" wh="5" />
+<rect id="p" xy="#b|h 20" wh="5" />
+<rect id="q" xy="#p|v 3" wh="5" />
 <polyline id="ll" start="#s1" end="#s2"/>
 "##;
     let expected1 = r#"<rect id="s1" x="-1" y="-1" width="7" height="14" class="d-surround"/>"#;
@@ -117,8 +117,8 @@ fn test_surround_bad() {
 <rect id="a" xy="0" wh="5" />
 <rect id="b" xy="#2" wh="2 10" />
 <rect id="c" surround="#p #q" margin="4" />
-<rect id="p" xy="#s:h 3" wh="5" />
-<rect id="q" xy="#b:v 3" wh="5" />
+<rect id="p" xy="#s|h 3" wh="5" />
+<rect id="q" xy="#b|v 3" wh="5" />
 "##;
     let output = transform_str_default(input);
     assert!(output.is_err());
@@ -132,7 +132,7 @@ fn test_surround_connectors_permute() {
 <rect id="s1" surround="#a #b" margin="1" />
 <rect id="a" xy="0" wh="5" /><rect id="b" xy="2" wh="2 10" />
 <rect id="s2" surround="#p #q" margin="2" />
-<rect id="p" xy="#b:h 20" wh="5" /><rect id="q" xy="#p:v 3" wh="5" />
+<rect id="p" xy="#b|h 20" wh="5" /><rect id="q" xy="#p|v 3" wh="5" />
 <polyline id="ll" start="#s1" end="#s2"/>
 "##;
 

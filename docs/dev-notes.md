@@ -34,7 +34,7 @@ to the context have already occurred and may not be un-doable.
 
 One approach would be to do a topological sort on references early on,
 avoiding the need to 'abort and retry' on reference errors, but that
-fails if we have e.g. `id="thing-$k"` or `xy="#{thing-$k}:h"`, where
+fails if we have e.g. `id="thing-$k"` or `xy="#{thing-$k}|h"`, where
 the references depend on 'current' document state. (I'm keen to keep the
 ability to have non-static ids.)
 
@@ -150,8 +150,8 @@ a reasonable workaround, but this is more inconsistency.
 
 <rect xy="0" wh="0"/>
 <loop count="5" loop-var="i">
-<rect xy="^:v" wh="10 5" text="{{select($i, $num_list)}}"/>
-<rect xy="^:v" wh="10 5" text="$s${i}"/>
+<rect xy="^|v" wh="10 5" text="{{select($i, $num_list)}}"/>
+<rect xy="^|v" wh="10 5" text="$s${i}"/>
 </loop>
 ```
 
@@ -161,8 +161,8 @@ It's often useful to refer to the 'last-but-one' element, which isn't currently
 possible without using an `id`.
 
 Perhaps something like `^^`, with reasonable extension (e.g. no more than 10)
-to earlier elements. This would allow nicer grids which need to alternate `:h`
-and `:v` type relative positions.
+to earlier elements. This would allow nicer grids which need to alternate `|h`
+and `|v` type relative positions.
 
 ### Auto-style class combinations
 
@@ -205,10 +205,10 @@ priority, when it would be nice if these could be independent...
     .b-blue:not(text), .b-blue *:not(text) {fill:blue;}
   </style>
   <rect wh="3" text="a"/>
-  <rect wh="^" xy="^:v 2" class="b-red" text="b"/>
+  <rect wh="^" xy="^|v 2" class="b-red" text="b"/>
   <g class="b-red">
     <rect wh="^" xy="5 0" text="c"/>
-    <rect wh="^" xy="^:v 2" class="b-blue" text="d"/>
+    <rect wh="^" xy="^|v 2" class="b-blue" text="d"/>
   </g>
 </svg>
 ```
@@ -255,13 +255,13 @@ of specialisation):
 When should variable lookup happen?
 
 It seems useful to have element references which may be parameterized by a variable,
-e.g. `xy="$el:h"`, and then define `el="#blob"` elsewhere. This is catered for fine;
+e.g. `xy="$el|h"`, and then define `el="#blob"` elsewhere. This is catered for fine;
 prior to any positioning, attributes are evaluated, and at that point it will be
-replaced with `xy="#blob:h"`, which later feeds in to positioning logic.
+replaced with `xy="#blob|h"`, which later feeds in to positioning logic.
 
 Note this implies a further sequencing operation: 'compound' attributes such as `xy`
 already have an implicit 'splitting' action, such that `xy` will be split into `x`, `y`
-attribute pairs if there isn't a relative position (e.g. ':h') involved. But this is
+attribute pairs if there isn't a relative position (e.g. '|h') involved. But this is
 still reasonable: first expand variables, then check for relative positioning, then
 finally split (as appropriate) into different target attributes.
 

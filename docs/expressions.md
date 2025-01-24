@@ -52,7 +52,7 @@ Arithmetic expressions are specified in double-brace pairs, for example `{{ 1 + 
 Expressions may include the following. Note these are listed in order of precedence.
 * Numbers, including floating point and negative numbers. Internally numbers are stored with at least IEEE 754 single-precision floats, but exact precision and range are not part of this spec.
 * Variable references of the form `$var` or `${var}`
-* Element references, of the form `#id:v` where `id` indicates the target element and `v` is the value of that element to retrieve.
+* Element references, of the form `#id|v` where `id` indicates the target element and `v` is the value of that element to retrieve.
 * [function](#built-in-functions) calls, of the form `function(args)`
 * `(`, `)` - parenthesis, for increasing precedence.
 * `*`, `/`, `%` - multiply, divide, remainder. Precedence is left-to-right among these.
@@ -127,7 +127,7 @@ The following scalar values may be referred to from an element reference:
 * `ry` - the y-radius of the given element
 
 These are accessed by providing an element reference (e.g. `#abc`) followed by a
-dot (`.`), followed by the appropriate entry from the list above.
+tilde (`~`), followed by the appropriate entry from the list above.
 
 Note these are different to the relative locations which may be derived from an element.
 

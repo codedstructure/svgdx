@@ -84,12 +84,12 @@ fn test_loc_shape_offset() {
 
 #[test]
 fn test_loc_points() {
-    let input = format!(r##"{RECT_SVG}<polyline points="#a.r 1, #b@bl, #c.w 4" />"##);
+    let input = format!(r##"{RECT_SVG}<polyline points="#a~r 1, #b@bl, #c~w 4" />"##);
     let expected_polyline = r#"<polyline points="5 1, 20 5, 5 4"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_polyline);
 
-    let input = format!(r##"{RECT_SVG}<polygon points="#a.r 1, #b@bl, #c.w 4" />"##);
+    let input = format!(r##"{RECT_SVG}<polygon points="#a~r 1, #b@bl, #c~w 4" />"##);
     let expected_polyline = r#"<polygon points="5 1, 20 5, 5 4"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_polyline);
@@ -97,7 +97,7 @@ fn test_loc_points() {
 
 #[test]
 fn test_loc_path() {
-    let input = format!(r##"{RECT_SVG}<path d="M #a.r 1 #b@bl #c.w 4 z" />"##);
+    let input = format!(r##"{RECT_SVG}<path d="M #a~r 1 #b@bl #c~w 4 z" />"##);
     let expected_polyline = r#"<path d="M 5 1 20 5 5 4 z"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_polyline);

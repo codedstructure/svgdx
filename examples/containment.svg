@@ -20,7 +20,7 @@
   <rect id="o2" x="-8" y="-8" width="71" height="70" opacity="0.4" class="d-fill-grey d-surround"/>
   <rect id="o3" x="-3" y="-3" width="26" height="60" opacity="0.4" class="d-fill-grey d-dash d-surround"/>
   <rect id="o4" x="32" y="-3" width="26" height="44" opacity="0.4" class="d-fill-grey d-surround"/>
-  <!-- TODO: would be nice to specify xy on o5, (e.g. xy="#o3:v 10") and have elements organise within -->
+  <!-- TODO: would be nice to specify xy on o5, (e.g. xy="#o3|v 10") and have elements organise within -->
   <rect id="o5" x="14.5" y="65" width="48" height="34" opacity="0.4" class="d-fill-grey d-surround"/>
 
   <rect id="inp" width="20" height="8"/>
@@ -46,7 +46,7 @@
   <rect id="yproc1" x="39.5" y="68" width="20" height="8"/>
   <text x="49.5" y="72" class="d-text">preprocess</text>
   <rect id="group" x="17.5" y="68" width="42" height="8" class="d-none d-surround"/>
-  <!-- TODO: would be nice to be able to use '^:v' rather than #group:v -->
+  <!-- TODO: would be nice to be able to use '^|v' rather than #group|v -->
   <rect id="yproc2" x="17.5" y="78" width="42" height="8"/>
   <text x="38.5" y="82" class="d-text">process 2</text>
   <rect id="yout" x="17.5" y="88" width="42" height="8"/>

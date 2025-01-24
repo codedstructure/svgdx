@@ -467,7 +467,7 @@ fn test_text_element() {
 fn test_text_anchor() {
     let input = r##"
 <rect id="z" xy="0" wh="10"/>
-<text xy="#z:h 3" text="thing"/>
+<text xy="#z|h 3" text="thing"/>
 "##;
     let expected = r#"
 <rect id="z" x="0" y="0" width="10" height="10"/>
