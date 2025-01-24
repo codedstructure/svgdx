@@ -1,6 +1,7 @@
 use crate::connector::{ConnectionType, Connector};
 use crate::constants::{
-    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP, VAR_PREFIX
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
+    VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};

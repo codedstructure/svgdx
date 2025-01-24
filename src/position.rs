@@ -903,7 +903,10 @@ mod test {
         );
         assert_eq!(
             parse_el_loc("#id@t:25%").unwrap(),
-            (ElRef::Id("id".to_string()), Some(LocSpec::TopEdge(Length::Ratio(0.25))))
+            (
+                ElRef::Id("id".to_string()),
+                Some(LocSpec::TopEdge(Length::Ratio(0.25)))
+            )
         );
         assert_eq!(
             parse_el_loc("#id").unwrap(),
