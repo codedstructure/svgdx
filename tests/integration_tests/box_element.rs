@@ -17,7 +17,7 @@ fn test_box_simple() {
 fn test_box_refspec() {
     let input = r##"
 <rect id="r0" wh="10"/>
-<box id="b0" xy="#r0:h 5" wh="10"/>
+<box id="b0" xy="#r0|h 5" wh="10"/>
 <rect id="r1" cxy="#b0@c" wh="2"/>
 "##;
     let expected = r#"<rect id="r1" x="19" y="4" width="2" height="2"/>"#;
@@ -45,9 +45,9 @@ fn test_box_prev_element() {
     // centered horizontally between #r0 and #r1
     let input = r##"
 <rect id="r0" wh="10"/>
-<rect id="r1" xy="^:h 20" wh="10"/>
+<rect id="r1" xy="^|h 20" wh="10"/>
 <box id="b0" surround="#r0 #r1"/>
-<rect id="z" xy="^:v" wh="10"/>
+<rect id="z" xy="^|v" wh="10"/>
 "##;
     let expected = r#"<rect id="z" x="15" y="10" width="10" height="10"/>"#;
     let output = transform_str_default(input).unwrap();
@@ -58,7 +58,7 @@ fn test_box_prev_element() {
 fn test_box_text() {
     let input = r##"
 <rect id="a" wh="10"/>
-<rect id="b" xy="^:v 5" wh="10"/>
+<rect id="b" xy="^|v 5" wh="10"/>
 <box surround="#a #b" text="hello"/>
 "##;
     let expected = r#"<text x="5" y="12.5" class="d-text">hello</text>"#;

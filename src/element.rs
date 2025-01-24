@@ -1046,9 +1046,12 @@ impl SvgElement {
 
     /// Direction relative positioning - horizontally below, above, to the left, or to the
     /// right of the referenced element.
-    /// ```text
-    /// (^|#id)(:(h|H|v|V) [gap])
-    /// ```
+    /// ELREF '|' DIR ' ' [gap]
+    /// DIR values:
+    ///   h - horizontal to the right
+    ///   H - horizontal to the left
+    ///   v - vertical below
+    ///   V - vertical above
     fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
@@ -1206,7 +1209,7 @@ impl SvgElement {
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
     fn expand_compound_pos(&mut self) {
-        // NOTE: must have already done any relative positioning (e.g. `xy="#abc:h"`)
+        // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
         // before this point as xy is not considered a compound attribute in that case.
         if let Some(xy) = self.pop_attr("xy") {
             let (x, y) = Self::split_compound_attr(&xy);

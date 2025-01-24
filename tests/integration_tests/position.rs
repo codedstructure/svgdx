@@ -339,7 +339,7 @@ fn test_reuse_bbox() {
     <g id="a"><rect xy="0" wh="10"/></g>
   </defs>
   <reuse id="b" href="#a"/>
-  <circle xy="#b:h" r="2"/>
+  <circle xy="#b|h" r="2"/>
 </svg>
 "##;
     let output = transform_str_default(input).unwrap();
@@ -359,7 +359,7 @@ fn test_reuse_specs_bbox() {
     <g id="a"><rect xy="0" wh="10"/></g>
   </specs>
   <reuse id="b" href="#a"/>
-  <circle xy="#b:h" r="2"/>
+  <circle xy="#b|h" r="2"/>
 </svg>
 "##;
     let output = transform_str_default(input).unwrap();

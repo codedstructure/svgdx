@@ -255,7 +255,7 @@ fn test_var_closure() {
     let input = r##"
 <svg>
 <var k="word"/>
-<rect xy="#later:h" wh="10" text="$k"/>
+<rect xy="#later|h" wh="10" text="$k"/>
 <rect id="later" xy="0" wh="10"/>
 </svg>
 "##;
@@ -268,7 +268,7 @@ fn test_var_closure() {
 <svg>
   <g>
     <var k="12"/>
-    <rect xy="#later:h" wh="10" text="{{$k / 3}}"/>
+    <rect xy="#later|h" wh="10" text="{{$k / 3}}"/>
   </g>
   <rect id="later" xy="0" wh="10"/>
 </svg>

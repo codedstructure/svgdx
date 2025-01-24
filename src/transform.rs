@@ -815,7 +815,7 @@ mod tests {
 
         let seq = InputList::from_str(
             r##"<svg>
-          <rect xy="#a:h" wh="10"/>
+          <rect xy="#a|h" wh="10"/>
           <circle id="a" cx="50" cy="50" r="40"/>
         </svg>"##,
         )

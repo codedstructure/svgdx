@@ -38,7 +38,7 @@ fn test_relh() {
     // TO THE RIGHT
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:h" wh="20 60" id="z"/>
+<rect xy="^|h" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="30" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -47,7 +47,7 @@ fn test_relh() {
     // With a gap
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:h 3" wh="20 60" id="z"/>
+<rect xy="^|h 3" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="33" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -56,7 +56,7 @@ fn test_relh() {
     // TO THE LEFT
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:H" wh="20 60" id="z"/>
+<rect xy="^|H" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="-10" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -65,7 +65,7 @@ fn test_relh() {
     // With a gap
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:H 3" wh="20 60" id="z"/>
+<rect xy="^|H 3" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="-13" y="20" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -77,7 +77,7 @@ fn test_relv() {
     // VERTICAL BELOW
     let rel_v_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:v" wh="20 60" id="z"/>
+<rect xy="^|v" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="10" y="80" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -86,7 +86,7 @@ fn test_relv() {
     // With a gap
     let rel_v_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:v 5" wh="20 60" id="z"/>
+<rect xy="^|v 5" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="10" y="85" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -95,7 +95,7 @@ fn test_relv() {
     // VERTICAL ABOVE
     let rel_v_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:V" wh="20 60" id="z"/>
+<rect xy="^|V" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="10" y="-40" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -104,7 +104,7 @@ fn test_relv() {
     // With a gap
     let rel_v_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:V 5" wh="20 60" id="z"/>
+<rect xy="^|V 5" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="10" y="-45" width="20" height="60"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -117,7 +117,7 @@ fn test_elref_relh() {
     let rel_h_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:h" wh="10" />
+<rect id="z" xy="#abc|h" wh="10" />
 "##;
     let expected_rect = r#"<rect id="z" x="20" y="20" width="10" height="10"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -127,7 +127,7 @@ fn test_elref_relh() {
     let rel_h_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:h 3" wh="10" />
+<rect id="z" xy="#abc|h 3" wh="10" />
 "##;
     let expected_rect = r#"<rect id="z" x="23" y="20" width="10" height="10"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -137,7 +137,7 @@ fn test_elref_relh() {
     let rel_h_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:H" wh="8" />
+<rect id="z" xy="#abc|H" wh="8" />
 "##;
     let expected_rect = r#"<rect id="z" x="2" y="21" width="8" height="8"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -147,7 +147,7 @@ fn test_elref_relh() {
     let rel_h_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:H 3" wh="8" />
+<rect id="z" xy="#abc|H 3" wh="8" />
 "##;
     let expected_rect = r#"<rect id="z" x="-1" y="21" width="8" height="8"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -160,7 +160,7 @@ fn test_elref_relv() {
     let rel_v_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:v" wh="10" />
+<rect id="z" xy="#abc|v" wh="10" />
 "##;
     let expected_rect = r#"<rect id="z" x="10" y="30" width="10" height="10"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -170,7 +170,7 @@ fn test_elref_relv() {
     let rel_v_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:v 3" wh="10" />
+<rect id="z" xy="#abc|v 3" wh="10" />
 "##;
     let expected_rect = r#"<rect id="z" x="10" y="33" width="10" height="10"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -180,7 +180,7 @@ fn test_elref_relv() {
     let rel_v_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:V" wh="8" />
+<rect id="z" xy="#abc|V" wh="8" />
 "##;
     let expected_rect = r#"<rect id="z" x="11" y="12" width="8" height="8"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -190,7 +190,7 @@ fn test_elref_relv() {
     let rel_v_input = r##"
 <rect id="abc" xy="10 20" wh="10" />
 <rect id="def" xy="30" wh="2" />
-<rect id="z" xy="#abc:V 3" wh="8" />
+<rect id="z" xy="#abc|V 3" wh="8" />
 "##;
     let expected_rect = r#"<rect id="z" x="11" y="9" width="8" height="8"/>"#;
     let output = transform_str_default(rel_v_input).unwrap();
@@ -201,7 +201,7 @@ fn test_elref_relv() {
 fn test_rel_dx_dy() {
     let rel_h_input = r#"
 <rect xy="10 20" wh="20 60" />
-<rect xy="^:h" dxy="-1.23 4.56" wh="20 60" id="z"/>
+<rect xy="^|h" dxy="-1.23 4.56" wh="20 60" id="z"/>
 "#;
     let expected_rect = r#"<rect id="z" x="28.77" y="24.56" width="20" height="60"/>"#;
     let output = transform_str_default(rel_h_input).unwrap();
@@ -278,12 +278,12 @@ fn test_rel_recursive() {
 fn test_rel_multi_recursive() {
     // Ensure a relative position can be derived through many recursive references
     let rel_refid_input = r##"
-<rect id="a" xy="#b:H" wh="2" />
-<rect id="b" xy="#c:H" wh="2" />
-<rect id="c" xy="#d:H" wh="2" />
-<rect id="d" xy="#e:H" wh="2" />
-<rect id="e" xy="#f:H" wh="2" />
-<rect id="f" xy="#g:H" wh="2" />
+<rect id="a" xy="#b|H" wh="2" />
+<rect id="b" xy="#c|H" wh="2" />
+<rect id="c" xy="#d|H" wh="2" />
+<rect id="d" xy="#e|H" wh="2" />
+<rect id="e" xy="#f|H" wh="2" />
+<rect id="f" xy="#g|H" wh="2" />
 <rect id="g" xy="50" wh="2" />
 "##;
     let expected_rect = r#"<rect id="a" x="38" y="50" width="2" height="2"/>"#;

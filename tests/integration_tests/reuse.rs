@@ -367,7 +367,7 @@ fn test_use_relpos() {
   <rect id="pqr" wh="7" xy="-3"/>
 </defs>
 <use id="u1" href="#abc"/>
-<use id="u2" href="#pqr" xy="^:v"/>
+<use id="u2" href="#pqr" xy="^|v"/>
 "##;
     let expected = r##"<use id="u2" href="#pqr" x="-4" y="1"/>"##;
     let output = transform_str_default(input).unwrap();
