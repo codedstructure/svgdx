@@ -50,10 +50,12 @@ Unfortunately even providing these two attributes isn't enough in most cases; th
 
 Consider the following image and corresponding SVG code:
 
-![](./images/minimal-svg.svg)
-
-```xml
-{{#include ./images/minimal-svg.svg}}
+```svgdx-xml
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="120" height="50" style="fill:red" />
+  <rect x="120" y="0" width="120" height="50" style="fill:green" />
+  <rect x="240" y="0" width="120" height="50" style="fill:blue" />
+</svg>
 ```
 
 Each of the three rectangles has the same size (120 x 100 ['user units'](https://www.w3.org/TR/SVG11/coords.html#Units)), but the displayed image (probably!) has the blue rectangle cut off and plenty of whitespace underneath the three coloured rectangles.

@@ -1,6 +1,0 @@
-<svg>
- <rect xy="0" wh="20" text="A"/>
- <rect xy="^:h 10" wh="20" text="B"/>
- <rect xy="^:V 5" wh="20" text="C"/>
- <rect xy="^:H 10" wh="20" text="D"/>
-</svg>

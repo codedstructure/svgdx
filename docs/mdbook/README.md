@@ -2,6 +2,8 @@
 
 This directory contains the documentation for `svgdx` in mdbook format.
 
+At present it is a work-in-progress...
+
 ## The mdbook-svgdx preprocessor
 
 As well as [mdbook](https://rust-lang.github.io/mdBook/) itself, these docs use the [mdbook-svgdx](https://github.com/codedstructure/mdbook-svgdx) preprocessor to render embedded `svgdx` fragments.

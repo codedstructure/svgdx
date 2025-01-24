@@ -23,10 +23,11 @@ The value of any `text` attribute is extracted and a new `<text>` element is cre
 The first (rectangle) element above is converted by svgdx into the following SVG fragment - the base element is immediately followed by a new text element, with content generated from the `text` attribute and positioned appropriately.
 
 ```xml
-{{#include ./images/text-shape-fragment.xml}}
+<rect x="0" y="0" width="40" height="10"/>
+<text x="20" y="5" class="d-text">I am a rectangle!</text>
 ```
 
-Note the use of the `d-tbox` class; CSS is used to anchor text as required; for centered text, the anchor is set to the center of the text itself, rather than the bottom-left default.
+Note the use of the `d-text` class; CSS is used to anchor text as required. For centered text, the anchor is set to the center of the text itself, rather than the bottom-left default.
 
 ## Multi-line text
 
@@ -38,15 +39,15 @@ The text attribute works well where there is a single short text value - perhaps
 line text - by splitting the `text`
 attribute over several lines."/>
 
-  <rect xy="^:h 5" wh="50 20" text="Or use '\\n'\nto separate\nlines"/>
+  <rect xy="^|h 5" wh="50 20" text="Or use '\\n'\nto separate\nlines"/>
 
-  <rect xy="#r:v 5" wh="50 20">
+  <rect xy="#r|v 5" wh="50 20">
     And you can just
     put the text as
     the element content.
   </rect>
 
-  <rect xy="^:h 5" wh="50 20">
+  <rect xy="^|h 5" wh="50 20">
 <![CDATA[The content can be a CDATA
   block, allowing things such
   as "i < &j" without the need
@@ -57,8 +58,6 @@ attribute over several lines."/>
 ```
 
 ## Text positioning
-
-
 
 ## Text styling
 
