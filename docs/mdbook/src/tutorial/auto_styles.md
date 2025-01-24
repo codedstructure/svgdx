@@ -1,26 +1,29 @@
-# Auto-style classes
+# Delta 3 - Auto-styles
 
-`svgdx` provides a range of classes which may be added to elements to assign style
-and behaviour. By including these classes on elements, associated `<style>` rules and
-`<defs>` entries are automatically included.
+> svgdx provides a range of CSS classes which control style and behaviour
 
-To avoid conflicts with your own styles, avoid defining `class` or `id` values
-beginning `d-`; all classes and id values provided by `svgdx` begin with this prefix.
+## Auto-style classes
 
-## Colour - stroke and fill
+Built-in svgdx class names all have a `d-` prefix.  To avoid conflicts with your own styles, avoid defining `class` or `id` values beginning `d-`.
 
-Three class types affect colour:
+Note that inclusion of the relevant CSS definitions is automatic based on which classes are defined on properties; while this makes changing classes in the generated SVG document less convenient, but avoids including large chunks of mostly-unused style definitions in the output.
+
+Adding these auto-style classes can be used to both affect presentation style and control layout and positioning.
+
+## Presentation style
+
+### Colour - stroke and fill
+
+Three class definition formats affect colour:
 
 - [`d-<colour>`](#d-colour) sets a 'default' colour for shape outlines and text
 - [`d-fill-<colour>`](#d-fill-colour) sets the colour for shape fills, and sets a default text colour to an appropriate contrast colour, if not overridden by `d-fill-<colour>` or `d-text-<colour>`
 - [`d-text-<colour>`](#d-text-colour) sets the colour for text elements, which overrides any implicit text colour set by `d-colour` or `d-fill-colour`.
 
-> Note that the approach to colour in auto-styles assumes that text will not have a stroke; if text stroke needs to be specified, use custom classes and styles.
+> Note that the approach to colour in auto-styles assumes that text will not have a `stroke` outline; if text stroke needs to be specified, use custom classes and styles.
 
-### `d-<colour>`
-Sets the stroke of this element to the given colour, which must be a colour name as
-given in the [SVG 'Color' type](https://www.w3.org/TR/SVG11/types.html#DataTypeColor)
-or the value `none` to disable stroke.
+#### `d-<colour>`
+Sets the stroke of this element to the given colour, which must be a colour name as given in the [SVG 'Color' type](https://www.w3.org/TR/SVG11/types.html#DataTypeColor) or the value `none` to disable stroke.
 
 By default any `text` associated with this element will also have its colour changed, though text colour is applied via the `fill` attribute rather than `stroke`. Text colour can be overridden by use of [`d-text-<colour>`](#d-text-colour).
 
@@ -33,7 +36,7 @@ Examples:
 <rect xy="0" wh="10" class="d-red" />
 ```
 
-### `d-fill-<colour>`
+#### `d-fill-<colour>`
 Sets the fill of this element to the given colour, which must be a colour name as given
 by the [SVG 'Color' keywords](https://www.w3.org/TR/SVG11/types.html#ColorKeywords) or
 the value `none` to disable fill (note `fill: none;` is the default style).
@@ -48,7 +51,7 @@ Examples:
 <rect xy="0" wh="10" text="Hello!" class="d-fill-deeppink" />
 ```
 
-### `d-text-<colour>`
+#### `d-text-<colour>`
 Sets the colour of rendered text to the given colour, which must be a colour name as given
 by the [SVG 'Color' keywords](https://www.w3.org/TR/SVG11/types.html#ColorKeywords).
 Note this overrides any colour applied by the other colour specifiers above.
@@ -60,13 +63,13 @@ Example:
 
 This will render a grey square with green outline and dark blue text.
 
-## Text styles
+### Text styles
 
-### `d-text-smallest` / `-smaller` / `-small` / `-medium` / `-large` / `-larger` / `-largest`
+#### `d-text-smallest` / `-smaller` / `-small` / `-medium` / `-large` / `-larger` / `-largest`
 
 These styles control the size of text. The default text size is `d-text-medium`, but providing
 this style as an option allows the various relative size styles to be used if global font-size
-is overridden.
+is overriden.
 
 ### `d-text-monospace` / `d-text-italic` / `d-text-bold`
 
@@ -78,7 +81,7 @@ These styles provide basic styling of text elements, and may be combined as requ
 Renders an element outline (stroke) with a 'dotted' or 'dashed' line style respectively.
 Implemented with `stroke-dasharray`.
 
-### `d-thinner` / `d-thin` / `d-thick` / `d-thicker`
+### `d-thin` / `d-thick`
 These respectively reduce or increase the stroke width from the default by a factor of 2.
 
 ### `d-arrow`

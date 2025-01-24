@@ -1,0 +1,8 @@
+[book]
+authors = ["Ben Bass <benbass@codedstructure.net>"]
+language = "en"
+multilingual = false
+src = "src"
+title = "svgdx: tutorial and reference"
+
+[preprocessor.svgdx]
