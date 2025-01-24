@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `:x` -> `|x` for each `x` in `[hHvV]` is a good start the relpos change;
   the scalarspec change requires a bit more care.
 
+- Changed (infra): only tags (with leading 'v') get pushed to the online editor at
+  [svgdx.net](svgdx.net). Tagging format has changed from `0.0.1` to `v0.0.1` to
+  support this (i.e. allow non-release tags to avoid pushing to github pages...)
+
 ## [0.17.1 - 2025-01-24]
 
 - Added: `text` attributes now processed for `<box>` and `<point>` elements.
