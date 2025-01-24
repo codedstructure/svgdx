@@ -1,11 +1,11 @@
 <svg>
   <config theme="glass" scale="2" font-family="monospace"/>
   <rect id="seed" wh="15 10" text="seed"/>
-  <rect id="state" xy="^:h 10" wh="^" text="x\n(state)"/>
-  <rect id="mult" xy="^:h 5" wh="^ -5 0" text="* a"/>
-  <rect id="const" xy="^:h 5" wh="^" text="+ c" />
-  <rect id="mod" xy="^:h 5" wh="^" text="% m" />
-  <rect id="out" xy="#mod:h 10" wh="^" text="out" />
+  <rect id="state" xy="^|h 10" wh="^" text="x\n(state)"/>
+  <rect id="mult" xy="^|h 5" wh="^ -5 0" text="* a"/>
+  <rect id="const" xy="^|h 5" wh="^" text="+ c" />
+  <rect id="mod" xy="^|h 5" wh="^" text="% m" />
+  <rect id="out" xy="#mod|h 10" wh="^" text="out" />
 
   <line start="#seed" end="#state" class="d-arrow"/>
   <line start="#state" end="#mult" class="d-arrow"/>

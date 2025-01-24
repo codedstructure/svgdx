@@ -2,11 +2,10 @@
   <config theme="light" scale="3"/>
   <var tstyle="d-text-silver d-fill-grey d-text-ol-black d-text-bold"/>
   <rect id="alice" rx="2" wh="20 15" class="$tstyle d-hardshadow" text="Alice"/>
-  <rect id="bob" rx="2" wh="^" xy="^:h 40" class="$tstyle d-hardshadow" text="Bob"/>
+  <rect id="bob" rx="2" wh="^" xy="^|h 40" class="$tstyle d-hardshadow" text="Bob"/>
   <box id="box" surround="#alice #bob"/>
-  <rect id="eve" rx="2" wh="15 10" xy="^:v 2" class="$tstyle d-hardshadow" text-style="fill: darkred; stroke: silver" text="Eve"/>
+  <rect id="eve" rx="2" wh="15 10" xy="^|v 2" class="$tstyle d-hardshadow" text-style="fill: darkred; stroke: silver" text="Eve"/>
 
   <line start="#box@c" end="#eve" class="$tstyle d-darkred d-flow-slow"/>
   <line start="#alice" end="#bob" text="insecure channel" class="$tstyle d-text-italic d-text-small d-flow-slow"/>
 </svg>
-
