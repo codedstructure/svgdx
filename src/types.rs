@@ -1,3 +1,4 @@
+use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
@@ -390,8 +391,8 @@ impl FromStr for ElRef {
 impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ElRef::Id(id) => write!(f, "#{}", id),
-            ElRef::Prev => write!(f, "^"),
+            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
+            ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
         }
     }
 }
@@ -401,7 +402,7 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
     let first_char_match = |c: char| c.is_alphabetic() || c == '_';
     let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
 
-    if let Some(s) = s.strip_prefix('#') {
+    if let Some(s) = s.strip_prefix(ELREF_ID_PREFIX) {
         if s.starts_with(first_char_match) {
             if let Some(split) = s.find(|c: char| !subseq_char_match(c)) {
                 let (id, remain) = s.split_at(split);
@@ -410,7 +411,7 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
                 return Ok((ElRef::Id(s.to_owned()), ""));
             }
         }
-    } else if let Some(s) = s.strip_prefix('^') {
+    } else if let Some(s) = s.strip_prefix(ELREF_PREVIOUS) {
         return Ok((ElRef::Prev, s));
     }
 

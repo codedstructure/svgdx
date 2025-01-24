@@ -3,6 +3,10 @@ use std::fmt::{self, Display, Formatter};
 
 use itertools::Itertools;
 
+use crate::constants::{
+    ELREF_ID_PREFIX, ELREF_PREVIOUS, END_BRACE, EXPR_END, EXPR_START, OPEN_BRACE, VARBRACE,
+    VAR_PREFIX,
+};
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Result, SvgdxError};
 use crate::functions::{eval_function, Function};
@@ -293,9 +297,9 @@ fn valid_variable_name(var: &str) -> Result<&str> {
 }
 
 fn tokenize_atom(input: &str) -> Result<Token> {
-    if let Some(input) = input.strip_prefix('$') {
-        let var_name = if let Some(input) = input.strip_prefix('{') {
-            input.strip_suffix('}')
+    if let Some(input) = input.strip_prefix(VAR_PREFIX) {
+        let var_name = if let Some(input) = input.strip_prefix(OPEN_BRACE) {
+            input.strip_suffix(END_BRACE)
         } else {
             Some(input)
         };
@@ -304,7 +308,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         } else {
             Err(SvgdxError::ParseError("Invalid variable".to_owned()))
         }
-    } else if input.starts_with(['#', '^']) {
+    } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(func) = input.parse() {
         Ok(Token::FnRef(func))
@@ -367,7 +371,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
                 in_quote = Some(ch);
                 continue;
             }
-            '#' => {
+            ELREF_ID_PREFIX => {
                 in_elref_id = true;
                 Token::Other
             }
@@ -649,31 +653,31 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
-        if let Some(idx) = value.find('$') {
+        if let Some(idx) = value.find(VAR_PREFIX) {
             let (prefix, remain) = value.split_at(idx);
             if let Some(esc_prefix) = prefix.strip_prefix('\\') {
                 // Escaped '$'; ignore '\' and add '$' to result
                 result.push_str(esc_prefix);
-                result.push('$');
+                result.push(VAR_PREFIX);
                 value = &remain[1..];
                 continue;
             }
             result.push_str(prefix);
             let remain = &remain[1..]; // skip '$'
-            if let Some(inner) = remain.strip_prefix('{') {
+            if let Some(inner) = remain.strip_prefix(OPEN_BRACE) {
                 value = inner;
-                if let Some(end_idx) = value.find('}') {
+                if let Some(end_idx) = value.find(END_BRACE) {
                     let inner = &value[..end_idx];
                     if let Some(value) = context.get_var(inner) {
                         result.push_str(&value);
                     } else {
-                        result.push_str("${");
+                        result.push_str(VARBRACE);
                         result.push_str(inner);
                         result.push('}');
                     }
                     value = &value[end_idx + 1..]; // skip '}'
                 } else {
-                    result.push_str("${");
+                    result.push_str(VARBRACE);
                     result.push_str(value);
                     break;
                 }
@@ -684,7 +688,7 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
                     if let Some(value) = context.get_var(var) {
                         result.push_str(&value);
                     } else {
-                        result.push('$');
+                        result.push(VAR_PREFIX);
                         result.push_str(var);
                     }
                     value = remain;
@@ -692,7 +696,7 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
                     if let Some(value) = context.get_var(remain) {
                         result.push_str(&value);
                     } else {
-                        result.push('$');
+                        result.push(VAR_PREFIX);
                         result.push_str(remain);
                     }
                     break;
@@ -712,13 +716,13 @@ fn eval_expr(value: &str, context: &impl ContextView) -> String {
     let mut result = String::new();
     let mut value = value;
     loop {
-        if let Some(idx) = value.find("{{") {
+        if let Some(idx) = value.find(EXPR_START) {
             result.push_str(&value[..idx]);
-            value = &value[idx + 2..];
-            if let Some(end_idx) = value.find("}}") {
+            value = &value[idx + EXPR_START.len()..];
+            if let Some(end_idx) = value.find(EXPR_END) {
                 let inner = &value[..end_idx];
                 result.push_str(&eval_str(inner, context));
-                value = &value[end_idx + 2..];
+                value = &value[end_idx + EXPR_END.len()..];
             } else {
                 result.push_str(value);
                 break;
@@ -758,11 +762,11 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
     // Conditions don't need surrounding by {{...}} since they always evaluate to
     // a single numeric expression, but allow for consistency with other attr values.
     let mut value = value;
-    if let Some(inner) = value.strip_prefix("{{") {
+    if let Some(inner) = value.strip_prefix(EXPR_START) {
         value = inner
-            .strip_suffix("}}")
+            .strip_suffix(EXPR_END)
             .ok_or(SvgdxError::ParseError(format!(
-                "Expected closing '}}': '{value}'"
+                "Expected closing '{EXPR_END}': '{value}'"
             )))?;
     }
     eval_str(value, context)
@@ -775,11 +779,11 @@ pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>>
     // Lists don't need surrounding by {{...}} since they always evaluate to
     // a list of Strings, but allow for consistency with other attr values.
     let mut value = value;
-    if let Some(inner) = value.strip_prefix("{{") {
+    if let Some(inner) = value.strip_prefix(EXPR_START) {
         value = inner
-            .strip_suffix("}}")
+            .strip_suffix(EXPR_END)
             .ok_or(SvgdxError::ParseError(format!(
-                "Expected closing '}}': '{value}'"
+                "Expected closing '{EXPR_END}': '{value}'"
             )))?;
     }
     let tokens = tokenize(value)?;

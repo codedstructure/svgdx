@@ -1,4 +1,7 @@
 use crate::connector::{ConnectionType, Connector};
+use crate::constants::{
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP, VAR_PREFIX
+};
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent};
@@ -84,16 +87,17 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
             c.is_alphanumeric()
                 || c == '_'
                 || c == '-'
-                || c == '.'
-                || c == ':'
-                || c == '@'
+                || c == SCALARSPEC_SEP
+                || c == RELPOS_SEP
+                || c == LOCSPEC_SEP
+                || c == EDGESPEC_SEP
                 || c == '%'
         )
     };
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
-        if let Some(idx) = value.find(['#', '^']) {
+        if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
             result.push_str(&value[..idx]);
             value = &value[idx..];
             if let Some(mut idx) = value[1..].find(word_break) {
@@ -122,11 +126,14 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
             if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
-        } else if let Some(loc) = rest.strip_prefix('@').and_then(|s| s.parse().ok()) {
+        } else if let Some(loc) = rest.strip_prefix(LOCSPEC_SEP).and_then(|s| s.parse().ok()) {
             if let Ok(Some(point)) = elem_loc(elem, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
-        } else if let Some(scalar) = rest.strip_prefix('.').and_then(|s| s.parse().ok()) {
+        } else if let Some(scalar) = rest
+            .strip_prefix(SCALARSPEC_SEP)
+            .and_then(|s| s.parse().ok())
+        {
             if let Ok(Some(pos)) = ctx
                 .get_element_bbox(elem)
                 .map(|bb| bb.map(|bb| bb.scalarspec(scalar)))
@@ -665,7 +672,9 @@ impl SvgElement {
             // might be resolved later) then return Ok(None).
             // This will return `true` for things such as "10%" or "40mm".
             strp(value).is_err()
-                && !(value.contains('$') || value.contains('#') || value.contains('^'))
+                && !(value.contains(VAR_PREFIX)
+                    || value.contains(ELREF_ID_PREFIX)
+                    || value.contains(ELREF_PREVIOUS))
         }
         let mut el_bbox = match self.name.as_str() {
             "g" | "symbol" => self.content_bbox,
@@ -926,9 +935,12 @@ impl SvgElement {
         bbox: &BoundingBox,
         anchor: LocSpec,
     ) -> Result<Option<(f32, f32)>> {
-        if let Some((x, y)) = if remain.starts_with('@') {
+        if let Some((x, y)) = if remain.starts_with(LOCSPEC_SEP) {
             let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-            if let Some(loc) = loc_str.strip_prefix('@').and_then(|ls| ls.parse().ok()) {
+            if let Some(loc) = loc_str
+                .strip_prefix(LOCSPEC_SEP)
+                .and_then(|ls| ls.parse().ok())
+            {
                 let (x, y) = bbox.locspec(loc);
                 let (dx, dy) = self.extract_dx_dy(dxy)?;
                 {
@@ -996,14 +1008,14 @@ impl SvgElement {
         if let Some(input) = input {
             let (_, rel_loc) = split_relspec(input, ctx)?;
             let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
-            if let Some(rel) = rel_loc.strip_prefix(':') {
+            if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
                 match rel.parse()? {
                     DirSpec::Above => self.set_default_attr("text-loc", "t"),
                     DirSpec::Below => self.set_default_attr("text-loc", "b"),
                     DirSpec::InFront => self.set_default_attr("text-loc", "r"),
                     DirSpec::Behind => self.set_default_attr("text-loc", "l"),
                 }
-            } else if let Some(loc) = rel_loc.strip_prefix('@') {
+            } else if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
                 if let Ok(loc_spec) = loc.parse::<LocSpec>() {
                     match loc_spec {
                         LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
@@ -1045,15 +1057,16 @@ impl SvgElement {
                 Some(el) => el,
                 None => return Ok(()),
             };
-            if let (Some(bbox), Some(skip_colon)) =
-                (ctx.get_element_bbox(ref_el)?, remain.strip_prefix(':'))
-            {
-                let parts = skip_colon.find(|c: char| c.is_whitespace());
+            if let (Some(bbox), Some(skip_rp_sep)) = (
+                ctx.get_element_bbox(ref_el)?,
+                remain.strip_prefix(RELPOS_SEP),
+            ) {
+                let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
                 let (reldir, remain) = if let Some(split_idx) = parts {
-                    let (a, b) = skip_colon.split_at(split_idx);
+                    let (a, b) = skip_rp_sep.split_at(split_idx);
                     (a, b.trim_start())
                 } else {
-                    (skip_colon, "")
+                    (skip_rp_sep, "")
                 };
                 let rel: DirSpec = reldir.parse()?;
                 // this relies on x / y defaulting to 0 if not present, so we can get a bbox
@@ -1114,7 +1127,7 @@ impl SvgElement {
         // wh="#thing" -> width="#thing", height="#thing"
         // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
         // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
-        if value.starts_with(['#', '^']) {
+        if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
             let mut parts = value.splitn(2, char::is_whitespace);
             let prefix = parts.next().expect("nonempty");
             if let Some(remain) = parts.next() {

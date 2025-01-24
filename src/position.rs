@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
@@ -497,7 +498,7 @@ impl FromStr for LocSpec {
             "l" => Ok(Self::Left),
             "c" => Ok(Self::Center),
             s => {
-                if let Some((edge, len)) = s.split_once(':') {
+                if let Some((edge, len)) = s.split_once(EDGESPEC_SEP) {
                     let len = len.parse::<Length>()?;
                     match edge {
                         "t" => Ok(Self::TopEdge(len)),
@@ -850,7 +851,7 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
         return Ok((elref, None));
     }
     let remain = remain
-        .strip_prefix('@')
+        .strip_prefix(LOCSPEC_SEP)
         .ok_or(SvgdxError::ParseError(format!("Invalid locspec: {s}")))?;
     let mut chars = remain.chars();
     let mut loc = String::new();
@@ -871,7 +872,7 @@ pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
         return Ok((elref, None));
     }
     let remain = remain
-        .strip_prefix('.')
+        .strip_prefix(SCALARSPEC_SEP)
         .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))?;
     let mut chars = remain.chars();
     let mut scalar = String::new();
@@ -899,6 +900,10 @@ mod test {
         assert_eq!(
             parse_el_loc("#id@tl").unwrap(),
             (ElRef::Id("id".to_string()), Some(LocSpec::TopLeft))
+        );
+        assert_eq!(
+            parse_el_loc("#id@t:25%").unwrap(),
+            (ElRef::Id("id".to_string()), Some(LocSpec::TopEdge(Length::Ratio(0.25))))
         );
         assert_eq!(
             parse_el_loc("#id").unwrap(),

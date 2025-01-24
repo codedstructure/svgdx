@@ -44,6 +44,7 @@ use tempfile::NamedTempFile;
 pub mod cli;
 mod colours;
 mod connector;
+mod constants;
 mod context;
 mod element;
 mod errors;
