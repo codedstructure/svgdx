@@ -5,17 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- **Breaking format changes**:
+  - the separator for relative positioning has changed from ':' to '|'.
+    Example: `xy="#abc:h"` becomes `xy="#abc|h"`.
+  - the separator for elref scalars has changed from '.' to '~'.
+    Example: `width="#other.h"` becomes `width="#other~h"`.
+
+  This change is to better align with XML, where 'id' attribute names are
+  explicitly allowed to include the '.' and ':' characters.
+  In future ':' may be used as part of the 'elref' target format (e.g.
+  `#abc:def` would meaningfully reference a particular element).
+
+  Updating svgdx documents with case-sensitive search-and-replace for
+  `:x` -> `|x` for each `x` in `[hHvV]` is a good start the relpos change;
+  the scalarspec change requires a bit more care.
+
 ## [0.17.1 - 2025-01-24]
-
-- **Breaking format change**: the separator for relative positioning has changed
-  from ':' to '|'. As an example, `xy="#abc:h"` becomes `xy="#abc|h"`. Updating
-  svgdx documents with case-sensitive search-and-replace for `:x` -> `|x` for each
-  `x` in `[hHvV]` is likely to be a good start for migration.
-
-  As well as having a clearer difference between 'relspec' and 'edgespec' formats,
-  this change better aligns with XML, where 'id' attribute names may include the
-  ':' character. In future ':' may be used as part of the 'elref' target format
-  (i.e. `#abc:def` would meaningfully reference a particular element).
 
 - Added: `text` attributes now processed for `<box>` and `<point>` elements.
 

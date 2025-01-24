@@ -503,7 +503,7 @@ impl<'a> EvalState<'a> {
     fn element_ref(&self, v: &str) -> Result<ExprValue> {
         // TODO: perhaps this should be in the SvgElement impl, so it can
         // be re-used by other single-value attribute references, e.g.
-        // <line x1="#abc.l" .../>
+        // <line x1="#abc~l" .../>
         if let Ok((elref, Some(scalar))) = parse_el_scalar(v) {
             if let Some(elem) = self.context.get_element(&elref) {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {

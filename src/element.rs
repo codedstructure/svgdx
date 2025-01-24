@@ -79,7 +79,7 @@ fn split_relspec<'a, 'b>(
 /// Infallible; any invalid refspec will be left unchanged (other
 /// than whitespace)
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    // For most elements either a `#elem.X` or `#elem@X` form is required,
+    // For most elements either a `#elem~X` or `#elem@X` form is required,
     // but for `<point>` elements a standalone `#elem` suffices.
 
     let word_break = |c: char| {
@@ -1393,11 +1393,11 @@ mod tests {
             ),
         );
 
-        let out = expand_relspec("#abc.w", &ctx);
+        let out = expand_relspec("#abc~w", &ctx);
         assert_eq!(out, "10");
         let out = expand_relspec("#abc@br", &ctx);
         assert_eq!(out, "10 20");
-        let out = expand_relspec("1 2 #abc@t 3 4 #abc.h 5 6 #abc@c", &ctx);
+        let out = expand_relspec("1 2 #abc@t 3 4 #abc~h 5 6 #abc@c", &ctx);
         assert_eq!(out, "1 2 5 0 3 4 20 5 6 5 10");
     }
 }

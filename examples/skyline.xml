@@ -2,8 +2,8 @@
   <config theme="light"/>
   <specs>
     <g id="shade">
-      <var sh="{{$target.h / 4}}"/>
-      <path d="M $target@bl l $sh $sh h $target.w l -$sh -$sh z" style="fill:grey; stroke:none"/>
+      <var sh="{{$target~h / 4}}"/>
+      <path d="M $target@bl l $sh $sh h $target~w l -$sh -$sh z" style="fill:grey; stroke:none"/>
     </g>
   </specs>
 

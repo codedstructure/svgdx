@@ -127,7 +127,7 @@ The following scalar values may be referred to from an element reference:
 * `ry` - the y-radius of the given element
 
 These are accessed by providing an element reference (e.g. `#abc`) followed by a
-dot (`.`), followed by the appropriate entry from the list above.
+tilde (`~`), followed by the appropriate entry from the list above.
 
 Note these are different to the relative locations which may be derived from an element.
 

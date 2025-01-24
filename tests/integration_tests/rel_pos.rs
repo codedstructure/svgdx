@@ -325,7 +325,7 @@ fn test_rel_scalar_point_delta() {
 fn test_path_refspec() {
     let input = r##"
   <box id="p" xy="0 15" wh="15 5"/>
-  <path d="M #p@tl h #p.w v #p.h h -#p.w M #p@t:60% v #p.h M #p@t:70% v #p.h M #p@t:80% v #p.h M #p@t:90% v #p.h"/>
+  <path d="M #p@tl h #p~w v #p~h h -#p~w M #p@t:60% v #p~h M #p@t:70% v #p~h M #p@t:80% v #p~h M #p@t:90% v #p~h"/>
 "##;
     let expected =
         r#"<path d="M 0 15 h 15 v 5 h -15 M 9 15 v 5 M 10.5 15 v 5 M 12 15 v 5 M 13.5 15 v 5"/>"#;

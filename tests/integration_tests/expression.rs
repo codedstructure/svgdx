@@ -4,7 +4,7 @@ use svgdx::transform_str_default;
 fn test_scalarspec() {
     let input = r#"
   <rect id="a" wh="20"/>
-  <text xy="^" text="{{#a.w}}"/>
+  <text xy="^" text="{{#a~w}}"/>
 "#;
     let expected = r#"
   <rect id="a" width="20" height="20"/>
@@ -19,7 +19,7 @@ fn test_scalarspec() {
     // As above but use '^' for scalar elref
     let input = r#"
   <rect wh="20"/>
-  <text xy="^" text="{{^.w}}"/>
+  <text xy="^" text="{{^~w}}"/>
 "#;
     let expected = r#"
   <rect width="20" height="20"/>
@@ -34,7 +34,7 @@ fn test_scalarspec() {
     // As above but use an id containing '-'
     let input = r#"
   <rect id="a-1" wh="20"/>
-  <text xy="^" text="{{#a-1.w}}"/>
+  <text xy="^" text="{{#a-1~w}}"/>
 "#;
     let expected = r#"
   <rect id="a-1" width="20" height="20"/>
