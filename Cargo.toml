@@ -1,6 +1,6 @@
 [package]
 name = "svgdx"
-version = "0.17.0"
+version = "0.17.1"
 description = "create SVG diagrams easily"
 authors = ["Ben Bass <benbass@codedstructure.net>"]
 repository = "https://github.com/codedstructure/svgdx"
