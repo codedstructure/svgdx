@@ -43,13 +43,14 @@ impl Position {
             (Some(s), _, _, Some(l)) => Some((s, s + l)),
             (_, Some(e), _, Some(l)) => Some((e - l, e)),
             (_, _, Some(m), Some(l)) => Some((m - l / 2.0, m + l / 2.0)),
-            // The following case allows lines to be specified by cx/cy in one dimension
-            (None, None, Some(m), None) => {
-                if self.shape == "line" {
-                    Some((m, m))
-                } else {
-                    None
-                }
+            // The following cases allow lines to be specified by a single start/mid/end
+            // value in one dimension, as long as there's only a single such value.
+            (Some(m), None, None, None)
+            | (None, Some(m), None, None)
+            | (None, None, Some(m), None)
+                if self.shape == "line" =>
+            {
+                Some((m, m))
             }
             _ => None,
         }

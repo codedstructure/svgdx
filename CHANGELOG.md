@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `:x` -> `|x` for each `x` in `[hHvV]` is a good start the relpos change;
   the scalarspec change requires a bit more care.
 
+- Added: support for line elements to be specified with `width` / `height` attrs,
+  e.g. `<line xy1="#abc@r" width="10"/>`.
+
 - Changed (infra): only tags (with leading 'v') get pushed to the online editor at
   [svgdx.net](svgdx.net). Tagging format has changed from `0.0.1` to `v0.0.1` to
   support this (i.e. allow non-release tags to avoid pushing to github pages...)

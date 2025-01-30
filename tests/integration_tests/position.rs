@@ -368,3 +368,46 @@ fn test_reuse_specs_bbox() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_line_width_height() {
+    // Fix x1, width
+    let input1 = r#"<line x1="2" y1="3" width="10"/>"#;
+    // y2 vs y1 shouldn't matter
+    let input2 = r#"<line x1="2" y2="3" width="10"/>"#;
+    let input3 = r#"<line xy1="2 3" width="10"/>"#;
+    let expected = r#"<line x1="2" y1="3" x2="12" y2="3"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+    assert_eq!(transform_str_default(input2).unwrap(), expected);
+    assert_eq!(transform_str_default(input3).unwrap(), expected);
+
+    // Fix y1, height
+    let input1 = r#"<line x1="2" y1="3" height="10"/>"#;
+    // x2 vs x1 shouldn't matter
+    let input2 = r#"<line x2="2" y1="3" height="10"/>"#;
+    let input3 = r#"<line xy1="2 3" height="10"/>"#;
+    let expected = r#"<line x1="2" y1="3" x2="2" y2="13"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+    assert_eq!(transform_str_default(input2).unwrap(), expected);
+    assert_eq!(transform_str_default(input3).unwrap(), expected);
+
+    // Fix x2, width
+    let input1 = r#"<line x2="3" y2="5" width="10"/>"#;
+    // y2 vs y1 shouldn't matter
+    let input2 = r#"<line x2="3" y1="5" width="10"/>"#;
+    let input3 = r#"<line xy2="3 5" width="10"/>"#;
+    let expected = r#"<line x1="-7" y1="5" x2="3" y2="5"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+    assert_eq!(transform_str_default(input2).unwrap(), expected);
+    assert_eq!(transform_str_default(input3).unwrap(), expected);
+
+    // Fix y2, height
+    let input1 = r#"<line x1="2" y2="3" height="10"/>"#;
+    // x2 vs x1 shouldn't matter
+    let input2 = r#"<line x2="2" y2="3" height="10"/>"#;
+    let input3 = r#"<line xy2="2 3" height="10"/>"#;
+    let expected = r#"<line x1="2" y1="-7" x2="2" y2="3"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+    assert_eq!(transform_str_default(input2).unwrap(), expected);
+    assert_eq!(transform_str_default(input3).unwrap(), expected);
+}
