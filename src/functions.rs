@@ -325,7 +325,7 @@ pub fn eval_function(
         Function::Asin => args.one_number()?.asin().to_degrees(),
         Function::Acos => args.one_number()?.acos().to_degrees(),
         Function::Atan => args.one_number()?.atan().to_degrees(),
-        Function::Random => eval_state.context.get_rng().borrow_mut().gen::<f32>(),
+        Function::Random => eval_state.context.get_rng().borrow_mut().random::<f32>(),
         Function::RandInt => {
             let (min, max) = args.number_pair()?;
             let (min, max) = (min as i32, max as i32);
@@ -338,7 +338,7 @@ pub fn eval_function(
                 .context
                 .get_rng()
                 .borrow_mut()
-                .gen_range(min..=max) as f32
+                .random_range(min..=max) as f32
         }
         Function::Max => args
             .number_list()?

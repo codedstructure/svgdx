@@ -262,7 +262,7 @@ impl TransformerContext {
                 .unwrap()
                 .as_micros() as u64;
             let mut rng = Pcg32::seed_from_u64(now_seed);
-            self.local_style_id = Some(format!("svgdx-{:08x}", rng.gen::<u32>()))
+            self.local_style_id = Some(format!("svgdx-{:08x}", rng.random::<u32>()))
         } else {
             self.local_style_id = None;
         }
