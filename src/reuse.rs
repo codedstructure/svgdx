@@ -44,15 +44,13 @@ impl EventGen for ReuseElement {
             }
         }
 
-        // the referenced element will have an `id` attribute (which it was
-        // referenced by) but the new instance should not have this to avoid
-        // multiple elements with the same id. We remove it here and re-add as
-        // a class.
+        // if referenced by an ElRef::Id (rather than Prev), will have an `id`
+        // attribute (which it was referenced by) but the new instance should
+        // not have this to avoid multiple elements with the same id.
+        // We remove it here and re-add as a class.
         // However we *do* want the instance element to inherit any `id` which
         // was on the `reuse` element.
-        let ref_id = instance_element.pop_attr("id").ok_or_else(|| {
-            SvgdxError::InternalLogicError("referenced element should have id".to_owned())
-        })?;
+        let ref_id = instance_element.pop_attr("id");
         if let Some(inst_id) = reuse_element.get_attr("id") {
             instance_element.set_attr("id", &inst_id);
             context.update_element(&reuse_element);
@@ -65,7 +63,9 @@ impl EventGen for ReuseElement {
             instance_element.set_attr("style", &inst_style);
         }
         instance_element.add_classes(&reuse_element.classes);
-        instance_element.add_class(&ref_id);
+        if let Some(ref_id) = ref_id {
+            instance_element.add_class(&ref_id);
+        }
 
         // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
         // and any x/y attrs become a new (final) entry in the `transform`.

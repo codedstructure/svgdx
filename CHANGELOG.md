@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: support for line elements to be specified with `width` / `height` attrs,
   e.g. `<line xy1="#abc@r" width="10"/>`.
 
+- Fixed: reuse of previous element (`<reuse href="^" .../>`) should not require the
+  previous element to have an `id` attribute.
+
 - Changed (infra): only tags (with leading 'v') get pushed to the online editor at
   [svgdx.net](svgdx.net). Tagging format has changed from `0.0.1` to `v0.0.1` to
   support this (i.e. allow non-release tags to avoid pushing to github pages...)

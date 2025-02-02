@@ -373,3 +373,14 @@ fn test_use_relpos() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_prev() {
+    let input = r##"
+<rect wh="3" xy="0"/>
+<reuse id="z" href="^" y="2"/>"##;
+    let expected =
+        r##"<rect id="z" x="0" y="0" width="3" height="3" transform="translate(0, 2)"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
