@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Editor: Fixed 'Copy PNG' action, which was being suppressed by CSP.
+  Required addition of `blob:` scheme to `img-src`.
+
 ## [0.18.0 - 2025-02-02]
 
 - **Breaking format changes**:

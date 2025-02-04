@@ -16,7 +16,8 @@ use crate::{transform_str, TransformConfig};
 // but otherwise restrict to same-origin resources.
 // Includes 'wasm-unsafe-eval' for consistency even though is doing server-side
 // transforms rather than in-browser.
-const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'";
+// img-src requires `blob:` scheme for clipboard copy.
+const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; frame-ancestors 'none'";
 
 // Not all fields make sense for the editor, but add_metadata
 // is needed to allow hover-over line highlighting.
