@@ -32,15 +32,21 @@
             <div id="controls">
                 <div id="error-output"></div>
                 <div style="display: inline-block">
-                    <button id="toggle-layout">Layout</button>
-                    <button id="toggle-output">Text Output</button>
-                    <button id="auto-viewbox">Auto Fit</button>
-                    <button id="reset-view">Reset View</button>
-                    <button id="save-input">Save Input</button>
-                    <button id="save-output">Save SVG</button>
-                    <button id="copy-output">Copy SVG</button>
+                    <button id="toggle-layout" data-info="Toggle layout between horizontal and vertical">Layout</button>
+                    <button id="toggle-output" data-info="View output as text rather than image">Text Output</button>
+                    <button id="auto-viewbox" data-info="When active, auto-resize and center the SVG on update">Auto Fit</button>
+                    <button id="reset-view" data-info="Resize and center the SVG">Reset View</button>
+                    <button id="save-input" data-info="Download the input">Save Input</button>
+                    <button id="save-output" data-info="Download the SVG">Save SVG</button>
+                    <div id="copy-svg-popup" class="popup-container">
+                      <button id="copy-svg" data-info="Copy SVG to clipboard">Copy SVG</button>
+                      <div class="popup-buttons">
+                        <button class="popup-button" id="copy-svg-img" data-info="Clipboard SVG not supported by all browsers/applications">SVG image</button>
+                        <button class="popup-button" id="copy-svg-text" data-info="Copy the raw SVG XML as text">SVG text</button>
+                      </div>
+                    </div>
                     <div id="copy-popup" class="popup-container">
-                      <button id="copy-png">Copy PNG</button>
+                      <button id="copy-png" data-info="Copy as PNG to clipboard">Copy PNG</button>
                       <div class="popup-buttons">
                         <button class="popup-button" id="copy-png-big">Large (2048px)</button>
                         <button class="popup-button" id="copy-png-medium">Medium (1024px)</button>
@@ -48,7 +54,7 @@
                       </div>
                     </div>
                     <div id="help-popup" class="popup-container">
-                      <button id="help">Help</button>
+                      <button id="help" data-info="Show help links">Help</button>
                       <div class="popup-buttons">
                         <button class="popup-button" id="help-link-svg2"><a target="_blank" href="https://www.w3.org/TR/SVG2/">SVG&nbsp;2 Spec</a></button>
                         <button class="popup-button" id="help-link-svg"><a target="_blank" href="https://www.w3.org/TR/SVG11/">SVG&nbsp;1.1 Spec</a></button>

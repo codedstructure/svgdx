@@ -375,28 +375,67 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     });
 
     // copy SVG output
-    document.getElementById('copy-output').addEventListener('click', async () => {
-        // start by getting a fresh output without metadata
-        const svgdx_input = editor.getValue();
-        let [ok, svg_output] = await get_transform(svgdx_input, false);
-        if (!ok) {
-            // update status bar with error message
-            statusbar.style.color = "darkred";
-            statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
-            return;
-        }
-        // copy to clipboard
-        try {
-            await navigator.clipboard.writeText(svg_output);
-        } catch (e) {
-            console.error('Error copying SVG to clipboard', e);
-            statusbar.style.color = "darkred";
-            statusbar.innerText = "Error copying SVG to clipboard";
-            return;
-        }
-        statusbar.style.color = null;
-        statusbar.innerText = "SVG output copied to clipboard";
-    });
+    document.querySelectorAll('#copy-svg-popup .popup-button').forEach(
+        el => el.addEventListener('click', async (e) => {
+            // start by getting a fresh output without metadata
+            const svgdx_input = editor.getValue();
+            let [ok, svg_output] = await get_transform(svgdx_input, false);
+            if (!ok) {
+                // update status bar with error message
+                statusbar.style.color = "darkred";
+                statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
+                return;
+            }
+            // Hide the buttons again after copying. This is quite hacky (including
+            // the timeout values), due to pure-CSS popup not having a way to close.
+            // We make all the inner elements invisible, which will (should!) cause
+            // the popup to no longer be :hover, at which point it will be hidden,
+            // but then we need to remove the display:none to allow it to be used again...
+            setTimeout(() => {
+                document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
+                setTimeout(() => {
+                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
+                }, 200);
+            }, 200);
+
+            let id = e.target.id;
+            if (id === "copy-svg-text") {
+                // copy to clipboard
+                try {
+                    await navigator.clipboard.writeText(svg_output);
+                } catch (e) {
+                    console.error('Error copying SVG to clipboard', e);
+                    statusbar.style.color = "darkred";
+                    statusbar.innerText = "Error copying SVG to clipboard";
+                    return;
+                }
+            } else if (id === "copy-svg-img") {
+                try {
+                    // Perhaps this should use ClipboardItem.supports("image/svg+xml") but
+                    // that isn't supported on browsers which don't support image/svg+xml
+                    // anyway, so just give it a go in a try/catch block.
+                    let blob = new Blob([svg_output], { type: "image/svg+xml" });
+                    navigator.clipboard.write([
+                        new ClipboardItem({
+                            ["image/svg+xml"]: blob,
+                        }),
+                    ]);
+                    console.log("SVG image copied to clipboard");
+                } catch (error) {
+                    console.error("Error copying SVG image to clipboard:", error);
+                    statusbar.style.color = "darkred";
+                    statusbar.innerText = "Error copying SVG to clipboard";
+                    return;
+                }
+            } else {
+                console.error(`Unknown copy output button: ${id}`);
+                return;
+            }
+
+            statusbar.style.color = null;
+            statusbar.innerText = "SVG output copied to clipboard";
+        })
+    );
 
     // copy PNG buttons
     document.querySelectorAll('#copy-popup .popup-button').forEach(
@@ -631,21 +670,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     document.addEventListener('mousemove', (e) => {
         const svg = svg_container.querySelector('svg');
 
-        const tooltips = {
-            "toggle-layout": "Toggle layout between horizontal and vertical",
-            "toggle-output": "View output as text rather than image",
-            "auto-viewbox": "When active, auto-resize and center the SVG on update",
-            "reset-view": "Resize and center the SVG",
-            "save-input": "Download the input",
-            "save-output": "Download the SVG",
-            "copy-output": "Copy the SVG to clipboard",
-            "copy-png": "Copy as PNG to clipboard",
-            "help": "Show help links"
-        };
-
-        if (e.target.id in tooltips) {
+        if (typeof e.target.dataset.info !== "undefined") {
             // show tooltip in status bar
-            statusbar.innerText = tooltips[e.target.id];
+            statusbar.innerText = e.target.dataset.info;
         } else if (svg !== null && e.target.closest('div > svg') === svg) {
             // highlight source of this element in editor
             for (let i= 0; i < editor.lineCount(); i++) {

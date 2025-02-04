@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Editor: Fixed 'Copy PNG' action, which was being suppressed by CSP.
   Required addition of `blob:` scheme to `img-src`.
 
+- Editor: Button to copy SVG as image, though note this is not supported
+  by all browsers or target applications, and there's minimal error
+  reporting (check the Javascript Console in dev tools). It does at least
+  work to copy from Microsoft Edge to Pages on MacOS 15.2 - beyond that, YMMV!
+
 ## [0.18.0 - 2025-02-02]
 
 - **Breaking format changes**:

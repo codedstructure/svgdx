@@ -68,9 +68,10 @@ button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
 #controls div.popup-buttons { position: absolute; bottom: 100%; margin: 0; }
 
 /* hide popup buttons by default */
-#controls div .popup-button { display: none; }
+#controls div .popup-button { display: none; width: 100%; }
 /* initial reveal */
 #copy-png:hover ~ .popup-buttons .popup-button { display: block; }
+#copy-svg:hover ~ .popup-buttons .popup-button { display: block; }
 #help:hover ~ .popup-buttons .popup-button { display: block; }
 /* keep shown when hovering over popup */
 #controls .popup-buttons:hover .popup-button { display: block; }
