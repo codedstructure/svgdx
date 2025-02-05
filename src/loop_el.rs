@@ -39,7 +39,7 @@ impl TryFrom<&SvgElement> for LoopDef {
         };
         let loop_type;
         if let Some(count) = element.get_attr("count") {
-            loop_type = LoopType::Repeat(count); //, loop_spec));
+            loop_type = LoopType::Repeat(count);
         } else if let Some(while_expr) = element.get_attr("while") {
             loop_type = LoopType::While(while_expr);
         } else if let Some(until_expr) = element.get_attr("until") {
@@ -77,12 +77,12 @@ impl EventGen for LoopElement {
             let mut loop_var_value = 0.;
             let mut loop_step = 1.;
             if let LoopType::Repeat(count) = &loop_def.loop_type {
-                loop_count = eval_attr(count, context).parse()?;
+                loop_count = eval_attr(count, context)?.parse()?;
             }
             if let Some((loop_var, start, step)) = loop_def.loop_spec {
-                loop_var_name = eval_attr(&loop_var, context);
-                loop_var_value = eval_attr(&start, context).parse()?;
-                loop_step = eval_attr(&step, context).parse()?;
+                loop_var_name = eval_attr(&loop_var, context)?;
+                loop_var_value = eval_attr(&start, context)?.parse()?;
+                loop_step = eval_attr(&step, context)?.parse()?;
             }
             loop {
                 if let LoopType::Repeat(_) = &loop_def.loop_type {

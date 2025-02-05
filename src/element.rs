@@ -260,7 +260,7 @@ impl SvgElement {
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
-            let value = eval_attr(&comment, ctx);
+            let value = eval_attr(&comment, ctx)?;
             events.push(OutputEvent::Comment(format!(" {value} ")));
             events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
@@ -336,7 +336,7 @@ impl SvgElement {
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
         // moved out of this function and called once per element (or this function
         // should be called once per element...)
-        self.eval_attributes(ctx);
+        self.eval_attributes(ctx)?;
 
         self.handle_containment(ctx)?;
 
@@ -484,21 +484,23 @@ impl SvgElement {
         self.attrs.to_vec().into_iter().collect()
     }
 
-    /// Resolve any expressions in attributes. Note attributes are unchanged on failure.
-    pub fn eval_attributes(&mut self, ctx: &impl ContextView) {
+    /// Resolve any expressions in attributes.
+    pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Resolve any attributes
         for (key, value) in self.attrs.clone() {
             if key == "__" {
                 // Raw comments are not evaluated
                 continue;
             }
-            let replace = eval_attr(&value, ctx);
+            let replace = eval_attr(&value, ctx)?;
             self.attrs.insert(&key, &replace);
         }
         // Classes are handled separately to other attributes
         for class in &self.classes.clone() {
-            self.classes.replace(class, eval_attr(class, ctx));
+            self.classes.replace(class, eval_attr(class, ctx)?);
         }
+
+        Ok(())
     }
 
     /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement

@@ -114,7 +114,7 @@ impl EventGen for Container {
                 if new_el.name == "svg" && new_el.get_attr("xmlns").is_some() {
                     return Ok((self.0.all_events(context).into(), None));
                 }
-                new_el.eval_attributes(context);
+                new_el.eval_attributes(context)?;
                 if context.config.add_metadata {
                     new_el
                         .attrs
@@ -213,7 +213,7 @@ impl EventGen for GroupElement {
         // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
-        new_el.eval_attributes(context);
+        new_el.eval_attributes(context)?;
 
         // push variables onto the stack
         context.push_element(&self.0);
@@ -332,7 +332,7 @@ impl EventGen for VarElement {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
             if key != "_" && key != "__" {
-                let value = eval_attr(&value, context);
+                let value = eval_attr(&value, context)?;
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
                     return Err(SvgdxError::VarLimitError(

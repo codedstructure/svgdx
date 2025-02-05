@@ -470,13 +470,13 @@ impl<'a> EvalState<'a> {
                 Ok(ExprValue::List(Vec::new()))
             } else {
                 let mut es = EvalState::new(tokens, self.context, &self.checked_vars);
-                let e = expr_list(&mut es);
+                let e = expr_list(&mut es)?;
                 if es.peek().is_none() {
-                    e
+                    Ok(e)
                 } else {
-                    return Err(SvgdxError::ParseError(
-                        "Unexpected trailing tokens".to_owned(),
-                    ));
+                    return Err(SvgdxError::ParseError(format!(
+                        "Unexpected trailing tokens evaluating {v}"
+                    )));
                 }
             }
         } else {
@@ -521,7 +521,7 @@ impl<'a> EvalState<'a> {
 }
 
 fn evaluate(
-    tokens: impl IntoIterator<Item = Token>,
+    tokens: impl IntoIterator<Item = Token> + std::fmt::Debug + Clone,
     context: &impl ContextView,
 ) -> Result<ExprValue> {
     // This just forwards with initial empty checked_vars
@@ -529,18 +529,18 @@ fn evaluate(
 }
 
 fn evaluate_inner(
-    tokens: impl IntoIterator<Item = Token>,
+    tokens: impl IntoIterator<Item = Token> + std::fmt::Debug + Clone,
     context: &impl ContextView,
     checked_vars: &[String],
 ) -> Result<ExprValue> {
-    let mut eval_state = EvalState::new(tokens, context, checked_vars);
-    let e = expr_list(&mut eval_state);
+    let mut eval_state = EvalState::new(tokens.clone(), context, checked_vars);
+    let e = expr_list(&mut eval_state)?;
     if eval_state.peek().is_none() {
-        e
+        Ok(e)
     } else {
-        Err(SvgdxError::ParseError(
-            "Unexpected trailing tokens".to_owned(),
-        ))
+        Err(SvgdxError::ParseError(format!(
+            "Unexpected trailing tokens: {tokens:?}"
+        )))
     }
 }
 
@@ -711,7 +711,7 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(value: &str, context: &impl ContextView) -> String {
+fn eval_expr(value: &str, context: &impl ContextView) -> Result<String> {
     // Note - must catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let mut result = String::new();
     let mut value = value;
@@ -721,7 +721,7 @@ fn eval_expr(value: &str, context: &impl ContextView) -> String {
             value = &value[idx + EXPR_START.len()..];
             if let Some(end_idx) = value.find(EXPR_END) {
                 let inner = &value[..end_idx];
-                result.push_str(&eval_str(inner, context));
+                result.push_str(&eval_str(inner, context)?);
                 value = &value[end_idx + EXPR_END.len()..];
             } else {
                 result.push_str(value);
@@ -732,28 +732,23 @@ fn eval_expr(value: &str, context: &impl ContextView) -> String {
             break;
         }
     }
-    result
+    Ok(result)
 }
 
-fn eval_str(value: &str, context: &impl ContextView) -> String {
-    if let Ok(tokens) = tokenize(value) {
-        if let Ok(parsed) = evaluate(tokens, context) {
-            parsed.to_string()
-        } else {
-            value.to_owned()
-        }
-    } else {
-        value.to_owned()
-    }
+/// Evaluate an expression.
+fn eval_str(value: &str, context: &impl ContextView) -> Result<String> {
+    tokenize(value)
+        .and_then(|tokens| evaluate(tokens, context))
+        .map(|v| v.to_string())
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(value: &str, context: &impl ContextView) -> String {
+pub fn eval_attr(value: &str, context: &impl ContextView) -> Result<String> {
     // Step 1: Replace variables (which may contain element references, for example).
     // Note this is only a single pass, so variables could potentially reference other
     // variables which are resolved in eval_expr - provided they hold numeric values.
     let value = eval_vars(value, context);
-    // Step 2: Evaluate arithmetic expressions.
+    // Step 2: Evaluate expressions, which could fail with e.g. ReferenceError
     eval_expr(&value, context)
 }
 
@@ -769,7 +764,7 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
                 "Expected closing '{EXPR_END}': '{value}'"
             )))?;
     }
-    eval_str(value, context)
+    eval_str(value, context)?
         .parse::<f32>()
         .map(|v| v != 0.)
         .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
@@ -856,9 +851,9 @@ mod tests {
         context: &impl ContextView,
     ) -> Result<f32> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
-        let e = expr(&mut eval_state);
+        let e = expr(&mut eval_state)?;
         if eval_state.peek().is_none() {
-            Ok(e?.one_number()?)
+            Ok(e.one_number()?)
         } else {
             Err(SvgdxError::ParseError(
                 "Unexpected trailing tokens".to_owned(),
@@ -1367,11 +1362,11 @@ mod tests {
         ]);
 
         assert_eq!(
-            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &ctx),
+            eval_attr("Made by ${me} in 20{{20 + ${one} * 3}}", &ctx).unwrap(),
             "Made by Ben in 2023"
         );
         assert_eq!(
-            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &ctx),
+            eval_attr("Made by ${me} in {{5*4}}{{20 + ${one} * 3}}", &ctx).unwrap(),
             "Made by Ben in 2023"
         );
         // This should 'fail' evaluation and be preserved as the variable value
@@ -1427,13 +1422,9 @@ mod tests {
         let ctx = TestContext::new();
         for (expr, expected) in [
             ("{{1 + 2}} + {{3 + 4}}", "3 + 7"),
-            // TODO: following may be unexpected; basically '{{' inside
-            // an expression is treated as any other text literal. This
-            // may change in future.
-            ("abc {{2 {{ 4 }} 3}}", "abc 2 {{ 4  3}}"),
             ("abc 2 {{ 4 }} 3", "abc 2 4 3"),
         ] {
-            assert_eq!(eval_expr(expr, &ctx), expected);
+            assert_eq!(eval_expr(expr, &ctx).unwrap(), expected);
         }
     }
 
@@ -1457,7 +1448,7 @@ mod tests {
             ("{{divmod(3, 8)}}", "0, 3"),
             ("{{divmod(28, 8)}}", "3, 4"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected);
+            assert_eq!(eval_attr(expr, &ctx).unwrap(), expected);
         }
     }
 
@@ -1474,7 +1465,7 @@ mod tests {
             ("{{scalev(0.5, 123)}}", "61.5"),
             ("{{scalev(0.5, 1,2,3)}}", "0.5, 1, 1.5"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected);
+            assert_eq!(eval_attr(expr, &ctx).unwrap(), expected);
         }
     }
 
@@ -1488,7 +1479,7 @@ mod tests {
             ("{{$double}}", "1, 2, 1, 2"),
             ("{{scalev(2, $double)}}", "2, 4, 2, 4"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected);
+            assert_eq!(eval_attr(expr, &ctx).unwrap(), expected);
         }
     }
 
@@ -1514,7 +1505,11 @@ mod tests {
             ("{{count(1)}}", "1"),
             ("{{count(1, 2, 3, 4, 5)}}", "5"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+            assert_eq!(
+                eval_attr(expr, &ctx).unwrap(),
+                expected,
+                "'{expr}' != '{expected}'"
+            );
         }
     }
 
@@ -1544,7 +1539,11 @@ mod tests {
             ("{{$choice}}", "2"),
             ("{{$choice + 1}}", "3"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+            assert_eq!(
+                eval_attr(expr, &ctx).unwrap(),
+                expected,
+                "'{expr}' != '{expected}'"
+            );
         }
     }
 
@@ -1580,7 +1579,11 @@ mod tests {
             ("{{join('', 'base', 'target')}}", "'basetarget'"),
             ("{{join('* -')}}", "''"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+            assert_eq!(
+                eval_attr(expr, &ctx).unwrap(),
+                expected,
+                "'{expr}' != '{expected}'"
+            );
         }
     }
 
@@ -1589,7 +1592,6 @@ mod tests {
         let ctx = TestContext::new();
         for (expr, expected) in [
             ("{{'abc'}}", "'abc'"),
-            ("{{'a\'bc'}}", "'a'bc'"),
             (r#"{{'a\', \'bc'}}"#, r#"'a\', \'bc'"#),
             (r#"{{_('abc')}}"#, r#"abc"#),
             (r#"{{_('a\', \'bc')}}"#, r#"a', 'bc"#),
@@ -1598,7 +1600,11 @@ mod tests {
             (r#"{{_('a\nb')}}"#, "a\nb"),
             (r#"{{_('a\\b')}}"#, "a\\b"),
         ] {
-            assert_eq!(eval_attr(expr, &ctx), expected, "'{expr}' != '{expected}'");
+            assert_eq!(
+                eval_attr(expr, &ctx).unwrap(),
+                expected,
+                "'{expr}' != '{expected}'"
+            );
         }
     }
 }

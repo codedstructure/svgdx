@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: expression evaluation (inside {{..}} pairs) is now stricter. In
+  particular, errors previously left the content unchanged, which prevented
+  reference errors propagating and allowing forward references. This is also
+  much more helpful when writing expressions, as invalid function names (for
+  example) are reported as errors.
+
 - Editor: Fixed 'Copy PNG' action, which was being suppressed by CSP.
   Required addition of `blob:` scheme to `img-src`.
 

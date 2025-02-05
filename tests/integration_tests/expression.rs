@@ -1,3 +1,4 @@
+use assertables::assert_contains;
 use svgdx::transform_str_default;
 
 #[test]
@@ -42,6 +43,23 @@ fn test_scalarspec() {
 "#;
 
     assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_scalarspec_forwardref() {
+    let input = r##"
+  <text id="z" text="{{(#a~x2 + #b~x1) / 2}}"/>
+  <rect id="a" wh="20"/>
+  <rect id="b" xy="#a|h 10" wh="20"/>
+"##;
+    let expected = r#"
+  <text id="z" x="0" y="0" class="d-text">25</text>
+"#;
+
+    assert_contains!(
         transform_str_default(input).unwrap().trim(),
         expected.trim()
     );

@@ -2,7 +2,6 @@ use crate::context::TransformerContext;
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
-use crate::expression::eval_attr;
 use crate::position::BoundingBox;
 use crate::transform::{process_events, EventGen};
 use crate::types::ElRef;
@@ -19,7 +18,7 @@ impl EventGen for ReuseElement {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 
-        reuse_element.eval_attributes(context);
+        reuse_element.eval_attributes(context)?;
 
         context.push_element(&reuse_element);
         let elref = reuse_element
@@ -74,8 +73,8 @@ impl EventGen for ReuseElement {
             let reuse_x = reuse_element.get_attr("x");
             let reuse_y = reuse_element.get_attr("y");
             let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
-                let reuse_x = eval_attr(&reuse_x.unwrap_or("0".to_string()), context);
-                let reuse_y = eval_attr(&reuse_y.unwrap_or("0".to_string()), context);
+                let reuse_x = reuse_x.unwrap_or("0".to_string());
+                let reuse_y = reuse_y.unwrap_or("0".to_string());
                 Some(format!("translate({reuse_x}, {reuse_y})"))
             } else {
                 None

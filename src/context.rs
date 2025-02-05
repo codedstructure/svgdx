@@ -197,8 +197,9 @@ impl ElementMap for TransformerContext {
             };
             // TODO: move following to element::bbox() ?
             if el.name == "use" || el.name == "reuse" {
-                let translate_x = el.get_attr("x").map(|x| eval_attr(&x, ctx));
-                let translate_y = el.get_attr("y").map(|y| eval_attr(&y, ctx));
+                // assumes el has already had position & attributes resolved
+                let translate_x = el.get_attr("x");
+                let translate_y = el.get_attr("y");
                 if translate_x.is_some() || translate_y.is_some() {
                     if let Some(ref mut bbox) = &mut el_bbox {
                         el_bbox = Some(bbox.translated(
@@ -416,7 +417,7 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
-            let id = eval_attr(&id, self);
+            let id = eval_attr(&id, self).unwrap_or(id);
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {
                 self.original_map.insert(id, el.clone());
             }

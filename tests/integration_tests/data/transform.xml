@@ -4,7 +4,7 @@
     * { stroke-width: 0.2; fill: none; stroke: black; }
     ]]>
   </style>
-  <var rsize="20 40" rwh="1" expr="3 * 11"/>
+  <var rsize="20, 40" rwh="1" expr="3 * 11"/>
   <rect xy="0" wh="5" id="a"/>
   <rect xy="^@bl 0 2" wh="5"/>
   <ellipse cxy="20 30" rxy="10 5" text="ellipse" text-style="font-size:5px" id="z"/>
