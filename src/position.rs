@@ -853,13 +853,13 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
     }
     let remain = remain
         .strip_prefix(LOCSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: {s}")))?;
+        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut loc = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid locspec: {s}")))
+                return Err(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),
@@ -874,13 +874,13 @@ pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
     }
     let remain = remain
         .strip_prefix(SCALARSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))?;
+        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut scalar = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: {s}")))
+                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))
             }
             Some(c) => scalar.push(c),
             None => return Ok((elref, Some(scalar.parse()?))),

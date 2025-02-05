@@ -173,7 +173,11 @@ impl FromStr for Function {
             "trim" => Self::Trim,
             "join" => Self::Join,
             "_" => Self::Text,
-            _ => return Err(SvgdxError::ParseError(format!("Unknown function: {value}"))),
+            _ => {
+                return Err(SvgdxError::ParseError(format!(
+                    "Unknown function: '{value}'"
+                )))
+            }
         })
     }
 }

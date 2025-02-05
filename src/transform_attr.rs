@@ -121,7 +121,7 @@ impl FromStr for TransformType {
                 }
             }
             _ => Err(SvgdxError::ParseError(format!(
-                "Unknown transform type: {name}"
+                "Unknown transform type: '{name}'"
             )))?,
         })
     }

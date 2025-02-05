@@ -197,8 +197,7 @@ impl ExprValue {
         match self {
             Self::Number(v) => Ok(vec![*v]),
             Self::String(s) | Self::Text(s) => Err(SvgdxError::ParseError(format!(
-                "Expected a list of numbers, got '{}'",
-                s
+                "Expected a list of numbers, got '{s}'"
             ))),
             Self::List(v) => {
                 let mut out = Vec::new();
@@ -285,13 +284,17 @@ enum Token {
 
 fn valid_variable_name(var: &str) -> Result<&str> {
     if !var.starts_with(|c: char| c.is_ascii_alphabetic()) {
-        return Err(SvgdxError::ParseError("Invalid variable name".to_owned()));
+        return Err(SvgdxError::ParseError(format!(
+            "Invalid variable name '{var}'"
+        )));
     }
     if !var[1..]
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_')
     {
-        return Err(SvgdxError::ParseError("Invalid variable name".to_owned()));
+        return Err(SvgdxError::ParseError(format!(
+            "Invalid variable name '{var}'"
+        )));
     }
     Ok(var)
 }
@@ -306,7 +309,9 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         if let Some(var) = var_name {
             valid_variable_name(var).map(|v| Token::Var(v.to_string()))
         } else {
-            Err(SvgdxError::ParseError("Invalid variable".to_owned()))
+            Err(SvgdxError::ParseError(format!(
+                "Missing closing brace in '{input}'"
+            )))
         }
     } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
         Ok(Token::ElementRef(input.to_owned()))
@@ -318,7 +323,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
             .ok()
             .map(Token::Number)
             .ok_or_else(|| {
-                SvgdxError::ParseError(format!("Invalid number or function '{input}"))
+                SvgdxError::ParseError(format!("Invalid number or function '{input}'"))
             })?)
     }
 }
@@ -475,14 +480,14 @@ impl<'a> EvalState<'a> {
                     Ok(e)
                 } else {
                     return Err(SvgdxError::ParseError(format!(
-                        "Unexpected trailing tokens evaluating {v}"
+                        "Unexpected trailing tokens evaluating '{v}'"
                     )));
                 }
             }
         } else {
-            return Err(SvgdxError::ParseError(
-                "Could not evaluate variable".to_owned(),
-            ));
+            return Err(SvgdxError::ParseError(format!(
+                "Could not evaluate variable '{v}'"
+            )));
         };
         // Need this to allow e.g. "$var + $var"
         self.checked_vars.pop();
@@ -515,7 +520,9 @@ impl<'a> EvalState<'a> {
                 Err(SvgdxError::ReferenceError(elref))
             }
         } else {
-            Err(SvgdxError::ParseError(format!("Invalid element_ref: {v}")))
+            Err(SvgdxError::ParseError(format!(
+                "Invalid element_ref: '{v}'"
+            )))
         }
     }
 }

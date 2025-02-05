@@ -35,38 +35,34 @@ pub enum SvgdxError {
 impl fmt::Display for SvgdxError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SvgdxError::IoError(source) => write!(f, "IO error: {}", source),
-            SvgdxError::ParseError(reason) => write!(f, "Parse error: {}", reason),
-            SvgdxError::InvalidData(reason) => write!(f, "Invalid data: {}", reason),
-            SvgdxError::ReferenceError(elref) => write!(f, "Reference error: {}", elref),
+            SvgdxError::IoError(source) => write!(f, "IO error: {source}"),
+            SvgdxError::ParseError(reason) => write!(f, "Parse error: {reason}"),
+            SvgdxError::InvalidData(reason) => write!(f, "Invalid data: {reason}"),
+            SvgdxError::ReferenceError(elref) => write!(f, "Reference error: {elref}"),
             SvgdxError::VarLimitError(name, len, limit) => {
-                write!(
-                    f,
-                    "Variable '{}' length ({}) exceeded limit {}",
-                    name, len, limit
-                )
+                write!(f, "Variable '{name}' length ({len}) exceeded limit {limit}")
             }
             SvgdxError::LoopLimitError(count, limit) => {
-                write!(f, "Loop count {} exceeded limit {}", count, limit)
+                write!(f, "Loop count {count} exceeded limit {limit}")
             }
             SvgdxError::DepthLimitExceeded(depth, limit) => {
-                write!(f, "Depth {} exceeded limit {}", depth, limit)
+                write!(f, "Depth {depth} exceeded limit {limit}")
             }
             SvgdxError::CircularRefError(reason) => {
-                write!(f, "Circular reference error: {}", reason)
+                write!(f, "Circular reference error: {reason}")
             }
-            SvgdxError::DocumentError(reason) => write!(f, "Document error: {}", reason),
-            SvgdxError::MissingAttribute(attr) => write!(f, "Element missing attribute '{}'", attr),
-            SvgdxError::MissingBoundingBox(reason) => write!(f, "Missing bounding box: {}", reason),
+            SvgdxError::DocumentError(reason) => write!(f, "Document error: {reason}"),
+            SvgdxError::MissingAttribute(attr) => write!(f, "Element missing attribute '{attr}'"),
+            SvgdxError::MissingBoundingBox(reason) => write!(f, "Missing bounding box: {reason}"),
             SvgdxError::MessageError(reason) => write!(f, "{}", reason),
-            SvgdxError::InternalLogicError(reason) => write!(f, "Internal logic error: {}", reason),
+            SvgdxError::InternalLogicError(reason) => write!(f, "Internal logic error: {reason}"),
             SvgdxError::MultiError(errors) => {
                 for (_, (el, err)) in errors.iter().sorted_by(|a, b| a.0.cmp(b.0)) {
                     write!(f, "\n {:>4}: {}: {}", el.src_line, el.original, err)?;
                 }
                 Ok(())
             }
-            SvgdxError::OtherError(source) => write!(f, "{}", source),
+            SvgdxError::OtherError(source) => source.fmt(f),
         }
     }
 }
@@ -110,25 +106,25 @@ impl From<std::io::Error> for SvgdxError {
 
 impl From<ParseFloatError> for SvgdxError {
     fn from(err: ParseFloatError) -> SvgdxError {
-        SvgdxError::ParseError(format!("float: {}", err))
+        SvgdxError::ParseError(format!("float: {err}"))
     }
 }
 
 impl From<ParseBoolError> for SvgdxError {
     fn from(err: ParseBoolError) -> SvgdxError {
-        SvgdxError::ParseError(format!("bool: {}", err))
+        SvgdxError::ParseError(format!("bool: {err}"))
     }
 }
 
 impl From<ParseIntError> for SvgdxError {
     fn from(err: ParseIntError) -> SvgdxError {
-        SvgdxError::ParseError(format!("int: {}", err))
+        SvgdxError::ParseError(format!("int: {err}"))
     }
 }
 
 impl From<FromUtf8Error> for SvgdxError {
     fn from(err: FromUtf8Error) -> SvgdxError {
-        SvgdxError::ParseError(format!("utf8: {}", err))
+        SvgdxError::ParseError(format!("utf8: {err}"))
     }
 }
 

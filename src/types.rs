@@ -34,7 +34,7 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
                 return Err(SvgdxError::ParseError(format!(
-                    "Invalid character in numeric value: {ch}"
+                    "Invalid character in numeric value: '{ch}'"
                 )));
             }
             value.push(ch);
@@ -383,7 +383,9 @@ impl FromStr for ElRef {
         if remain.is_empty() {
             Ok(elref)
         } else {
-            Err(SvgdxError::ParseError(format!("Invalid elref format {s}")))
+            Err(SvgdxError::ParseError(format!(
+                "Invalid elref format '{s}'"
+            )))
         }
     }
 }
@@ -415,7 +417,9 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         return Ok((ElRef::Prev, s));
     }
 
-    Err(SvgdxError::ParseError(format!("Invalid elref format {s}")))
+    Err(SvgdxError::ParseError(format!(
+        "Invalid elref format '{s}'"
+    )))
 }
 
 #[cfg(test)]
