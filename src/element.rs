@@ -971,7 +971,7 @@ impl SvgElement {
             if matches!(
                 (self.name.as_str(), key.as_str()),
                 (
-                    "rect" | "use" | "image" | "svg" | "foreignObject" | "line",
+                    "rect" | "box" | "use" | "image" | "svg" | "foreignObject" | "line",
                     "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2" | "width" | "height",
                 ) | (
                     "circle",
