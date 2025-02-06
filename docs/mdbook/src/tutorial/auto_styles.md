@@ -75,6 +75,18 @@ is overriden.
 
 These styles provide basic styling of text elements, and may be combined as required.
 
+### `d-text-pre`
+
+This style is similar to `d-text-monospace`, but in addition the text element has spaces
+replaced with non-breaking spaces. This prevents the usual XML whitespace collapse which
+replaces multiple contiguous spaces with a single space.
+
+> The NBSP replacement approach may change in future,
+> as SVG2 has better support for preserving whitespace.
+
+This is useful for including code listings, ASCII art, and other whitespace-sensitive text
+in an SVG document.
+
 ## Line styles - dots, dashes, and arrows
 
 ### `d-dot` / `d-dash`

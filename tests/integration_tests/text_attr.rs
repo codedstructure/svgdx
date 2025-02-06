@@ -282,10 +282,10 @@ fn test_text_cdata() {
 #[test]
 fn test_text_cdata_pre() {
     // While conversion preserves whitespace, the rendering of SVG does not, due
-    // to XML whitespace rules. The `text-pre` attribute converts whitespace to
+    // to XML whitespace rules. The `d-text-pre` class converts whitespace to
     // non-breaking spaces to preserve formatting.
     let input = r#"
-<rect xy="0" wh="10" text-pre="true">
+<rect xy="0" wh="10" class="d-text-pre">
 <![CDATA[
     def start():
         print("Hello World!")
@@ -297,7 +297,7 @@ fn test_text_cdata_pre() {
     // repectively, for easier string authoring...
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" class="d-text">
+<text x="5" y="5" class="d-text d-text-pre">
 <tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;HelloNWorld!&quot;)</tspan>
 </text>
 "#;

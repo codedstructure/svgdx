@@ -78,6 +78,7 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
         ("d-text-light", "text.d-text-light, text.d-text-light * { font-weight: 100; }"),
         ("d-text-italic", "text.d-text-italic, text.d-text-italic * { font-style: italic; }"),
         ("d-text-monospace", "text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
+        ("d-text-pre", "text.d-text-pre, text.d-text-pre * { font-family: monospace; }"),
     ] {
         if tb.has_class(class) {
             tb.add_style(rule);

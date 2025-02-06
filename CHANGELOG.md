@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: the `text-pre` attribute has been replaced with a `d-text-pre`
+  class. This performs the same 'nbsp replacement' approach to emulating
+  pre-formatted text, and additionally applies the monospace font-family.
+
 - Changed: expression evaluation (inside {{..}} pairs) is now stricter. In
   particular, errors previously left the content unchanged, which prevented
   reference errors propagating and allowing forward references. This is also

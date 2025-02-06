@@ -174,6 +174,8 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let multiline = line_count > 1;
     let vertical = orig_elem.has_class("d-text-vertical");
+    // Whether text is pre-formatted (i.e. spaces are not collapsed)
+    let text_pre = orig_elem.has_class("d-text-pre");
 
     // There will always be a text element; if not multiline this is the only element.
     let mut text_elem = if orig_elem.name == "text" {
@@ -185,8 +187,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     text_elem.set_attr("y", &y_str);
     // line spacing (in 'em').
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
-    // Whether text is pre-formatted (i.e. spaces are not collapsed)
-    let text_pre = orig_elem.pop_attr("text-pre").is_some();
     // Extract style and class(es) from original element. Note we use
     // `text-style` for styling text rather than copying `style` to both outer
     // element and generated text, as is likely there will be conflicts with

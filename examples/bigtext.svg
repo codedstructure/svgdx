@@ -15,6 +15,7 @@
       .d-none { stroke: none; }
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-left, text.d-text-left * { text-anchor: start; }
+      text.d-text-pre, text.d-text-pre * { font-family: monospace; }
     ]]>
   </style>
   <style>
@@ -34,7 +35,7 @@
   </text>
 
   <rect x="50" y="30" width="0" height="0" class="d-none d-code"/>
-  <text x="51" y="30" class="d-text d-text-left d-none d-code">
+  <text x="51" y="30" class="d-text d-text-left d-none d-code d-text-pre">
   <tspan x="51" dy="-1.8em">​</tspan><tspan x="51" dy="0.9em">def area(w, h):</tspan><tspan x="51" dy="0.9em">  &quot;&quot;&quot;Return area of thing&quot;&quot;&quot;</tspan><tspan x="51" dy="0.9em">  return w * h</tspan><tspan x="51" dy="0.9em">  </tspan>
   </text>
 
