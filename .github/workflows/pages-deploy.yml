@@ -32,6 +32,19 @@ jobs:
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install mdbook
+        run: cargo install mdbook
+      - name: Install mdbook-svgdx preprocessor
+        run: cargo install mdbook-svgdx
+      - name: Build docs
+        run: mdbook build docs/mdbook
+      - name: Move docs to editor
+        run: mv docs/mdbook/book editor/docs
       - name: Build WASM
         run: ./wasm_build.sh
       - name: Upload artifact
