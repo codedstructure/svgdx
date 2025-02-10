@@ -45,8 +45,9 @@ fn append_common_styles(tb: &mut ThemeBuilder, fill: &str, stroke: &str, stroke_
     // Default styles suitable for box-and-line diagrams
     let font_family = &tb.font_family;
     let font_size = tb.font_size;
+    let all_elements = if tb.local_style_id.is_some() { "*" } else { "svg *" };
     for s in [
-        "svg * { stroke-linecap: round; stroke-linejoin: round; }".to_string(),
+        format!("{all_elements} {{ stroke-linecap: round; stroke-linejoin: round; }}"),
         format!("rect, circle, ellipse, polygon {{ stroke-width: {stroke_width}; fill: {fill}; stroke: {stroke}; }}"),
         format!("line, polyline, path {{ stroke-width: {stroke_width}; fill: none; stroke: {stroke}; }}"),
         format!("text, tspan {{ stroke-width: 0; font-family: {font_family}; font-size: {font_size}px; fill: {stroke}; paint-order: stroke; stroke: {fill}; }}"),
