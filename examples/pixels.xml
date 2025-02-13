@@ -1,0 +1,11 @@
+<svg>
+  <var r="6"/>
+  <loop count="16" start="-8" loop-var="i">
+    <loop count="16" start="-8" loop-var="j">
+      <var cx="{{$i + 0.5}}" cy="{{$j + 0.5}}"/>
+      <var d="{{if (sqrt($cx*$cx + $cy*$cy) lt $r, _('red'), _('white'))}}"/>
+      <rect xy="{{(scalev(5, $i, $j))}}" wh="5" style="fill:$d"/>
+    </loop>
+  </loop>
+  <circle r="{{5 * $r}}" class="d-fill-none d-thick"/>
+</svg>
