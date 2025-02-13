@@ -1,5 +1,6 @@
 /// Recursive descent expression parser
 use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 
 use itertools::Itertools;
 
@@ -19,6 +20,12 @@ pub enum ExprValue {
     String(String),
     Text(String),
     List(Vec<ExprValue>),
+}
+
+impl From<bool> for ExprValue {
+    fn from(v: bool) -> Self {
+        Self::Number(if v { 1. } else { 0. })
+    }
 }
 
 impl From<f32> for ExprValue {
@@ -246,6 +253,52 @@ impl ExprValue {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ComparisonOp {
+    Eq,
+    Ne,
+    Gt,
+    Ge,
+    Lt,
+    Le,
+}
+
+impl FromStr for ComparisonOp {
+    type Err = SvgdxError;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "eq" => Ok(Self::Eq),
+            "ne" => Ok(Self::Ne),
+            "gt" => Ok(Self::Gt),
+            "ge" => Ok(Self::Ge),
+            "lt" => Ok(Self::Lt),
+            "le" => Ok(Self::Le),
+            _ => Err(SvgdxError::ParseError(format!(
+                "Invalid comparison op '{s}'"
+            ))),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LogicalOp {
+    And,
+    Or,
+    Xor,
+}
+
+impl FromStr for LogicalOp {
+    type Err = SvgdxError;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "and" => Ok(Self::And),
+            "or" => Ok(Self::Or),
+            "xor" => Ok(Self::Xor),
+            _ => Err(SvgdxError::ParseError(format!("Invalid logical op '{s}'"))),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum Token {
     /// A numeric literal
@@ -256,8 +309,8 @@ enum Token {
     ElementRef(String),
     /// String surrounded by single or double quotes
     String(String),
-    /// A function reference
-    FnRef(Function),
+    /// Symbol - used for alphanumeric operators & function identifiers
+    Symbol(String),
     /// A literal '('
     OpenParen,
     /// A literal ')'
@@ -299,6 +352,13 @@ fn valid_variable_name(var: &str) -> Result<&str> {
     Ok(var)
 }
 
+fn valid_symbol(s: &str) -> bool {
+    s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+        && s.chars()
+            .skip(1)
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 fn tokenize_atom(input: &str) -> Result<Token> {
     if let Some(input) = input.strip_prefix(VAR_PREFIX) {
         let var_name = if let Some(input) = input.strip_prefix(OPEN_BRACE) {
@@ -315,16 +375,14 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         }
     } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
         Ok(Token::ElementRef(input.to_owned()))
-    } else if let Ok(func) = input.parse() {
-        Ok(Token::FnRef(func))
+    } else if let Ok(num) = input.parse::<f32>() {
+        Ok(Token::Number(num))
+    } else if valid_symbol(input) {
+        Ok(Token::Symbol(input.to_owned()))
     } else {
-        Ok(input
-            .parse::<f32>()
-            .ok()
-            .map(Token::Number)
-            .ok_or_else(|| {
-                SvgdxError::ParseError(format!("Invalid number or function '{input}'"))
-            })?)
+        Err(SvgdxError::ParseError(format!(
+            "Unexpected token '{input}'"
+        )))
     }
 }
 
@@ -398,6 +456,11 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     }
 
     if !buffer.is_empty() {
+        if in_quote.is_some() {
+            return Err(SvgdxError::ParseError(format!(
+                "Missing closing quote in '{input}'"
+            )));
+        }
         let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
         buffer.clear();
         tokens.push(buffer_token);
@@ -575,17 +638,67 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
 }
 
 fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
+    logical(eval_state)
+}
+
+// Handle `or`, `and`, 'xor' operators, all left-to-right associative
+fn logical(eval_state: &mut EvalState) -> Result<ExprValue> {
+    let mut e = comparison(eval_state)?;
+    while let Some(Token::Symbol(s)) = eval_state.peek() {
+        match s.parse::<LogicalOp>() {
+            Ok(logop) => {
+                eval_state.advance();
+                // Note: in order to avoid leaving tokens un-pulled, we don't
+                // short-circuit evaluation of logical operators.
+                let other = comparison(eval_state)?.one_number()?;
+                e = match logop {
+                    LogicalOp::And => ((e.one_number()? != 0.) && (other != 0.)).into(),
+                    LogicalOp::Or => ((e.one_number()? != 0.) || (other != 0.)).into(),
+                    LogicalOp::Xor => ((e.one_number()? != 0.) != (other != 0.)).into(),
+                };
+            }
+            _ => break,
+        }
+    }
+    Ok(e)
+}
+
+fn comparison(eval_state: &mut EvalState) -> Result<ExprValue> {
     let t = term(eval_state)?;
+    if let Ok(mut first) = t.one_number() {
+        if let Some(Token::Symbol(s)) = eval_state.peek().cloned() {
+            if let Ok(op) = s.parse::<ComparisonOp>() {
+                eval_state.advance();
+                let second = term(eval_state)?.one_number()?;
+                let comp = match op {
+                    ComparisonOp::Eq => first == second,
+                    ComparisonOp::Ne => first != second,
+                    ComparisonOp::Gt => first > second,
+                    ComparisonOp::Ge => first >= second,
+                    ComparisonOp::Lt => first < second,
+                    ComparisonOp::Le => first <= second,
+                };
+                first = comp as i32 as f32;
+            }
+        }
+        Ok(first.into())
+    } else {
+        Ok(t)
+    }
+}
+
+fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
+    let t = factor(eval_state)?;
     if let Ok(mut e) = t.one_number() {
         loop {
             match eval_state.peek() {
                 Some(Token::Add) => {
                     eval_state.advance();
-                    e += term(eval_state)?.one_number()?;
+                    e += factor(eval_state)?.one_number()?;
                 }
                 Some(Token::Sub) => {
                     eval_state.advance();
-                    e -= term(eval_state)?.one_number()?;
+                    e -= factor(eval_state)?.one_number()?;
                 }
                 _ => {
                     break;
@@ -598,24 +711,24 @@ fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
-fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
-    let f = factor(eval_state)?;
+fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
+    let f = primary(eval_state)?;
     if let Ok(mut e) = f.one_number() {
         loop {
             match eval_state.peek() {
                 Some(Token::Mul) => {
                     eval_state.advance();
-                    e *= factor(eval_state)?.one_number()?;
+                    e *= primary(eval_state)?.one_number()?;
                 }
                 Some(Token::Div) => {
                     eval_state.advance();
-                    e /= factor(eval_state)?.one_number()?;
+                    e /= primary(eval_state)?.one_number()?;
                 }
                 Some(Token::Mod) => {
                     eval_state.advance();
                     // note euclid remainder rather than '%' operator
                     // to ensure positive result useful for indexing
-                    e = e.rem_euclid(factor(eval_state)?.one_number()?);
+                    e = e.rem_euclid(primary(eval_state)?.one_number()?);
                 }
                 _ => {
                     break;
@@ -628,7 +741,7 @@ fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
-fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn primary(eval_state: &mut EvalState) -> Result<ExprValue> {
     match eval_state.next() {
         Some(Token::Number(x)) => Ok(ExprValue::Number(x)),
         Some(Token::String(s)) => Ok(ExprValue::String(s)),
@@ -640,17 +753,20 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
             Ok(e)
         }
         // unary minus
-        Some(Token::Sub) => Ok(ExprValue::Number(-factor(eval_state)?.one_number()?)),
-        Some(Token::FnRef(fun)) => {
+        Some(Token::Sub) => Ok(ExprValue::Number(-primary(eval_state)?.one_number()?)),
+        Some(Token::Symbol(fun)) => {
+            let fun = fun.parse::<Function>()?;
             eval_state.require(Token::OpenParen)?;
             let args = expr_list(eval_state)?;
             let e = eval_function(fun, &args, eval_state)?;
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
-        _ => Err(SvgdxError::ParseError(
-            "Invalid token in factor()".to_owned(),
-        )),
+        Some(tok) => Err(SvgdxError::ParseError(format!(
+            "Invalid token in primary(): {:?}",
+            tok
+        ))),
+        None => Err(SvgdxError::ParseError("Unexpected end of input".to_owned())),
     }
 }
 
@@ -874,6 +990,16 @@ mod tests {
     ) -> Result<ExprValue> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         expr(&mut eval_state)
+    }
+
+    #[test]
+    fn test_valid_symbol() {
+        for s in ["abc", "a1", "a_b", "_abc", "__", "a_b_c", "a_b_c_"] {
+            assert!(valid_symbol(s));
+        }
+        for s in ["", "1", "123", "1abc", "1_a", "1a_", "1_"] {
+            assert!(!valid_symbol(s));
+        }
     }
 
     #[test]
@@ -1282,11 +1408,89 @@ mod tests {
             "${abcthing}",
             "$abc 1",
             "'- -'",
-            "'thing'",
-            "\"thing\"",
+            "'thing'",   // string
+            "\"thing\"", // string
+            "thing",     // symbol
             "\"one\", 'two', 3",
+            "2 eq 2",
         ] {
-            assert!(tokenize(expr).is_ok(), "Should succeed: {expr}");
+            let t = tokenize(expr);
+            assert!(t.is_ok(), "Should succeed: {expr} => {t:?}");
+        }
+    }
+
+    #[test]
+    fn test_infix_comparison() {
+        for expr in [
+            ("1 eq 1", 1.),
+            ("1 ne 1", 0.),
+            ("1 ne 2", 1.),
+            ("1 lt 2", 1.),
+            ("2 lt 1", 0.),
+            ("1 le 2", 1.),
+            ("2 le 1", 0.),
+            ("1 le 1", 1.),
+            ("2 gt 1", 1.),
+            ("1 gt 2", 0.),
+            ("1 ge 2", 0.),
+            ("2 ge 1", 1.),
+            ("1 ge 1", 1.),
+        ] {
+            let tokens = tokenize(expr.0).expect("test");
+            let res = evaluate_one(tokens, &TestContext::new()).unwrap();
+            assert_eq!(
+                res, expr.1,
+                "{} => Got: {}; Expected: {}",
+                res, expr.0, expr.1
+            );
+        }
+    }
+
+    #[test]
+    fn test_infix_logical() {
+        for expr in [
+            ("1 and 1", 1.),
+            ("1 and 0", 0.),
+            ("0 and 1", 0.),
+            ("0 and 0", 0.),
+            ("2.5 and 0.1", 1.),
+            ("1 or 1", 1.),
+            ("1 or 0", 1.),
+            ("0 or 1", 1.),
+            ("0 or 0", 0.),
+            ("2.5 and 0.1", 1.),
+            ("1 xor 1", 0.),
+            ("1 xor 0", 1.),
+            ("0 xor 1", 1.),
+            ("0 xor 0", 0.),
+            ("2.5 xor 0.1", 0.),
+            ("1 and 1 and 1 and 1 and 1", 1.),
+            ("1 and 1 and 0 and 1 and 1", 0.),
+            ("0 and 1 and 0 and 1 and 1", 0.),
+            ("0 or 0 or 0 or 0 or 0", 0.),
+            ("1 or 0 or 0 or 0 or 0", 1.),
+            ("0 or 0 or 0 or 1 or 0", 1.),
+            ("1 or 1 or 1 or 1 or 1", 1.),
+            ("1 le 2 and 3 eq 3", 1.),
+            ("1 le 2 and 3 eq 4", 0.),
+            ("1 le 2 or 3 eq 4", 1.),
+            ("1 gt 2 or 3 eq 4", 0.),
+            ("1 gt 2 or 3 eq 3", 1.),
+            ("1 gt 2 or 3 eq 2", 0.),
+            ("1 gt 2 xor 3 eq 4", 0.),
+            ("1 gt 2 xor 3 eq 3", 1.),
+            ("1 gt 2 xor 3 eq 2", 0.),
+            ("1 le 2 xor 3 eq 4", 1.),
+            ("1 le 2 xor 3 eq 3", 0.),
+            ("1 le 2 xor 3 eq 2", 1.),
+        ] {
+            let tokens = tokenize(expr.0).expect("test");
+            let res = evaluate_one(tokens, &TestContext::new()).unwrap();
+            assert_eq!(
+                res, expr.1,
+                "{} => Got: {}; Expected: {}",
+                res, expr.0, expr.1
+            );
         }
     }
 
@@ -1302,13 +1506,14 @@ mod tests {
             "${abc-thing}",
             "${abc-thing}",
             "234#",
-            "thing",
+            "1thing",
             "'thing",
             "\"thing",
             "thing'",
             "'thing\"",
         ] {
-            assert!(tokenize(expr).is_err(), "Should have failed: {expr}");
+            let tokens = tokenize(expr);
+            assert!(tokens.is_err(), "Should have failed: {expr} => {tokens:?}");
         }
     }
 
