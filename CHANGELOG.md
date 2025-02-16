@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   much more helpful when writing expressions, as invalid function names (for
   example) are reported as errors.
 
+- Added: infix operators for comparison and logical operators, with changes
+  to expression tokenisation which could affect some expressions. Note the
+  function-form of comparison and logical operators may be removed in the
+  future.
+
 - Fixed: relpos (e.g. `xy="#abc|h 2"`) now works for non-rect-like elements
   (specifically lines, circles and ellipses).
 
