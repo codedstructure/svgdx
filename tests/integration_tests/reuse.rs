@@ -239,6 +239,27 @@ fn test_use_circular() {
     assert!(transform_str_default(r##"<use id="a" href="#a"/>"##).is_err());
 
     assert!(transform_str_default(r##"<use id="a" href="#b"/><use id="b" href="#a"/>"##).is_err());
+
+    // Should be fine; repeated identical _href_s with '^', but they reference different elements.
+    // TODO: this doesn't work until we support closures properly; at present the
+    //       `^` is evaluated in the context of the current element only, so is the
+    //       same throughout the evaluation.
+    //     let input = r##"
+    // <rect id="a" wh="1"/>
+    // <use id="b" href="#a"/>
+    // <use id="c" href="^"/>
+    // <use id="d" href="^"/>
+    // "##;
+    //     assert!(transform_str_default(input).is_ok());
+
+    // Should _not_ be ok - circular reference
+    let input = r##"
+<rect id="a" wh="1"/>
+<use id="b" href="#d"/>
+<use id="c" href="^"/>
+<use id="d" href="^"/>
+"##;
+    assert!(transform_str_default(input).is_err());
 }
 
 #[test]

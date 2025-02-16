@@ -167,52 +167,24 @@ impl ElementMap for TransformerContext {
     }
 
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
-        // This is recursive for use/reuse elements. We use an inner function and a vec of hrefs
-        // to detect circular references.
-        fn inner(
-            el: &SvgElement,
-            ctx: &TransformerContext,
-            already: &mut Vec<String>,
-        ) -> Result<Option<BoundingBox>> {
-            let mut el_bbox = if el.name == "use" || el.name == "reuse" {
-                // use and reuse elements reference another element - get the bbox of the target
-                // (which could be another (re)use element)
-                let href = el
-                    .get_attr("href")
-                    .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+        let target_el = el.get_target_element(self)?;
+        let mut el_bbox = target_el.bbox()?;
 
-                if already.contains(&href) {
-                    return Err(SvgdxError::CircularRefError(href));
-                }
-                already.push(href.clone());
-
-                let elref: ElRef = href.parse()?;
-                let target_el = ctx
-                    .get_element(&elref)
-                    .ok_or_else(|| SvgdxError::ReferenceError(elref))?;
-                // recurse to get bbox of the target
-                inner(target_el, ctx, already)?
-            } else {
-                el.bbox()?
-            };
-            // TODO: move following to element::bbox() ?
-            if el.name == "use" || el.name == "reuse" {
-                // assumes el has already had position & attributes resolved
-                let translate_x = el.get_attr("x");
-                let translate_y = el.get_attr("y");
-                if translate_x.is_some() || translate_y.is_some() {
-                    if let Some(ref mut bbox) = &mut el_bbox {
-                        el_bbox = Some(bbox.translated(
-                            translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
-                            translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
-                        ));
-                    }
+        // TODO: move following to element::bbox() ?
+        if el.name == "use" || el.name == "reuse" {
+            // assumes el has already had position & attributes resolved
+            let translate_x = el.get_attr("x");
+            let translate_y = el.get_attr("y");
+            if translate_x.is_some() || translate_y.is_some() {
+                if let Some(ref mut bbox) = &mut el_bbox {
+                    el_bbox = Some(bbox.translated(
+                        translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
+                        translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
+                    ));
                 }
             }
-            Ok(el_bbox)
         }
-        let mut already_seen = Vec::new();
-        inner(el, self, &mut already_seen)
+        Ok(el_bbox)
     }
 }
 

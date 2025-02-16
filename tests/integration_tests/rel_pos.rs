@@ -332,3 +332,14 @@ fn test_path_refspec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_line_relpos() {
+    let input = r#"
+<line xy1="0 5" xy2="10 5"/>
+<line xy="^|v 1" wh="^"/>"#;
+    let expected = r#"
+<line x1="0" y1="5" x2="10" y2="5"/>
+<line x1="0" y1="6" x2="10" y2="6"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

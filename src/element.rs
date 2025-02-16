@@ -661,6 +661,102 @@ impl SvgElement {
         }
     }
 
+    pub fn get_target_element(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
+        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
+        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
+        // cope with '^' where the target might not even have an id. Would be better
+        // to assign a dedicated internal ID to every element and use that.
+        // TODO: in addition to the above, '^' is already broken since it doesn't get
+        // captured in the 'remain' thing for deferred elements, and is always the same
+        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
+        // internal ID with each element so can follow a chain of these.
+        let mut seen: Vec<OrderIndex> = vec![];
+        let mut element = self;
+
+        while element.name == "use" || element.name == "reuse" {
+            let href = element
+                .get_attr("href")
+                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+            let elref = href.parse()?;
+            if let Some(el) = ctx.get_element(&elref) {
+                if seen.contains(&el.order_index) {
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "{} already seen",
+                        elref
+                    )));
+                }
+                seen.push(el.order_index.clone());
+                element = el;
+            } else {
+                return Err(SvgdxError::ReferenceError(elref));
+            }
+        }
+        Ok(element.clone())
+    }
+
+    pub fn size(&self, ctx: &impl ElementMap) -> Result<Option<(f32, f32)>> {
+        // NOTE: unlike bbox, this does not replace missing values with '0'.
+        // Assumes any dw / dh have already been applied.
+
+        // The width/height cases cover rect-like elements, but they are also used
+        // as intermediate (e.g. `wh` expansion) size attributes for other elements.
+        let mut width = None;
+        let mut height = None;
+        if let Some(w) = self.attrs.get("width") {
+            width = Some(strp(w)?);
+        }
+        if let Some(h) = self.attrs.get("height") {
+            height = Some(strp(h)?);
+        }
+        match self.name.as_str() {
+            "use" | "reuse" => {
+                let target_el = self.get_target_element(ctx)?;
+                if let Ok(Some((w, h))) = target_el.size(ctx) {
+                    width = Some(w);
+                    height = Some(h);
+                }
+            }
+            "point" | "text" => {
+                width = Some(0.);
+                height = Some(0.);
+            }
+            "circle" => {
+                if let Some(r) = self.attrs.get("r").map(|n| strp(n)).transpose()? {
+                    width = Some(r * 2.0);
+                    height = Some(r * 2.0);
+                }
+            }
+            "ellipse" => {
+                let rx = self.attrs.get("rx").map(|n| strp(n)).transpose()?;
+                let ry = self.attrs.get("ry").map(|n| strp(n)).transpose()?;
+                if let Some(rx) = rx {
+                    width = Some(rx * 2.0);
+                }
+                if let Some(ry) = ry {
+                    height = Some(ry * 2.0);
+                }
+            }
+            "line" => {
+                let x1 = self.attrs.get("x1").map(|n| strp(n)).transpose()?;
+                let x2 = self.attrs.get("x2").map(|n| strp(n)).transpose()?;
+                if let (Some(x1), Some(x2)) = (x1, x2) {
+                    width = Some((x2 - x1).abs());
+                }
+                let y1 = self.attrs.get("y1").map(|n| strp(n)).transpose()?;
+                let y2 = self.attrs.get("y2").map(|n| strp(n)).transpose()?;
+                if let (Some(y1), Some(y2)) = (y1, y2) {
+                    height = Some((y2 - y1).abs());
+                }
+            }
+            _ => {}
+        }
+        if let (Some(width), Some(height)) = (width, height) {
+            Ok(Some((width, height)))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
@@ -1075,11 +1171,9 @@ impl SvgElement {
                     (skip_rp_sep, "")
                 };
                 let rel: DirSpec = reldir.parse()?;
-                // this relies on x / y defaulting to 0 if not present, so we can get a bbox
-                // from only having a defined width / height.
-                let this_bbox = ctx.get_element_bbox(self)?;
-                let this_width = this_bbox.map(|bb| bb.width()).unwrap_or(0.);
-                let this_height = this_bbox.map(|bb| bb.height()).unwrap_or(0.);
+                // We won't have the full *position* of this element at this point, but hopefully
+                // we have enough to determine its size.
+                let (this_width, this_height) = self.size(ctx)?.unwrap_or((0., 0.));
                 let gap = if !remain.is_empty() {
                     let mut parts = attr_split(remain);
                     strp(&parts.next().unwrap_or("0".to_string()))?
@@ -1106,17 +1200,10 @@ impl SvgElement {
             "use" => {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
-                let target = self.get_attr("href").unwrap_or_default();
-                let elref = target.parse()?;
-                if let Some(bbox) = ctx
-                    .get_element(&elref)
-                    .and_then(|el| ctx.get_element_bbox(el).ok().flatten())
-                {
+                if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
                     let (dx, dy) = bbox.locspec(LocSpec::TopLeft);
                     self.set_attr("x", &fstr(x - dx));
                     self.set_attr("y", &fstr(y - dy));
-                } else {
-                    return Err(SvgdxError::ReferenceError(elref));
                 }
             }
             _ => {

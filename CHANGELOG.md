@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   much more helpful when writing expressions, as invalid function names (for
   example) are reported as errors.
 
+- Fixed: relpos (e.g. `xy="#abc|h 2"`) now works for non-rect-like elements
+  (specifically lines, circles and ellipses).
+
 - Editor: Fixed 'Copy PNG' action, which was being suppressed by CSP.
   Required addition of `blob:` scheme to `img-src`.
 
