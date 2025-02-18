@@ -63,7 +63,9 @@ fn split_relspec<'a, 'b>(
 ) -> Result<(Option<&'a SvgElement>, &'b str)> {
     if let Ok((elref, remain)) = extract_elref(input) {
         if let Some(el) = ctx.get_element(&elref) {
-            Ok((Some(el), remain.trim_start()))
+            // Note: essential we don't trim `remain` - if it starts
+            // with whitespace, that is significant.
+            Ok((Some(el), remain))
         } else {
             Err(SvgdxError::ReferenceError(elref))
         }
@@ -969,46 +971,98 @@ impl SvgElement {
         }
     }
 
-    fn eval_rel_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
-        if let Ok(ss) = ScalarSpec::from_str(name) {
+    fn is_size_attr(&self, name: &str) -> bool {
+        if self.name == "text" || self.name == "point" {
+            return false;
+        }
+        let mut size_attr = matches!(name, "width" | "height");
+        size_attr = size_attr || (self.name == "circle" && name == "r");
+        size_attr = size_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
+        size_attr
+    }
+
+    fn is_pos_attr(&self, name: &str) -> bool {
+        // Position attributes are identical for all element types
+        matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
+    }
+
+    fn eval_size_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
+        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
             if let (Some(el), remain) = split_relspec(value, ctx)? {
                 if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
                     // default value - same 'type' as attr name, e.g. y2 => ymax
-                    let mut v = bbox.scalarspec(ss);
-
-                    let mut length_attr = matches!(name, "width" | "height" | "dw" | "dh");
-                    length_attr = length_attr || (self.name == "circle" && name == "r");
-                    length_attr =
-                        length_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
-                    if length_attr {
-                        if let Ok(len) = strp_length(remain) {
-                            v = len.adjust(v);
-                        }
-                    } else {
-                        let anchor = if self.name == "text" {
-                            // text elements (currently) have no size, and default
-                            // to center of the referenced element
-                            LocSpec::from_str(&self.get_attr("text-loc").unwrap_or("c".to_owned()))?
-                        } else {
-                            // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
-                            // will set x2 to the 'x2' (i.e. right edge) of #abc
-                            ss.into()
-                        };
-                        // position attributes handle dx/dy within eval_pos_helper
-                        if let Ok(Some((x, y))) = self.eval_pos_helper(remain, &bbox, anchor) {
-                            use ScalarSpec::*;
-                            v = match ss {
-                                Minx | Maxx | Cx => x,
-                                Miny | Maxy | Cy => y,
-                                _ => v,
-                            };
-                        }
+                    let mut v = bbox.scalarspec(attr_ss);
+                    // "[~scalarspec][ delta]"
+                    let (ss_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+                    if let Some(ss) = ss_str.strip_prefix(SCALARSPEC_SEP) {
+                        v = bbox.scalarspec(ss.parse()?);
                     }
-                    return Ok(fstr(v).to_string());
+                    if let Ok(len) = strp_length(dxy) {
+                        v = len.adjust(v);
+                    }
+                    return Ok(fstr(v));
                 }
             }
         }
         Ok(value.to_owned())
+    }
+
+    fn eval_pos_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
+        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
+            if let (Some(el), remain) = split_relspec(value, ctx)? {
+                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
+                    return self.pos_attr_helper(remain, &bbox, attr_ss);
+                }
+            }
+        }
+        Ok(value.to_owned())
+    }
+
+    fn pos_attr_helper(
+        &self,
+        remain: &str,
+        bbox: &BoundingBox,
+        attr_ss: ScalarSpec,
+    ) -> Result<String> {
+        // default value - same 'type' as attr name, e.g. y2 => ymax
+        let mut v = bbox.scalarspec(attr_ss);
+
+        // 'position' attribute, e.g. x/y/cx...
+        let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+        if let Some(ss) = loc_str.strip_prefix(SCALARSPEC_SEP) {
+            // "[~scalarspec][ delta]"
+            v = bbox.scalarspec(ss.parse()?);
+            if let Ok(len) = strp_length(dxy) {
+                v = len.adjust(v);
+            }
+        } else {
+            let mut loc = if self.name == "text" {
+                // text elements (currently) have no size, and default
+                // to center of the referenced element
+                LocSpec::from_str(&self.get_attr("text-loc").unwrap_or("c".to_owned()))?
+            } else {
+                // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
+                // will set x2 to the 'x2' (i.e. right edge) of #abc
+                attr_ss.into()
+            };
+            // "[@loc][ dx dy]"
+            if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
+                loc = ls.parse()?;
+            } else if !loc_str.is_empty() {
+                return Err(SvgdxError::ParseError(format!(
+                    "Could not parse '{loc_str}' in this context",
+                )));
+            }
+            let (x, y) = bbox.locspec(loc);
+            let (dx, dy) = self.extract_dx_dy(dxy)?;
+            use ScalarSpec::*;
+            v = match attr_ss {
+                Minx | Maxx | Cx => x + dx,
+                Miny | Maxy | Cy => y + dy,
+                _ => v,
+            };
+        }
+        Ok(fstr(v).to_string())
     }
 
     /// Extract dx/dy from a string such as '10 20' or '10' (in which case both are 10)
@@ -1019,79 +1073,15 @@ impl SvgElement {
         Ok((dx, dy))
     }
 
-    /// Location-based positioning - relative to a specific location on the reference element
-    /// ```text
-    /// (^|#id)[@loc] [dx] [dy]
-    /// ```
-    ///
-    /// Edge-based positioning - relative to a specific location on the reference element
-    /// ```text
-    /// (^|#id)[@edge][:length] [dx] [dy]
-    /// ```
-    fn eval_pos_helper(
-        &self,
-        remain: &str,
-        bbox: &BoundingBox,
-        anchor: LocSpec,
-    ) -> Result<Option<(f32, f32)>> {
-        if let Some((x, y)) = if remain.starts_with(LOCSPEC_SEP) {
-            let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-            if let Some(loc) = loc_str
-                .strip_prefix(LOCSPEC_SEP)
-                .and_then(|ls| ls.parse().ok())
-            {
-                let (x, y) = bbox.locspec(loc);
-                let (dx, dy) = self.extract_dx_dy(dxy)?;
-                {
-                    Some((x + dx, y + dy))
-                }
-            } else {
-                return Err(SvgdxError::MissingBoundingBox(format!(
-                    "Could not determine location from {loc_str}"
-                )));
-            }
-        } else if let Ok((dx, dy)) = self.extract_dx_dy(remain) {
-            let (x, y) = bbox.locspec(anchor);
-            Some((x + dx, y + dy))
-        } else {
-            None
-        } {
-            Ok(Some((x, y)))
-        } else {
-            Ok(None)
-        }
-    }
-
     fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
-            if matches!(
-                (self.name.as_str(), key.as_str()),
-                (
-                    "rect" | "box" | "use" | "image" | "svg" | "foreignObject" | "line",
-                    "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2" | "width" | "height",
-                ) | (
-                    "circle",
-                    "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2" | "width" | "height" | "r",
-                ) | (
-                    "ellipse",
-                    "x" | "y"
-                        | "cx"
-                        | "cy"
-                        | "x1"
-                        | "y1"
-                        | "x2"
-                        | "y2"
-                        | "width"
-                        | "height"
-                        | "r"
-                        | "rx"
-                        | "ry",
-                ) | (
-                    "text" | "point",
-                    "x" | "y" | "cx" | "cy" | "x1" | "y1" | "x2" | "y2",
-                )
-            ) {
-                let computed = self.eval_rel_attr(&key, &value, ctx)?;
+            if self.is_size_attr(&key) {
+                let computed = self.eval_size_attr(&key, &value, ctx)?;
+                if strp(&computed).is_ok() {
+                    self.attrs.insert(key.clone(), computed);
+                }
+            } else if self.is_pos_attr(&key) {
+                let computed = self.eval_pos_attr(&key, &value, ctx)?;
                 if strp(&computed).is_ok() {
                     self.attrs.insert(key.clone(), computed);
                 }
@@ -1377,34 +1367,73 @@ mod tests {
     }
 
     #[test]
+    fn test_eval_size_attr() {
+        let mut ctx = TestContext::default();
+
+        ctx.add(
+            "abc",
+            SvgElement::new(
+                "rect",
+                &[
+                    (String::from("x"), String::from("0")),
+                    (String::from("y"), String::from("0")),
+                    (String::from("width"), String::from("10")),
+                    (String::from("height"), String::from("20")),
+                ],
+            ),
+        );
+
+        let element = SvgElement::new("rect", &[]);
+
+        let result = element.eval_size_attr("width", "#abc", &ctx);
+        assert_eq!(result.unwrap(), "10");
+        let result = element.eval_size_attr("height", "#abc", &ctx);
+        assert_eq!(result.unwrap(), "20");
+        let result = element.eval_size_attr("width", "#abc~h", &ctx);
+        assert_eq!(result.unwrap(), "20");
+        let result = element.eval_size_attr("width", "#abc~h 25%", &ctx);
+        assert_eq!(result.unwrap(), "5");
+        let result = element.eval_size_attr("height", "#abc~w -3", &ctx);
+        assert_eq!(result.unwrap(), "7");
+        let result = element.eval_size_attr("width", "#abc~hkjhdsfg", &ctx);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_eval_pos_edge() {
         let element = SvgElement::new("rect", &[]);
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with edge positioning
-        let result = element.eval_pos_helper("@t:25%", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@t:25%", &bbox, ScalarSpec::Minx);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((25., 0.)));
+        assert_eq!(result.unwrap(), "25");
 
-        let result = element.eval_pos_helper("@t:25% -4", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@t:25% -4", &bbox, ScalarSpec::Minx);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((21., -4.)));
+        assert_eq!(result.unwrap(), "21");
 
-        let result = element.eval_pos_helper("@r:200%", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@r:200%", &bbox, ScalarSpec::Minx);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((100., 200.)));
+        assert_eq!(result.unwrap(), "100");
+        let result = element.pos_attr_helper("@r:200%", &bbox, ScalarSpec::Miny);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "200");
 
-        let result = element.eval_pos_helper("@l:-1", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@l:-1", &bbox, ScalarSpec::Miny);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((0., 99.)));
+        assert_eq!(result.unwrap(), "99");
 
-        let result = element.eval_pos_helper("@l:37", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@l:37", &bbox, ScalarSpec::Miny);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((0., 37.)));
+        assert_eq!(result.unwrap(), "37");
 
-        let result = element.eval_pos_helper("@l:37 3 5", &bbox, LocSpec::TopLeft);
+        let result = element.pos_attr_helper("@l:37 3 5", &bbox, ScalarSpec::Minx);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((3., 42.)));
+        assert_eq!(result.unwrap(), "3");
+        let result = element.pos_attr_helper("@l:37 3 5", &bbox, ScalarSpec::Miny);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), "42");
     }
 
     #[test]
@@ -1413,32 +1442,41 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with location positioning
-        let result = element.eval_pos_helper("@tr", &bbox, LocSpec::TopLeft);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((100., 0.)));
+        let result = element.pos_attr_helper("@tr", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "100");
+        let result = element.pos_attr_helper("@tr", &bbox, ScalarSpec::Miny);
+        assert_eq!(result.unwrap(), "0");
 
-        let result = element.eval_pos_helper("@bl", &bbox, LocSpec::TopLeft);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((0., 100.)));
+        let result = element.pos_attr_helper("@bl", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "0");
+        let result = element.pos_attr_helper("@bl", &bbox, ScalarSpec::Miny);
+        assert_eq!(result.unwrap(), "100");
 
-        let result = element.eval_pos_helper("@c", &bbox, LocSpec::TopLeft);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((50., 50.)));
+        let result = element.pos_attr_helper("@c", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "50");
+        let result = element.pos_attr_helper("@c", &bbox, ScalarSpec::Miny);
+        assert_eq!(result.unwrap(), "50");
     }
 
     #[test]
     fn test_eval_pos_invalid() {
         let element = SvgElement::new("rect", &[]);
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+
+        // empty should be fine
+        let result = element.pos_attr_helper("", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "0");
+
         // Test with invalid input
+        let result = element.pos_attr_helper("invalid", &bbox, ScalarSpec::Minx);
+        assert!(result.is_err());
 
-        let result = element.eval_pos_helper("invalid", &bbox, LocSpec::TopLeft);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), None);
+        // Scalar-spec isn't valid for pos_attr_helper
+        let result = element.pos_attr_helper("~w", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "100");
 
-        let result = element.eval_pos_helper("30 20", &bbox, LocSpec::TopLeft);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), Some((30., 20.)));
+        let result = element.pos_attr_helper(" 30 20", &bbox, ScalarSpec::Minx);
+        assert_eq!(result.unwrap(), "30");
     }
 
     #[derive(Default)]

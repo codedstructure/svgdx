@@ -411,3 +411,21 @@ fn test_line_width_height() {
     assert_eq!(transform_str_default(input2).unwrap(), expected);
     assert_eq!(transform_str_default(input3).unwrap(), expected);
 }
+
+#[test]
+fn test_non_rect_scalar() {
+    let input = r##"<circle id="a" r="3"/><circle id="b" r="#a~r"/>"##;
+    assert_contains!(
+        transform_str_default(input).unwrap(),
+        r#"<circle id="b" r="3"/>"#
+    );
+
+    // Convention: 'r' scalarspec is the larger of rx/ry
+    let input =
+        r##"<ellipse id="a" rxy="3 4"/><circle id="b" r="#a~r"/><circle id="c" r="#a~rx"/>"##;
+    let expected1 = r#"<circle id="b" r="4"/>"#;
+    let expected2 = r#"<circle id="c" r="3"/>"#;
+    let result = transform_str_default(input).unwrap();
+    assert_contains!(result, expected1);
+    assert_contains!(result, expected2);
+}

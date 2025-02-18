@@ -530,7 +530,7 @@ impl From<ScalarSpec> for LocSpec {
             ScalarSpec::Maxy => Self::Bottom,
             ScalarSpec::Cy => Self::Center,
             ScalarSpec::Width => Self::Right,
-            ScalarSpec::Rx => Self::Right,
+            ScalarSpec::Radius | ScalarSpec::Rx => Self::Right,
             ScalarSpec::Height => Self::Bottom,
             ScalarSpec::Ry => Self::Bottom,
         }
@@ -548,28 +548,37 @@ pub enum ScalarSpec {
     Miny,
     Maxy,
     Cy,
+    Radius,
     Width,
     Rx,
     Height,
     Ry,
 }
 
+impl ScalarSpec {
+    pub fn is_size_scalar(&self) -> bool {
+        matches!(
+            self,
+            Self::Width | Self::Height | Self::Rx | Self::Ry | Self::Radius
+        )
+    }
+}
+
 impl FromStr for ScalarSpec {
     type Err = SvgdxError;
 
     fn from_str(value: &str) -> Result<Self> {
-        // TODO: 'r' here is ambiguous vs circle's radius attribute.
-        // Perhaps require uppercase 'T/R/B/L' for edge values.
         // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
         // *not* required that the *attributes* x1 < x2 or y1 < y2.
         // Perhaps a separate 'attribute spec' concept is needed...
         match value {
-            "x" | "x1" | "l" => Ok(Self::Minx),
-            "y" | "y1" | "t" => Ok(Self::Miny),
+            "x" | "x1" => Ok(Self::Minx),
+            "y" | "y1" => Ok(Self::Miny),
             "cx" => Ok(Self::Cx),
-            "x2" | "r" => Ok(Self::Maxx),
-            "y2" | "b" => Ok(Self::Maxy),
+            "x2" => Ok(Self::Maxx),
+            "y2" => Ok(Self::Maxy),
             "cy" => Ok(Self::Cy),
+            "r" => Ok(Self::Radius),
             "w" | "width" => Ok(Self::Width),
             "rx" => Ok(Self::Rx),
             "h" | "height" => Ok(Self::Height),
@@ -658,6 +667,10 @@ impl BoundingBox {
             ScalarSpec::Height => (self.y2 - self.y1).abs(),
             ScalarSpec::Cx => (self.x1 + self.x2) / 2.,
             ScalarSpec::Cy => (self.y1 + self.y2) / 2.,
+            // By convention, radius is maximum of rx/ry
+            ScalarSpec::Radius => self
+                .scalarspec(ScalarSpec::Rx)
+                .max(self.scalarspec(ScalarSpec::Ry)),
             ScalarSpec::Rx => (self.x2 - self.x1).abs() / 2.,
             ScalarSpec::Ry => (self.y2 - self.y1).abs() / 2.,
         }

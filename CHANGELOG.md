@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   much more helpful when writing expressions, as invalid function names (for
   example) are reported as errors.
 
+- Changed: stricter elref parsing; previously `cy="#a!"£"` would ignore the
+  junk following `#a`; now it errors. The various internal functions for
+  evaluating layout (size & position) attributes have been tidied up and made
+  more consistent: one impact of this is on the *scalar spec* values.
+  Previously `t`/`r`/`b`/`l` values were synonyms for `y1`/`x2`/`y2`/`x1`
+  respectively; now the corresponding x/y scalar name must be used. A minor
+  change enabled by this is that `r` is a valid scalarspec for circles,
+  indicating the radius.
+
 - Added: infix operators for comparison and logical operators, with changes
   to expression tokenisation which could affect some expressions. Note the
   function-form of comparison and logical operators may be removed in the
