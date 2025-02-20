@@ -393,6 +393,21 @@ fn test_use_relpos() {
     let expected = r##"<use id="u2" href="#pqr" x="-4" y="1"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
+
+    let input = r##"
+<defs>
+ <g id="thing">
+  <rect wh="5"/>
+ </g>
+</defs>
+<use href="#thing"/>
+<use xy="^|h 2" href="#thing"/>
+"##;
+    let expected1 = r##"<use href="#thing"/>"##;
+    let expected2 = r##"<use href="#thing" x="7" y="0"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
 }
 
 #[test]

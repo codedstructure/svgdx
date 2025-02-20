@@ -718,6 +718,12 @@ impl SvgElement {
                     height = Some(h);
                 }
             }
+            "g" | "symbol" => {
+                if let Some(bb) = self.content_bbox {
+                    width = Some(bb.width());
+                    height = Some(bb.height());
+                }
+            }
             "point" | "text" => {
                 width = Some(0.);
                 height = Some(0.);
