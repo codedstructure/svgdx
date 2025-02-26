@@ -20,3 +20,4 @@
 - [Attributes](reference/attribute-ref.md)
 - [Expressions](reference/expressions.md)
 - [Layout](reference/layout.md)
+- [Styles](reference/styles.md)

@@ -86,3 +86,62 @@ Each bounding box has nine 'locations' which can be used as relative positioning
 ```
 
 A mnemonic to remember these positions is "TRBL", so stay out of 'trouble' by remembering these! A further point to note is that for the corner positions, the Top/Bottom indicator is always before the Left/Right indicator, so it's always `br` - not `rb` - for the bottom-right corner.
+
+## Scalarspec
+
+The following diagram shows the set of scalar values which may obtained from any bounding box in svgdx.
+
+This is closely related to 'uniform positioning' - the idea that regardless of the native attributes for a shape (e.g. `x`/`y`/`width`/`height` for a `<rect>`, `x1`/`y1`/`x2`/`y2` for a `<line>` and so on), shapes in svgdx can be positioned with any meaningful and sufficient combination of these attributes.
+
+For example, a horizontal line in svgdx can be defined with a start point (`x1` & `y1`, or using compound attributes `xy1`) and a `width`. Similarly if `xy2` is given together with a width, that is the right most point of the horizontal line, which stretches out for `width` units up to that point.
+
+```svgdx
+<svg>
+  <config border="10" font-family="monospace"/>
+  <rect cxy="#r1" wh="#r1 200%" opacity="0.3"class="d-grid-2 d-none"/>
+  <rect id="r1" wh="32" class="d-fill-beige"/>
+
+  <line xy2="#r1@tl" width="5" text="y1" text-loc="l" class="d-dot"/>
+  <line xy2="#r1@l" width="5" text="cy" text-loc="l" class="d-dot"/>
+  <line xy2="#r1@bl" width="5" text="y2" text-loc="l" class="d-dot"/>
+
+  <line xy2="#r1@tl" height="5" text="x1" text-loc="t" class="d-dot"/>
+  <line xy2="#r1@t" height="5" text="cx" text-loc="t" class="d-dot"/>
+  <line xy2="#r1@tr" height="5" text="x2" text-loc="t" class="d-dot"/>
+
+  <line xy1="#r1@bl" xy2="#r1@br" dy="5" text="w" text-loc="b" class="d-biarrow d-dot"/>
+  <line xy1="#r1@tr" xy2="#r1@br" dx="5"  text="h" text-loc="r" class="d-biarrow d-dot"/>
+</svg>
+```
+
+For an `<ellipse>` shape, additional `rx` and `ry` values are available, as in the next diagram.
+`<circle>` elements have a single `r` value for radius.
+
+```svgdx
+<svg>
+  <config border="10" font-family="monospace"/>
+  <rect cxy="#e1" wh="#e1 150% 200%" opacity="0.3"class="d-grid-2 d-none"/>
+  <ellipse id="e1" rxy="24 12" class="d-fill-beige"/>
+
+  <line xy1="#e1@tl -5 0" xy2="#e1@t" text="y1" text-loc="l" class="d-dot"/>
+  <line xy2="#e1@l" width="5" text="cy" text-loc="l" class="d-dot"/>
+  <line xy1="#e1@bl -5 0" xy2="#e1@b" text="y2" text-loc="l" class="d-dot"/>
+
+  <line xy1="#e1@tl 0 -5" xy2="#e1@l" text="x1" text-loc="t" class="d-dot"/>
+  <line xy2="#e1@t" height="5" text="cx" text-loc="t" class="d-dot"/>
+  <line xy1="#e1@tr 0 -5" xy2="#e1@r" text="x2" text-loc="t" class="d-dot"/>
+
+  <line xy1="#e1@bl" xy2="#e1@br" dy="5" text="w" text-loc="b" class="d-biarrow d-dot"/>
+  <line xy1="#e1@tr" xy2="#e1@br" dx="5"  text="h" text-loc="r" class="d-biarrow d-dot"/>
+  <line xy1="#e1@c" xy2="#e1@r" text="rx" text-loc="t" class="d-biarrow d-dot"/>
+  <line xy1="#e1@c" xy2="#e1@b" text="ry" text-loc="l" class="d-biarrow d-dot"/>
+</svg>
+```
+
+There are some basic aliases for these 'scalarspec' values:
+
+* `x` == `x1`
+* `y` == `y1`
+* `w` == `width`
+* `h` == `height`
+

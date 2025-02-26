@@ -52,7 +52,7 @@ Arithmetic expressions are specified in double-brace pairs, for example `{{ 1 + 
 Expressions may include the following. Note these are listed in order of precedence.
 * Numbers, including floating point and negative numbers. Internally numbers are stored with at least IEEE 754 single-precision floats, but exact precision and range are not part of this spec.
 * Variable references of the form `$var` or `${var}`
-* Element references, of the form `#id|v` where `id` indicates the target element and `v` is the value of that element to retrieve.
+* Element references, of the form `#id~v` where `id` indicates the target element and `v` is the value of that element to retrieve.
 * [function](#built-in-functions) calls, of the form `function(args)`
 * `(`, `)` - parenthesis, for increasing precedence.
 * `*`, `/`, `%` - multiply, divide, remainder. Precedence is left-to-right among these.
@@ -115,14 +115,15 @@ Note these functions (e.g. the order of arguments in `mix` and `clamp`) are infl
 
 The following scalar values may be referred to from an element reference:
 
-* `t`, `y`, `y1` - top, the y coordinate of the top of the given element
-* `r`, `x2` - right, the x coordinate of the right-hand-side of the given element
-* `b`, `y2` - bottom, the y coordinate of the bottom of the given element
-* `l`, `x`, `x1` - left, the x coordinate of the left-hand-side of the given element
+* `x`, `x1` - the x coordinate of the left-hand-side of the given element
+* `y`, `y1` - the y coordinate of the top of the given element
+* `x2` - the x coordinate of the right-hand-side of the given element
+* `y2` - the y coordinate of the bottom of the given element
 * `w`, `width` - the width of the given element
 * `h`, `height` - the height of the given element
 * `cx` - the x coordinate of the centre of the given element
 * `cy` - the y coordinate of the centre of the given element
+* `r` - the radius of the given element (assuming a circle!)
 * `rx` - the x-radius of the given element
 * `ry` - the y-radius of the given element
 
