@@ -29,7 +29,6 @@ pub struct SvgElement {
     pub attrs: AttrMap,
     pub classes: ClassList,
     pub text_content: Option<String>,
-    pub tail: Option<String>,
     pub order_index: OrderIndex,
     pub indent: usize,
     pub src_line: usize,
@@ -168,7 +167,6 @@ impl SvgElement {
             attrs: attr_map.clone(),
             classes,
             text_content: None,
-            tail: None,
             order_index: OrderIndex::default(),
             indent: 0,
             src_line: 0,
@@ -386,10 +384,6 @@ impl SvgElement {
 
     pub fn set_event_range(&mut self, range: (usize, usize)) {
         self.event_range = Some(range);
-    }
-
-    pub fn set_tail(&mut self, tail: &str) {
-        self.tail = Some(tail.to_string());
     }
 
     pub fn add_class(&mut self, class: &str) -> Self {

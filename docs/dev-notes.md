@@ -38,47 +38,6 @@ fails if we have e.g. `id="thing-$k"` or `xy="#{thing-$k}|h"`, where
 the references depend on 'current' document state. (I'm keen to keep the
 ability to have non-static ids.)
 
-### Error handling
-
-The current error handling of svgdx isn't great; end-user experience is OK,
-with unresolvable elements output with line number info, but internally it's
-a bit of a mess.
-
-The current state effectively uses `Result` objects and `?` propagation to
-emulate exceptions, and post-hoc checks of 'did it go better this time' to
-determine whether progress has been made or the processing has stalled.
-
-`anyhow` has made this easy, but I'm not sure it's good; the code really needs
-to distinguish between 'retryable' errors (e.g. reference lookup to something
-which might be a forward reference) and unrecoverable errors. Other than reference
-errors propagated to enable forward references, many error conditions just
-leave attribute values (for example) unchanged; having `<circle r="thing"/>`
-should probably be a hard error rather than being left as-is; it's more likely
-there's a missing '$' in there somewhere, and reporting this as an error
-would be useful.
-
-Alternatively having warnings when e.g. `strp` fails might be helpful, though
-the current system only returns errors or the document. Perhaps metadata
-analogous to the `data-src-line` - e.g. `data-warning` - would allow the
-client program (using `config.add_metadata`) to extract the info without
-changing to return the document and some out-of-band data?
-
-Tidying up the error handling would also improve the UX; it wouldn't just list
-unresolvable elements, but *why* a particular element could not be resolved.
-
-Therefore should probably investigate `thiserror` or similar, either to augment
-or replace `anyhow`.
-
-### Regex replacement
-
-During earlier WASM investigations using `twiggy` showed that well over 50% of
-the code size was due to `regex` handling. Even after moving to `regex-lite` it's
-still a significant proportion of the code size.
-
-Should investigate moving to `nom` to both centralize parsing and see if it has
-code size / perf improvements (or maybe just hand-code something - there's nothing
-particularly tricky AFAICT).
-
 ## Open questions
 
 ### Round-tripping / preserving SVG document structure
@@ -137,23 +96,6 @@ for it, which currently isn't the case.
 
 Motivation: should `<loop count="$expr">` be changed to automatically use numeric
 evaluation for `$expr`?
-
-### String lists
-
-Numeric data lists can be provided with a comma separated list of values; strings
-cannot be similarly specified. For a short list, using a dynamic id variable is
-a reasonable workaround, but this is more inconsistency.
-
-```
-<var num_list="1, 2, 3, 4, 5"/>
-<var s0="Monday" s1="Tuesday" s2="Wednesday" s3="Thursday" s4="Friday"/>
-
-<rect xy="0" wh="0"/>
-<loop count="5" loop-var="i">
-<rect xy="^|v" wh="10 5" text="{{select($i, $num_list)}}"/>
-<rect xy="^|v" wh="10 5" text="$s${i}"/>
-</loop>
-```
 
 ### Previous N reference
 
