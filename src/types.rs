@@ -1,6 +1,5 @@
 use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
@@ -91,25 +90,17 @@ impl OrderIndex {
 
 /// `AttrMap` - an order preserving map for storing element attributes.
 ///
-/// Implemented with a `BTreeMap` for key-ordered iteration, and a separate
-/// mapping from 'user-key' to index, with the `BTreeMap` keyed on an (index,
-/// user-key) pair.
-///
-/// NOTE: Since `next_index` is never decremented, a large number of remove/insert
-/// operations on the same `AttrMap` instance could cause overflow, especially for
-/// usize < 64 bits. For the target use-case and typical 64-bit target
-/// architectures, this is not considered a problem.
+/// Reordered on insert to provide partial ordering of attributes,
+/// e.g. 'id' before 'x' before 'width', etc.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AttrMap {
-    attrs: BTreeMap<(isize, String), String>,
-    index_map: HashMap<String, isize>,
-    next_index: isize,
+    attrs: Vec<(String, String)>,
 }
 
 impl Display for AttrMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.attrs.iter().enumerate() {
-            write!(f, r#"{}="{}""#, k.1, v)?;
+            write!(f, r#"{}="{}""#, k, v)?;
             if idx < self.attrs.len() - 1 {
                 write!(f, " ")?;
             }
@@ -120,38 +111,38 @@ impl Display for AttrMap {
 
 impl AttrMap {
     pub fn new() -> Self {
-        Self {
-            attrs: BTreeMap::new(),
-            index_map: HashMap::new(),
-            next_index: 0,
-        }
+        Self { attrs: Vec::new() }
     }
 
     pub fn is_empty(&self) -> bool {
         self.attrs.is_empty()
     }
 
-    fn tweak_index(&self, key: &str, index: isize) -> isize {
+    fn priority(key: &str) -> usize {
         match key {
-            "id" => -10000,
-            "version" => -9900,
-            "xmlns" => -9800,
-            "href" => -9700,
-            "x" => -9000,
-            "cx" => -8500,
-            "x1" => -8250,
-            "y" => -8000,
-            "cy" => -7500,
-            "y1" => -7250,
-            "x2" => -7100,
-            "y2" => -7050,
-            "width" => -7000,
-            "height" => -6500,
-            "rx" => -6000,
-            "ry" => -5500,
-            "r" => -5000,
-            _ => index,
+            "id" => 0,
+            "version" => 1,
+            "xmlns" => 2,
+            "href" => 3,
+            "x" => 4,
+            "cx" => 5,
+            "x1" => 6,
+            "y" => 7,
+            "cy" => 8,
+            "y1" => 9,
+            "x2" => 10,
+            "y2" => 11,
+            "width" => 12,
+            "height" => 13,
+            "rx" => 14,
+            "ry" => 15,
+            "r" => 16,
+            _ => usize::MAX,
         }
+    }
+
+    fn reorder(&mut self) {
+        self.attrs.sort_by_key(|(k, _)| Self::priority(k));
     }
 
     /// Insert-or-update the given key/value into the `AttrMap`.
@@ -159,16 +150,18 @@ impl AttrMap {
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
         let value = value.into();
-        let tweaked = self.tweak_index(&key, self.next_index + 1);
-        if tweaked >= 0 {
-            self.next_index += 1;
+        if let Some((_, v)) = self.attrs.iter_mut().find(|(k, _)| *k == key) {
+            *v = value;
+        } else {
+            self.attrs.push((key, value));
         }
-        let index = *self.index_map.entry(key.clone()).or_insert_with(|| tweaked);
-        self.attrs.insert((index, key), value);
+        // TODO: if many attributes are being inserted, might want to defer this
+        self.reorder();
     }
 
     pub fn update(&mut self, other: &Self) {
-        for (k, v) in other.iter() {
+        // TODO: defer the reorder until the end
+        for (k, v) in &other.attrs {
             self.insert(k.clone(), v.clone());
         }
     }
@@ -176,106 +169,95 @@ impl AttrMap {
     pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
         if !self.contains_key(&key) {
-            self.insert(key, value);
+            self.insert(key, value.into());
         }
     }
 
     pub fn contains_key(&self, key: impl Into<String>) -> bool {
         let key = key.into();
-        self.index_map.contains_key(&key)
+        self.attrs.iter().any(|(k, _)| *k == key)
     }
 
     pub fn get(&self, key: impl Into<String>) -> Option<&String> {
         let key = key.into();
-        let index = *self.index_map.get(&key)?;
-        self.attrs.get(&(index, key))
+        self.attrs.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> + '_ {
-        self.attrs.iter().map(|item| (&item.0 .1, item.1))
+        self.attrs.iter().map(|(k, v)| (k, v))
     }
 
     pub fn pop(&mut self, key: impl Into<String>) -> Option<String> {
         let key = key.into();
-        if let Some(&index) = self.index_map.get(&key) {
-            self.index_map.remove(&key);
-            self.attrs.remove(&(index, key))
+        if let Some(pos) = self.attrs.iter().position(|(k, _)| *k == key) {
+            Some(self.attrs.remove(pos).1)
         } else {
             None
         }
     }
 
     pub fn to_vec(&self) -> Vec<(String, String)> {
-        self.clone().into_iter().collect()
+        self.attrs
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 }
 
 impl From<Vec<(String, String)>> for AttrMap {
     fn from(value: Vec<(String, String)>) -> Self {
-        value.into_iter().collect()
+        let mut am = Self { attrs: value };
+        am.reorder();
+        am
     }
 }
 
 impl FromIterator<(String, String)> for AttrMap {
     fn from_iter<I: IntoIterator<Item = (String, String)>>(iter: I) -> Self {
-        let mut am = Self::new();
-        for (k, v) in iter {
-            am.insert(k, v);
-        }
-        am
+        let am_vec = iter.into_iter().collect::<Vec<_>>();
+        am_vec.into()
     }
 }
 
 impl IntoIterator for AttrMap {
     type Item = (String, String);
-    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.attrs
-            .into_iter()
-            .map(|v| (v.0 .1, v.1))
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.attrs.into_iter()
     }
 }
 
 impl<'s> IntoIterator for &'s AttrMap {
     type Item = (&'s String, &'s String);
-    type IntoIter = <Vec<(&'s String, &'s String)> as IntoIterator>::IntoIter;
+    type IntoIter = std::iter::Map<
+        std::slice::Iter<'s, (String, String)>,
+        fn(&(String, String)) -> (&String, &String),
+    >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.attrs
-            .iter()
-            .map(|v| (&v.0 .1, v.1))
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.attrs.iter().map(|(k, v)| (k, v))
     }
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ClassList {
-    classes: BTreeSet<(usize, String)>,
-    index_map: HashMap<String, usize>,
-    next_index: usize,
+    classes: Vec<String>,
 }
 
 impl ClassList {
     pub fn new() -> Self {
         Self {
-            classes: BTreeSet::new(),
-            index_map: HashMap::new(),
-            next_index: 0,
+            classes: Vec::new(),
         }
     }
 
-    /// Insert the given key/value into the `ClassList`.
+    /// Insert the given class into the `ClassList`.
     pub fn insert(&mut self, class: impl Into<String>) {
         let class = class.into();
-        let index = *self.index_map.entry(class.clone()).or_insert_with(|| {
-            self.next_index += 1;
-            self.next_index
-        });
-        self.classes.insert((index, class));
+        if !self.classes.contains(&class) {
+            self.classes.push(class);
+        }
     }
 
     pub fn extend(&mut self, other: &Self) {
@@ -286,21 +268,21 @@ impl ClassList {
 
     pub fn contains(&self, class: impl Into<String>) -> bool {
         let class = class.into();
-        self.index_map.contains_key(&class)
+        self.classes.contains(&class)
     }
 
     pub fn is_empty(&self) -> bool {
-        self.index_map.is_empty()
+        self.classes.is_empty()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &String> + '_ {
-        self.classes.iter().map(|item| (&item.1))
+        self.classes.iter()
     }
 
     /// Replace a class entry with a new class (or multiple space-separated)
     pub fn replace(&mut self, old: impl Into<String>, new: impl Into<String>) {
-        // Can't just do an in-place update in a BTreeSet
-        if self.remove(old) {
+        let old = old.into();
+        if self.remove(&old) {
             for class in new.into().split_whitespace() {
                 self.insert(class);
             }
@@ -309,28 +291,32 @@ impl ClassList {
 
     pub fn remove(&mut self, class: impl Into<String>) -> bool {
         let class = class.into();
-        if let Some(&index) = self.index_map.get(&class) {
-            self.index_map.remove(&class);
-            self.classes.remove(&(index, class))
+        if let Some(pos) = self.classes.iter().position(|c| *c == class) {
+            self.classes.remove(pos);
+            true
         } else {
             false
         }
     }
 
     pub fn to_vec(&self) -> Vec<String> {
-        self.clone().into_iter().collect()
+        self.classes.clone()
     }
 }
 
 impl Display for ClassList {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ClassList{:?}", self.to_vec())
+        write!(f, "ClassList{:?}", self.classes)
     }
 }
 
 impl From<Vec<String>> for ClassList {
     fn from(value: Vec<String>) -> Self {
-        value.into_iter().collect()
+        let mut cl = Self::new();
+        for class in value {
+            cl.insert(class);
+        }
+        cl
     }
 }
 
@@ -346,27 +332,19 @@ impl FromIterator<String> for ClassList {
 
 impl IntoIterator for ClassList {
     type Item = String;
-    type IntoIter = <Vec<Self::Item> as IntoIterator>::IntoIter;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.classes
-            .into_iter()
-            .map(|v| v.1)
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.classes.into_iter()
     }
 }
 
 impl<'s> IntoIterator for &'s ClassList {
     type Item = &'s String;
-    type IntoIter = <Vec<&'s String> as IntoIterator>::IntoIter;
+    type IntoIter = std::slice::Iter<'s, String>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.classes
-            .iter()
-            .map(|v| &v.1)
-            .collect::<Vec<_>>()
-            .into_iter()
+        self.classes.iter()
     }
 }
 
