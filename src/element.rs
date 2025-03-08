@@ -1,3 +1,4 @@
+use crate::bearing::process_path_bearing;
 use crate::connector::{ConnectionType, Connector};
 use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
@@ -176,6 +177,14 @@ impl SvgElement {
     }
 
     pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+        if self.name == "path" {
+            if let Some(d) = self.get_attr("d") {
+                if d.chars().any(|c| c == 'b' || c == 'B') {
+                    self.set_attr("d", &process_path_bearing(&d)?)
+                }
+            }
+        }
+
         if self.is_connector() {
             if let Ok(conn) = Connector::from_element(
                 self,
