@@ -1,0 +1,42 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="113mm" height="57mm" viewBox="-5 -35 113 57">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
+      text.d-text-small, text.d-text-small * { font-size: 2px; }
+      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+      marker path { fill: inherit; }
+    ]]>
+  </style>
+  <!-- you probably want something other than svgdx for flowcharts... -->
+  <!-- TODO: reuse doesn't yet support relpos (e.g. `#id|h 10`) -->
+  <path id="q1" d="M0 0 l17.321 -10l17.321 10l-17.321 10z" class="diamond"/>
+  <text x="17.321" y="0" class="d-text diamond">do you feel lucky?</text>
+  <path id="q2" d="M0 0 l8.66 -5l8.66 5l-8.66 5z" transform="translate(50, 0)" class="diamond"/>
+  <text x="58.66" y="0" class="d-text d-text-small diamond">
+  <tspan x="58.66" dy="-0.525em">are you</tspan><tspan x="58.66" dy="1.05em"> sure?</tspan>
+  </text>
+
+  <rect id="s1" x="7.321" y="-30" width="20" height="10" rx="5"/>
+  <text x="17.321" y="-25" class="d-text">start</text>
+  <rect id="e1" x="82.32" y="-5" width="20" height="10" rx="5"/>
+  <text x="92.32" y="0" class="d-text">ok then</text>
+
+  <line x1="17.321" y1="-20" x2="17.321" y2="-10" text-loc="t" class="d-arrow"/>
+  <line x1="34.642" y1="0" x2="50" y2="0" class="d-arrow"/>
+  <text x="42.321" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
+  <line x1="67.32" y1="0" x2="82.32" y2="0" class="d-arrow"/>
+  <text x="74.82" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
+  <polyline points="58.66 5, 58.66 17, 17.321 17, 17.321 10" class="d-arrow"/>
+  <text x="37.991" y="16" class="d-text d-text-bottom d-arrow">no</text>
+</svg>

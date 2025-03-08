@@ -1,0 +1,14 @@
+<svg width="300" height="100" viewBox="0 0 300 100">
+  <config add-auto-styles="false"/>
+  <!--
+    This implements the example from
+    https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands
+  -->
+  <path fill="#eee"
+        stroke="deeppink" stroke-width="8px" stroke-linejoin="round"
+        d="M 150,10
+           B 36 h 47
+           b 72 h 47
+           b 72 h 47
+           b 72 h 47 z"/>
+</svg>

@@ -1,0 +1,24 @@
+<svg>
+  <!-- you probably want something other than svgdx for flowcharts... -->
+  <defaults>
+    <line text-loc="t" class="d-arrow"/>
+    <polyline class="d-arrow" corner-offset="7"/>
+    <rect wh="20 10" rx="5"/>
+  </defaults>
+
+  <specs>
+    <path id="diamond" d="M0 0 b-30 h$size b60 h$size b120 h$size z" text="$text"/>
+  </specs>
+
+  <!-- TODO: reuse doesn't yet support relpos (e.g. `#id|h 10`) -->
+  <reuse id="q1" href="#diamond" size="20" text="do you feel lucky?"/>
+  <reuse id="q2" x="50" href="#diamond" size="10" text="are you\n sure?" class="d-text-small"/>
+
+  <rect id="s1" xy="#q1|V 10" text="start"/>
+  <rect id="e1" xy="#q2|h 15" wh="20 10" text="ok then"/>
+
+  <line start="#s1" end="#q1"/>
+  <line start="#q1" end="#q2" text="yes"/>
+  <line start="#q2" end="#e1" text="yes"/>
+  <polyline start="#q2@b" end="#q1@b" text="no" text-loc="b"/>
+</svg>
