@@ -769,6 +769,22 @@ impl SvgElement {
     }
 
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
+        let mut el_bbox = if self.content_bbox.is_some() {
+            // container elements (`g`, `symbol`, `clipPath` etc) set this
+            // to the bbox of their contents
+            self.content_bbox
+        } else {
+            self.bbox_raw()?
+        };
+        // apply any `transform` attr transformations to the bbox
+        if let (Some(transform), Some(ref mut bbox)) = (self.get_attr("transform"), &mut el_bbox) {
+            let transform: TransformAttr = transform.parse()?;
+            el_bbox = Some(transform.apply(bbox));
+        }
+        Ok(el_bbox)
+    }
+
+    fn bbox_raw(&self) -> Result<Option<BoundingBox>> {
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
@@ -786,8 +802,7 @@ impl SvgElement {
                     || value.contains(ELREF_ID_PREFIX)
                     || value.contains(ELREF_PREVIOUS))
         }
-        let mut el_bbox = match self.name.as_str() {
-            "g" | "symbol" => self.content_bbox,
+        Ok(match self.name.as_str() {
             "point" | "text" => {
                 let x = self.attrs.get("x").unwrap_or(&zstr);
                 let y = self.attrs.get("y").unwrap_or(&zstr);
@@ -906,13 +921,7 @@ impl SvgElement {
                 }
             }
             _ => None,
-        };
-        // apply any `transform` attr transformations to the bbox
-        if let (Some(transform), Some(ref mut bbox)) = (self.get_attr("transform"), &mut el_bbox) {
-            let transform: TransformAttr = transform.parse()?;
-            el_bbox = Some(transform.apply(bbox));
-        }
-        Ok(el_bbox)
+        })
     }
 
     fn translated(&self, dx: f32, dy: f32) -> Result<Self> {

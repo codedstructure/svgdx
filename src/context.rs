@@ -3,7 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
 use crate::position::BoundingBox;
-use crate::types::{attr_split, strp, AttrMap, ClassList, ElRef};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, ElRef};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -184,6 +184,24 @@ impl ElementMap for TransformerContext {
                 }
             }
         }
+
+        // TODO: this logic is duplicated in `impl EventGen for SvgElement` so
+        // it works in both '^' contexts and root SVG bbox generation context.
+        // Can't just move this to SvgElement::bbox() as it needs ElementMap.
+        if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
+            let clip_id = extract_urlref(&clip_path).ok_or(SvgdxError::InvalidData(format!(
+                "Invalid clip-path attribute: {clip_path}"
+            )))?;
+            let clip_el = self
+                .get_element(&clip_id)
+                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+            if let ("clipPath", Some(clip_bbox)) =
+                (clip_el.name.as_str(), self.get_element_bbox(clip_el)?)
+            {
+                el_bbox = bbox.intersect(&clip_bbox);
+            }
+        }
+
         Ok(el_bbox)
     }
 }

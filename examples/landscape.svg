@@ -1,7 +1,8 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="490mm" height="600mm" viewBox="-245 -105 490 600">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="110mm" height="60mm" viewBox="-55 -30 110 60">
   <style>
     <![CDATA[
       svg { background: none; }
+      .d-surround { fill: none; }
       svg * { stroke-linecap: round; stroke-linejoin: round; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
@@ -23,11 +24,11 @@
     ]]>
   </style>
   <defs>
-    <mask id="thing">
+    <clipPath id="thing">
       <rect x="-50" y="-25" width="100" height="50"/>
-    </mask>
+    </clipPath>
   </defs>
-  <g mask="url(#thing)">
+  <g clip-path="url(#thing)">
     <circle r="100" class="d-fill-skyblue"/>
     <circle r="6" class="d-none d-fill-gold"/>
 
@@ -107,4 +108,5 @@
     <circle cx="-50" cy="135" r="140" class="d-fill-olive"/>
     <circle cx="0" cy="250" r="240" class="d-fill-green"/>
   </g>
+  <rect x="-50" y="-25" width="100" height="50" class="d-thick d-surround"/>
 </svg>

@@ -139,3 +139,9 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 ![](football.svg)
 
 [source](football.svg)&nbsp;&nbsp;|&nbsp;&nbsp;[input file](football.xml)
+
+## Area clipping
+
+![](landscape.svg)
+
+[source](landscape.svg)&nbsp;&nbsp;&nbsp;&nbsp;[input file](landscape.xml)

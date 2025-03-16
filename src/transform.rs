@@ -7,7 +7,7 @@ use crate::loop_el::{ForElement, LoopElement};
 use crate::position::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::reuse::ReuseElement;
 use crate::themes::ThemeBuilder;
-use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
+use crate::types::{extract_urlref, fstr, split_unit, AttrMap, OrderIndex};
 use crate::TransformConfig;
 
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -52,7 +52,28 @@ impl EventGen for SvgElement {
             }
         };
         context.dec_depth()?;
-        res
+
+        let (ol, mut bbox) = res?;
+
+        if let (Some(el_bbox), Some(clip_id)) = (
+            bbox,
+            self.get_attr("clip-path")
+                .and_then(|url| extract_urlref(&url)),
+        ) {
+            let clip_el = context
+                .get_element(&clip_id)
+                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+            if let ("clipPath", Some(clip_bbox)) =
+                (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
+            {
+                bbox = el_bbox.intersect(&clip_bbox);
+                let mut el = self.clone();
+                el.content_bbox = bbox;
+                context.update_element(&el);
+            }
+        }
+
+        Ok((ol, bbox))
     }
 }
 
@@ -121,7 +142,7 @@ impl EventGen for Container {
                         .insert("data-src-line", self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
-                events.push(OutputEvent::Start(new_el));
+                events.push(OutputEvent::Start(new_el.clone()));
                 let (evlist, mut bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
@@ -133,6 +154,9 @@ impl EventGen for Container {
 
                 if self.0.name == "defs" || self.0.name == "symbol" {
                     bbox = None;
+                } else if bbox.is_some() {
+                    new_el.content_bbox = bbox;
+                    context.update_element(&new_el);
                 }
 
                 Ok((events, bbox))

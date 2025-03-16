@@ -38,6 +38,26 @@ fails if we have e.g. `id="thing-$k"` or `xy="#{thing-$k}|h"`, where
 the references depend on 'current' document state. (I'm keen to keep the
 ability to have non-static ids.)
 
+### Bounding box modifiers
+
+There are at least a couple of 'modifiers' on bounding boxes: `transform`
+attributes, and `clip-path` references. Both of these can change the bounding
+box of an element.
+
+Ideally we'd only compute the bounding box of an element once, but currently
+it is evaluated potentially every time it is referenced. Part of this is that
+context can matter; in the case of a `<reuse>` element, variables might impact
+the final bounding box differently on every instantiation.
+
+There are also two paths involving bbox computation: one is when an element
+is referenced as an elref from another element, and the other is in computing
+the total bbox of the containing element (possibly the root SVG element). The
+latter doesn't go via the `get_element_bbox()` function, but simply accumulates
+bounding boxes of elements at the same level as they are computed.
+
+Simplifying and unifying all this (as well as reducing the number of ad-hoc
+`update_element()` calls) would improve the maintainability of svgdx.
+
 ## Open questions
 
 ### Round-tripping / preserving SVG document structure

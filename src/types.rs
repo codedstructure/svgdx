@@ -59,6 +59,14 @@ pub fn attr_split(input: &str) -> impl Iterator<Item = String> + '_ {
         .map(|v| v.to_string())
 }
 
+pub fn extract_urlref(input: &str) -> Option<ElRef> {
+    input
+        .trim()
+        .strip_prefix("url(#")
+        .and_then(|s| s.strip_suffix(')'))
+        .map(|id| ElRef::Id(id.to_string()))
+}
+
 /// Returns iterator *cycling* over whitespace-or-comma separated values
 pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
     let x: Vec<String> = attr_split(input).collect();

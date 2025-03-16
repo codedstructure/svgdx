@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands
   for details.
 
+- Added: support for deriving bounding boxes from `clip-path` attributes and
+  `clipPath` elements. See the [landscape.xml](examples/landscape.xml) example.
+
 ## [0.19.0 - 2025-03-01]
 
 - Changed: the `text-pre` attribute has been replaced with a `d-text-pre`
