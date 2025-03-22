@@ -364,7 +364,40 @@ fn test_reuse_group_rel() {
 }
 
 #[test]
-fn test_use_symbol() {
+fn test_use_bbox() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </defs>
+  <use x="0" y="0" href="#a"/>
+</svg>
+"##;
+    let expected = r#"viewBox="0 0 10 10""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_reuse_bbox() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <specs>
+    <g id="a"><rect xy="0" wh="10"/></g>
+  </specs>
+  <reuse id="b" href="#a"/>
+  <circle xy="#b|h" r="5"/>
+</svg>
+"##;
+    let expected = r#"viewBox="0 0 20 10""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_use_symbol_bbox() {
     let input = r##"
 <svg>
   <config border="0"/>

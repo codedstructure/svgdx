@@ -124,3 +124,31 @@ fn test_internal_svg() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_root_svg_bbox_in_order() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <rect id="abc" xy="10" wh="20"/>
+  <rect xy="#abc|h" wh="20"/>
+</svg>
+"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="20mm" viewBox="10 10 40 20">"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_root_svg_bbox_out_of_order() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <rect xy="#abc|h" wh="20"/>
+  <rect id="abc" xy="10" wh="20"/>
+</svg>
+"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="20mm" viewBox="10 10 40 20">"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

@@ -22,7 +22,6 @@
     </g>
   </specs>
 
-  <rect wh="60 10" class="d-none" _="TODO: bbox for reuse + x so this isn't needed"/>
   <loop count="5" loop-var="xx">
     <reuse href="#dice" x="{{$xx * 12}}" n="{{randint(1, 6)}}"/>
   </loop>
