@@ -34,17 +34,17 @@ const svg_container = document.querySelector('#svg-output');
 const error_output = document.querySelector('#error-output');
 const statusbar = document.querySelector('#statusbar');
 
-function resetLayout() {
-    if (container.dataset.layout === "vertical") {
-        editorContainer.style.minWidth = "40%";
-        editorContainer.style.width = "40%";
-        editorContainer.style.minHeight = "";
-        editorContainer.style.height = "";
+function resetLayout(targetContainer, orientation) {
+    if (container.dataset.layout === orientation) {
+        targetContainer.style.minWidth = "40%";
+        targetContainer.style.width = "40%";
+        targetContainer.style.minHeight = "";
+        targetContainer.style.height = "";
     } else {
-        editorContainer.style.minWidth = "";
-        editorContainer.style.width = "";
-        editorContainer.style.minHeight = "40%";
-        editorContainer.style.height = "40%";
+        targetContainer.style.minWidth = "";
+        targetContainer.style.width = "";
+        targetContainer.style.minHeight = "40%";
+        targetContainer.style.height = "40%";
     }
 }
 
@@ -520,7 +520,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let layoutButtonChecked = localStorage.getItem('svgdx-layout') || "false";
     layoutButton.dataset.checked = layoutButtonChecked;
     container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
-    resetLayout();
+    resetLayout(editorContainer, "vertical");
+    resetLayout(svg_container, "horizontal");
     layoutButton.addEventListener('click', () => {
         layoutButtonChecked = layoutButtonChecked === "true" ? "false" : "true";
         layoutButton.dataset.checked = layoutButtonChecked;
@@ -528,7 +529,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         localStorage.setItem('svgdx-layout', layoutButton.dataset.checked);
 
         // Reset any manual resizing via the splitter
-        resetLayout();
+        resetLayout(editorContainer, "vertical");
+        resetLayout(svg_container, "horizontal");
         // opportunity for auto-fit to take effect
         update();
     });
@@ -540,12 +542,12 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     function updateOutputMode() {
         if (toggleOutputChecked === "true") {
-            document.getElementById('svg-output').style.display = "none";
+            // document.getElementById('svg-output').style.display = "none";
             document.getElementById('text-output').style.display = "";
             update();
         } else {
             document.getElementById('svg-output').style.display = "";
-            document.getElementById('text-output').style.display = "none";
+            // document.getElementById('text-output').style.display = "none";
             update();
         }
     }
@@ -713,20 +715,18 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     });
 })();
 
-/** Splitter for resizing editor and output */
-(function () {
-    let splitter = document.getElementById('splitter');
-
+/** Splitter for resizing panels */
+function setupSplitter(splitter, orientation, targetContainer) {
     let initialClientPos, initialSize;
 
     splitter.addEventListener('mousedown', function(e) {
         e.preventDefault();
-        if (container.dataset.layout === "vertical") {
+        if (container.dataset.layout === orientation) {
             initialClientPos = e.clientX;
-            initialSize = editorContainer.getBoundingClientRect().width;
+            initialSize = targetContainer.getBoundingClientRect().width;
         } else {
             initialClientPos = e.clientY;
-            initialSize = editorContainer.getBoundingClientRect().height;
+            initialSize = targetContainer.getBoundingClientRect().height;
         }
         document.addEventListener('mousemove', mousemove);
         document.addEventListener('mouseup', mouseup);
@@ -734,16 +734,16 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     // double-click to reset split
     splitter.addEventListener('dblclick', function(e) {
-        resetLayout();
+        resetLayout(targetContainer, orientation);
     });
 
     function mousemove(e) {
-        if (container.dataset.layout === "vertical") {
+        if (container.dataset.layout === orientation) {
             const dx = e.clientX - initialClientPos;
             let newWidth = initialSize + dx;
 
             // Convert min (25em) and max (80%) widths to pixels
-            const minPixels = parseFloat(getComputedStyle(editorContainer).fontSize) * 25;
+            const minPixels = parseFloat(getComputedStyle(targetContainer).fontSize) * 25;
             const maxPixels = window.innerWidth * 0.8;
 
             // Enforce min and max widths
@@ -751,8 +751,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             newWidth = Math.min(newWidth, maxPixels);
 
             // Set both width and min-width to improve cross-browser compatibility
-            editorContainer.style.width = newWidth + 'px';
-            editorContainer.style.minWidth = newWidth + 'px';
+            targetContainer.style.width = newWidth + 'px';
+            targetContainer.style.minWidth = newWidth + 'px';
         } else {
             const dy = e.clientY - initialClientPos;
             let newHeight = initialSize + dy;
@@ -761,13 +761,13 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             const minPixels = window.innerHeight * 0.2;
             const maxPixels = window.innerHeight * 0.8;
 
-            // Enforce min and max widths
+            // Enforce min and max heights
             newHeight = Math.max(newHeight, minPixels);
             newHeight = Math.min(newHeight, maxPixels);
 
-            // Set both width and min-width to improve cross-browser compatibility
-            editorContainer.style.height = newHeight + 'px';
-            editorContainer.style.minHeight = newHeight + 'px';
+            // Set both height and min-height to improve cross-browser compatibility
+            targetContainer.style.height = newHeight + 'px';
+            targetContainer.style.minHeight = newHeight + 'px';
         }
     }
 
@@ -775,4 +775,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         document.removeEventListener('mousemove', mousemove);
         document.removeEventListener('mouseup', mouseup);
     }
-})();
+}
+
+(function() {
+    setupSplitter(document.getElementById('main-split'), "vertical", editorContainer);
+    setupSplitter(document.getElementById('output-split'), "horizontal", svg_container);
+})()
