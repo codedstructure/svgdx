@@ -25,7 +25,7 @@ fn test_reuse_attr_locals() {
 </specs>
 <reuse href="#square" size="10" x="3" y="4"/>
 "##;
-    let expected = r#"<rect width="10" height="10" transform="translate(3, 4)" class="square"/>"#;
+    let expected = r#"<rect x="3" y="4" width="10" height="10" class="square"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -91,6 +91,62 @@ fn test_reuse_group_svg() {
 }
 
 #[test]
+fn test_reuse_positioning() {
+    for (input, expected) in [
+        (
+            // Simplest case: reuse with no positioning
+            r##"<specs><rect id="a1" wh="10 5"/></specs><reuse href="#a1" x="0" y="0"/>"##,
+            r##"<rect x="0" y="0" width="10" height="5" class="a1"/>"##,
+        ),
+        (
+            // Numeric xy in <reuse> element
+            r##"<specs><rect id="a2" wh="10 5"/></specs><reuse href="#a2" xy="1 2"/>"##,
+            r##"<rect x="1" y="2" width="10" height="5" class="a2"/>"##,
+        ),
+        (
+            // Locspec xy in <reuse> element
+            r##"<specs><rect id="a3" wh="10 5"/></specs><rect id="b" wh="5"/><reuse href="#a3" xy="#b@br"/>"##,
+            r##"<rect x="5" y="5" width="10" height="5" class="a3"/>"##,
+        ),
+        (
+            // Locspec _cxy_ in <reuse> element
+            r##"<specs><rect id="a4" wh="10 5"/></specs><rect id="b" wh="20"/><reuse href="#a4" cxy="#b@br"/>"##,
+            r##"<rect x="15" y="17.5" width="10" height="5" class="a4"/>"##,
+        ),
+        (
+            // Locspec xy in <reuse> element with xy-loc anchor
+            r##"<specs><rect id="a5" wh="10 5"/></specs><rect id="b" wh="20"/><reuse href="#a5" xy="#b@r" xy-loc="l"/>"##,
+            r##"<rect x="20" y="7.5" width="10" height="5" class="a5"/>"##,
+        ),
+        (
+            // Reuse of group element
+            r##"<g id="a6"><rect wh="10 5"/></g><reuse href="#a6" x="1" y="2"/>"##,
+            r##"<g transform="translate(1, 2)" class="a6"><rect width="10" height="5"/></g>"##,
+        ),
+        (
+            // Reuse of symbol element
+            r##"<defs><symbol id="a7"><rect wh="10 5"/></symbol></defs><reuse href="#a7" x="1" y="2"/>"##,
+            r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
+        ),
+        // (
+        //     // Reuse of group element inside <specs> block
+        //     r##"<specs><g id="a7"><rect wh="10 5"/></g></specs><reuse href="#a7" x="1" y="2"/>"##,
+        //     r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
+        // ),
+
+        // (
+        //     // Relspec (#id|h) in <reuse> element
+        //     // TODO: requires effective resolve_position() use.
+        //     r##"<specs><rect id="a6" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a6" xy="#b|h"/>"##,
+        //     r##"<rect x="3" y="1" width="1" height="1" class="a6"/>"##,
+        // ),
+    ] {
+        let output = transform_str_default(input).unwrap();
+        assert_contains!(output, expected);
+    }
+}
+
+#[test]
 fn test_reuse_xy_transform() {
     let input = r##"
 <specs>
@@ -99,7 +155,7 @@ fn test_reuse_xy_transform() {
 <reuse href="#tb" x="123"/>
 "##;
     let output = transform_str_default(input).unwrap();
-    let expected = r#"<rect width="20" height="10" transform="translate(123, 0)" class="tb"/>"#;
+    let expected = r#"<rect x="123" width="20" height="10" class="tb"/>"#;
 
     assert_contains!(output, expected);
 
@@ -165,6 +221,16 @@ fn test_reuse_symbol() {
 <reuse href="#sym"/>
   "##;
     let expected = r#"<g class="sym"><circle r="1"/></g>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<defs>
+  <symbol id="sym"><circle r="1"/></symbol>
+</defs>
+<reuse y="2" href="#sym"/>
+  "##;
+    let expected = r#"<g transform="translate(0, 2)" class="sym"><circle r="1"/></g>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -346,7 +412,11 @@ fn test_reuse_group_rel() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 
-    // same without the surrounding <g> element
+    // same without the surrounding <g> element.
+    // Now the 'xy="5"' on the target will be ignored/overwritten by the reuse
+    // element's x/y attributes - we use the target from a *bbox* perspective,
+    // since we (deliberately) don't distinguish between re-use of a shape in a
+    // <defs> block and an arbitrary positioned element in the document.
     let input = r##"
 <svg>
 <config border="0" add-auto-styles="false"/>
@@ -356,8 +426,8 @@ fn test_reuse_group_rel() {
 <reuse id="a" href="#tt" x="10" y="15"/>
 </svg>
 "##;
-    let expected1 = r##"<rect id="a" x="5" y="5" width="10" height="10" transform="translate(10, 15)" class="tt"/>"##;
-    let expected2 = r##"viewBox="15 20 10 10"##;
+    let expected1 = r##"<rect id="a" x="10" y="15" width="10" height="10" class="tt"/>"##;
+    let expected2 = r##"viewBox="10 15 10 10"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
@@ -448,8 +518,7 @@ fn test_reuse_prev() {
     let input = r##"
 <rect wh="3" xy="0"/>
 <reuse id="z" href="^" y="2"/>"##;
-    let expected =
-        r##"<rect id="z" x="0" y="0" width="3" height="3" transform="translate(0, 2)"/>"##;
+    let expected = r##"<rect id="z" x="0" y="2" width="3" height="3"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -513,7 +582,7 @@ fn test_reuse_relspec() {
 <circle id="b" r="1"/>
 <reuse id="z" href="#b" x="7" y="2"/>
 "##;
-    let expected = r##"<circle id="z" r="1" transform="translate(7, 2)" class="b"/>"##;
+    let expected = r##"<circle id="z" cx="8" cy="3" r="1" class="b"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -522,7 +591,7 @@ fn test_reuse_relspec() {
 <circle id="b" r="1"/>
 <reuse id="z" href="#b" xy="#a@r"/>
 "##;
-    let expected = r##"<circle id="z" r="1" transform="translate(10, 3)" class="b"/>"##;
+    let expected = r##"<circle id="z" cx="11" cy="4" r="1" class="b"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 

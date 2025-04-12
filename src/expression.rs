@@ -914,7 +914,7 @@ mod tests {
 
     use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
-    use crate::position::BoundingBox;
+    use crate::position::{BoundingBox, Size};
     use crate::types::ElRef;
     use assertables::{assert_in_delta, assert_lt};
     use rand::prelude::*;
@@ -954,6 +954,10 @@ mod tests {
 
         fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
             el.bbox()
+        }
+
+        fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
+            el.size(self)
         }
     }
 

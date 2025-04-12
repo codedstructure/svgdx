@@ -1,12 +1,10 @@
-use crate::context::TransformerContext;
+use crate::context::{ElementMap, TransformerContext};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
-use crate::position::BoundingBox;
+use crate::position::{BoundingBox, Position};
 use crate::transform::{process_events, EventGen};
 use crate::types::ElRef;
-
-use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
@@ -32,14 +30,20 @@ impl EventGen for ReuseElement {
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
             .get_original_element(&elref)
-            .ok_or_else(|| SvgdxError::ReferenceError(elref))?
+            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?
             .clone();
+        instance_element.expand_compound_size();
+        instance_element.eval_attributes(context).inspect_err(|_| {
+            context.pop_element();
+        })?;
+        let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {
             match attr.as_str() {
                 "href" | "id" | "x" | "y" | "transform" => continue,
                 _ => {
+                    // this is the _opposite_ of set_default_attr()...
                     if instance_element.has_attr(&attr) {
                         instance_element.set_attr(&attr, &value);
                     }
@@ -70,38 +74,84 @@ impl EventGen for ReuseElement {
             instance_element.add_class(&ref_id);
         }
 
-        // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
-        // and any x/y attrs become a new (final) entry in the `transform`.
-        // TODO: ensure transform() is considered by bbox() / positioning.
-        {
-            let reuse_x = reuse_element.get_attr("x");
-            let reuse_y = reuse_element.get_attr("y");
-            let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
-                let reuse_x = reuse_x.unwrap_or("0".to_string());
-                let reuse_y = reuse_y.unwrap_or("0".to_string());
-                Some(format!("translate({reuse_x}, {reuse_y})"))
-            } else {
-                None
-            };
-
-            // Resulting order: instance transform, reuse transform, x/y transform
-            let inst_xfrm = instance_element.get_attr("transform");
-            let reuse_xfrm = reuse_element.get_attr("transform");
-            let xfrm: Vec<_> = [inst_xfrm, reuse_xfrm, xy_xfrm]
-                .into_iter()
-                .flatten()
-                .collect();
-
-            if !xfrm.is_empty() {
-                let xfrm = xfrm.iter().join(" ");
-                instance_element.set_attr("transform", &xfrm);
-            }
-        }
-
         // reuse of a symbol element wraps the resulting content in a new <g> element
         if instance_element.name == "symbol" {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
+
+        // reuse_element.resolve_position(context)?;
+        let inst_el = context
+            .get_element(&elref)
+            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
+        let mut pos = Position::from(&reuse_element);
+        if let Some(bb) = inst_el.content_bbox {
+            pos.update_size(&bb.size());
+        } else if let Some(sz) = instance_size {
+            pos.update_size(&sz);
+        }
+        pos.set_position_attrs(&mut instance_element);
+
+        // // Convert any position attributes (e.g. x2, cy, etc.) to x/y
+        // if let Some((w, h)) = reuse_element.size(context)? {
+        //     if let Some(cx) = reuse_element.get_attr("cx") {
+        //         let cx = strp(&cx)?;
+        //         let x = cx - w / 2.0;
+        //         reuse_element.set_attr("x", &x.to_string());
+        //     }
+        //     if let Some(cy) = reuse_element.get_attr("cy") {
+        //         let cy = strp(&cy)?;
+        //         let y = cy - h / 2.0;
+        //         reuse_element.set_attr("y", &y.to_string());
+        //     }
+        //     if let Some(x2) = reuse_element.get_attr("x2") {
+        //         let x2 = strp(&x2)?;
+        //         let x = x2 - w;
+        //         reuse_element.set_attr("x", &x.to_string());
+        //     }
+        //     if let Some(y2) = reuse_element.get_attr("y2") {
+        //         let y2 = strp(&y2)?;
+        //         let y = y2 - h;
+        //         reuse_element.set_attr("y", &y.to_string());
+        //     }
+        //     if let Some(x1) = reuse_element.get_attr("x1") {
+        //         let x1 = strp(&x1)?;
+        //         let x = x1 - w;
+        //         reuse_element.set_attr("x", &x.to_string());
+        //     }
+        //     if let Some(y1) = reuse_element.get_attr("y1") {
+        //         let y1 = strp(&y1)?;
+        //         let y = y1 - h;
+        //         reuse_element.set_attr("y", &y.to_string());
+        //     }
+        // }
+
+        // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
+        // and any x/y attrs become a new (final) entry in the `transform`.
+        // TODO: ensure transform() is considered by bbox() / positioning.
+        // {
+        //     let reuse_x = reuse_element.get_attr("x");
+        //     let reuse_y = reuse_element.get_attr("y");
+        //     let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
+        //         let reuse_x = reuse_x.unwrap_or("0".to_string());
+        //         let reuse_y = reuse_y.unwrap_or("0".to_string());
+        //         Some(format!("translate({reuse_x}, {reuse_y})"))
+        //     } else {
+        //         None
+        //     };
+
+        //     // Resulting order: instance transform, reuse transform, x/y transform
+        //     let inst_xfrm = instance_element.get_attr("transform");
+        //     let reuse_xfrm = reuse_element.get_attr("transform");
+        //     let xfrm: Vec<_> = [inst_xfrm, reuse_xfrm, xy_xfrm]
+        //         .into_iter()
+        //         .flatten()
+        //         .collect();
+
+        //     if !xfrm.is_empty() {
+        //         let xfrm = xfrm.iter().join(" ");
+        //         instance_element.set_attr("transform", &xfrm);
+        //     }
+        // }
 
         let res = if let (false, Some((start, end))) = (
             instance_element.is_empty_element(),

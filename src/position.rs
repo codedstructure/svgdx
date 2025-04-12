@@ -1,11 +1,22 @@
 use std::str::FromStr;
 
+use itertools::Itertools;
+
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
+pub struct Size(pub f32, pub f32);
+
+impl Size {
+    pub fn as_wh(&self) -> (f32, f32) {
+        (self.0, self.1)
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct Position {
     pub xmin: Option<f32>,
     pub ymin: Option<f32>,
@@ -145,9 +156,10 @@ impl Position {
         self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some() || self.dy.is_some()
     }
 
-    pub fn update_from(&mut self, bb: &BoundingBox) {
-        self.width = Some(bb.width());
-        self.height = Some(bb.height());
+    pub fn update_size(&mut self, sz: &Size) {
+        self.width = Some(sz.0);
+        self.height = Some(sz.1);
+        // TODO: check not overconstrained
     }
 
     pub fn translate(&mut self, dx: f32, dy: f32) {
@@ -160,6 +172,9 @@ impl Position {
     }
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
+        // TODO: should this return an error if no BBox?
+        // TODO: plausible we don't have a full bbox but do have an xy pair, which
+        // would be sufficient for e.g. <g> elements.
         if let Some(bbox) = self.to_bbox() {
             match element.name.as_str() {
                 "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
@@ -179,6 +194,21 @@ impl Position {
                     element.remove_attrs(&[
                         "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
                     ]);
+                }
+                "g" => {
+                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                    if x1 != 0. || y1 != 0. {
+                        let xy_xfrm = Some(format!("translate({x1}, {y1})"));
+
+                        // Resulting order: reuse transform, x/y transform
+                        let reuse_xfrm = element.get_attr("transform");
+                        let xfrm: Vec<_> = [reuse_xfrm, xy_xfrm].into_iter().flatten().collect();
+
+                        if !xfrm.is_empty() {
+                            let xfrm = xfrm.iter().join(" ");
+                            element.set_attr("transform", &xfrm);
+                        }
+                    }
                 }
                 "circle" => {
                     let (cx, cy) = bbox.center();
@@ -266,6 +296,7 @@ impl SvgElement {
 }
 
 impl From<&SvgElement> for Position {
+    /// assumes SvgElement has already had compound attributes split
     fn from(value: &SvgElement) -> Self {
         let mut p = Position::new(&value.name);
 
@@ -325,6 +356,43 @@ impl From<&SvgElement> for Position {
         }
 
         p
+    }
+}
+
+impl std::fmt::Debug for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_struct("Position");
+        if let Some(xmin) = self.xmin {
+            f.field("xmin", &xmin);
+        }
+        if let Some(ymin) = self.ymin {
+            f.field("ymin", &ymin);
+        }
+        if let Some(xmax) = self.xmax {
+            f.field("xmax", &xmax);
+        }
+        if let Some(ymax) = self.ymax {
+            f.field("ymax", &ymax);
+        }
+        if let Some(cx) = self.cx {
+            f.field("cx", &cx);
+        }
+        if let Some(cy) = self.cy {
+            f.field("cy", &cy);
+        }
+        if let Some(width) = self.width {
+            f.field("width", &width);
+        }
+        if let Some(height) = self.height {
+            f.field("height", &height);
+        }
+        if let Some(dx) = self.dx {
+            f.field("dx", &dx);
+        }
+        if let Some(dy) = self.dy {
+            f.field("dy", &dy);
+        }
+        f.finish()
     }
 }
 
@@ -799,6 +867,10 @@ impl BoundingBox {
 
     pub fn height(&self) -> f32 {
         self.y2 - self.y1
+    }
+
+    pub fn size(&self) -> Size {
+        Size(self.width(), self.height())
     }
 
     pub fn center(&self) -> (f32, f32) {

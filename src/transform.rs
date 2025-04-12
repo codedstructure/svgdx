@@ -444,6 +444,7 @@ impl EventGen for Tag {
                 if let (Some(tail), false) = (tail, events.is_empty()) {
                     events.push(OutputEvent::Text(tail.to_owned()));
                 }
+                // NOTE: el.content_bbox may be set (e.g. if symbol) while bb is None here.
             }
             Tag::Leaf(el, tail) => {
                 let mut el = el.clone();

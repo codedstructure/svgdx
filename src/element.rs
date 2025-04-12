@@ -10,7 +10,7 @@ use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
 use crate::path::path_bbox;
 use crate::position::{
-    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, TrblLength,
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TrblLength,
 };
 use crate::text::process_text_attr;
 use crate::transform_attr::TransformAttr;
@@ -380,12 +380,12 @@ impl SvgElement {
                 let el = ctx
                     .get_element(&elref)
                     .ok_or_else(|| SvgdxError::ReferenceError(elref))?;
-                if let Some(bb) = ctx.get_element_bbox(el)? {
-                    p.update_from(&bb);
+                if let Some(sz) = ctx.get_element_size(el)? {
+                    p.update_size(&sz);
                     if el.name == "circle" || el.name == "ellipse" {
                         // The referenced element is defined by its center,
                         // but use elements are defined by top-left pos.
-                        p.translate(bb.width() / 4., bb.height() / 4.);
+                        p.translate(sz.0 / 4., sz.1 / 4.);
                     }
                 }
             }
@@ -715,7 +715,7 @@ impl SvgElement {
         Ok(element.clone())
     }
 
-    pub fn size(&self, ctx: &impl ElementMap) -> Result<Option<(f32, f32)>> {
+    pub fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>> {
         // NOTE: unlike bbox, this does not replace missing values with '0'.
         // Assumes any dw / dh have already been applied.
 
@@ -732,9 +732,15 @@ impl SvgElement {
         match self.name.as_str() {
             "use" | "reuse" => {
                 let target_el = self.get_target_element(ctx)?;
-                if let Ok(Some((w, h))) = target_el.size(ctx) {
-                    width = Some(w);
-                    height = Some(h);
+                // Take a _copy_ of the target element and evaluate attributes
+                // (should really only evaluate those which contribute to size...)
+                // This allows 'reuse' attributes which appear as vars within the
+                // target's context to determine size.
+                // let mut target_el = target_el.clone();
+                // target_el.eval_attributes(ctx)?;
+                if let Some(sz) = target_el.size(ctx)? {
+                    width = Some(sz.0);
+                    height = Some(sz.1);
                 }
             }
             "g" | "symbol" => {
@@ -778,7 +784,7 @@ impl SvgElement {
             _ => {}
         }
         if let (Some(width), Some(height)) = (width, height) {
-            Ok(Some((width, height)))
+            Ok(Some(Size(width, height)))
         } else {
             Ok(None)
         }
@@ -1197,7 +1203,7 @@ impl SvgElement {
                 let rel: DirSpec = reldir.parse()?;
                 // We won't have the full *position* of this element at this point, but hopefully
                 // we have enough to determine its size.
-                let (this_width, this_height) = self.size(ctx)?.unwrap_or((0., 0.));
+                let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
                 let gap = if !remain.is_empty() {
                     let mut parts = attr_split(remain);
                     strp(&parts.next().unwrap_or("0".to_string()))?
@@ -1230,6 +1236,16 @@ impl SvgElement {
                     self.set_attr("y", &fstr(y - dy));
                 }
             }
+            // "reuse" => {
+            //     // Need to determine top-left corner of the target bbox which
+            //     // may not be (0, 0), and offset by the equivalent amount.
+            //     if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
+            //         let (dx, dy) = bbox.locspec(LocSpec::TopLeft);
+            //         self.set_attr("transform", &format!("translate({} {})", fstr(x - dx), fstr(y - dy)));
+            //         // self.set_attr("x", &fstr(x - dx));
+            //         // self.set_attr("y", &fstr(y - dy));
+            //     }
+            // }
             _ => {
                 self.set_attr("x", &fstr(x));
                 self.set_attr("y", &fstr(y));
@@ -1263,7 +1279,7 @@ impl SvgElement {
         }
     }
 
-    fn expand_compound_size(&mut self) {
+    pub fn expand_compound_size(&mut self) {
         if let Some(wh) = self.attrs.pop("wh") {
             // Split value into width and height
             let (w, h) = Self::split_compound_attr(&wh);
@@ -1528,6 +1544,10 @@ mod tests {
 
         fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
             el.bbox()
+        }
+
+        fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
+            el.size(self)
         }
     }
 
