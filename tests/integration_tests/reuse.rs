@@ -133,13 +133,12 @@ fn test_reuse_positioning() {
         //     r##"<specs><g id="a7"><rect wh="10 5"/></g></specs><reuse href="#a7" x="1" y="2"/>"##,
         //     r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
         // ),
-
-        // (
-        //     // Relspec (#id|h) in <reuse> element
-        //     // TODO: requires effective resolve_position() use.
-        //     r##"<specs><rect id="a6" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a6" xy="#b|h"/>"##,
-        //     r##"<rect x="3" y="1" width="1" height="1" class="a6"/>"##,
-        // ),
+        (
+            // Relspec (#id|h) in <reuse> element
+            // TODO: requires effective resolve_position() use.
+            r##"<specs><rect id="a6" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a6" xy="#b|h"/>"##,
+            r##"<rect x="3" y="1" width="1" height="1" class="a6"/>"##,
+        ),
     ] {
         let output = transform_str_default(input).unwrap();
         assert_contains!(output, expected);

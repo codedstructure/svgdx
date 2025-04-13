@@ -16,11 +16,10 @@ impl EventGen for ReuseElement {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 
+        // first resolve any attributes on the immediate reuse element;
+        // we later resolve those on the target element in the context
+        // of any vars set by this.
         reuse_element.eval_attributes(context)?;
-        // TODO: ideally we need the size of the referenced element before we can
-        // apply any relative positioning, eg. with eval_rel_position()
-        reuse_element.expand_compound_pos();
-        reuse_element.eval_rel_attributes(context)?;
 
         context.push_element(&reuse_element);
         let elref = reuse_element
@@ -79,7 +78,11 @@ impl EventGen for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        // reuse_element.resolve_position(context)?;
+        // TODO: This isn't ideal. resolve_position() is needed to handle
+        // relpos positioning (`xy="#a|h"` etc), but the Position-based
+        // stuff fully handles other positioning. Should be unified.
+        reuse_element.resolve_position(context)?;
+
         let inst_el = context
             .get_element(&elref)
             .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
@@ -90,40 +93,6 @@ impl EventGen for ReuseElement {
             pos.update_size(&sz);
         }
         pos.set_position_attrs(&mut instance_element);
-
-        // // Convert any position attributes (e.g. x2, cy, etc.) to x/y
-        // if let Some((w, h)) = reuse_element.size(context)? {
-        //     if let Some(cx) = reuse_element.get_attr("cx") {
-        //         let cx = strp(&cx)?;
-        //         let x = cx - w / 2.0;
-        //         reuse_element.set_attr("x", &x.to_string());
-        //     }
-        //     if let Some(cy) = reuse_element.get_attr("cy") {
-        //         let cy = strp(&cy)?;
-        //         let y = cy - h / 2.0;
-        //         reuse_element.set_attr("y", &y.to_string());
-        //     }
-        //     if let Some(x2) = reuse_element.get_attr("x2") {
-        //         let x2 = strp(&x2)?;
-        //         let x = x2 - w;
-        //         reuse_element.set_attr("x", &x.to_string());
-        //     }
-        //     if let Some(y2) = reuse_element.get_attr("y2") {
-        //         let y2 = strp(&y2)?;
-        //         let y = y2 - h;
-        //         reuse_element.set_attr("y", &y.to_string());
-        //     }
-        //     if let Some(x1) = reuse_element.get_attr("x1") {
-        //         let x1 = strp(&x1)?;
-        //         let x = x1 - w;
-        //         reuse_element.set_attr("x", &x.to_string());
-        //     }
-        //     if let Some(y1) = reuse_element.get_attr("y1") {
-        //         let y1 = strp(&y1)?;
-        //         let y = y1 - h;
-        //         reuse_element.set_attr("y", &y.to_string());
-        //     }
-        // }
 
         // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
         // and any x/y attrs become a new (final) entry in the `transform`.
