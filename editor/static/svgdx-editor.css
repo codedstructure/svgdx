@@ -1,26 +1,32 @@
 body { font-family: sans-serif; margin: 0; }
 .container {
     display: flex;
-    flex: 1;
-    height: calc(100svh - 50px);
+    flex: 1 1 auto;
+    height: calc(100svh - 70px);
+    padding: 10px;
 }
 .container[data-layout="vertical"] { flex-direction: row; }
 .container[data-layout="horizontal"] { flex-direction: column; }
 
 #editor-container {
     border: 1px solid #ccc;
-    margin: 10px;
-    min-width: 100px;
-    min-height: 100px;
+    min-width: 10px;
+    min-height: 10px;
 }
 
 #output-container {
     display: flex;
     flex-direction: column;
     flex: 1 1 auto;
-    margin: 10px;
-    min-width: 100px;
-    min-height: 100px;
+    min-width: 10px;
+    min-height: 10px;
+}
+
+.minimized {
+    display: none !important;
+}
+.maximized {
+    display: block;
 }
 
 .output-panel {
@@ -29,8 +35,14 @@ body { font-family: sans-serif; margin: 0; }
 #output-container .CodeMirror-scroll {
     background: #f8f8f8;
 }
+#output-container.error .CodeMirror-scroll {
+    opacity: 0.3;
+}
+#editor-container.error .CodeMirror-scroll {
+    background-color: #fff8f8;
+}
 
-#svg-output, #text-output {
+#editor-container, #svg-output, #text-output {
     margin: 0;
     height: 100%;
     width: 100%;
@@ -57,17 +69,23 @@ body { font-family: sans-serif; margin: 0; }
 }
 #statusbar { font-family: monospace; }
 
-.splitter { min-width: 8px; min-height: 8px; background-color: #eee; flex: none; }
+.splitter {
+    min-width: 8px;
+    min-height: 8px;
+    background-color: #eee;
+    flex: none;
+    z-index: 1000;
+}
 .splitter:hover { background-color: #ddd; }
 .splitter:active { background-color: #ccc; }
 .container[data-layout="horizontal"] {
-    #main-split { cursor: row-resize; margin: -5px 10px; }
-    #output-split { cursor: col-resize; margin: -5px 5px -3px 5px; }
+    #main-split { cursor: row-resize; }
+    #output-split { cursor: col-resize; }
     #output-container { flex-direction: row; }
 }
 .container[data-layout="vertical"] {
-    #main-split { cursor: col-resize; margin: 10px -5px; }
-    #output-split { cursor: row-resize; margin: 5px -3px 5px -5px; }
+    #main-split { cursor: col-resize; }
+    #output-split { cursor: row-resize; }
     #output-container { flex-direction: column; }
 }
 
