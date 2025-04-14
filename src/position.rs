@@ -162,6 +162,30 @@ impl Position {
         // TODO: check not overconstrained
     }
 
+    pub fn update_shape(&mut self, shape: &str) {
+        self.shape = shape.to_owned();
+    }
+
+    /// Get most-reasonable 'x' value for this element,
+    /// defaulting to 0 if required. Excludes dx.
+    pub fn x(&self) -> f32 {
+        if let Some((x1, _)) = self.x_def() {
+            x1
+        } else {
+            self.xmin.unwrap_or(0.)
+        }
+    }
+
+    /// Get most-reasonable 'y' value for this element,
+    /// defaulting to 0 if required. Excludes dy.
+    pub fn y(&self) -> f32 {
+        if let Some((y1, _)) = self.y_def() {
+            y1
+        } else {
+            self.ymin.unwrap_or(0.)
+        }
+    }
+
     pub fn translate(&mut self, dx: f32, dy: f32) {
         self.xmin = self.xmin.map(|x| x + dx);
         self.xmax = self.xmax.map(|x| x + dx);
@@ -173,8 +197,6 @@ impl Position {
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
         // TODO: should this return an error if no BBox?
-        // TODO: plausible we don't have a full bbox but do have an xy pair, which
-        // would be sufficient for e.g. <g> elements.
         if let Some(bbox) = self.to_bbox() {
             match element.name.as_str() {
                 "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
@@ -283,6 +305,30 @@ impl Position {
                 }
                 _ => (),
             }
+        } else if matches!(element.name.as_str(), "g" | "path" | "polyline" | "polygon") {
+            // We don't have a full bbox, but for some elements we don't need one...
+            self.position_via_transform(element);
+        }
+    }
+
+    fn position_via_transform(&self, element: &mut SvgElement) {
+        let (mut x, mut y) = (self.x(), self.y());
+        if let Some(dx) = self.dx {
+            x += dx;
+        }
+        if let Some(dy) = self.dy {
+            y += dy;
+        }
+        if x != 0. || y != 0. {
+            let mut xy_xfrm = format!("translate({x}, {y})");
+            if let Some(exist_xfrm) = element.get_attr("transform") {
+                xy_xfrm = format!("{} {}", exist_xfrm, xy_xfrm);
+            }
+            element.set_attr("transform", &xy_xfrm);
+            element.remove_attrs(&[
+                "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "rx", "ry",
+                "r", "width", "height",
+            ]);
         }
     }
 }

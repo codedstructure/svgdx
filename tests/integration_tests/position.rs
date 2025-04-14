@@ -294,20 +294,8 @@ fn test_position_dxy() {
 
 #[test]
 fn test_position_dxy_polyline() {
-    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dxy="2"/>"#;
-    let expected = r#"<polyline points="3 3 4 3 4 4 5 4 5 3 6 3"/>"#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
-
-    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dx="1"/>"#;
-    let expected = r#"<polyline points="2 1 3 1 3 2 4 2 4 1 5 1"/>"#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
-
-    let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dy="-2"/>"#;
-    let expected = r#"<polyline points="1 -1 2 -1 2 0 3 0 3 -1 4 -1"/>"#;
-    assert_eq!(transform_str_default(input).unwrap(), expected);
-
     let input = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" dxy="-1 3"/>"#;
-    let expected = r#"<polyline points="0 4 1 4 1 5 2 5 2 4 3 4"/>"#;
+    let expected = r#"<polyline points="1 1 2 1 2 2 3 2 3 1 4 1" transform="translate(-1, 3)"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
 

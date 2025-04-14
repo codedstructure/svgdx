@@ -128,14 +128,13 @@ fn test_reuse_positioning() {
             r##"<defs><symbol id="a7"><rect wh="10 5"/></symbol></defs><reuse href="#a7" x="1" y="2"/>"##,
             r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
         ),
-        // (
-        //     // Reuse of group element inside <specs> block
-        //     r##"<specs><g id="a7"><rect wh="10 5"/></g></specs><reuse href="#a7" x="1" y="2"/>"##,
-        //     r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
-        // ),
+        (
+            // Reuse of group element inside <specs> block
+            r##"<specs><g id="a7"><rect wh="10 5"/></g></specs><reuse href="#a7" x="1" y="2"/>"##,
+            r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
+        ),
         (
             // Relspec (#id|h) in <reuse> element
-            // TODO: requires effective resolve_position() use.
             r##"<specs><rect id="a6" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a6" xy="#b|h"/>"##,
             r##"<rect x="3" y="1" width="1" height="1" class="a6"/>"##,
         ),
@@ -165,7 +164,7 @@ fn test_reuse_xy_transform() {
 <reuse href="#tb" text="thing" y="1" transform="translate(11)"/>
 "##;
     let output = transform_str_default(input).unwrap();
-    let expected1 = r#"<rect width="20" height="10" transform="translate(10) translate(11) translate(0, 1)" class="tb"/>"#;
+    let expected1 = r#"<rect y="1" width="20" height="10" transform="translate(10) translate(11)" class="tb"/>"#;
     let expected2 = r#"<text x="31" y="6" class="d-text tb">thing</text>"#;
 
     assert_contains!(output, expected1);
@@ -180,9 +179,9 @@ fn test_reuse_group_transform() {
 <rect x="0" y="0" width="$size" height="$size"/>
 </g>
 </specs>
-<reuse id="this" href="#square" x="3" y="5" size="10" transform="rotate(45)"/>
+<reuse id="this" href="#square" size="10"/>
 "##;
-    let expected = r#"<g id="this" transform="rotate(45) translate(3, 5)" class="square">"#;
+    let expected = r#"<g id="this" class="square">"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -204,9 +203,9 @@ fn test_reuse_group_transform() {
 <rect x="0" y="0" width="$size" height="$size"/>
 </g>
 </specs>
-<reuse id="this" href="#square" size="10"/>
+<reuse id="this" href="#square" x="3" y="5" size="10" transform="rotate(45)"/>
 "##;
-    let expected = r#"<g id="this" class="square">"#;
+    let expected = r#"<g id="this" transform="rotate(45) translate(3, 5)" class="square">"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -594,18 +593,14 @@ fn test_reuse_relspec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
-    //     let input = r##"
-    // <rect id="a" wh="10 6"/>
-    // <rect id="b" wh="2" />
-    // <reuse id="z" href="#b" cxy="#a@c"/>
-    // "##;
-    //     let expected = r##"<use id="z" href="#b" x="4" y="2"/>"##;
-    //     let output = transform_str_default(input).unwrap();
-    //     assert_contains!(output, expected);
+    // check reuse of use element
+    let input = r##"
+<rect id="a" wh="10 6"/>
+<rect id="b" wh="2" />
+<use id="c" href="#b"/>
+<reuse id="z" href="#c" cxy="#a@c"/>
+"##;
+    let expected = r##"<use id="z" href="#b" x="4" y="2" class="c"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
 }
-
-// <defs>
-// <g id="tt"><rect xy="3" wh="10"/></g>
-// </defs>
-// <use id="a" href="#tt"/>
-// <use xy="#a:h 10" href="#tt"/>

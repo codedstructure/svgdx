@@ -956,13 +956,6 @@ impl SvgElement {
                 "y" | "cy" | "y1" | "y2" => {
                     new_elem.set_attr(key, &fstr(strp(value)? + dy));
                 }
-                "points" => {
-                    let mut values = vec![];
-                    for (idx, part) in attr_split(value).enumerate() {
-                        values.push(fstr(strp(&part)? + if idx % 2 == 0 { dx } else { dy }));
-                    }
-                    new_elem.set_attr(key, &values.join(" "));
-                }
                 _ => (),
             }
         }
@@ -1236,16 +1229,6 @@ impl SvgElement {
                     self.set_attr("y", &fstr(y - dy));
                 }
             }
-            // "reuse" => {
-            //     // Need to determine top-left corner of the target bbox which
-            //     // may not be (0, 0), and offset by the equivalent amount.
-            //     if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
-            //         let (dx, dy) = bbox.locspec(LocSpec::TopLeft);
-            //         self.set_attr("transform", &format!("translate({} {})", fstr(x - dx), fstr(y - dy)));
-            //         // self.set_attr("x", &fstr(x - dx));
-            //         // self.set_attr("y", &fstr(y - dy));
-            //     }
-            // }
             _ => {
                 self.set_attr("x", &fstr(x));
                 self.set_attr("y", &fstr(y));
