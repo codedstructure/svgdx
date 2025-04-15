@@ -24,13 +24,21 @@ impl EventGen for ReuseElement {
         context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
-            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
-        let elref: ElRef = elref.parse()?;
+            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
+        let elref: ElRef = elref.parse().inspect_err(|_| {
+            context.pop_element();
+        })?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
             .get_original_element(&elref)
-            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?
-            .clone();
+            .cloned()
+            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
         instance_element.expand_compound_size();
         instance_element.eval_attributes(context).inspect_err(|_| {
             context.pop_element();

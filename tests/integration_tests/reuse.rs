@@ -604,3 +604,19 @@ fn test_reuse_relspec() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_wh_attrs() {
+    // width/height should *not* be considered in reuse elements,
+    // and just considered as context variables.
+    let input = r##"
+<specs>
+<polyline id="a" points="0 0 $width $height"/>
+</specs>
+<reuse id="z" href="#a" x="7" y="2" width="10" height="0"/>
+"##;
+    let expected =
+        r##"<polyline id="z" points="0 0 10 0" transform="translate(7, 2)" class="a"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

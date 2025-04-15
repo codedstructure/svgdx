@@ -28,7 +28,7 @@
     M 10 0
     A 10 10 0 1 0 10 20
     A 10 10 0 1 0 10 0
-    " transform="translate(0, 0)" class="person"/>
+    " class="person"/>
     <path id="bob" d="M 0 26.667 h 20
     M 10 20 v 20
     M 0 60 l 10 -20 10 20

@@ -376,13 +376,20 @@ impl From<&SvgElement> for Position {
             p.cy = Some(cy);
         }
 
-        let w = value.get_attr("width");
-        let h = value.get_attr("height");
-        if let Some(Ok(w)) = w.map(|w| strp(w.as_ref())) {
-            p.width = Some(w);
-        }
-        if let Some(Ok(h)) = h.map(|h| strp(h.as_ref())) {
-            p.height = Some(h);
+        // In theory `<use>` elements can have width/height attrs, but only if
+        // they target an `<svg>`/`<symbol>` element with a `viewPort` attr,
+        // where it is overwritten. We don't support that, and instead allow
+        // width/height to be used as context variables.
+        // See https://www.w3.org/TR/SVG2/struct.html#UseElement
+        if !matches!(p.shape.as_str(), "reuse" | "use") {
+            let w = value.get_attr("width");
+            let h = value.get_attr("height");
+            if let Some(Ok(w)) = w.map(|w| strp(w.as_ref())) {
+                p.width = Some(w);
+            }
+            if let Some(Ok(h)) = h.map(|h| strp(h.as_ref())) {
+                p.height = Some(h);
+            }
         }
 
         // if circle / ellipse, get width / height from r / rx / ry
