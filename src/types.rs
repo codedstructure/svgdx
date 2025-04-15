@@ -21,7 +21,9 @@ pub fn fstr(x: f32) -> String {
 
 /// Parse a string to an f32
 pub fn strp(s: &str) -> Result<f32> {
-    Ok(s.trim().parse::<f32>()?)
+    s.trim()
+        .parse::<f32>()
+        .map_err(|_| SvgdxError::ParseError(format!("Expected a number: '{s}'")))
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")

@@ -1,12 +1,10 @@
-use crate::context::TransformerContext;
+use crate::context::{ElementMap, TransformerContext};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
-use crate::position::BoundingBox;
+use crate::position::{BoundingBox, Position};
 use crate::transform::{process_events, EventGen};
 use crate::types::ElRef;
-
-use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
@@ -18,24 +16,51 @@ impl EventGen for ReuseElement {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 
+        // first resolve any attributes on the immediate reuse element;
+        // we later resolve those on the target element in the context
+        // of any vars set by this.
         reuse_element.eval_attributes(context)?;
 
         context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
-            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
-        let elref: ElRef = elref.parse()?;
+            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
+        let elref: ElRef = elref.parse().inspect_err(|_| {
+            context.pop_element();
+        })?;
         // Take a copy of the referenced element as starting point for our new instance
         let mut instance_element = context
             .get_original_element(&elref)
-            .ok_or_else(|| SvgdxError::ReferenceError(elref))?
-            .clone();
+            .cloned()
+            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
+        instance_element.expand_compound_size();
+        instance_element.eval_attributes(context).inspect_err(|_| {
+            context.pop_element();
+        })?;
+        let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {
             match attr.as_str() {
-                "href" | "id" | "x" | "y" | "transform" => continue,
+                "href" | "id" | "x" | "y" => continue,
+                "transform" => {
+                    // append to any existing transform
+                    let mut xfrm = value.clone();
+                    if let Some(inst_xfrm) = instance_element.get_attr("transform") {
+                        xfrm = format!("{} {}", inst_xfrm, xfrm);
+                    }
+                    instance_element.set_attr("transform", &xfrm);
+                }
                 _ => {
+                    // this is the _opposite_ of set_default_attr(); it allows
+                    // the target element to provide defaults, but have them
+                    // overridden by the reuse element.
                     if instance_element.has_attr(&attr) {
                         instance_element.set_attr(&attr, &value);
                     }
@@ -66,38 +91,27 @@ impl EventGen for ReuseElement {
             instance_element.add_class(&ref_id);
         }
 
-        // Emulate (a bit) the `<use>` element - in particular `transform` is passed through
-        // and any x/y attrs become a new (final) entry in the `transform`.
-        // TODO: ensure transform() is considered by bbox() / positioning.
-        {
-            let reuse_x = reuse_element.get_attr("x");
-            let reuse_y = reuse_element.get_attr("y");
-            let xy_xfrm = if reuse_x.is_some() || reuse_y.is_some() {
-                let reuse_x = reuse_x.unwrap_or("0".to_string());
-                let reuse_y = reuse_y.unwrap_or("0".to_string());
-                Some(format!("translate({reuse_x}, {reuse_y})"))
-            } else {
-                None
-            };
-
-            // Resulting order: instance transform, reuse transform, x/y transform
-            let inst_xfrm = instance_element.get_attr("transform");
-            let reuse_xfrm = reuse_element.get_attr("transform");
-            let xfrm: Vec<_> = [inst_xfrm, reuse_xfrm, xy_xfrm]
-                .into_iter()
-                .flatten()
-                .collect();
-
-            if !xfrm.is_empty() {
-                let xfrm = xfrm.iter().join(" ");
-                instance_element.set_attr("transform", &xfrm);
-            }
-        }
-
         // reuse of a symbol element wraps the resulting content in a new <g> element
         if instance_element.name == "symbol" {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
+
+        // TODO: This isn't ideal. resolve_position() is needed to handle
+        // relpos positioning (`xy="#a|h"` etc), but the Position-based
+        // stuff fully handles other positioning. Should be unified.
+        reuse_element.resolve_position(context)?;
+
+        let inst_el = context
+            .get_element(&elref)
+            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
+        let mut pos = Position::from(&reuse_element);
+        if let Some(bb) = inst_el.content_bbox {
+            pos.update_size(&bb.size());
+        } else if let Some(sz) = instance_size {
+            pos.update_size(&sz);
+        }
+        pos.update_shape(&instance_element.name);
+        pos.set_position_attrs(&mut instance_element);
 
         let res = if let (false, Some((start, end))) = (
             instance_element.is_empty_element(),

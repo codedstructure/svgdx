@@ -1,11 +1,22 @@
 use std::str::FromStr;
 
+use itertools::Itertools;
+
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
-#[derive(Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug)]
+pub struct Size(pub f32, pub f32);
+
+impl Size {
+    pub fn as_wh(&self) -> (f32, f32) {
+        (self.0, self.1)
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct Position {
     pub xmin: Option<f32>,
     pub ymin: Option<f32>,
@@ -145,7 +156,47 @@ impl Position {
         self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some() || self.dy.is_some()
     }
 
+    pub fn update_size(&mut self, sz: &Size) {
+        self.width = Some(sz.0);
+        self.height = Some(sz.1);
+        // TODO: check not overconstrained
+    }
+
+    pub fn update_shape(&mut self, shape: &str) {
+        self.shape = shape.to_owned();
+    }
+
+    /// Get most-reasonable 'x' value for this element,
+    /// defaulting to 0 if required. Excludes dx.
+    pub fn x(&self) -> f32 {
+        if let Some((x1, _)) = self.x_def() {
+            x1
+        } else {
+            self.xmin.unwrap_or(0.)
+        }
+    }
+
+    /// Get most-reasonable 'y' value for this element,
+    /// defaulting to 0 if required. Excludes dy.
+    pub fn y(&self) -> f32 {
+        if let Some((y1, _)) = self.y_def() {
+            y1
+        } else {
+            self.ymin.unwrap_or(0.)
+        }
+    }
+
+    pub fn translate(&mut self, dx: f32, dy: f32) {
+        self.xmin = self.xmin.map(|x| x + dx);
+        self.xmax = self.xmax.map(|x| x + dx);
+        self.cx = self.cx.map(|x| x + dx);
+        self.ymin = self.ymin.map(|y| y + dy);
+        self.ymax = self.ymax.map(|y| y + dy);
+        self.cy = self.cy.map(|y| y + dy);
+    }
+
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
+        // TODO: should this return an error if no BBox?
         if let Some(bbox) = self.to_bbox() {
             match element.name.as_str() {
                 "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
@@ -158,11 +209,28 @@ impl Position {
                     if self.has_y_position() {
                         element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
                     }
-                    element.set_attr("width", &fstr(width));
-                    element.set_attr("height", &fstr(height));
+                    if element.name != "use" {
+                        element.set_attr("width", &fstr(width));
+                        element.set_attr("height", &fstr(height));
+                    }
                     element.remove_attrs(&[
                         "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
                     ]);
+                }
+                "g" => {
+                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                    if x1 != 0. || y1 != 0. {
+                        let xy_xfrm = Some(format!("translate({x1}, {y1})"));
+
+                        // Resulting order: reuse transform, x/y transform
+                        let reuse_xfrm = element.get_attr("transform");
+                        let xfrm: Vec<_> = [reuse_xfrm, xy_xfrm].into_iter().flatten().collect();
+
+                        if !xfrm.is_empty() {
+                            let xfrm = xfrm.iter().join(" ");
+                            element.set_attr("transform", &xfrm);
+                        }
+                    }
                 }
                 "circle" => {
                     let (cx, cy) = bbox.center();
@@ -237,6 +305,30 @@ impl Position {
                 }
                 _ => (),
             }
+        } else if matches!(element.name.as_str(), "g" | "path" | "polyline" | "polygon") {
+            // We don't have a full bbox, but for some elements we don't need one...
+            self.position_via_transform(element);
+        }
+    }
+
+    fn position_via_transform(&self, element: &mut SvgElement) {
+        let (mut x, mut y) = (self.x(), self.y());
+        if let Some(dx) = self.dx {
+            x += dx;
+        }
+        if let Some(dy) = self.dy {
+            y += dy;
+        }
+        if x != 0. || y != 0. {
+            let mut xy_xfrm = format!("translate({x}, {y})");
+            if let Some(exist_xfrm) = element.get_attr("transform") {
+                xy_xfrm = format!("{} {}", exist_xfrm, xy_xfrm);
+            }
+            element.set_attr("transform", &xy_xfrm);
+            element.remove_attrs(&[
+                "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "rx", "ry",
+                "r", "width", "height",
+            ]);
         }
     }
 }
@@ -250,6 +342,7 @@ impl SvgElement {
 }
 
 impl From<&SvgElement> for Position {
+    /// assumes SvgElement has already had compound attributes split
     fn from(value: &SvgElement) -> Self {
         let mut p = Position::new(&value.name);
 
@@ -283,13 +376,20 @@ impl From<&SvgElement> for Position {
             p.cy = Some(cy);
         }
 
-        let w = value.get_attr("width");
-        let h = value.get_attr("height");
-        if let Some(Ok(w)) = w.map(|w| strp(w.as_ref())) {
-            p.width = Some(w);
-        }
-        if let Some(Ok(h)) = h.map(|h| strp(h.as_ref())) {
-            p.height = Some(h);
+        // In theory `<use>` elements can have width/height attrs, but only if
+        // they target an `<svg>`/`<symbol>` element with a `viewPort` attr,
+        // where it is overwritten. We don't support that, and instead allow
+        // width/height to be used as context variables.
+        // See https://www.w3.org/TR/SVG2/struct.html#UseElement
+        if !matches!(p.shape.as_str(), "reuse" | "use") {
+            let w = value.get_attr("width");
+            let h = value.get_attr("height");
+            if let Some(Ok(w)) = w.map(|w| strp(w.as_ref())) {
+                p.width = Some(w);
+            }
+            if let Some(Ok(h)) = h.map(|h| strp(h.as_ref())) {
+                p.height = Some(h);
+            }
         }
 
         // if circle / ellipse, get width / height from r / rx / ry
@@ -309,6 +409,43 @@ impl From<&SvgElement> for Position {
         }
 
         p
+    }
+}
+
+impl std::fmt::Debug for Position {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_struct("Position");
+        if let Some(xmin) = self.xmin {
+            f.field("xmin", &xmin);
+        }
+        if let Some(ymin) = self.ymin {
+            f.field("ymin", &ymin);
+        }
+        if let Some(xmax) = self.xmax {
+            f.field("xmax", &xmax);
+        }
+        if let Some(ymax) = self.ymax {
+            f.field("ymax", &ymax);
+        }
+        if let Some(cx) = self.cx {
+            f.field("cx", &cx);
+        }
+        if let Some(cy) = self.cy {
+            f.field("cy", &cy);
+        }
+        if let Some(width) = self.width {
+            f.field("width", &width);
+        }
+        if let Some(height) = self.height {
+            f.field("height", &height);
+        }
+        if let Some(dx) = self.dx {
+            f.field("dx", &dx);
+        }
+        if let Some(dy) = self.dy {
+            f.field("dy", &dy);
+        }
+        f.finish()
     }
 }
 
@@ -783,6 +920,10 @@ impl BoundingBox {
 
     pub fn height(&self) -> f32 {
         self.y2 - self.y1
+    }
+
+    pub fn size(&self) -> Size {
+        Size(self.width(), self.height())
     }
 
     pub fn center(&self) -> (f32, f32) {

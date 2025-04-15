@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: support for positioning of `<reuse>` elements; these now support
+  universal positioning attributes and relpos specification. Note that some
+  element types (`g`, `path`, `polyline`, `polygon`) are now positioned using
+  transform attributes to translate shapes; for `polyline` and `polygon` this
+  is a change to previous per-coord adjustments to `points` values.
+
 - Added: support for 'bearing' commands in path element data, allowing 'turtle
   graphics' motions as part of path data. This was part of the SVG2 spec in
   earlier drafts, but has since been dropped. Now with svgdx it can be used again!
@@ -15,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Added: support for deriving bounding boxes from `clip-path` attributes and
   `clipPath` elements. See the [landscape.xml](examples/landscape.xml) example.
+
+- Fixed: relative positioning of `<use>` elements now works consistently.
 
 ## [0.19.0 - 2025-03-01]
 

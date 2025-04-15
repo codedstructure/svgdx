@@ -58,6 +58,95 @@ bounding boxes of elements at the same level as they are computed.
 Simplifying and unifying all this (as well as reducing the number of ad-hoc
 `update_element()` calls) would improve the maintainability of svgdx.
 
+### Positioning approach
+
+Elements exist at one of three positioning levels:
+
+* Unknown / indeterminate
+* Size known
+* Full bounding box known
+
+Keeping the second two separate is important since some elements don't have a
+position (e.g. a symbol in a defs group, or a group in a specs block which will
+be referenced from a <reuse>). This largely applies to reuse (i.e. `<use>` or
+`<reuse>`) where multiple instances of a target may exist at different locations.
+
+However knowing the size is useful even if the full location is not known:
+
+* TODO - explain why, if there is a good reason...
+
+#### Positioning Principles
+
+Where reasonable, shapes should be located with their own attributes, e.g. `x`
+and `y` in the case of a `<rect>`.
+
+For `<g>` elements, a `transform` should be used instead - this avoids having
+to apply location to all elements within the (possibly nested) group.
+
+With `<polyline>` / `<polygon>` elements, either approach (translate / update
+each `points` coordinate) is reasonable, but for `<path>` elements it becomes
+more tricky, since there is a mix of relative and absolute values. Just
+translating the whole lot is quite attractive. (If the whole `d` attribute used
+relative commands, then a simple update to the initial `m` / `M` command would
+be nice, but that's not a reasonable constraint).
+
+So, to keep things simple:
+
+* use/rect/circle/ellipse/text - update the x/y (or equivalent) attributes.
+* polyline/polygon/path/g - use a `transform="translate(x,y)"` attribute.
+
+If we know the *size* of the item and a sufficient set of position attributes,
+this lets us place any of these objects. If we *don't* know the size, we could
+still place some objects given the top-left x/y point, and others (circle/ellipse)
+with their center point, but feels arbitrary.
+In addition we'd have to give up the useful `relpos` based positioning, which
+requires knowledge of both the referenced object's full bbox as well as the
+current object's size.
+
+We have a `Position` class which captures knowledge of various element dimensions,
+and once sufficient this should be able to write out the attributes of a target
+element. (Including e.g. transform attributes as appropriate).
+
+A key use-case of this is to handle reuse, where a copy of an instanced element
+may be applied in many different locations. It also allows a universal positioning
+approach, where all elements can be positioned using e.g. 'x2, cy' parameters -
+assuming that the element's size is known.
+
+So, for positioning:
+
+* general attribute evaluation within current context
+* expand compound size attributes (wh, dwh)
+* derive size (width, height, dw, dh - including appropriate element lookup)
+* if `xy` exists and is a relspec:
+  * require target element has a full bbox, else RefErr
+  * given size, set the anchor point as required considering gap as dx/dy.
+* else:
+  * expand compound position attributes (xy, cxy, xy1, xy2, dxy, etc)
+  * derive position (including element lookup)
+* if position is sufficient, apply element-appropriate attributes to the target (and remove any obsolete ones)
+
+The above implies that all positioning is done via the Position struct, even for
+basic cases. Is this reasonable?
+
+Is it reasonable to disallow / disregard transform on input? => Probably yes...?
+
+Suggests each element should include a Position object... possibly with enum
+to hold it's state (e.g. final, provisional - e.g. may be expanded, etc)
+
+#### Re-use positioning
+
+For reuse elements, both the targeted object and the reuse element may have position
+attributes. How should these be combined?
+
+* If the target element is in a defs block etc, it may have a 'deliberate' offset, e.g. xy="5".
+  In that case it might be natural to see the xy on the reuse as an offset, (i.e. dxy) to be
+  added to the original.
+* If the target element is already a visual thing used elsewhere, it is very unlikely to be
+  at the origin anyway, and using an offset would be counter-intuitive. The 'thing itself',
+  defined by its bbox, would be what should be positioned.
+* Therefore, xy on the reuse should translate the bbox of the target, *overriding* any position
+  it may have.
+
 ## Open questions
 
 ### Round-tripping / preserving SVG document structure

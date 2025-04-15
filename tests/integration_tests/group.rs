@@ -161,3 +161,40 @@ fn test_group_transform_prev() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_g_previous() {
+    let input = r##"
+<g>
+  <rect xy="10" wh="3"/>
+  <rect xy="^|h 2" wh="3"/>
+</g>
+<rect xy="^|v" wh="5"/>
+"##;
+    let expected = r##"
+<g>
+  <rect x="10" y="10" width="3" height="3"/>
+  <rect x="15" y="10" width="3" height="3"/>
+</g>
+<rect x="11.5" y="13" width="5" height="5"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<g>
+  <rect xy="10" wh="3"/>
+  <rect xy="^|h 2" wh="3"/>
+</g>
+<rect cxy="^@b" wh="2"/>
+"##;
+    let expected = r##"
+<g>
+  <rect x="10" y="10" width="3" height="3"/>
+  <rect x="15" y="10" width="3" height="3"/>
+</g>
+<rect x="13" y="12" width="2" height="2"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

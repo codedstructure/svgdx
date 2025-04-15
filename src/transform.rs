@@ -51,6 +51,10 @@ impl EventGen for SvgElement {
                 OtherElement(self.clone()).generate_events(context)
             }
         };
+        // Ideally would have a single 'if bbox, set prev_element' here,
+        // but is used for attribute lookup as well as bbox, so need the
+        // full *resolved* element, which isn't available here.
+        // TODO: see if just storing a 'prev_bbox' is feasible.
         context.dec_depth()?;
 
         let (ol, mut bbox) = res?;
@@ -159,6 +163,9 @@ impl EventGen for Container {
                     context.update_element(&new_el);
                 }
 
+                if bbox.is_some() {
+                    context.set_prev_element(&new_el);
+                }
                 Ok((events, bbox))
             }
         } else {
@@ -437,6 +444,7 @@ impl EventGen for Tag {
                 if let (Some(tail), false) = (tail, events.is_empty()) {
                     events.push(OutputEvent::Text(tail.to_owned()));
                 }
+                // NOTE: el.content_bbox may be set (e.g. if symbol) while bb is None here.
             }
             Tag::Leaf(el, tail) => {
                 let mut el = el.clone();
