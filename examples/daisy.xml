@@ -1,0 +1,7 @@
+<svg>
+  <rect cx="0" y1="0" y2="200" width="20" class="d-fill-green"/>
+  <loop count="36" loop-var="i">
+    <rect cxy="{{p2r(60, $i * 10)}}" rx="10" wh="50 10" rotate="{{10 * $i}}" class="d-fill-floralwhite"/>
+  </loop>
+  <circle r="40" class="d-fill-gold"/>
+</svg>

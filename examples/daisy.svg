@@ -1,0 +1,92 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="180mm" height="295mm" viewBox="-90 -90 180 295">
+  <style>
+    <![CDATA[
+      svg { background: none; }
+      svg * { stroke-linecap: round; stroke-linejoin: round; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      .d-fill-floralwhite { fill: floralwhite; }
+      text.d-fill-floralwhite, text.d-fill-floralwhite * { fill: black; stroke: white; }
+      .d-fill-gold { fill: gold; }
+      text.d-fill-gold, text.d-fill-gold * { fill: black; stroke: white; }
+      .d-fill-green { fill: green; }
+      text.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+    ]]>
+  </style>
+  <rect x="-10" y="0" width="20" height="200" class="d-fill-green"/>
+
+    <rect x="35" y="-5" width="50" height="10" rx="10" transform="rotate(0, 60, 0)" class="d-fill-floralwhite"/>
+
+    <rect x="34.088" y="5.419" width="50" height="10" rx="10" transform="rotate(10, 59.088, 10.419)" class="d-fill-floralwhite"/>
+
+    <rect x="31.382" y="15.521" width="50" height="10" rx="10" transform="rotate(20, 56.382, 20.521)" class="d-fill-floralwhite"/>
+
+    <rect x="26.962" y="25" width="50" height="10" rx="10" transform="rotate(30, 51.962, 30)" class="d-fill-floralwhite"/>
+
+    <rect x="20.963" y="33.567" width="50" height="10" rx="10" transform="rotate(40, 45.963, 38.567)" class="d-fill-floralwhite"/>
+
+    <rect x="13.567" y="40.963" width="50" height="10" rx="10" transform="rotate(50, 38.567, 45.963)" class="d-fill-floralwhite"/>
+
+    <rect x="5" y="46.962" width="50" height="10" rx="10" transform="rotate(60, 30, 51.962)" class="d-fill-floralwhite"/>
+
+    <rect x="-4.479" y="51.382" width="50" height="10" rx="10" transform="rotate(70, 20.521, 56.382)" class="d-fill-floralwhite"/>
+
+    <rect x="-14.581" y="54.088" width="50" height="10" rx="10" transform="rotate(80, 10.419, 59.088)" class="d-fill-floralwhite"/>
+
+    <rect x="-25" y="55" width="50" height="10" rx="10" transform="rotate(90, 0, 60)" class="d-fill-floralwhite"/>
+
+    <rect x="-35.419" y="54.088" width="50" height="10" rx="10" transform="rotate(100, -10.419, 59.088)" class="d-fill-floralwhite"/>
+
+    <rect x="-45.521" y="51.382" width="50" height="10" rx="10" transform="rotate(110, -20.521, 56.382)" class="d-fill-floralwhite"/>
+
+    <rect x="-55" y="46.962" width="50" height="10" rx="10" transform="rotate(120, -30, 51.962)" class="d-fill-floralwhite"/>
+
+    <rect x="-63.567" y="40.963" width="50" height="10" rx="10" transform="rotate(130, -38.567, 45.963)" class="d-fill-floralwhite"/>
+
+    <rect x="-70.963" y="33.567" width="50" height="10" rx="10" transform="rotate(140, -45.963, 38.567)" class="d-fill-floralwhite"/>
+
+    <rect x="-76.962" y="25" width="50" height="10" rx="10" transform="rotate(150, -51.962, 30)" class="d-fill-floralwhite"/>
+
+    <rect x="-81.382" y="15.521" width="50" height="10" rx="10" transform="rotate(160, -56.382, 20.521)" class="d-fill-floralwhite"/>
+
+    <rect x="-84.088" y="5.419" width="50" height="10" rx="10" transform="rotate(170, -59.088, 10.419)" class="d-fill-floralwhite"/>
+
+    <rect x="-85" y="-5" width="50" height="10" rx="10" transform="rotate(180, -60, 0)" class="d-fill-floralwhite"/>
+
+    <rect x="-84.088" y="-15.419" width="50" height="10" rx="10" transform="rotate(190, -59.088, -10.419)" class="d-fill-floralwhite"/>
+
+    <rect x="-81.382" y="-25.521" width="50" height="10" rx="10" transform="rotate(200, -56.382, -20.521)" class="d-fill-floralwhite"/>
+
+    <rect x="-76.962" y="-35" width="50" height="10" rx="10" transform="rotate(210, -51.962, -30)" class="d-fill-floralwhite"/>
+
+    <rect x="-70.963" y="-43.567" width="50" height="10" rx="10" transform="rotate(220, -45.963, -38.567)" class="d-fill-floralwhite"/>
+
+    <rect x="-63.567" y="-50.963" width="50" height="10" rx="10" transform="rotate(230, -38.567, -45.963)" class="d-fill-floralwhite"/>
+
+    <rect x="-55" y="-56.962" width="50" height="10" rx="10" transform="rotate(240, -30, -51.962)" class="d-fill-floralwhite"/>
+
+    <rect x="-45.521" y="-61.382" width="50" height="10" rx="10" transform="rotate(250, -20.521, -56.382)" class="d-fill-floralwhite"/>
+
+    <rect x="-35.419" y="-64.088" width="50" height="10" rx="10" transform="rotate(260, -10.419, -59.088)" class="d-fill-floralwhite"/>
+
+    <rect x="-25" y="-65" width="50" height="10" rx="10" transform="rotate(270, 0, -60)" class="d-fill-floralwhite"/>
+
+    <rect x="-14.581" y="-64.088" width="50" height="10" rx="10" transform="rotate(280, 10.419, -59.088)" class="d-fill-floralwhite"/>
+
+    <rect x="-4.479" y="-61.382" width="50" height="10" rx="10" transform="rotate(290, 20.521, -56.382)" class="d-fill-floralwhite"/>
+
+    <rect x="5" y="-56.962" width="50" height="10" rx="10" transform="rotate(300, 30, -51.962)" class="d-fill-floralwhite"/>
+
+    <rect x="13.567" y="-50.963" width="50" height="10" rx="10" transform="rotate(310, 38.567, -45.963)" class="d-fill-floralwhite"/>
+
+    <rect x="20.963" y="-43.567" width="50" height="10" rx="10" transform="rotate(320, 45.963, -38.567)" class="d-fill-floralwhite"/>
+
+    <rect x="26.962" y="-35" width="50" height="10" rx="10" transform="rotate(330, 51.962, -30)" class="d-fill-floralwhite"/>
+
+    <rect x="31.382" y="-25.521" width="50" height="10" rx="10" transform="rotate(340, 56.382, -20.521)" class="d-fill-floralwhite"/>
+
+    <rect x="34.088" y="-15.419" width="50" height="10" rx="10" transform="rotate(350, 59.088, -10.419)" class="d-fill-floralwhite"/>
+
+  <circle r="40" class="d-fill-gold"/>
+</svg>
