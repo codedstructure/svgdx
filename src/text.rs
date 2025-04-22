@@ -185,6 +185,15 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     };
     text_elem.set_attr("x", &x_str);
     text_elem.set_attr("y", &y_str);
+
+    // handle text-rotate; note this is ignored by positioning and alignment
+    // logic and generally assumes central text anchoring...
+    if let Some(rotate) = orig_elem.pop_attr("text-rotate") {
+        // move to text element, then process as if it were there to begin with
+        text_elem.set_attr("rotate", &rotate);
+        text_elem.handle_rotation()?;
+    }
+
     // line spacing (in 'em').
     let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
     // Extract style and class(es) from original element. Note we use

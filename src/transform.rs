@@ -156,7 +156,7 @@ impl EventGen for Container {
                 events.extend(&evlist);
                 events.push(OutputEvent::End(self.0.name.clone()));
 
-                if self.0.name == "defs" || self.0.name == "symbol" {
+                if self.0.name == "defs" {
                     bbox = None;
                 } else if bbox.is_some() {
                     new_el.content_bbox = bbox;
@@ -249,29 +249,34 @@ impl EventGen for GroupElement {
         // push variables onto the stack
         context.push_element(&self.0);
 
-        let mut content_bb = None;
-        let mut events = OutputList::new();
-        if self.0.is_empty_element() {
-            events.push(OutputEvent::Empty(new_el));
+        let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
+            // get the inner events / bbox first, as some outer element attrs
+            // (e.g. `transform` via rotate) may depend on the bbox.
+            process_events(inner_events, context).inspect_err(|_| {
+                context.pop_element();
+            })?
         } else {
-            let el_name = new_el.name.clone();
-            events.push(OutputEvent::Start(new_el));
-
-            if let Some(inner_events) = self.0.inner_events(context) {
-                let (ev_list, bb) = process_events(inner_events, context)?;
-                content_bb = bb;
-                events.extend(&ev_list);
-            }
-
-            events.push(OutputEvent::End(el_name));
-        }
+            (OutputList::new(), None)
+        };
 
         // pop variables off the stack
         context.pop_element();
 
-        // Messy! should probably have a id->bbox map in context
-        let mut new_el = self.0.clone();
+        // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
+        new_el.handle_rotation()?;
+
+        let mut events = OutputList::new();
+        if self.0.is_empty_element() {
+            events.push(OutputEvent::Empty(new_el.clone()));
+        } else {
+            let el_name = new_el.name.clone();
+            events.push(OutputEvent::Start(new_el.clone()));
+            events.extend(&inner);
+            events.push(OutputEvent::End(el_name));
+        }
+
+        // Messy! should probably have a id->bbox map in context
         context.update_element(&new_el);
         context.set_prev_element(&new_el);
 

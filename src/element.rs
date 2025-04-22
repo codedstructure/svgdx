@@ -227,6 +227,16 @@ impl SvgElement {
             }
         }
 
+        if self.name == "use" {
+            // rotation requires a bbox to identify center of rotation; for `<use>`
+            // elements derive from context and inject via `content_bbox`. Allows
+            // handle_rotation to be independent of context.
+            if let Some(bbox) = ctx.get_element_bbox(self)? {
+                self.content_bbox = Some(bbox);
+            }
+        }
+        self.handle_rotation()?;
+
         Ok(())
     }
 
@@ -579,6 +589,26 @@ impl SvgElement {
         self.has_attr("start")
             && self.has_attr("end")
             && (self.name == "line" || self.name == "polyline")
+    }
+
+    pub fn handle_rotation(&mut self) -> Result<()> {
+        let angle = self.pop_attr("rotate");
+        if angle.is_none() {
+            return Ok(());
+        }
+        let angle = angle.unwrap();
+        let angle = strp(&angle)?;
+        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.center()) {
+            let mut rot_xfrm = TransformAttr::new();
+            rot_xfrm.rotate_around(angle, cx, cy);
+            if let Some(xfrm) = self.pop_attr("transform") {
+                // rotation should be the outermost transform, so prepend it
+                self.set_attr("transform", &format!("{rot_xfrm} {xfrm}"));
+            } else {
+                self.set_attr("transform", &rot_xfrm.to_string());
+            }
+        }
+        Ok(())
     }
 
     fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {

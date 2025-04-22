@@ -4,7 +4,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::position::{BoundingBox, Position};
 use crate::transform::{process_events, EventGen};
-use crate::types::ElRef;
+use crate::types::{fstr, strp, ElRef};
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement(pub SvgElement);
@@ -49,6 +49,16 @@ impl EventGen for ReuseElement {
         for (attr, value) in reuse_element.get_attrs() {
             match attr.as_str() {
                 "href" | "id" | "x" | "y" => continue,
+                "rotate" | "text-rotate" => {
+                    // any existing rotation is built on by the reuse element
+                    if let Some(inst_rot) = instance_element.get_attr(&attr) {
+                        let inst_rot = strp(&inst_rot)?;
+                        let rot = strp(&value)?;
+                        instance_element.set_attr(&attr, &fstr(inst_rot + rot));
+                    } else {
+                        instance_element.set_attr(&attr, &value);
+                    }
+                }
                 "transform" => {
                     // append to any existing transform
                     let mut xfrm = value.clone();
