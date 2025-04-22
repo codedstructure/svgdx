@@ -32,7 +32,16 @@
         <div id="controls">
           <div id="error-output"></div>
           <div style="display: inline-block">
-            <button id="toggle-layout" data-info="Toggle layout between horizontal and vertical">Layout</button>
+            <div id="layout-popup" class="popup-container">
+              <button id="layout" data-info="Change the editor layout">Layout</button>
+              <div class="popup-buttons">
+                <button class="popup-button" id="layout-vertical">Vertical</button>
+                <button class="popup-button" id="layout-horizontal">Horizontal</button>
+                <button class="popup-button" id="layout-v-text">Vertical (SVG+text)</button>
+                <button class="popup-button" id="layout-h-text">Horizontal (SVG+text)</button>
+              </div>
+            </div>
+
             <button id="auto-viewbox" data-info="When active, auto-resize and center the SVG on update">Auto Fit</button>
             <button id="reset-view" data-info="Resize and center the SVG">Reset View</button>
             <button id="save-input" data-info="Download the input">Save Input</button>
@@ -50,6 +59,7 @@
                 <button class="popup-button" id="copy-png-big">Large (2048px)</button>
                 <button class="popup-button" id="copy-png-medium">Medium (1024px)</button>
                 <button class="popup-button" id="copy-png-small">Small (512px)</button>
+                <button class="popup-button" id="copy-png-tiny">Tiny (128px)</button>
               </div>
             </div>
             <div id="help-popup" class="popup-container">

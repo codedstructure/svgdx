@@ -36,21 +36,49 @@ const textOutputContainer = document.querySelector('#text-output');
 const error_output = document.querySelector('#error-output');
 const statusbar = document.querySelector('#statusbar');
 
-function resetLayout(targetContainer, otherContainer, orientation) {
+function layoutOrientation(selection) {
+    switch (selection) {
+        case "horizontal":
+        case "h-text":
+            return "horizontal";
+        case "vertical":
+        case "v-text":
+            return "vertical";
+    }
+    return "vertical";
+}
+
+function setDefaultWidth(target) {
+    target.style.width = "40%";
+    target.style.minWidth = "40%";
+}
+
+function setDefaultHeight(target) {
+    target.style.height = "40%";
+    target.style.minHeight = "40%";
+}
+
+function clearHeight(target) {
+    target.style.height = "";
+    target.style.minHeight = "";
+}
+
+function clearWidth(target) {
+    target.style.width = "";
+    target.style.minWidth = "";
+}
+
+function resetSplitter(targetContainer, otherContainer, orientation) {
     if (container.dataset.layout === orientation) {
-        targetContainer.style.minWidth = "40%";
-        targetContainer.style.width = "40%";
-        targetContainer.style.minHeight = "";
-        targetContainer.style.height = "";
+        setDefaultWidth(targetContainer);
+        clearHeight(targetContainer);
         targetContainer.classList.remove("maximized");
         targetContainer.classList.remove("minimized");
         otherContainer.classList.remove("maximized");
         otherContainer.classList.remove("minimized");
     } else {
-        targetContainer.style.minWidth = "";
-        targetContainer.style.width = "";
-        targetContainer.style.minHeight = "40%";
-        targetContainer.style.height = "40%";
+        setDefaultHeight(targetContainer);
+        clearWidth(targetContainer);
         targetContainer.classList.remove("maximized");
         targetContainer.classList.remove("minimized");
         otherContainer.classList.remove("maximized");
@@ -469,7 +497,12 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     document.querySelectorAll('#copy-popup .popup-button').forEach(
         el => el.addEventListener('click', async (e) => {
             let id = e.target.id;
-            const res = id === "copy-png-big" ? 2048 : (id === "copy-png-medium" ? 1024 : 512);
+            const resolution = {"copy-png-big": 2048, "copy-png-medium": 1024, "copy-png-small": 512, "copy-png-tiny": 128};
+            const res = resolution[id];
+            if (res === undefined) {
+                console.error(`Unknown copy PNG button: ${id}`);
+                return;
+            }
             try {
                 navigator.clipboard.write([
                     new ClipboardItem({
@@ -543,25 +576,90 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         return pngBlob;
     }
 
-    // toggle layout between horizontal and vertical
-    const layoutButton = document.getElementById('toggle-layout');
-    let layoutButtonChecked = localStorage.getItem('svgdx-layout') || "false";
-    layoutButton.dataset.checked = layoutButtonChecked;
-    container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
-    resetLayout(editorContainer, outputContainer, "vertical");
-    resetLayout(svgOutputContainer, textOutputContainer, "horizontal");
-    layoutButton.addEventListener('click', () => {
-        layoutButtonChecked = layoutButtonChecked === "true" ? "false" : "true";
-        layoutButton.dataset.checked = layoutButtonChecked;
-        container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
-        localStorage.setItem('svgdx-layout', layoutButton.dataset.checked);
+    function updateLayout(selection) {
+        // Reset to initial layout
+        for (const el of [editorContainer, outputContainer, svgOutputContainer, textOutputContainer]) {
+            el.classList.remove("maximized");
+            el.classList.remove("minimized");
+            el.style.width = "";
+            el.style.minWidth = "";
+            el.style.height = "";
+            el.style.minHeight = "";
+        }
 
         // Reset any manual resizing via the splitter
-        resetLayout(editorContainer, outputContainer, "vertical");
-        resetLayout(svgOutputContainer, textOutputContainer, "horizontal");
+        switch (selection) {
+            case "horizontal":
+                setDefaultHeight(editorContainer);
+                svgOutputContainer.classList.add("maximized");
+                textOutputContainer.classList.add("minimized");
+                break;
+            case "vertical":
+                setDefaultWidth(editorContainer);
+                svgOutputContainer.classList.add("maximized");
+                textOutputContainer.classList.add("minimized");
+                break;
+            case "h-text":
+                setDefaultHeight(editorContainer);
+                setDefaultWidth(svgOutputContainer);
+                break;
+            case "v-text":
+                setDefaultWidth(editorContainer);
+                setDefaultHeight(svgOutputContainer);
+                break;
+            default:
+                break;
+        }
         // opportunity for auto-fit to take effect
         update();
-    });
+    }
+
+    // Load layout from localStorage, defaulting if not set or invalid
+    let layoutSelection = localStorage.getItem('svgdx-layout') || "";
+    switch (layoutSelection) {
+        case "horizontal":
+        case "vertical":
+        case "v-text":
+        case "h-text":
+            break;
+        default:
+            layoutSelection = "vertical";
+            break;
+    }
+    container.dataset.layout = layoutOrientation(layoutSelection);
+    updateLayout(layoutSelection);
+
+    document.querySelectorAll('#layout-popup .popup-button').forEach(
+        el => el.addEventListener('click', async (e) => {
+            // Hide the buttons again after copying. This is quite hacky (including
+            // the timeout values), due to pure-CSS popup not having a way to close.
+            // We make all the inner elements invisible, which will (should!) cause
+            // the popup to no longer be :hover, at which point it will be hidden,
+            // but then we need to remove the display:none to allow it to be used again...
+            setTimeout(() => {
+                document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
+                setTimeout(() => {
+                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
+                }, 200);
+            }, 200);
+
+            let id = e.target.id;
+            switch (id) {
+                case "layout-vertical":
+                case "layout-horizontal":
+                case "layout-v-text":
+                case "layout-h-text":
+                    break;
+                default:
+                    console.error(`Unknown layout button: ${id}`);
+                    return;
+            }
+            const selection = id.replace("layout-", "");
+            localStorage.setItem('svgdx-layout', selection);
+            container.dataset.layout = layoutOrientation(selection);
+            updateLayout(selection);
+        })
+    );
 })();
 
 /** Scroll wheel: zoom SVG */
@@ -637,6 +735,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         document.body.style.cursor = 'move';
         const svg = svgOutputContainer.querySelector('svg');
         if (e.target.closest('#svg-output > svg') === svg) {
+            e.preventDefault();
             isDragging = true;
             startX = e.clientX;
             startY = e.clientY;
@@ -645,6 +744,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
+        e.preventDefault();
 
         const svg = svgOutputContainer.querySelector('svg');
         // Note stores mouse *client* position rather than SVG position
@@ -736,7 +836,7 @@ function setupSplitter(splitter, orientation, targetContainer, otherContainer) {
 
     // double-click to reset split
     splitter.addEventListener('dblclick', function(e) {
-        resetLayout(targetContainer, otherContainer, orientation);
+        resetSplitter(targetContainer, otherContainer, orientation);
     });
 
     function mousemove(e) {
@@ -834,6 +934,8 @@ function setupSplitter(splitter, orientation, targetContainer, otherContainer) {
             targetContainer.style.height = newHeight + 'px';
             targetContainer.style.minHeight = newHeight + 'px';
         }
+
+        e.preventDefault();
     }
 
     function mouseup() {
