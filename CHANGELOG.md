@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0 - 2025-04-22]
+
 - Improved: support for positioning of `<reuse>` elements; these now support
   universal positioning attributes and relpos specification. Note that some
   element types (`g`, `path`, `polyline`, `polygon`) are now positioned using
