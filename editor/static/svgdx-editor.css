@@ -1,21 +1,49 @@
 body { font-family: sans-serif; margin: 0; }
 .container {
     display: flex;
-    flex: 1;
-    height: calc(100svh - 50px);
+    flex: 1 1 auto;
+    height: calc(100svh - 70px);
+    padding: 10px;
 }
 .container[data-layout="vertical"] { flex-direction: row; }
 .container[data-layout="horizontal"] { flex-direction: column; }
 
-#editor-container, #output {
+#editor-container {
     border: 1px solid #ccc;
-    margin: 10px;
-    min-width: 100px;
-    min-height: 100px;
+    min-width: 10px;
+    min-height: 10px;
 }
 
-#output { flex: 1 1 auto; }
-#svg-output, #text-output {
+#output-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-width: 10px;
+    min-height: 10px;
+}
+
+.minimized {
+    display: none !important;
+}
+.maximized {
+    display: block;
+}
+
+.output-panel {
+    border: 1px solid #ccc;
+}
+#output-container .CodeMirror-scroll {
+    background: #f8f8f8;
+}
+#output-container.error .CodeMirror-scroll {
+    opacity: 0.3;
+}
+#editor-container.error .CodeMirror-scroll {
+    background-color: #fff8f8;
+}
+
+#editor-container, #svg-output, #text-output {
+    margin: 0;
     height: 100%;
     width: 100%;
 }
@@ -41,11 +69,30 @@ body { font-family: sans-serif; margin: 0; }
 }
 #statusbar { font-family: monospace; }
 
-#splitter { min-width: 8px; min-height: 8px; background-color: #eee; flex: none; }
-.container[data-layout="horizontal"] #splitter { cursor: row-resize; margin: -5px 10px; }
-.container[data-layout="vertical"] #splitter { cursor: col-resize; margin: 10px -5px; }
-#splitter:hover { background-color: #ddd; }
-#splitter:active { background-color: #ccc; }
+.splitter {
+    min-width: 8px;
+    min-height: 8px;
+    flex: none;
+    z-index: 1000;
+}
+.container[data-layout="horizontal"] {
+    #main-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
+    #main-split:hover { background: linear-gradient(#bbb, #888) }
+    #main-split:active { background: linear-gradient(#ccc, #eee) }
+    #output-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
+    #output-split:hover { background: linear-gradient(90deg, #bbb, #888) }
+    #output-split:active { background: linear-gradient(90deg, #ccc, #eee) }
+    #output-container { flex-direction: row; }
+}
+.container[data-layout="vertical"] {
+    #main-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
+    #main-split:hover { background: linear-gradient(90deg, #bbb, #888) }
+    #main-split:active { background: linear-gradient(90deg, #ccc, #eee) }
+    #output-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
+    #output-split:hover { background: linear-gradient(#bbb, #888) }
+    #output-split:active { background: linear-gradient(#ccc, #eee) }
+    #output-container { flex-direction: column; }
+}
 
 .CodeMirror .error-line { background-color: #ffdddd; }
 .CodeMirror .hover-line { background-color: #f0f0f0; }
@@ -70,9 +117,7 @@ button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
 /* hide popup buttons by default */
 #controls div .popup-button { display: none; width: 100%; }
 /* initial reveal */
-#copy-png:hover ~ .popup-buttons .popup-button { display: block; }
-#copy-svg:hover ~ .popup-buttons .popup-button { display: block; }
-#help:hover ~ .popup-buttons .popup-button { display: block; }
+#controls div button:hover ~ .popup-buttons .popup-button { display: block; }
 /* keep shown when hovering over popup */
 #controls .popup-buttons:hover .popup-button { display: block; }
 

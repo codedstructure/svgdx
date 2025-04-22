@@ -35,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: relative positioning of `<use>` elements now works consistently.
 
+- Editor: new layout options to show both SVG image and text together. This
+  replaces the previous 'Text Output' button.
+
 ## [0.19.0 - 2025-03-01]
 
 - Changed: the `text-pre` attribute has been replaced with a `d-text-pre`

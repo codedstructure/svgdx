@@ -30,21 +30,59 @@ function clientToSvg(svg, x, y) {
 
 const container = document.querySelector('.container');
 const editorContainer = document.querySelector('#editor-container');
-const svg_container = document.querySelector('#svg-output');
+const outputContainer = document.querySelector('#output-container');
+const svgOutputContainer = document.querySelector('#svg-output');
+const textOutputContainer = document.querySelector('#text-output');
 const error_output = document.querySelector('#error-output');
 const statusbar = document.querySelector('#statusbar');
 
-function resetLayout() {
-    if (container.dataset.layout === "vertical") {
-        editorContainer.style.minWidth = "40%";
-        editorContainer.style.width = "40%";
-        editorContainer.style.minHeight = "";
-        editorContainer.style.height = "";
+function layoutOrientation(selection) {
+    switch (selection) {
+        case "horizontal":
+        case "h-text":
+            return "horizontal";
+        case "vertical":
+        case "v-text":
+            return "vertical";
+    }
+    return "vertical";
+}
+
+function setDefaultWidth(target) {
+    target.style.width = "40%";
+    target.style.minWidth = "40%";
+}
+
+function setDefaultHeight(target) {
+    target.style.height = "40%";
+    target.style.minHeight = "40%";
+}
+
+function clearHeight(target) {
+    target.style.height = "";
+    target.style.minHeight = "";
+}
+
+function clearWidth(target) {
+    target.style.width = "";
+    target.style.minWidth = "";
+}
+
+function resetSplitter(targetContainer, otherContainer, orientation) {
+    if (container.dataset.layout === orientation) {
+        setDefaultWidth(targetContainer);
+        clearHeight(targetContainer);
+        targetContainer.classList.remove("maximized");
+        targetContainer.classList.remove("minimized");
+        otherContainer.classList.remove("maximized");
+        otherContainer.classList.remove("minimized");
     } else {
-        editorContainer.style.minWidth = "";
-        editorContainer.style.width = "";
-        editorContainer.style.minHeight = "40%";
-        editorContainer.style.height = "40%";
+        setDefaultHeight(targetContainer);
+        clearWidth(targetContainer);
+        targetContainer.classList.remove("maximized");
+        targetContainer.classList.remove("minimized");
+        otherContainer.classList.remove("maximized");
+        otherContainer.classList.remove("minimized");
     }
 }
 
@@ -84,14 +122,23 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     // keeping a changing SVG 'fixed' on screen.
     let last_viewbox = null;
 
-    function update_response(svgData) {
+    function update_text_output(svgData) {
         if (document.getElementById('text-output').style.display !== "none") {
             // Updating the codemirror editor while hidden is ineffective;
             // we set if visible or when it becomes visible.
+
+            outputContainer.classList.remove('error');
+            // retrieve current scroll position
+            const scrollTop = textViewer.getScrollInfo().top;
             textViewer.setValue(svgData);
+            // restore scroll position
+            textViewer.scrollTo(null, scrollTop);
         }
-        svg_container.innerHTML = svgData;
-        const svg = svg_container.querySelector('svg');
+    }
+
+    function update_svg_output(svgData) {
+        svgOutputContainer.innerHTML = svgData;
+        const svg = svgOutputContainer.querySelector('svg');
         if (svg === null) {
             throw new Error("No SVG returned");
         }
@@ -106,7 +153,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             svg.setAttribute('viewBox', last_viewbox);
         }
 
-        document.getElementById('editor').style.backgroundColor = "white";
+        editorContainer.classList.remove('error');
         error_output.innerText = "";
         error_output.style.display = "none";
 
@@ -117,11 +164,6 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         // for (const lineNumber of linesWithErrors) {
         //     editor.addLineClass(lineNumber, "background", "error-line");
         // }
-    }
-
-    function want_metadata() {
-        // We want metadata if the SVG is showing rather than the text output
-        return document.getElementById('svg-output').style.display !== "none";
     }
 
     async function svgdx_transform_server(svgdx_input, add_metadata) {
@@ -240,20 +282,34 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             // save editor content to localStorage
             localStorage.setItem(`svgdx-editor-value-${activeTab()}`, svgdx_input);
 
-            let result = await get_transform(svgdx_input, want_metadata());
+            let result = await get_transform(svgdx_input, true);
 
             const responseOk = result[0];
             const responseText = result[1];
 
             if (responseOk) {
-                const oldSvg = svg_container.querySelector('svg');
+                const oldSvg = svgOutputContainer.querySelector('svg');
                 if (oldSvg) {
                     last_viewbox = oldSvg.getAttribute('viewBox');
                 }
 
-                update_response(responseText);
+                update_svg_output(responseText);
+
+                // TODO: would be nice to get both with & without metadata in a single
+                // GET request, which implies something like getting SVG over JSON,
+                // which is just meh.
+                // re-get without metadata to update text output
+                let [ok, svg_output] = await get_transform(svgdx_input, false);
+                if (ok) {
+                    update_text_output(svg_output);
+                } else {
+                    // update status bar with error message
+                    statusbar.style.color = "darkred";
+                    statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
+                }
             } else {
-                document.getElementById('editor').style.backgroundColor = 'red';
+                outputContainer.classList.add('error');
+                editorContainer.classList.add('error');
                 error_output.innerText = responseText;
                 error_output.style.display = "";
                 statusbar.innerText = "svgdx editor";
@@ -315,7 +371,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     const resetButton = document.getElementById('reset-view');
     resetButton.addEventListener('click', () => {
-        const svg = svg_container.querySelector('svg');
+        const svg = svgOutputContainer.querySelector('svg');
         svg.setAttribute('viewBox', svg.dataset.origViewbox);
     });
 
@@ -441,7 +497,12 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     document.querySelectorAll('#copy-popup .popup-button').forEach(
         el => el.addEventListener('click', async (e) => {
             let id = e.target.id;
-            const res = id === "copy-png-big" ? 2048 : (id === "copy-png-medium" ? 1024 : 512);
+            const resolution = {"copy-png-big": 2048, "copy-png-medium": 1024, "copy-png-small": 512, "copy-png-tiny": 128};
+            const res = resolution[id];
+            if (res === undefined) {
+                console.error(`Unknown copy PNG button: ${id}`);
+                return;
+            }
             try {
                 navigator.clipboard.write([
                     new ClipboardItem({
@@ -515,49 +576,90 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         return pngBlob;
     }
 
-    // toggle layout between horizontal and vertical
-    const layoutButton = document.getElementById('toggle-layout');
-    let layoutButtonChecked = localStorage.getItem('svgdx-layout') || "false";
-    layoutButton.dataset.checked = layoutButtonChecked;
-    container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
-    resetLayout();
-    layoutButton.addEventListener('click', () => {
-        layoutButtonChecked = layoutButtonChecked === "true" ? "false" : "true";
-        layoutButton.dataset.checked = layoutButtonChecked;
-        container.dataset.layout = layoutButtonChecked === "true" ? "vertical" : "horizontal";
-        localStorage.setItem('svgdx-layout', layoutButton.dataset.checked);
+    function updateLayout(selection) {
+        // Reset to initial layout
+        for (const el of [editorContainer, outputContainer, svgOutputContainer, textOutputContainer]) {
+            el.classList.remove("maximized");
+            el.classList.remove("minimized");
+            el.style.width = "";
+            el.style.minWidth = "";
+            el.style.height = "";
+            el.style.minHeight = "";
+        }
 
         // Reset any manual resizing via the splitter
-        resetLayout();
+        switch (selection) {
+            case "horizontal":
+                setDefaultHeight(editorContainer);
+                svgOutputContainer.classList.add("maximized");
+                textOutputContainer.classList.add("minimized");
+                break;
+            case "vertical":
+                setDefaultWidth(editorContainer);
+                svgOutputContainer.classList.add("maximized");
+                textOutputContainer.classList.add("minimized");
+                break;
+            case "h-text":
+                setDefaultHeight(editorContainer);
+                setDefaultWidth(svgOutputContainer);
+                break;
+            case "v-text":
+                setDefaultWidth(editorContainer);
+                setDefaultHeight(svgOutputContainer);
+                break;
+            default:
+                break;
+        }
         // opportunity for auto-fit to take effect
         update();
-    });
-
-    // Toggle Output button: checked => text, unchecked => image
-    const toggleOutput = document.getElementById('toggle-output');
-    let toggleOutputChecked = localStorage.getItem('svgdx-toggle-output') || "false";
-    toggleOutput.dataset.checked = toggleOutputChecked;
-
-    function updateOutputMode() {
-        if (toggleOutputChecked === "true") {
-            document.getElementById('svg-output').style.display = "none";
-            document.getElementById('text-output').style.display = "";
-            update();
-        } else {
-            document.getElementById('svg-output').style.display = "";
-            document.getElementById('text-output').style.display = "none";
-            update();
-        }
     }
 
-    updateOutputMode();
+    // Load layout from localStorage, defaulting if not set or invalid
+    let layoutSelection = localStorage.getItem('svgdx-layout') || "";
+    switch (layoutSelection) {
+        case "horizontal":
+        case "vertical":
+        case "v-text":
+        case "h-text":
+            break;
+        default:
+            layoutSelection = "vertical";
+            break;
+    }
+    container.dataset.layout = layoutOrientation(layoutSelection);
+    updateLayout(layoutSelection);
 
-    toggleOutput.addEventListener('click', () => {
-        toggleOutputChecked = toggleOutputChecked === "true" ? "false" : "true";
-        toggleOutput.dataset.checked = toggleOutputChecked;
-        localStorage.setItem('svgdx-toggle-output', toggleOutput.dataset.checked);
-        updateOutputMode();
-    });
+    document.querySelectorAll('#layout-popup .popup-button').forEach(
+        el => el.addEventListener('click', async (e) => {
+            // Hide the buttons again after copying. This is quite hacky (including
+            // the timeout values), due to pure-CSS popup not having a way to close.
+            // We make all the inner elements invisible, which will (should!) cause
+            // the popup to no longer be :hover, at which point it will be hidden,
+            // but then we need to remove the display:none to allow it to be used again...
+            setTimeout(() => {
+                document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
+                setTimeout(() => {
+                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
+                }, 200);
+            }, 200);
+
+            let id = e.target.id;
+            switch (id) {
+                case "layout-vertical":
+                case "layout-horizontal":
+                case "layout-v-text":
+                case "layout-h-text":
+                    break;
+                default:
+                    console.error(`Unknown layout button: ${id}`);
+                    return;
+            }
+            const selection = id.replace("layout-", "");
+            localStorage.setItem('svgdx-layout', selection);
+            container.dataset.layout = layoutOrientation(selection);
+            updateLayout(selection);
+        })
+    );
 })();
 
 /** Scroll wheel: zoom SVG */
@@ -570,7 +672,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let busy = false;
     const zoomDelayMs = 50;
 
-    svg_container.addEventListener('wheel', (e) => {
+    svgOutputContainer.addEventListener('wheel', (e) => {
         // Prevent default scrolling behavior
         e.preventDefault();
 
@@ -582,7 +684,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         const factor = Math.sign(e.deltaY) * ZOOM_SPEED;
 
         // initial viewBox
-        const svg = svg_container.querySelector('svg');
+        const svg = svgOutputContainer.querySelector('svg');
         const x = svg.viewBox.baseVal.x;
         const y = svg.viewBox.baseVal.y;
         const width = svg.viewBox.baseVal.width;
@@ -625,14 +727,15 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     let isDragging = false;
     let startX, startY;
 
-    svg_container.addEventListener('mousedown', (e) => {
+    svgOutputContainer.addEventListener('mousedown', (e) => {
         // we're only interested in the left mouse button
         if (e.button !== 0) return;
 
         // set cursor to xy move
         document.body.style.cursor = 'move';
-        const svg = svg_container.querySelector('svg');
+        const svg = svgOutputContainer.querySelector('svg');
         if (e.target.closest('#svg-output > svg') === svg) {
+            e.preventDefault();
             isDragging = true;
             startX = e.clientX;
             startY = e.clientY;
@@ -641,8 +744,9 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     document.addEventListener('mousemove', (e) => {
         if (!isDragging) return;
+        e.preventDefault();
 
-        const svg = svg_container.querySelector('svg');
+        const svg = svgOutputContainer.querySelector('svg');
         // Note stores mouse *client* position rather than SVG position
         // for accuracy, since mouse moves in integer pixel steps, and
         // converts only to calculate the delta for viewBox updates.
@@ -668,7 +772,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 /** status bar updates */
 (function () {
     document.addEventListener('mousemove', (e) => {
-        const svg = svg_container.querySelector('svg');
+        const svg = svgOutputContainer.querySelector('svg');
 
         if (typeof e.target.dataset.info !== "undefined") {
             // show tooltip in status bar
@@ -713,20 +817,18 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     });
 })();
 
-/** Splitter for resizing editor and output */
-(function () {
-    let splitter = document.getElementById('splitter');
-
+/** Splitter for resizing panels */
+function setupSplitter(splitter, orientation, targetContainer, otherContainer) {
     let initialClientPos, initialSize;
 
     splitter.addEventListener('mousedown', function(e) {
         e.preventDefault();
-        if (container.dataset.layout === "vertical") {
+        if (container.dataset.layout === orientation) {
             initialClientPos = e.clientX;
-            initialSize = editorContainer.getBoundingClientRect().width;
+            initialSize = targetContainer.getBoundingClientRect().width;
         } else {
             initialClientPos = e.clientY;
-            initialSize = editorContainer.getBoundingClientRect().height;
+            initialSize = targetContainer.getBoundingClientRect().height;
         }
         document.addEventListener('mousemove', mousemove);
         document.addEventListener('mouseup', mouseup);
@@ -734,45 +836,115 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
 
     // double-click to reset split
     splitter.addEventListener('dblclick', function(e) {
-        resetLayout();
+        resetSplitter(targetContainer, otherContainer, orientation);
     });
 
     function mousemove(e) {
-        if (container.dataset.layout === "vertical") {
+        if (container.dataset.layout === orientation) {
             const dx = e.clientX - initialClientPos;
             let newWidth = initialSize + dx;
 
-            // Convert min (25em) and max (80%) widths to pixels
-            const minPixels = parseFloat(getComputedStyle(editorContainer).fontSize) * 25;
-            const maxPixels = window.innerWidth * 0.8;
+            const edgeMin = 100;
+            const collapseAt = 40;
+            const uncollapseAt = 20;
+            // Convert min (20%) and max (80%) width to pixels
+            const minPixels = Math.max(edgeMin, container.clientWidth * 0.2);
+            const maxPixels = Math.max(edgeMin, container.clientWidth * 0.8);
+
+            // Allow the splitter to hide/show the target container when dragged to the edges
+            let resetStyleSize = false;
+            if (newWidth < minPixels - collapseAt) {
+                targetContainer.classList.add("minimized");
+                resetStyleSize = true;
+            } else if (newWidth > minPixels - uncollapseAt) {
+                targetContainer.classList.remove("minimized");
+            }
+            if (newWidth > maxPixels + collapseAt) {
+                otherContainer.classList.add("minimized");
+                // fill the space, overriding the normal limit.
+                targetContainer.classList.add("maximized");
+                resetStyleSize = true;
+            } else if (newWidth < maxPixels + uncollapseAt) {
+                otherContainer.classList.remove("minimized");
+            }
+            if (resetStyleSize) {
+                targetContainer.style.width = "";
+                targetContainer.style.minWidth = "";
+                return;
+            }
 
             // Enforce min and max widths
             newWidth = Math.max(newWidth, minPixels);
             newWidth = Math.min(newWidth, maxPixels);
 
+            targetContainer.classList.remove("maximized");
+            targetContainer.classList.remove("minimized");
+            otherContainer.classList.remove("maximized");
+            otherContainer.classList.remove("minimized");
+
             // Set both width and min-width to improve cross-browser compatibility
-            editorContainer.style.width = newWidth + 'px';
-            editorContainer.style.minWidth = newWidth + 'px';
+            targetContainer.style.width = newWidth + 'px';
+            targetContainer.style.minWidth = newWidth + 'px';
         } else {
             const dy = e.clientY - initialClientPos;
             let newHeight = initialSize + dy;
 
+            const edgeMin = 50;
+            const collapseAt = 40;
+            const uncollapseAt = 20;
             // Convert min (20%) and max (80%) height to pixels
-            const minPixels = window.innerHeight * 0.2;
-            const maxPixels = window.innerHeight * 0.8;
+            const minPixels = Math.max(edgeMin, container.clientHeight * 0.2);
+            const maxPixels = Math.max(edgeMin, container.clientHeight * 0.8);
 
-            // Enforce min and max widths
+            // Allow the splitter to hide/show the target container when dragged to the edges
+            let resetStyleSize = false;
+            if (newHeight < minPixels - collapseAt) {
+                targetContainer.classList.add("minimized");
+                resetStyleSize = true;
+            } else if (newHeight > minPixels - uncollapseAt) {
+                targetContainer.classList.remove("minimized");
+            }
+            // thresholds here influenced by overall page incl headers & margin;
+            // mustn't be too low or cursor needs to scroll 'off the window' which
+            // isn't possible in a maximised window.
+            if (newHeight > maxPixels + collapseAt) {
+                otherContainer.classList.add("minimized");
+                // fill the space, overriding the normal limit.
+                targetContainer.classList.add("maximized");
+                resetStyleSize = true;
+            } else if (newHeight < maxPixels + uncollapseAt) {
+                otherContainer.classList.remove("minimized");
+            }
+            if (resetStyleSize) {
+                targetContainer.style.height = "";
+                targetContainer.style.minHeight = "";
+                return;
+            }
+
+            // Enforce min and max heights
             newHeight = Math.max(newHeight, minPixels);
             newHeight = Math.min(newHeight, maxPixels);
 
-            // Set both width and min-width to improve cross-browser compatibility
-            editorContainer.style.height = newHeight + 'px';
-            editorContainer.style.minHeight = newHeight + 'px';
+            targetContainer.classList.remove("maximized");
+            targetContainer.classList.remove("minimized");
+            otherContainer.classList.remove("maximized");
+            otherContainer.classList.remove("minimized");
+
+            // Set both height and min-height to improve cross-browser compatibility
+            targetContainer.style.height = newHeight + 'px';
+            targetContainer.style.minHeight = newHeight + 'px';
         }
+
+        e.preventDefault();
     }
 
     function mouseup() {
         document.removeEventListener('mousemove', mousemove);
         document.removeEventListener('mouseup', mouseup);
     }
-})();
+}
+
+(function() {
+    setupSplitter(document.getElementById('main-split'), "vertical", editorContainer, outputContainer);
+    setupSplitter(document.getElementById('output-split'), "horizontal", svgOutputContainer, textOutputContainer);
+})()
