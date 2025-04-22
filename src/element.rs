@@ -185,8 +185,6 @@ impl SvgElement {
             }
         }
 
-        self.handle_rotation()?;
-
         if self.is_connector() {
             if let Ok(conn) = Connector::from_element(
                 self,
@@ -228,6 +226,16 @@ impl SvgElement {
                 *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
             }
         }
+
+        if self.name == "use" {
+            // rotation requires a bbox to identify center of rotation; for `<use>`
+            // elements derive from context and inject via `content_bbox`. Allows
+            // handle_rotation to be independent of context.
+            if let Some(bbox) = ctx.get_element_bbox(self)? {
+                self.content_bbox = Some(bbox);
+            }
+        }
+        self.handle_rotation()?;
 
         Ok(())
     }

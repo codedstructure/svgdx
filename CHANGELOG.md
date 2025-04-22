@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transform attributes to translate shapes; for `polyline` and `polygon` this
   is a change to previous per-coord adjustments to `points` values.
 
+- Added: new `rotate` attribute which takes a value in degrees to rotate the
+  element around its center. See the [daisy.xml](examples/daisy.xml) example.
+  Note that currently the object's _bounding box_ is rotated rather than a
+  new bbox being calculated for the rotated object, so non-rectangular shapes
+  may have bboxes which are too large (consider a circle at 45degrees...).
+
+- Added: a corresponding `text-rotate` attribute allows attached `text` to be
+  rotated, providing control beyond the `d-text-vertical` class. Text objects
+  are rotated around the anchor point, which may lead to unexpected results
+  when text is not anchored centrally.
+
 - Added: support for 'bearing' commands in path element data, allowing 'turtle
   graphics' motions as part of path data. This was part of the SVG2 spec in
   earlier drafts, but has since been dropped. Now with svgdx it can be used again!

@@ -22,6 +22,7 @@ mod rel_pos;
 mod rel_size;
 mod reuse;
 mod root_svg;
+mod rotate;
 mod roundtrip;
 mod src_line;
 mod text_attr;

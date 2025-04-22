@@ -215,6 +215,11 @@ impl TransformAttr {
                         result.x2 as f64,
                         result.y2 as f64,
                     );
+                    // TODO: ideally we'd get the convex hull of the shape (or simply a set
+                    // of points on the shape boundary, even internal) and rotate each point
+                    // to derive the resulting bounding box; this currently over-estimates
+                    // bboxes for non-rectangular shapes (e.g. a circle at 45deg will have a
+                    // larger bbox than a circle at 0deg despite being the same size)
                     let corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)];
                     let rot = corners
                         .iter()
