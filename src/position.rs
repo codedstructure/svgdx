@@ -197,7 +197,10 @@ impl Position {
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
         // TODO: should this return an error if no BBox?
-        if let Some(bbox) = self.to_bbox() {
+        if matches!(element.name.as_str(), "g" | "path" | "polyline" | "polygon") {
+            // These don't need a full bbox, and are always set via transform in any case.
+            self.position_via_transform(element);
+        } else if let Some(bbox) = self.to_bbox() {
             match element.name.as_str() {
                 "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
                     let width = bbox.width();
@@ -230,6 +233,9 @@ impl Position {
                             let xfrm = xfrm.iter().join(" ");
                             element.set_attr("transform", &xfrm);
                         }
+                        element.remove_attrs(&[
+                            "dx", "dy", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "r",
+                        ]);
                     }
                 }
                 "circle" => {
@@ -305,9 +311,6 @@ impl Position {
                 }
                 _ => (),
             }
-        } else if matches!(element.name.as_str(), "g" | "path" | "polyline" | "polygon") {
-            // We don't have a full bbox, but for some elements we don't need one...
-            self.position_via_transform(element);
         }
     }
 

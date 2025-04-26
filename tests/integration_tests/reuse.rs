@@ -620,3 +620,31 @@ fn test_reuse_wh_attrs() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_path() {
+    // Check that reuse of a path element works.
+    let input = r##"
+<path id="a" d="M0 0L1 1"/>
+<reuse id="z" href="#a" x="2" y="3"/>
+"##;
+    let expected = r#"<path id="z" d="M0 0L1 1" transform="translate(2, 3)" class="a"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<path id="a" d="M0 0L1 1"/>
+<reuse id="z" href="#a" xy="#a|h 2"/>
+"##;
+    let expected = r#"<path id="z" d="M0 0L1 1" transform="translate(3, 0)" class="a"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<path id="a" d="M0 0L1 1"/>
+<use id="z" href="#a" xy="#a|h 2"/>
+"##;
+    let expected = r##"<use id="z" href="#a" x="3" y="0"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

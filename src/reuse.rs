@@ -106,15 +106,16 @@ impl EventGen for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        // TODO: This isn't ideal. resolve_position() is needed to handle
-        // relpos positioning (`xy="#a|h"` etc), but the Position-based
-        // stuff fully handles other positioning. Should be unified.
-        reuse_element.resolve_position(context)?;
+        let mut pos = if let Some(dirspec_pos) = reuse_element.pos_from_dirspec(context)? {
+            dirspec_pos
+        } else {
+            reuse_element.resolve_position(context)?;
+            Position::from(&reuse_element)
+        };
 
         let inst_el = context
             .get_element(&elref)
             .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
-        let mut pos = Position::from(&reuse_element);
         if let Some(bb) = inst_el.content_bbox {
             pos.update_size(&bb.size());
         } else if let Some(sz) = instance_size {

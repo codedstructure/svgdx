@@ -811,7 +811,12 @@ impl SvgElement {
                     height = Some((y2 - y1).abs());
                 }
             }
-            _ => {}
+            _ => {
+                if let Some(bb) = self.bbox()? {
+                    width = Some(bb.width());
+                    height = Some(bb.height());
+                }
+            }
         }
         if let (Some(width), Some(height)) = (width, height) {
             Ok(Some(Size(width, height)))
@@ -1203,6 +1208,55 @@ impl SvgElement {
     ///   H - horizontal to the left
     ///   v - vertical below
     ///   V - vertical above
+    pub fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
+        let input = self.attrs.get("xy");
+        // element-relative position can only be applied via xy attribute
+        if let Some(input) = input {
+            let (ref_el, remain) = split_relspec(input, ctx)?;
+            let ref_el = match ref_el {
+                Some(el) => el,
+                None => return Ok(None),
+            };
+            if let (Some(bbox), Some(skip_rp_sep)) = (
+                ctx.get_element_bbox(ref_el)?,
+                remain.strip_prefix(RELPOS_SEP),
+            ) {
+                let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
+                let (reldir, remain) = if let Some(split_idx) = parts {
+                    let (a, b) = skip_rp_sep.split_at(split_idx);
+                    (a, b.trim_start())
+                } else {
+                    (skip_rp_sep, "")
+                };
+                let rel: DirSpec = reldir.parse()?;
+                // We won't have the full *position* of this element at this point, but hopefully
+                // we have enough to determine its size.
+                let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
+                let gap = if !remain.is_empty() {
+                    let mut parts = attr_split(remain);
+                    strp(&parts.next().unwrap_or("0".to_string()))?
+                } else {
+                    0.
+                };
+                let (x, y) = bbox.locspec(rel.to_locspec());
+                let (dx, dy) = match rel {
+                    DirSpec::Above => (-this_width / 2., -(this_height + gap)),
+                    DirSpec::Below => (-this_width / 2., gap),
+                    DirSpec::InFront => (gap, -this_height / 2.),
+                    DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
+                };
+
+                let mut pos = Position::new(self.name.clone());
+                pos.xmin = Some(x + dx);
+                pos.xmax = Some(x + dx + this_width);
+                pos.ymin = Some(y + dy);
+                pos.ymax = Some(y + dy + this_height);
+                return Ok(Some(pos))
+            }
+        }
+        Ok(None)
+    }
+
     fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         let input = self.attrs.get("xy");
         // element-relative position can only be applied via xy attribute
