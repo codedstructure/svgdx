@@ -369,11 +369,6 @@ impl SvgElement {
             self.eval_text_anchor(ctx)?;
         }
 
-        self.eval_rel_position(ctx)?;
-        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        self.expand_compound_pos();
-        self.eval_rel_attributes(ctx)?;
-
         if let ("polyline" | "polygon", Some(points)) =
             (self.name.as_str(), self.get_attr("points"))
         {
@@ -383,20 +378,35 @@ impl SvgElement {
             self.set_attr("d", &expand_relspec(&d, ctx));
         }
 
+        // TODO: issue is that this could fail with a reference error
+        // which would be resolved by expand_relspec, though that requires
+        // eval_rel_attributes to be called first...
+        if let Some(pos) = self.pos_from_dirspec(ctx)? {
+            self.pop_attr("xy");
+            pos.set_position_attrs(self);
+        }
+        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        self.expand_compound_pos();
+        self.eval_rel_attributes(ctx)?;
+
+        // if let ("polyline" | "polygon", Some(points)) =
+        //     (self.name.as_str(), self.get_attr("points"))
+        // {
+        //     self.set_attr("points", &expand_relspec(&points, ctx));
+        // }
+        // if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
+        //     self.set_attr("d", &expand_relspec(&d, ctx));
+        // }
+
         let mut p = Position::from(self as &SvgElement);
         if self.name == "use" {
-            if let Some(href) = self.get_attr("href") {
-                let elref = href.parse()?;
-                let el = ctx
-                    .get_element(&elref)
-                    .ok_or_else(|| SvgdxError::ReferenceError(elref))?;
-                if let Some(sz) = ctx.get_element_size(el)? {
-                    p.update_size(&sz);
-                    if el.name == "circle" || el.name == "ellipse" {
-                        // The referenced element is defined by its center,
-                        // but use elements are defined by top-left pos.
-                        p.translate(sz.0 / 4., sz.1 / 4.);
-                    }
+            let el = self.get_target_element(ctx)?;
+            if let Some(sz) = el.size(ctx)? {
+                p.update_size(&sz);
+                if el.name == "circle" || el.name == "ellipse" {
+                    // The referenced element is defined by its center,
+                    // but use elements are defined by top-left pos.
+                    p.translate(sz.0 / 4., sz.1 / 4.);
                 }
             }
         }
@@ -1210,115 +1220,67 @@ impl SvgElement {
     ///   V - vertical above
     pub fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
         let input = self.attrs.get("xy");
+        if input.is_none() {
+            return Ok(None);
+        }
+        let input = input.unwrap();
+        if !input.contains(RELPOS_SEP) {
+            return Ok(None);
+        }
         // element-relative position can only be applied via xy attribute
-        if let Some(input) = input {
-            let (ref_el, remain) = split_relspec(input, ctx)?;
-            let ref_el = match ref_el {
-                Some(el) => el,
-                None => return Ok(None),
+        // containing RELPOS_SEP.
+        let (ref_el, remain) = split_relspec(input, ctx)?;
+        let ref_el = match ref_el {
+            Some(el) => el,
+            None => return Ok(None),
+        };
+        if let (Some(bbox), Some(skip_rp_sep)) = (
+            ctx.get_element_bbox(ref_el)?,
+            remain.strip_prefix(RELPOS_SEP),
+        ) {
+            let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
+            let (reldir, remain) = if let Some(split_idx) = parts {
+                let (a, b) = skip_rp_sep.split_at(split_idx);
+                (a, b.trim_start())
+            } else {
+                (skip_rp_sep, "")
             };
-            if let (Some(bbox), Some(skip_rp_sep)) = (
-                ctx.get_element_bbox(ref_el)?,
-                remain.strip_prefix(RELPOS_SEP),
-            ) {
-                let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
-                let (reldir, remain) = if let Some(split_idx) = parts {
-                    let (a, b) = skip_rp_sep.split_at(split_idx);
-                    (a, b.trim_start())
-                } else {
-                    (skip_rp_sep, "")
-                };
-                let rel: DirSpec = reldir.parse()?;
-                // We won't have the full *position* of this element at this point, but hopefully
-                // we have enough to determine its size.
-                let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
-                let gap = if !remain.is_empty() {
-                    let mut parts = attr_split(remain);
-                    strp(&parts.next().unwrap_or("0".to_string()))?
-                } else {
-                    0.
-                };
-                let (x, y) = bbox.locspec(rel.to_locspec());
-                let (dx, dy) = match rel {
-                    DirSpec::Above => (-this_width / 2., -(this_height + gap)),
-                    DirSpec::Below => (-this_width / 2., gap),
-                    DirSpec::InFront => (gap, -this_height / 2.),
-                    DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
-                };
+            let rel: DirSpec = reldir.parse()?;
+            // We won't have the full *position* of this element at this point, but hopefully
+            // we have enough to determine its size.
+            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
+            let gap = if !remain.is_empty() {
+                let mut parts = attr_split(remain);
+                strp(&parts.next().unwrap_or("0".to_string()))?
+            } else {
+                0.
+            };
+            let (x, y) = bbox.locspec(rel.to_locspec());
+            let (dx, dy) = match rel {
+                DirSpec::Above => (-this_width / 2., -(this_height + gap)),
+                DirSpec::Below => (-this_width / 2., gap),
+                DirSpec::InFront => (gap, -this_height / 2.),
+                DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
+            };
 
-                let mut pos = Position::new(self.name.clone());
+            let mut pos = Position::new(self.name.clone());
+            if self.name.as_str() == "use" {
+                // Need to determine top-left corner of the target bbox which
+                // may not be (0, 0), and offset by the equivalent amount.
+                if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
+                    let (tx, ty) = bbox.locspec(LocSpec::TopLeft);
+                    pos.xmin = Some(x + dx - tx);
+                    pos.ymin = Some(y + dy - ty);
+                }
+            } else {
                 pos.xmin = Some(x + dx);
                 pos.xmax = Some(x + dx + this_width);
                 pos.ymin = Some(y + dy);
                 pos.ymax = Some(y + dy + this_height);
-                return Ok(Some(pos))
             }
+            return Ok(Some(pos));
         }
         Ok(None)
-    }
-
-    fn eval_rel_position(&mut self, ctx: &impl ContextView) -> Result<()> {
-        let input = self.attrs.get("xy");
-        // element-relative position can only be applied via xy attribute
-        if let Some(input) = input {
-            let (ref_el, remain) = split_relspec(input, ctx)?;
-            let ref_el = match ref_el {
-                Some(el) => el,
-                None => return Ok(()),
-            };
-            if let (Some(bbox), Some(skip_rp_sep)) = (
-                ctx.get_element_bbox(ref_el)?,
-                remain.strip_prefix(RELPOS_SEP),
-            ) {
-                let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
-                let (reldir, remain) = if let Some(split_idx) = parts {
-                    let (a, b) = skip_rp_sep.split_at(split_idx);
-                    (a, b.trim_start())
-                } else {
-                    (skip_rp_sep, "")
-                };
-                let rel: DirSpec = reldir.parse()?;
-                // We won't have the full *position* of this element at this point, but hopefully
-                // we have enough to determine its size.
-                let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
-                let gap = if !remain.is_empty() {
-                    let mut parts = attr_split(remain);
-                    strp(&parts.next().unwrap_or("0".to_string()))?
-                } else {
-                    0.
-                };
-                let (x, y) = bbox.locspec(rel.to_locspec());
-                let (dx, dy) = match rel {
-                    DirSpec::Above => (-this_width / 2., -(this_height + gap)),
-                    DirSpec::Below => (-this_width / 2., gap),
-                    DirSpec::InFront => (gap, -this_height / 2.),
-                    DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
-                };
-                self.pop_attr("xy"); // don't need xy anymore
-                self.place_at(ctx, x + dx, y + dy)?;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn place_at(&mut self, ctx: &impl ContextView, x: f32, y: f32) -> Result<()> {
-        match self.name.as_str() {
-            "use" => {
-                // Need to determine top-left corner of the target bbox which
-                // may not be (0, 0), and offset by the equivalent amount.
-                if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
-                    let (dx, dy) = bbox.locspec(LocSpec::TopLeft);
-                    self.set_attr("x", &fstr(x - dx));
-                    self.set_attr("y", &fstr(y - dy));
-                }
-            }
-            _ => {
-                self.set_attr("x", &fstr(x));
-                self.set_attr("y", &fstr(y));
-            }
-        }
-        Ok(())
     }
 
     fn split_compound_attr(value: &str) -> (String, String) {

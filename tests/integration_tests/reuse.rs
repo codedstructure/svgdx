@@ -648,3 +648,30 @@ fn test_reuse_path() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_reuse_path_refvar() {
+    // Check reuse of a path element containing a reference variable.
+    let input = r##"
+<specs>
+<path id="origin" d="M0 0L $target@c"/>
+</specs>
+<point id="one" xy="1"/>
+<reuse href="#origin" target="#one"/>
+"##;
+    let expected = r#"<path d="M0 0L 1 1" class="origin"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<specs>
+<path id="diamond" d="M0 0 b-45 h$size b90 h$size b90 h$size z" text="$text"/>
+</specs>
+<reuse href="#diamond" size="2" text="ok?"/>
+"##;
+    let expected1 = r#"<path d="M0 0 l1.414 -1.414l1.414 1.414l-1.414 1.414z" class="diamond"/>"#;
+    let expected2 = r#"<text x="1.414" y="0" class="d-text diamond">ok?</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

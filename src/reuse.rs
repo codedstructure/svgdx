@@ -39,10 +39,26 @@ impl EventGen for ReuseElement {
             .inspect_err(|_| {
                 context.pop_element();
             })?;
-        instance_element.expand_compound_size();
-        instance_element.eval_attributes(context).inspect_err(|_| {
+        // TODO: this replicates some of the logic from OtherElement::generate_events()
+        // but maybe should just generate the inner events first rather than later in
+        // this function? The current approach assumes that we can't generate events
+        // until we know position, which is true for 'simple' elements, but not for
+        // containers, where we use transform on the outer element. Potentially we could
+        // wrap *every* rendered reuse instance in a <g> element with a transform...
+        // (not keen...)
+        instance_element
+            .resolve_position(context)
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
+        instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
+        instance_element
+            .resolve_position(context)
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
         let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
