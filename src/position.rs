@@ -1,7 +1,5 @@
 use std::str::FromStr;
 
-use itertools::Itertools;
-
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
 use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
@@ -196,118 +194,118 @@ impl Position {
     }
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
-        // TODO: should this return an error if no BBox?
-        if let Some(bbox) = self.to_bbox() {
-            match element.name.as_str() {
-                "" | "rect" | "use" | "image" | "svg" | "foreignObject" => {
-                    let width = bbox.width();
-                    let height = bbox.height();
-                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-                    if self.has_x_position() {
-                        element.set_attr("x", &fstr(x1 + self.dx.unwrap_or(0.)));
-                    }
-                    if self.has_y_position() {
-                        element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
-                    }
-                    if element.name != "use" {
-                        element.set_attr("width", &fstr(width));
-                        element.set_attr("height", &fstr(height));
-                    }
-                    element.remove_attrs(&[
-                        "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
-                    ]);
-                }
-                "g" => {
-                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-                    if x1 != 0. || y1 != 0. {
-                        let xy_xfrm = Some(format!("translate({x1}, {y1})"));
-
-                        // Resulting order: reuse transform, x/y transform
-                        let reuse_xfrm = element.get_attr("transform");
-                        let xfrm: Vec<_> = [reuse_xfrm, xy_xfrm].into_iter().flatten().collect();
-
-                        if !xfrm.is_empty() {
-                            let xfrm = xfrm.iter().join(" ");
-                            element.set_attr("transform", &xfrm);
-                        }
-                    }
-                }
-                "circle" => {
-                    let (cx, cy) = bbox.center();
-                    let r = bbox.width() / 2.0;
-                    if self.has_x_position() {
-                        element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
-                    }
-                    if self.has_y_position() {
-                        element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
-                    }
-                    element.set_attr("r", &fstr(r));
-                    element.remove_attrs(&[
-                        "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "rx", "ry",
-                        "width", "height",
-                    ]);
-                }
-                "ellipse" => {
-                    let (cx, cy) = bbox.center();
-                    let rx = bbox.width() / 2.0;
-                    let ry = bbox.height() / 2.0;
-                    if self.has_x_position() {
-                        element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
-                    }
-                    if self.has_y_position() {
-                        element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
-                    }
-                    element.set_attr("rx", &fstr(rx));
-                    element.set_attr("ry", &fstr(ry));
-                    element.remove_attrs(&[
-                        "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "r", "width",
-                        "height",
-                    ]);
-                }
-                "line" => {
-                    // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
-                    // if they're already set, but we do need to add dx/dy to any existing attrs.
-                    let zstr = "0".to_owned();
-                    let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
-                    if element.get_attr("x1").is_none() {
-                        element.set_attr("x1", &fstr(x1 + self.dx.unwrap_or(0.)));
-                    } else if let Some(dx) = self.dx {
-                        if let Ok(x1) = strp(&element.get_attr("x1").unwrap_or(zstr.clone())) {
-                            element.set_attr("x1", &fstr(x1 + dx));
-                        }
-                    }
-                    if element.get_attr("y1").is_none() {
-                        element.set_attr("y1", &fstr(y1 + self.dy.unwrap_or(0.)));
-                    } else if let Some(dy) = self.dy {
-                        if let Ok(y1) = strp(&element.get_attr("y1").unwrap_or(zstr.clone())) {
-                            element.set_attr("y1", &fstr(y1 + dy));
-                        }
-                    }
-                    let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
-                    if element.get_attr("x2").is_none() {
-                        element.set_attr("x2", &fstr(x2 + self.dx.unwrap_or(0.)));
-                    } else if let Some(dx) = self.dx {
-                        if let Ok(x2) = strp(&element.get_attr("x2").unwrap_or(zstr.clone())) {
-                            element.set_attr("x2", &fstr(x2 + dx));
-                        }
-                    }
-                    if element.get_attr("y2").is_none() {
-                        element.set_attr("y2", &fstr(y2 + self.dy.unwrap_or(0.)));
-                    } else if let Some(dy) = self.dy {
-                        if let Ok(y2) = strp(&element.get_attr("y2").unwrap_or(zstr.clone())) {
-                            element.set_attr("y2", &fstr(y2 + dy));
-                        }
-                    }
-                    element.remove_attrs(&[
-                        "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
-                        "height",
-                    ]);
-                }
-                _ => (),
+        // TODO: should this return a Result?
+        match (element.name.as_str(), self.to_bbox()) {
+            ("g" | "path" | "polyline" | "polygon", _) => {
+                // These don't need a full bbox, and are always set via transform in any case.
+                self.position_via_transform(element);
             }
-        } else if matches!(element.name.as_str(), "g" | "path" | "polyline" | "polygon") {
-            // We don't have a full bbox, but for some elements we don't need one...
-            self.position_via_transform(element);
+            ("use" | "point" | "text", _) => {
+                // These only have x & y attrs.
+                // TODO: should `length` be set to Some(0.) for these shape types
+                // so extent() works and e.g. a 'cxy="5"` works on a `<point>`?
+                if self.has_x_position() {
+                    element.set_attr("x", &fstr(self.x() + self.dx.unwrap_or(0.)));
+                }
+                if self.has_y_position() {
+                    element.set_attr("y", &fstr(self.y() + self.dy.unwrap_or(0.)));
+                }
+                element.remove_attrs(&["dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r"]);
+                if element.name != "use" {
+                    element.remove_attrs(&["width", "height"]);
+                }
+                if element.name != "text" {
+                    element.remove_attrs(&["dx", "dy"]);
+                }
+            }
+            ("" | "rect" | "box" | "image" | "svg" | "foreignObject", Some(bbox)) => {
+                let width = bbox.width();
+                let height = bbox.height();
+                let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                if self.has_x_position() {
+                    element.set_attr("x", &fstr(x1 + self.dx.unwrap_or(0.)));
+                }
+                if self.has_y_position() {
+                    element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
+                }
+                element.set_attr("width", &fstr(width));
+                element.set_attr("height", &fstr(height));
+                element.remove_attrs(&[
+                    "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
+                ]);
+            }
+            ("circle", Some(bbox)) => {
+                let (cx, cy) = bbox.center();
+                let r = bbox.width() / 2.0;
+                if self.has_x_position() {
+                    element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
+                }
+                if self.has_y_position() {
+                    element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
+                }
+                element.set_attr("r", &fstr(r));
+                element.remove_attrs(&[
+                    "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "rx", "ry", "width",
+                    "height",
+                ]);
+            }
+            ("ellipse", Some(bbox)) => {
+                let (cx, cy) = bbox.center();
+                let rx = bbox.width() / 2.0;
+                let ry = bbox.height() / 2.0;
+                if self.has_x_position() {
+                    element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
+                }
+                if self.has_y_position() {
+                    element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
+                }
+                element.set_attr("rx", &fstr(rx));
+                element.set_attr("ry", &fstr(ry));
+                element.remove_attrs(&[
+                    "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "r", "width",
+                    "height",
+                ]);
+            }
+            ("line", Some(bbox)) => {
+                // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
+                // if they're already set, but we do need to add dx/dy to any existing attrs.
+                let zstr = "0".to_owned();
+                let (x1, y1) = bbox.locspec(LocSpec::TopLeft);
+                if element.get_attr("x1").is_none() {
+                    element.set_attr("x1", &fstr(x1 + self.dx.unwrap_or(0.)));
+                } else if let Some(dx) = self.dx {
+                    if let Ok(x1) = strp(&element.get_attr("x1").unwrap_or(zstr.clone())) {
+                        element.set_attr("x1", &fstr(x1 + dx));
+                    }
+                }
+                if element.get_attr("y1").is_none() {
+                    element.set_attr("y1", &fstr(y1 + self.dy.unwrap_or(0.)));
+                } else if let Some(dy) = self.dy {
+                    if let Ok(y1) = strp(&element.get_attr("y1").unwrap_or(zstr.clone())) {
+                        element.set_attr("y1", &fstr(y1 + dy));
+                    }
+                }
+                let (x2, y2) = bbox.locspec(LocSpec::BottomRight);
+                if element.get_attr("x2").is_none() {
+                    element.set_attr("x2", &fstr(x2 + self.dx.unwrap_or(0.)));
+                } else if let Some(dx) = self.dx {
+                    if let Ok(x2) = strp(&element.get_attr("x2").unwrap_or(zstr.clone())) {
+                        element.set_attr("x2", &fstr(x2 + dx));
+                    }
+                }
+                if element.get_attr("y2").is_none() {
+                    element.set_attr("y2", &fstr(y2 + self.dy.unwrap_or(0.)));
+                } else if let Some(dy) = self.dy {
+                    if let Ok(y2) = strp(&element.get_attr("y2").unwrap_or(zstr.clone())) {
+                        element.set_attr("y2", &fstr(y2 + dy));
+                    }
+                }
+                element.remove_attrs(&[
+                    "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
+                    "height",
+                ]);
+            }
+            _ => (),
         }
     }
 

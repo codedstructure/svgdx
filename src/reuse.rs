@@ -39,10 +39,26 @@ impl EventGen for ReuseElement {
             .inspect_err(|_| {
                 context.pop_element();
             })?;
-        instance_element.expand_compound_size();
-        instance_element.eval_attributes(context).inspect_err(|_| {
+        // TODO: this replicates some of the logic from OtherElement::generate_events()
+        // but maybe should just generate the inner events first rather than later in
+        // this function? The current approach assumes that we can't generate events
+        // until we know position, which is true for 'simple' elements, but not for
+        // containers, where we use transform on the outer element. Potentially we could
+        // wrap *every* rendered reuse instance in a <g> element with a transform...
+        // (not keen...)
+        instance_element
+            .resolve_position(context)
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
+        instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
+        instance_element
+            .resolve_position(context)
+            .inspect_err(|_| {
+                context.pop_element();
+            })?;
         let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
@@ -106,15 +122,16 @@ impl EventGen for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        // TODO: This isn't ideal. resolve_position() is needed to handle
-        // relpos positioning (`xy="#a|h"` etc), but the Position-based
-        // stuff fully handles other positioning. Should be unified.
-        reuse_element.resolve_position(context)?;
+        let mut pos = if let Some(dirspec_pos) = reuse_element.pos_from_dirspec(context)? {
+            dirspec_pos
+        } else {
+            reuse_element.resolve_position(context)?;
+            Position::from(&reuse_element)
+        };
 
         let inst_el = context
             .get_element(&elref)
             .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
-        let mut pos = Position::from(&reuse_element);
         if let Some(bb) = inst_el.content_bbox {
             pos.update_size(&bb.size());
         } else if let Some(sz) = instance_size {
