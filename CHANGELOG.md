@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: various positioning issues (including universal layout attributes)
+  with `<reuse>` and `<use>` elements.
+
 ## [0.20.0 - 2025-04-22]
 
 - Improved: support for positioning of `<reuse>` elements; these now support
