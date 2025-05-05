@@ -1,11 +1,9 @@
 use crate::context::{ElementMap, TransformerContext};
-use crate::element::SvgElement;
+use crate::elements::{ForElement, LoopElement, ReuseElement, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::expression::{eval_attr, eval_condition};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
-use crate::loop_el::{ForElement, LoopElement};
-use crate::reuse::ReuseElement;
 use crate::themes::ThemeBuilder;
 use crate::types::{extract_urlref, fstr, split_unit, AttrMap, OrderIndex};
 use crate::TransformConfig;

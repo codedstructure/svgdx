@@ -1,10 +1,11 @@
-use crate::bearing::process_path_bearing;
-use crate::connector::{ConnectionType, Connector};
 use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
     VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::elements::{
+    path_bbox, process_path_bearing, process_text_attr, ConnectionType, Connector,
+};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
@@ -12,8 +13,6 @@ use crate::geometry::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
     TrblLength,
 };
-use crate::path::path_bbox;
-use crate::text::process_text_attr;
 use crate::types::{
     attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
 };

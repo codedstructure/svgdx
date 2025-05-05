@@ -1,5 +1,5 @@
+use super::SvgElement;
 use crate::context::{ElementMap, TransformerContext};
-use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::geometry::{BoundingBox, Position};

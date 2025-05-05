@@ -1,4 +1,4 @@
-use crate::element::SvgElement;
+use crate::elements::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;

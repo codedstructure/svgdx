@@ -40,25 +40,19 @@ use std::io::{BufRead, Cursor, Write};
 #[cfg(feature = "cli")]
 use tempfile::NamedTempFile;
 
-mod bearing;
 #[cfg(feature = "cli")]
 pub mod cli;
 mod colours;
-mod connector;
 mod constants;
 mod context;
-mod element;
+mod elements;
 mod errors;
 mod events;
 mod expression;
 mod functions;
 mod geometry;
-mod loop_el;
-mod path;
-mod reuse;
 #[cfg(feature = "server")]
 pub mod server;
-mod text;
 mod themes;
 mod transform;
 mod types;

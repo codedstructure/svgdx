@@ -1,4 +1,4 @@
-use crate::element::SvgElement;
+use crate::elements::SvgElement;
 use crate::geometry::{BoundingBox, Size};
 use crate::types::{fstr, strp};
 
