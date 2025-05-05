@@ -18,7 +18,7 @@ use super::path::PathSyntax;
 use crate::errors::{Result, SvgdxError};
 use crate::types::fstr;
 
-pub struct BearingPathSyntax {
+struct BearingPathSyntax {
     data: Vec<char>,
     index: usize,
 }

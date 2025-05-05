@@ -1,26 +1,144 @@
+use super::{
+    path_bbox, process_path_bearing, process_text_attr, ConfigElement, ConnectionType, Connector,
+    Container, DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement,
+    SpecsElement, VarElement,
+};
 use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
     VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
-use crate::elements::{
-    path_bbox, process_path_bearing, process_text_attr, ConnectionType, Connector,
-};
 use crate::errors::{Result, SvgdxError};
-use crate::events::{InputList, OutputEvent};
+use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expression::eval_attr;
 use crate::geometry::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
     TrblLength,
 };
+use crate::transform::EventGen;
 use crate::types::{
-    attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
+    attr_split, attr_split_cycle, extract_elref, extract_urlref, fstr, strp, AttrMap, ClassList,
+    OrderIndex,
 };
 
 use core::fmt::Display;
 use std::collections::HashMap;
 use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
 use std::str::FromStr;
+
+impl EventGen for SvgElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        context.inc_depth()?;
+        let res = match self.name.as_str() {
+            "loop" => LoopElement(self.clone()).generate_events(context),
+            "config" => ConfigElement(self.clone()).generate_events(context),
+            "reuse" => ReuseElement(self.clone()).generate_events(context),
+            "specs" => SpecsElement(self.clone()).generate_events(context),
+            "var" => VarElement(self.clone()).generate_events(context),
+            "if" => IfElement(self.clone()).generate_events(context),
+            "defaults" => DefaultsElement(self.clone()).generate_events(context),
+            "for" => ForElement(self.clone()).generate_events(context),
+            "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
+            _ => {
+                if let Some((start, end)) = self.event_range {
+                    if start != end {
+                        return Container(self.clone()).generate_events(context);
+                    }
+                }
+                OtherElement(self.clone()).generate_events(context)
+            }
+        };
+        // Ideally would have a single 'if bbox, set prev_element' here,
+        // but is used for attribute lookup as well as bbox, so need the
+        // full *resolved* element, which isn't available here.
+        // TODO: see if just storing a 'prev_bbox' is feasible.
+        context.dec_depth()?;
+
+        let (ol, mut bbox) = res?;
+
+        if let (Some(el_bbox), Some(clip_id)) = (
+            bbox,
+            self.get_attr("clip-path")
+                .and_then(|url| extract_urlref(&url)),
+        ) {
+            let clip_el = context
+                .get_element(&clip_id)
+                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+            if let ("clipPath", Some(clip_bbox)) =
+                (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
+            {
+                bbox = el_bbox.intersect(&clip_bbox);
+                let mut el = self.clone();
+                el.content_bbox = bbox;
+                context.update_element(&el);
+            }
+        }
+
+        Ok((ol, bbox))
+    }
+}
+
+#[derive(Debug, Clone)]
+struct OtherElement(pub SvgElement);
+
+impl EventGen for OtherElement {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        let mut output = OutputList::new();
+        let mut e = self.0.clone();
+        e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
+        e.transmute(context)?;
+        e.resolve_position(context)?;
+        context.update_element(&e);
+        let mut bb = context.get_element_bbox(&e)?;
+        if bb.is_some() {
+            context.set_prev_element(&e);
+        }
+        let events = e.element_events(context)?;
+        for svg_ev in events {
+            let is_empty = matches!(svg_ev, OutputEvent::Empty(_));
+            let adapted = if let OutputEvent::Empty(e) | OutputEvent::Start(e) = svg_ev {
+                let mut new_el = SvgElement::new(&e.name, &[]);
+                // Collect pass-through attributes
+                for (k, v) in e.attrs {
+                    if k != "class" && k != "data-src-line" && k != "_" && k != "__" {
+                        new_el.set_attr(&k, &v);
+                    }
+                }
+                // Any 'class' attribute values are stored separately as a HashSet;
+                // collect those into the BytesStart object
+                if !e.classes.is_empty() {
+                    new_el.add_classes(&e.classes);
+                }
+                // Add 'data-src-line' for all elements generated by input `element`
+                if context.config.add_metadata {
+                    new_el.set_attr("data-src-line", &e.src_line.to_string());
+                }
+                if is_empty {
+                    OutputEvent::Empty(new_el)
+                } else {
+                    OutputEvent::Start(new_el)
+                }
+            } else {
+                svg_ev
+            };
+
+            output.push(adapted);
+        }
+        if self.0.name == "point" {
+            // point elements have no bounding box, and are primarily used for
+            // update_element() side-effects, e.g. setting prev_element.
+            // (They can generate text though, so not rejected earlier.
+            bb = None;
+        }
+        Ok((output, bb))
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
