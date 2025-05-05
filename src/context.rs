@@ -1,8 +1,8 @@
-use crate::element::SvgElement;
+use crate::elements::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
-use crate::position::{BoundingBox, Size};
+use crate::geometry::{BoundingBox, Size};
 use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, ElRef};
 use crate::TransformConfig;
 

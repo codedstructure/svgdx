@@ -7,7 +7,7 @@ use std::string::FromUtf8Error;
 
 use itertools::Itertools;
 
-use crate::element::SvgElement;
+use crate::elements::SvgElement;
 use crate::types::{ElRef, OrderIndex};
 
 // type alias for Result for use across the library

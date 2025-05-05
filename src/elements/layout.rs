@@ -1,78 +1,19 @@
-use crate::bearing::process_path_bearing;
-use crate::connector::{ConnectionType, Connector};
+use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
+use std::str::FromStr;
+
+use super::SvgElement;
 use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
     VAR_PREFIX,
 };
-use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::context::{ContextView, ElementMap};
+use crate::elements::path::path_bbox;
 use crate::errors::{Result, SvgdxError};
-use crate::events::{InputList, OutputEvent};
-use crate::expression::eval_attr;
-use crate::path::path_bbox;
-use crate::position::{
-    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TrblLength,
+use crate::geometry::{
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
+    TrblLength,
 };
-use crate::text::process_text_attr;
-use crate::transform_attr::TransformAttr;
-use crate::types::{
-    attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
-};
-
-use core::fmt::Display;
-use std::collections::HashMap;
-use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
-use std::str::FromStr;
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct SvgElement {
-    pub name: String,
-    pub original: String,
-    pub attrs: AttrMap,
-    pub classes: ClassList,
-    pub text_content: Option<String>,
-    pub order_index: OrderIndex,
-    pub indent: usize,
-    pub src_line: usize,
-    pub event_range: Option<(usize, usize)>,
-    pub content_bbox: Option<BoundingBox>,
-}
-
-impl Display for SvgElement {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<{}", self.name)?;
-        if !self.attrs.is_empty() {
-            write!(f, " {}", self.attrs)?;
-        }
-        if !self.classes.is_empty() {
-            write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
-        }
-        write!(f, ">")?;
-        Ok(())
-    }
-}
-
-/// Split a possible relspec into the reference element (if it exists) and remainder
-///
-/// `input`: the relspec string
-///
-/// If the input is not a relspec, the reference element is `None` and the remainder
-/// is the entire input string.
-fn split_relspec<'a, 'b>(
-    input: &'b str,
-    ctx: &'a impl ElementMap,
-) -> Result<(Option<&'a SvgElement>, &'b str)> {
-    if let Ok((elref, remain)) = extract_elref(input) {
-        if let Some(el) = ctx.get_element(&elref) {
-            // Note: essential we don't trim `remain` - if it starts
-            // with whitespace, that is significant.
-            Ok((Some(el), remain))
-        } else {
-            Err(SvgdxError::ReferenceError(elref))
-        }
-    } else {
-        Ok((None, input))
-    }
-}
+use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, strp};
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -148,208 +89,30 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
     value.to_string()
 }
 
-impl SvgElement {
-    pub fn new(name: &str, attrs: &[(String, String)]) -> Self {
-        let mut attr_map = AttrMap::new();
-        let mut classes = ClassList::new();
-
-        for (key, value) in attrs {
-            if key == "class" {
-                for c in value.split(' ') {
-                    classes.insert(c.to_string());
-                }
-            } else {
-                attr_map.insert(key.to_string(), value.to_string());
-            }
-        }
-        Self {
-            name: name.to_string(),
-            original: format!("<{name} {}>", attr_map),
-            attrs: attr_map.clone(),
-            classes,
-            text_content: None,
-            order_index: OrderIndex::default(),
-            indent: 0,
-            src_line: 0,
-            event_range: None,
-            content_bbox: None,
-        }
-    }
-
-    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
-        if self.name == "path" {
-            if let Some(d) = self.get_attr("d") {
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(&d)?)
-                }
-            }
-        }
-
-        if self.is_connector() {
-            if let Ok(conn) = Connector::from_element(
-                self,
-                ctx,
-                if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(&e_type)
-                } else if self.name == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            ) {
-                // replace with rendered connection element
-                *self = conn.render(ctx)?.without_attr("edge-type");
-            } else {
-                return Err(SvgdxError::InvalidData(
-                    "Cannot create connector".to_owned(),
-                ));
-            }
-        }
-
-        // Process dx / dy as translation offsets if not an element
-        // where they already have intrinsic meaning.
-        // TODO: would be nice to get rid of this; it's mostly handled
-        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
-        // then that won't do anything and this does.
-        if !matches!(self.name.as_str(), "text" | "tspan" | "feOffset") {
-            let dx = self.pop_attr("dx");
-            let dy = self.pop_attr("dy");
-            let mut d_x = None;
-            let mut d_y = None;
-            if let Some(dx) = dx {
-                d_x = Some(strp(&dx)?);
-            }
-            if let Some(dy) = dy {
-                d_y = Some(strp(&dy)?);
-            }
-            if d_x.is_some() || d_y.is_some() {
-                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
-            }
-        }
-
-        if self.name == "use" {
-            // rotation requires a bbox to identify center of rotation; for `<use>`
-            // elements derive from context and inject via `content_bbox`. Allows
-            // handle_rotation to be independent of context.
-            if let Some(bbox) = ctx.get_element_bbox(self)? {
-                self.content_bbox = Some(bbox);
-            }
-        }
-        self.handle_rotation()?;
-
-        Ok(())
-    }
-
-    pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
-        if let Some((start, end)) = self.event_range {
-            // empty events will have end == start
-            if end > start {
-                return Some(InputList::from(&context.events[start + 1..end]));
-            }
-        }
-        None
-    }
-
-    pub fn all_events(&self, context: &TransformerContext) -> InputList {
-        if let Some((start, end)) = self.event_range {
-            InputList::from(&context.events[start..end + 1])
+/// Split a possible relspec into the reference element (if it exists) and remainder
+///
+/// `input`: the relspec string
+///
+/// If the input is not a relspec, the reference element is `None` and the remainder
+/// is the entire input string.
+fn split_relspec<'a, 'b>(
+    input: &'b str,
+    ctx: &'a impl ElementMap,
+) -> Result<(Option<&'a SvgElement>, &'b str)> {
+    if let Ok((elref, remain)) = extract_elref(input) {
+        if let Some(el) = ctx.get_element(&elref) {
+            // Note: essential we don't trim `remain` - if it starts
+            // with whitespace, that is significant.
+            Ok((Some(el), remain))
         } else {
-            InputList::new()
+            Err(SvgdxError::ReferenceError(elref))
         }
+    } else {
+        Ok((None, input))
     }
+}
 
-    /// Process a given `SvgElement` into a list of `SvgEvent`s
-    // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
-        let mut events = vec![];
-
-        if ctx.config.debug {
-            // Prefix replaced element(s) with a representation of the original element
-            //
-            // Replace double quote with backtick to avoid messy XML entity conversion
-            // (i.e. &quot; or &apos; if single quotes were used)
-            events.push(OutputEvent::Comment(
-                format!(" {} ", self.original)
-                    .replace('"', "`")
-                    .replace(['<', '>'], ""),
-            ));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // Standard comment: expressions & variables are evaluated.
-        if let Some(comment) = self.get_attr("_") {
-            // Expressions in comments are evaluated
-            let value = eval_attr(&comment, ctx)?;
-            events.push(OutputEvent::Comment(format!(" {value} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // 'Raw' comment: no evaluation of expressions occurs here
-        if let Some(comment) = self.get_attr("__") {
-            events.push(OutputEvent::Comment(format!(" {comment} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // Some elements don't generate text themselves, but can have
-        // associated text.
-        // TODO: refactor this method to handle text event gen better
-        let phantom = matches!(self.name.as_str(), "point" | "box");
-
-        if self.has_attr("text") {
-            let (orig_elem, text_elements) = process_text_attr(self)?;
-            if orig_elem.name != "text" && !phantom {
-                // We only care about the original element if it wasn't a text element
-                // (otherwise we generate a useless empty text element for the original)
-                events.push(OutputEvent::Empty(orig_elem));
-                events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-            }
-            match text_elements.as_slice() {
-                [] => {}
-                [elem] => {
-                    events.push(OutputEvent::Start(elem.clone()));
-                    if let Some(value) = &elem.text_content {
-                        events.push(OutputEvent::Text(value.clone()));
-                    } else {
-                        return Err(SvgdxError::InvalidData(
-                            "Text element should have content".to_owned(),
-                        ));
-                    }
-                    events.push(OutputEvent::End("text".to_string()));
-                }
-                _ => {
-                    // Multiple text spans
-                    let text_elem = &text_elements[0];
-                    events.push(OutputEvent::Start(text_elem.clone()));
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    for elem in &text_elements[1..] {
-                        // Note: we can't insert a newline/last_indent here as whitespace
-                        // following a tspan is compressed to a single space and causes
-                        // misalignment - see https://stackoverflow.com/q/41364908
-                        events.push(OutputEvent::Start(elem.clone()));
-                        if let Some(value) = &elem.text_content {
-                            events.push(OutputEvent::Text(value.clone()));
-                        } else {
-                            return Err(SvgdxError::InvalidData(
-                                "Text element should have content".to_owned(),
-                            ));
-                        }
-                        events.push(OutputEvent::End("tspan".to_string()));
-                    }
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    events.push(OutputEvent::End("text".to_string()));
-                }
-            }
-        } else if !phantom {
-            if self.is_empty_element() {
-                events.push(OutputEvent::Empty(self.clone()));
-            } else {
-                events.push(OutputEvent::Start(self.clone()));
-            }
-        }
-
-        Ok(events)
-    }
-
+impl SvgElement {
     pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
@@ -406,218 +169,12 @@ impl SvgElement {
                 if el.name == "circle" || el.name == "ellipse" {
                     // The referenced element is defined by its center,
                     // but use elements are defined by top-left pos.
-                    p.translate(sz.0 / 4., sz.1 / 4.);
+                    p.translate(sz.width / 4., sz.height / 4.);
                 }
             }
         }
         p.set_position_attrs(self);
 
-        Ok(())
-    }
-
-    pub fn set_indent(&mut self, indent: usize) {
-        self.indent = indent;
-    }
-
-    pub fn set_src_line(&mut self, line: usize) {
-        self.src_line = line;
-    }
-
-    pub fn set_order_index(&mut self, order_index: &OrderIndex) {
-        self.order_index = order_index.clone();
-    }
-
-    pub fn set_event_range(&mut self, range: (usize, usize)) {
-        self.event_range = Some(range);
-    }
-
-    pub fn add_class(&mut self, class: &str) -> Self {
-        self.classes.insert(class.to_string());
-        self.clone()
-    }
-
-    pub fn add_classes(&mut self, classes: &ClassList) {
-        for class in classes {
-            // update classes directly rather than use add_class which
-            // performs a clone() operation.
-            self.classes.insert(class.to_string());
-        }
-    }
-
-    pub fn has_class(&self, class: &str) -> bool {
-        self.classes.contains(class)
-    }
-
-    /// Remove a class from the element, returning `true` if the class was present
-    pub fn pop_class(&mut self, class: &str) -> bool {
-        self.classes.remove(class)
-    }
-
-    pub fn get_classes(&self) -> Vec<String> {
-        self.classes.to_vec()
-    }
-
-    pub fn has_attr(&self, key: &str) -> bool {
-        self.attrs.contains_key(key)
-    }
-
-    fn replace_attrs(&mut self, attrs: AttrMap) {
-        self.attrs = attrs;
-    }
-
-    #[allow(dead_code)]
-    #[must_use]
-    fn with_attr(&self, key: &str, value: &str) -> Self {
-        let mut element = self.clone();
-        element.set_attr(key, value);
-        element
-    }
-
-    #[must_use]
-    pub fn without_attr(&self, key: &str) -> Self {
-        let attrs: Vec<(String, String)> = self
-            .attrs
-            .clone()
-            .into_iter()
-            .filter(|(k, _v)| k != key)
-            .collect();
-        let mut element = self.clone();
-        element.replace_attrs(attrs.into());
-        element
-    }
-
-    /// copy attributes, classes and indentation from another element,
-    /// returning the merged element
-    #[must_use]
-    pub fn with_attrs_from(&self, other: &Self) -> Self {
-        let mut attrs = self.attrs.clone();
-        for (k, v) in &other.attrs {
-            attrs.insert(k, v);
-        }
-        let mut element = other.clone();
-        element.replace_attrs(attrs);
-        // Everything but the name and any attrs unique to the original element
-        // is from the other element.
-        element.name.clone_from(&self.name);
-        element
-    }
-
-    pub fn pop_attr(&mut self, key: &str) -> Option<String> {
-        self.attrs.pop(key)
-    }
-
-    pub fn get_attr(&self, key: &str) -> Option<String> {
-        self.attrs.get(key).map(|x| x.to_owned())
-    }
-
-    pub fn set_attr(&mut self, key: &str, value: &str) {
-        self.attrs.insert(key, value);
-    }
-
-    /// set an attribute key/value if the key does not already exist
-    pub fn set_default_attr(&mut self, key: &str, value: &str) {
-        if !self.has_attr(key) {
-            self.set_attr(key, value);
-        }
-    }
-
-    pub fn get_attrs(&self) -> HashMap<String, String> {
-        self.attrs.to_vec().into_iter().collect()
-    }
-
-    /// Resolve any expressions in attributes.
-    pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
-        // Resolve any attributes
-        for (key, value) in self.attrs.clone() {
-            if key == "__" {
-                // Raw comments are not evaluated
-                continue;
-            }
-            let replace = eval_attr(&value, ctx)?;
-            self.attrs.insert(&key, &replace);
-        }
-        // Classes are handled separately to other attributes
-        for class in &self.classes.clone() {
-            self.classes.replace(class, eval_attr(class, ctx)?);
-        }
-
-        Ok(())
-    }
-
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
-    /// Note `reuse` is not a standard SVG element, but is used here in similar
-    /// contexts to the `use` element.
-    pub fn is_graphics_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "circle"
-                | "ellipse"
-                | "image"
-                | "line"
-                | "path"
-                | "polygon"
-                | "polyline"
-                | "rect"
-                | "text"
-                | "use"
-                // Following are non-standard.
-                | "reuse"
-        )
-    }
-
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
-    /// Note `specs` is not a standard SVG element, but is used here in similar
-    /// contexts to the `defs` element.
-    #[allow(dead_code)]
-    pub fn is_container_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "a" | "defs"
-                | "glyph"
-                | "g"
-                | "marker"
-                | "mask"
-                | "missing-glyph"
-                | "pattern"
-                | "svg"
-                | "switch"
-                | "symbol"
-                // Following are non-standard.
-                | "specs"
-        )
-    }
-
-    pub fn is_empty_element(&self) -> bool {
-        if let Some((start, end)) = self.event_range {
-            start == end
-        } else {
-            true
-        }
-    }
-
-    pub fn is_connector(&self) -> bool {
-        self.has_attr("start")
-            && self.has_attr("end")
-            && (self.name == "line" || self.name == "polyline")
-    }
-
-    pub fn handle_rotation(&mut self) -> Result<()> {
-        let angle = self.pop_attr("rotate");
-        if angle.is_none() {
-            return Ok(());
-        }
-        let angle = angle.unwrap();
-        let angle = strp(&angle)?;
-        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.center()) {
-            let mut rot_xfrm = TransformAttr::new();
-            rot_xfrm.rotate_around(angle, cx, cy);
-            if let Some(xfrm) = self.pop_attr("transform") {
-                // rotation should be the outermost transform, so prepend it
-                self.set_attr("transform", &format!("{rot_xfrm} {xfrm}"));
-            } else {
-                self.set_attr("transform", &rot_xfrm.to_string());
-            }
-        }
         Ok(())
     }
 
@@ -687,7 +244,7 @@ impl SvgElement {
     }
 
     /// Calculate bounding box of target_shape inside self
-    pub fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
+    fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
         let zstr = "0".to_owned();
         match (target_shape, self.name.as_str()) {
             // rect inside circle
@@ -722,39 +279,6 @@ impl SvgElement {
         }
     }
 
-    pub fn get_target_element(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
-        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
-        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
-        // cope with '^' where the target might not even have an id. Would be better
-        // to assign a dedicated internal ID to every element and use that.
-        // TODO: in addition to the above, '^' is already broken since it doesn't get
-        // captured in the 'remain' thing for deferred elements, and is always the same
-        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
-        // internal ID with each element so can follow a chain of these.
-        let mut seen: Vec<OrderIndex> = vec![];
-        let mut element = self;
-
-        while element.name == "use" || element.name == "reuse" {
-            let href = element
-                .get_attr("href")
-                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
-            let elref = href.parse()?;
-            if let Some(el) = ctx.get_element(&elref) {
-                if seen.contains(&el.order_index) {
-                    return Err(SvgdxError::CircularRefError(format!(
-                        "{} already seen",
-                        elref
-                    )));
-                }
-                seen.push(el.order_index.clone());
-                element = el;
-            } else {
-                return Err(SvgdxError::ReferenceError(elref));
-            }
-        }
-        Ok(element.clone())
-    }
-
     pub fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>> {
         // NOTE: unlike bbox, this does not replace missing values with '0'.
         // Assumes any dw / dh have already been applied.
@@ -779,8 +303,8 @@ impl SvgElement {
                 // let mut target_el = target_el.clone();
                 // target_el.eval_attributes(ctx)?;
                 if let Some(sz) = target_el.size(ctx)? {
-                    width = Some(sz.0);
-                    height = Some(sz.1);
+                    width = Some(sz.width);
+                    height = Some(sz.height);
                 }
             }
             "g" | "symbol" => {
@@ -829,7 +353,7 @@ impl SvgElement {
             }
         }
         if let (Some(width), Some(height)) = (width, height) {
-            Ok(Some(Size(width, height)))
+            Ok(Some(Size::new(width, height)))
         } else {
             Ok(None)
         }
@@ -991,7 +515,7 @@ impl SvgElement {
         })
     }
 
-    fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
+    pub fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
         for (key, value) in &self.attrs {
             match key.as_str() {
@@ -1049,19 +573,37 @@ impl SvgElement {
         }
     }
 
-    fn is_size_attr(&self, name: &str) -> bool {
-        if self.name == "text" || self.name == "point" {
-            return false;
-        }
-        let mut size_attr = matches!(name, "width" | "height");
-        size_attr = size_attr || (self.name == "circle" && name == "r");
-        size_attr = size_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
-        size_attr
-    }
+    fn resolve_size_delta(&mut self) {
+        // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
+        let (w, h) = match self.name.as_str() {
+            "circle" => {
+                let diam = self.get_attr("r").map(|r| 2. * strp(&r).unwrap_or(0.));
+                (diam, diam)
+            }
+            "ellipse" => (
+                self.get_attr("rx")
+                    .and_then(|rx| strp(&rx).ok())
+                    .map(|x| x * 2.),
+                self.get_attr("ry")
+                    .and_then(|ry| strp(&ry).ok())
+                    .map(|x| x * 2.),
+            ),
+            _ => (
+                self.get_attr("width").and_then(|w| strp(&w).ok()),
+                self.get_attr("height").and_then(|h| strp(&h).ok()),
+            ),
+        };
 
-    fn is_pos_attr(&self, name: &str) -> bool {
-        // Position attributes are identical for all element types
-        matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
+        if let Some(dw) = self.pop_attr("dw") {
+            if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
+                self.set_attr("width", &fstr(new_w));
+            }
+        }
+        if let Some(dh) = self.pop_attr("dh") {
+            if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
+                self.set_attr("height", &fstr(new_h));
+            }
+        }
     }
 
     fn eval_size_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
@@ -1151,7 +693,22 @@ impl SvgElement {
         Ok((dx, dy))
     }
 
-    pub fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
+    fn is_size_attr(&self, name: &str) -> bool {
+        if self.name == "text" || self.name == "point" {
+            return false;
+        }
+        let mut size_attr = matches!(name, "width" | "height");
+        size_attr = size_attr || (self.name == "circle" && name == "r");
+        size_attr = size_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
+        size_attr
+    }
+
+    fn is_pos_attr(&self, name: &str) -> bool {
+        // Position attributes are identical for all element types
+        matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
+    }
+
+    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
             if self.is_size_attr(&key) {
                 let computed = self.eval_size_attr(&key, &value, ctx)?;
@@ -1248,7 +805,7 @@ impl SvgElement {
             let rel: DirSpec = reldir.parse()?;
             // We won't have the full *position* of this element at this point, but hopefully
             // we have enough to determine its size.
-            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
+            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
             let gap = if !remain.is_empty() {
                 let mut parts = attr_split(remain);
                 strp(&parts.next().unwrap_or("0".to_string()))?
@@ -1283,32 +840,7 @@ impl SvgElement {
         Ok(None)
     }
 
-    fn split_compound_attr(value: &str) -> (String, String) {
-        // wh="10" -> width="10", height="10"
-        // wh="10 20" -> width="10", height="20"
-        // wh="#thing" -> width="#thing", height="#thing"
-        // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
-        // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
-        if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
-            let mut parts = value.splitn(2, char::is_whitespace);
-            let prefix = parts.next().expect("nonempty");
-            if let Some(remain) = parts.next() {
-                let mut parts = attr_split_cycle(remain);
-                let x_suffix = parts.next().unwrap_or_default();
-                let y_suffix = parts.next().unwrap_or_default();
-                ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
-            } else {
-                (value.to_owned(), value.to_owned())
-            }
-        } else {
-            let mut parts = attr_split_cycle(value);
-            let x = parts.next().unwrap_or_default();
-            let y = parts.next().unwrap_or_default();
-            (x, y)
-        }
-    }
-
-    pub fn expand_compound_size(&mut self) {
+    fn expand_compound_size(&mut self) {
         if let Some(wh) = self.attrs.pop("wh") {
             // Split value into width and height
             let (w, h) = Self::split_compound_attr(&wh);
@@ -1329,44 +861,11 @@ impl SvgElement {
         }
     }
 
-    fn resolve_size_delta(&mut self) {
-        // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
-        let (w, h) = match self.name.as_str() {
-            "circle" => {
-                let diam = self.get_attr("r").map(|r| 2. * strp(&r).unwrap_or(0.));
-                (diam, diam)
-            }
-            "ellipse" => (
-                self.get_attr("rx")
-                    .and_then(|rx| strp(&rx).ok())
-                    .map(|x| x * 2.),
-                self.get_attr("ry")
-                    .and_then(|ry| strp(&ry).ok())
-                    .map(|x| x * 2.),
-            ),
-            _ => (
-                self.get_attr("width").and_then(|w| strp(&w).ok()),
-                self.get_attr("height").and_then(|h| strp(&h).ok()),
-            ),
-        };
-
-        if let Some(dw) = self.pop_attr("dw") {
-            if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
-                self.set_attr("width", &fstr(new_w));
-            }
-        }
-        if let Some(dh) = self.pop_attr("dh") {
-            if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
-                self.set_attr("height", &fstr(new_h));
-            }
-        }
-    }
-
     // Compound attributes, e.g.
     // xy="#o" -> x="#o", y="#o"
     // xy="#o 2" -> x="#o 2", y="#o 2"
     // xy="#o 2 4" -> x="#o 2", y="#o 4"
-    pub fn expand_compound_pos(&mut self) {
+    fn expand_compound_pos(&mut self) {
         // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
         // before this point as xy is not considered a compound attribute in that case.
         if let Some(xy) = self.pop_attr("xy") {

@@ -1,7 +1,7 @@
+use super::SvgElement;
 use crate::context::ElementMap;
-use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
-use crate::position::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
+use crate::geometry::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
 use crate::types::{attr_split, fstr, strp};
 
 #[derive(Clone, Copy, Debug)]

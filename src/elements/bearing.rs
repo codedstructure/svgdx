@@ -14,11 +14,11 @@
 //! the direction of relative `l`, `m`, `h`, and `v` commands, where the 'x' coordinate is
 //! aligned with the bearing direction and the 'y' coordinate is perpendicular to it.
 
+use super::path::PathSyntax;
 use crate::errors::{Result, SvgdxError};
-use crate::path::PathSyntax;
 use crate::types::fstr;
 
-pub struct BearingPathSyntax {
+struct BearingPathSyntax {
     data: Vec<char>,
     index: usize,
 }
