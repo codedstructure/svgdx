@@ -3,7 +3,7 @@ use crate::element::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::OutputList;
 use crate::expression::{eval_attr, eval_condition, eval_list};
-use crate::position::{BoundingBox, BoundingBoxBuilder};
+use crate::geometry::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, EventGen};
 
 #[derive(Debug, Clone, PartialEq)]

@@ -1,5 +1,5 @@
 use crate::element::SvgElement;
-use crate::position::LocSpec;
+use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
 use crate::errors::{Result, SvgdxError};

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::errors::{Result, SvgdxError};
-use crate::position::BoundingBox;
+use crate::geometry::BoundingBox;
 use crate::types::{fstr, strp};
 
 impl BoundingBox {

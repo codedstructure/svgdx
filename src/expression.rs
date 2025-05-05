@@ -11,7 +11,7 @@ use crate::constants::{
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Result, SvgdxError};
 use crate::functions::{eval_function, Function};
-use crate::position::parse_el_scalar;
+use crate::geometry::parse_el_scalar;
 use crate::types::fstr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -914,7 +914,7 @@ mod tests {
 
     use crate::context::{ElementMap, VariableMap};
     use crate::element::SvgElement;
-    use crate::position::{BoundingBox, Size};
+    use crate::geometry::{BoundingBox, Size};
     use crate::types::ElRef;
     use assertables::{assert_in_delta, assert_lt};
     use rand::prelude::*;

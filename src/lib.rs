@@ -52,9 +52,9 @@ mod errors;
 mod events;
 mod expression;
 mod functions;
+mod geometry;
 mod loop_el;
 mod path;
-mod position;
 mod reuse;
 #[cfg(feature = "server")]
 pub mod server;

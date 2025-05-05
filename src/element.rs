@@ -8,10 +8,10 @@ use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
-use crate::path::path_bbox;
-use crate::position::{
+use crate::geometry::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TrblLength,
 };
+use crate::path::path_bbox;
 use crate::text::process_text_attr;
 use crate::transform_attr::TransformAttr;
 use crate::types::{
@@ -406,7 +406,7 @@ impl SvgElement {
                 if el.name == "circle" || el.name == "ellipse" {
                     // The referenced element is defined by its center,
                     // but use elements are defined by top-left pos.
-                    p.translate(sz.0 / 4., sz.1 / 4.);
+                    p.translate(sz.width / 4., sz.height / 4.);
                 }
             }
         }
@@ -504,6 +504,12 @@ impl SvgElement {
 
     pub fn pop_attr(&mut self, key: &str) -> Option<String> {
         self.attrs.pop(key)
+    }
+
+    pub fn remove_attrs(&mut self, keys: &[&str]) {
+        for key in keys {
+            self.pop_attr(key);
+        }
     }
 
     pub fn get_attr(&self, key: &str) -> Option<String> {
@@ -779,8 +785,8 @@ impl SvgElement {
                 // let mut target_el = target_el.clone();
                 // target_el.eval_attributes(ctx)?;
                 if let Some(sz) = target_el.size(ctx)? {
-                    width = Some(sz.0);
-                    height = Some(sz.1);
+                    width = Some(sz.width);
+                    height = Some(sz.height);
                 }
             }
             "g" | "symbol" => {
@@ -829,7 +835,7 @@ impl SvgElement {
             }
         }
         if let (Some(width), Some(height)) = (width, height) {
-            Ok(Some(Size(width, height)))
+            Ok(Some(Size::new(width, height)))
         } else {
             Ok(None)
         }
@@ -1248,7 +1254,7 @@ impl SvgElement {
             let rel: DirSpec = reldir.parse()?;
             // We won't have the full *position* of this element at this point, but hopefully
             // we have enough to determine its size.
-            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size(0., 0.)).as_wh();
+            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
             let gap = if !remain.is_empty() {
                 let mut parts = attr_split(remain);
                 strp(&parts.next().unwrap_or("0".to_string()))?
