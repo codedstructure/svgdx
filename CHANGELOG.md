@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Refactor: codebase reorganisation to extract element and geometry modules.
+
 - Fixed: various positioning issues (including universal layout attributes)
   with `<reuse>` and `<use>` elements.
 
