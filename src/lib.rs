@@ -61,7 +61,6 @@ pub mod server;
 mod text;
 mod themes;
 mod transform;
-mod transform_attr;
 mod types;
 
 pub use errors::Result;

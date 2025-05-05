@@ -9,11 +9,11 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent};
 use crate::expression::eval_attr;
 use crate::geometry::{
-    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TrblLength,
+    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
+    TrblLength,
 };
 use crate::path::path_bbox;
 use crate::text::process_text_attr;
-use crate::transform_attr::TransformAttr;
 use crate::types::{
     attr_split, attr_split_cycle, extract_elref, fstr, strp, AttrMap, ClassList, OrderIndex,
 };
