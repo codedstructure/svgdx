@@ -112,6 +112,35 @@ fn split_relspec<'a, 'b>(
     }
 }
 
+// Elements which have a bounding box, including graphical elements
+// and selected containers.
+pub fn is_layout_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "circle"
+            | "ellipse"
+            | "image"
+            | "line"
+            | "path"
+            | "polygon"
+            | "polyline"
+            | "rect"
+            | "text"
+            | "use"
+            // Following are non-standard.
+            | "reuse"
+            // Following also have at least some level of layout
+            | "g"
+            | "symbol"
+            | "clipPath"
+            | "box"
+            | "point"
+            | "svg"
+            | "foreignObject"
+    )
+}
+
+// Elements wh
 impl SvgElement {
     pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes

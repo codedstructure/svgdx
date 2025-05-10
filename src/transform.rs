@@ -147,9 +147,10 @@ fn process_tags(
 }
 
 pub fn process_events(
-    input: InputList,
+    input: impl Into<InputList>,
     context: &mut TransformerContext,
 ) -> Result<(OutputList, Option<BoundingBox>)> {
+    let input = input.into();
     if is_real_svg(&input) {
         if context.get_top_element().is_none() {
             // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document

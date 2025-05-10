@@ -67,9 +67,6 @@ impl EventGen for Container {
                     context.update_element(&new_el);
                 }
 
-                if bbox.is_some() {
-                    context.set_prev_element(&new_el);
-                }
                 Ok((events, bbox))
             }
         } else {
@@ -121,9 +118,7 @@ impl EventGen for GroupElement {
             events.push(OutputEvent::End(el_name));
         }
 
-        // Messy! should probably have a id->bbox map in context
         context.update_element(&new_el);
-        context.set_prev_element(&new_el);
 
         let result_bb = if self.0.name() == "symbol" {
             // symbols have a size which needs storing in context for evaluating
