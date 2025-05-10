@@ -293,3 +293,17 @@ fn test_inside_surround_invalid() {
     let output = transform_str_default(input);
     assert!(output.is_err());
 }
+
+#[test]
+fn test_surround_previous_defer() {
+    // checks that bbox from '^' is used at point of reference,
+    // not at point where everything can be resolved.
+    let input = r##"
+<rect xy="20" wh="10" />
+<rect id="c" surround="^ #a" />
+<rect id="a" xy="5" wh="10" />
+"##;
+    let expected = r#"<rect id="c" x="5" y="5" width="25" height="25" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
