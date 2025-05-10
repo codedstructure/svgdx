@@ -108,6 +108,24 @@ impl OrderIndex {
         Self(vec![idx])
     }
 
+    pub fn depth(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn step(&mut self) {
+        if let Some(v) = self.0.last_mut() {
+            *v += 1;
+        }
+    }
+
+    pub fn down(&mut self) {
+        *self = self.with_index(1);
+    }
+
+    pub fn up(&mut self) {
+        self.0.pop().expect("OrderIndex underflow");
+    }
+
     pub fn with_sub_index(&self, other: &Self) -> Self {
         let mut new_idx = self.0.clone();
         new_idx.extend(other.0.iter());

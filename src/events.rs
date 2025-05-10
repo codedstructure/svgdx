@@ -13,6 +13,7 @@ use quick_xml::{Reader, Writer};
 pub struct InputEvent {
     event: Event<'static>,
     pub index: usize,
+    order: OrderIndex,
     line: usize,
     indent: usize,
     pub alt_idx: Option<usize>,
@@ -32,6 +33,13 @@ impl InputEvent {
             _ => None,
         }
     }
+
+    pub fn with_base_index(&self, order: &OrderIndex) -> Self {
+        Self {
+            order: order.with_sub_index(&self.order),
+            ..self.clone()
+        }
+    }
 }
 
 impl From<Event<'_>> for InputEvent {
@@ -39,6 +47,7 @@ impl From<Event<'_>> for InputEvent {
         Self {
             event: value.into_owned(),
             index: 0,
+            order: OrderIndex::new(0),
             line: 0,
             indent: 0,
             alt_idx: None,
@@ -65,12 +74,19 @@ impl From<&[InputEvent]> for InputList {
                 .map(|v| InputEvent {
                     event: v.event.clone(),
                     index: v.index,
+                    order: v.order.clone(),
                     line: v.line,
                     indent: v.indent,
                     alt_idx: v.alt_idx,
                 })
                 .collect(),
         }
+    }
+}
+
+impl From<Vec<InputEvent>> for InputList {
+    fn from(value: Vec<InputEvent>) -> Self {
+        Self { events: value }
     }
 }
 
@@ -131,6 +147,7 @@ impl InputList {
         let mut src_line = 1;
         let mut indent = 0;
         let mut index = 0;
+        let mut order = OrderIndex::new(1);
         loop {
             let ev = reader.read_event_into(&mut buf);
             let event_lines = if let Ok(ok_ev) = ev.clone() {
@@ -138,9 +155,13 @@ impl InputList {
             } else {
                 0
             };
+            let ev = ev.map_err(|e| {
+                SvgdxError::ParseError(format!("XML error near line {src_line}: {e:?}"))
+            })?;
+
             match &ev {
-                Ok(Event::Eof) => break, // exits the loop when reaching end of file
-                Ok(Event::Text(t)) => {
+                Event::Eof => break, // exits the loop when reaching end of file
+                Event::Text(t) => {
                     let mut t_str = String::from_utf8(t.to_vec())?;
                     if let Some((_, rest)) = t_str.rsplit_once('\n') {
                         t_str = rest.to_string();
@@ -148,47 +169,52 @@ impl InputList {
                     indent = t_str.len() - t_str.trim_end_matches(' ').len();
 
                     events.push(InputEvent {
-                        event: ev.expect("match").into_owned(),
+                        event: ev.into_owned(),
                         index,
+                        order: order.clone(),
                         line: src_line,
                         indent,
                         alt_idx: None,
                     });
+                    order.step();
                 }
-                Ok(Event::Start(_)) => {
+                Event::Start(_) => {
                     events.push(InputEvent {
-                        event: ev.expect("match").into_owned(),
+                        event: ev.into_owned(),
                         index,
+                        order: order.clone(),
                         line: src_line,
                         indent,
                         alt_idx: None,
                     });
                     event_idx_stack.push(index);
+                    order.down();
                 }
-                Ok(Event::End(_)) => {
+                Event::End(_) => {
                     let start_idx = event_idx_stack.pop();
                     if let Some(start_idx) = start_idx {
                         events[start_idx].alt_idx = Some(index);
                     }
+                    order.up();
                     events.push(InputEvent {
-                        event: ev.expect("match").into_owned(),
+                        event: ev.into_owned(),
                         index,
+                        order: order.clone(),
                         line: src_line,
                         indent,
                         alt_idx: start_idx,
                     });
                 }
-                Ok(e) => events.push(InputEvent {
-                    event: e.clone().into_owned(),
-                    index,
-                    line: src_line,
-                    indent,
-                    alt_idx: None,
-                }),
-                Err(e) => {
-                    return Err(SvgdxError::ParseError(format!(
-                        "XML error near line {src_line}: {e:?}"
-                    )))
+                e => {
+                    events.push(InputEvent {
+                        event: e.clone().into_owned(),
+                        index,
+                        order: order.clone(),
+                        line: src_line,
+                        indent,
+                        alt_idx: None,
+                    });
+                    order.step();
                 }
             }
 
@@ -563,7 +589,7 @@ impl TryFrom<InputEvent> for SvgElement {
                 element.original = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
                 element.set_indent(ev.indent);
                 element.set_src_line(ev.line);
-                element.set_order_index(&OrderIndex::new(ev.index));
+                element.set_order_index(&ev.order);
                 Ok(element)
             }
             _ => Err(SvgdxError::DocumentError(format!(

@@ -84,6 +84,8 @@ impl EventGen for LoopElement {
                 loop_var_value = eval_attr(&start, context)?.parse()?;
                 loop_step = eval_attr(&step, context)?.parse()?;
             }
+
+            let loop_base = event_element.order_index.clone();
             loop {
                 if let LoopType::Repeat(_) = &loop_def.loop_type {
                     if iteration >= loop_count {
@@ -99,7 +101,15 @@ impl EventGen for LoopElement {
                     context.set_var(&loop_var_name, &loop_var_value.to_string());
                 }
 
-                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
+                // Each iteration needs different order indices on elements, so e.g.
+                // ElRef::Prev isn't identical for each iteration.
+                let iter_oi = loop_base.with_index(iteration as usize);
+                let iter_inner = inner_events
+                    .iter()
+                    .map(|e| e.with_base_index(&iter_oi))
+                    .collect::<Vec<_>>();
+
+                let (ev_list, ev_bbox) = process_events(iter_inner, context)?;
                 gen_events.extend(&ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);

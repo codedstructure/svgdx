@@ -19,6 +19,8 @@ impl EventGen for SvgElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         context.inc_depth()?;
+        // early update: may be updated further during processing
+        context.update_element(self);
         let res = match self.name() {
             "loop" => LoopElement(self.clone()).generate_events(context),
             "config" => ConfigElement(self.clone()).generate_events(context),
@@ -80,9 +82,6 @@ impl EventGen for OtherElement {
         e.transmute(context)?;
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
-        if bb.is_some() {
-            context.set_prev_element(&e);
-        }
         let events = e.element_events(context)?;
         for svg_ev in events {
             let is_empty = matches!(svg_ev, OutputEvent::Empty(_));
@@ -115,9 +114,9 @@ impl EventGen for OtherElement {
             output.push(adapted);
         }
         if self.0.name == "point" {
-            // point elements have no bounding box, and are primarily used for
-            // update_element() side-effects, e.g. setting prev_element.
-            // (They can generate text though, so not rejected earlier.
+            // point elements don't contribute to parent bounding box,
+            // and are primarily used for update_element() side-effects.
+            // (They can generate text though, so not rejected earlier.)
             bb = None;
         }
         Ok((output, bb))
