@@ -3,7 +3,7 @@ use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::events::{OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events, EventGen};
+use crate::transform::{process_events, process_events_with_index, EventGen};
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
@@ -94,7 +94,8 @@ impl EventGen for GroupElement {
         let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
             // get the inner events / bbox first, as some outer element attrs
             // (e.g. `transform` via rotate) may depend on the bbox.
-            process_events(inner_events, context).inspect_err(|_| {
+            let oi_base = Some(new_el.order_index.clone());
+            process_events_with_index(inner_events, context, oi_base).inspect_err(|_| {
                 context.pop_element();
             })?
         } else {

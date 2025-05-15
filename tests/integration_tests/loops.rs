@@ -260,3 +260,20 @@ fn test_for_loop() {
     assert_contains!(output, expected2);
     assert_contains!(output, expected3);
 }
+
+#[test]
+fn test_for_loop_simple() {
+    let input = r##"
+<rect xy="0" wh="2"/>
+<for data="0, 0, 0" var="_"><rect xy="^|h" wh="2"/>
+</for>
+"##;
+    let expected = r#"
+<rect x="0" y="0" width="2" height="2"/>
+<rect x="2" y="0" width="2" height="2"/>
+<rect x="4" y="0" width="2" height="2"/>
+<rect x="6" y="0" width="2" height="2"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output.trim(), expected.trim());
+}
