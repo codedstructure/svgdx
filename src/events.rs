@@ -254,10 +254,10 @@ impl Tag {
         }
     }
 
-    pub fn get_element(&self) -> Option<SvgElement> {
+    pub fn get_element_mut(&mut self) -> Option<&mut SvgElement> {
         match self {
-            Tag::Compound(el, _) => Some(el.clone()),
-            Tag::Leaf(el, _) => Some(el.clone()),
+            Tag::Compound(el, _) => Some(el),
+            Tag::Leaf(el, _) => Some(el),
             _ => None,
         }
     }

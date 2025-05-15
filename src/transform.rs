@@ -94,16 +94,21 @@ fn process_tags(
     context: &mut TransformerContext,
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
     bbb: &mut BoundingBoxBuilder,
+    oi_base: Option<OrderIndex>,
 ) -> Result<Option<BoundingBox>> {
     let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
     let remain = &mut Vec::new();
 
     while !tags.is_empty() && remain.len() != tags.len() {
         for (idx, t) in &mut tags.iter_mut() {
-            let idx = idx.clone();
-            let el = if let Some(el) = t.get_element() {
+            let idx = oi_base
+                .as_ref()
+                .map(|base| base.with_sub_index(idx))
+                .unwrap_or_else(|| idx.clone());
+            let el = if let Some(el) = t.get_element_mut() {
                 // update early so reuse targets are available even if the element
                 // is not ready (e.g. within a specs block)
+                el.set_order_index(&idx);
                 context.update_element(&el);
                 Some(el.clone())
             } else {
@@ -150,6 +155,14 @@ pub fn process_events(
     input: impl Into<InputList>,
     context: &mut TransformerContext,
 ) -> Result<(OutputList, Option<BoundingBox>)> {
+    process_events_with_index(input, context, None)
+}
+
+pub fn process_events_with_index(
+    input: impl Into<InputList>,
+    context: &mut TransformerContext,
+    oi_base: Option<OrderIndex>,
+) -> Result<(OutputList, Option<BoundingBox>)> {
     let input = input.into();
     if is_real_svg(&input) {
         if context.get_top_element().is_none() {
@@ -167,7 +180,7 @@ pub fn process_events(
         .enumerate()
         .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
         .collect::<Vec<_>>();
-    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb)?;
+    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb, oi_base)?;
 
     for (_idx, events) in idx_output {
         output.extend(&events);
@@ -482,7 +495,13 @@ mod tests {
             .collect::<Vec<_>>();
         let bbb = &mut BoundingBoxBuilder::new();
 
-        let result = process_tags(&mut tags, &mut transformer.context, &mut idx_output, bbb);
+        let result = process_tags(
+            &mut tags,
+            &mut transformer.context,
+            &mut idx_output,
+            bbb,
+            None,
+        );
         assert!(result.is_ok());
 
         // let ok_ev_count = idx_output

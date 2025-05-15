@@ -1,5 +1,6 @@
 use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
+use itertools::Itertools;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
@@ -138,6 +139,18 @@ impl OrderIndex {
         new_idx.push(idx);
 
         Self(new_idx)
+    }
+
+    /// is `other` a strict prefix of self?
+    pub fn has_prefix(&self, other: &Self) -> bool {
+        // other is shorter and all elements match
+        other.0.len() < self.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl Display for OrderIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{{}}}", self.0.iter().map(|i| i.to_string()).join("."))
     }
 }
 
@@ -655,6 +668,24 @@ mod test {
         assert_lt!(idx1.with_sub_index(&subidx1), idx1.with_sub_index(&subidx2));
         assert_lt!(idx1.with_sub_index(&subidx2), idx2);
         assert_lt!(idx1.with_sub_index(&subidx2), idx2.with_sub_index(&subidx1));
+    }
+
+    #[test]
+    fn test_order_index_prefix() {
+        let idx1 = OrderIndex(vec![1]);
+        let idx2 = OrderIndex(vec![1, 2]);
+        let idx3 = OrderIndex(vec![1, 2, 1]);
+        let idx4 = OrderIndex(vec![1, 2, 2]);
+        assert!(idx2.has_prefix(&idx1));
+        assert!(idx3.has_prefix(&idx1));
+        assert!(idx3.has_prefix(&idx2));
+        assert!(idx4.has_prefix(&idx1));
+        assert!(idx4.has_prefix(&idx2));
+        assert!(!idx4.has_prefix(&idx3));
+        assert!(!idx1.has_prefix(&idx2));
+        assert!(!idx1.has_prefix(&idx3));
+        // x is not a prefix of x
+        assert!(!idx1.has_prefix(&idx1));
     }
 
     #[test]

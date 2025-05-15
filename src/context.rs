@@ -496,6 +496,8 @@ impl TransformerContext {
                 .rev()
                 .filter(|(oi, _)| oi.depth() <= current.depth())
                 .filter(|(_, el)| is_layout_element(el))
+                // when scanning backwards, ignore any parent elements, e.g. a <g> we're inside of
+                .filter(|(oi, _)| !current.has_prefix(oi))
                 .nth((-offset - 1) as usize)
                 .map(|(_, value)| value)
         }

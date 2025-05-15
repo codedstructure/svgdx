@@ -4,7 +4,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::OutputList;
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
-use crate::transform::{process_events, EventGen};
+use crate::transform::{process_events_with_index, EventGen};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -85,7 +85,6 @@ impl EventGen for LoopElement {
                 loop_step = eval_attr(&step, context)?.parse()?;
             }
 
-            let loop_base = event_element.order_index.clone();
             loop {
                 if let LoopType::Repeat(_) = &loop_def.loop_type {
                     if iteration >= loop_count {
@@ -103,13 +102,9 @@ impl EventGen for LoopElement {
 
                 // Each iteration needs different order indices on elements, so e.g.
                 // ElRef::Prev isn't identical for each iteration.
-                let iter_oi = loop_base.with_index(iteration as usize);
-                let iter_inner = inner_events
-                    .iter()
-                    .map(|e| e.with_base_index(&iter_oi))
-                    .collect::<Vec<_>>();
-
-                let (ev_list, ev_bbox) = process_events(iter_inner, context)?;
+                let iter_oi = event_element.order_index.with_index(iteration as usize);
+                let (ev_list, ev_bbox) =
+                    process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
                 gen_events.extend(&ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
@@ -185,7 +180,9 @@ impl EventGen for ForElement {
                 if let Some(ref idx_name) = idx_name {
                     context.set_var(idx_name, &idx.to_string());
                 }
-                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
+                let iter_oi = event_element.order_index.with_index(idx as usize);
+                let (ev_list, ev_bbox) =
+                    process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
                 gen_events.extend(&ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
