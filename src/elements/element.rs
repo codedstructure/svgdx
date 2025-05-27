@@ -93,6 +93,10 @@ impl EventGen for OtherElement {
                         new_el.set_attr(&k, &v);
                     }
                 }
+
+                // TODO: have a range of debug options to include/exclude
+                // new_el.set_attr("_oi", &e.order_index.to_string());
+
                 // Any 'class' attribute values are stored separately as a HashSet;
                 // collect those into the BytesStart object
                 if !e.classes.is_empty() {

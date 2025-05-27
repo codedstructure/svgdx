@@ -99,20 +99,25 @@ fn process_tags(
     let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
     let remain = &mut Vec::new();
 
+    for (idx, t) in tags.iter_mut() {
+        let idx = oi_base
+            .as_ref()
+            .map(|base| base.with_sub_index(idx))
+            .unwrap_or_else(|| idx.clone());
+        if let Some(el) = t.get_element_mut() {
+            // update early so reuse targets are available even if the element
+            // is not ready (e.g. within a specs block)
+            el.set_order_index(&idx);
+            context.update_element(el);
+        }
+    }
+
     while !tags.is_empty() && remain.len() != tags.len() {
         for (idx, t) in &mut tags.iter_mut() {
-            let idx = oi_base
-                .as_ref()
-                .map(|base| base.with_sub_index(idx))
-                .unwrap_or_else(|| idx.clone());
-            let el = if let Some(el) = t.get_element_mut() {
-                // update early so reuse targets are available even if the element
-                // is not ready (e.g. within a specs block)
-                el.set_order_index(&idx);
-                context.update_element(&el);
-                Some(el.clone())
+            let (el, idx) = if let Some(el) = t.get_element_mut() {
+                (Some(el.clone()), el.order_index.clone())
             } else {
-                None
+                (None, idx.clone())
             };
             let gen_result = t.generate_events(context);
             if !context.in_specs {

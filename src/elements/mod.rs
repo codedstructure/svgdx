@@ -17,5 +17,5 @@ use reuse::ReuseElement;
 use special::{ConfigElement, DefaultsElement, IfElement, SpecsElement, VarElement};
 use text::process_text_attr;
 
-pub use layout::is_layout_element;
 pub use element::SvgElement;
+pub use layout::is_layout_element;

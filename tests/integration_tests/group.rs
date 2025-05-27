@@ -211,3 +211,19 @@ fn test_prev_el_from_group() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_next_el_group() {
+    let input = r##"
+<svg>
+  <circle xy="+|v" r="1"/>
+  <g>
+    <rect wh="1"/>
+    <rect xy="^|h 1" wh="1"/>
+  </g>
+</svg>
+"##;
+    let expected = r#"<circle cx="1.5" cy="2" r="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

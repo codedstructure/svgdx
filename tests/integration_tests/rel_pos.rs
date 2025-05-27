@@ -343,3 +343,26 @@ fn test_line_relpos() {
 <line x1="0" y1="6" x2="10" y2="6"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+fn test_dirspec_next() {
+    let input = r#"
+<rect id="z1" xy="+|v" wh="2"/>
+<rect id="z2" xy="10" wh="2"/>
+"#;
+    let expected1 = r#"<rect id="z1" x="10" y="12" width="2" height="2"/>"#;
+    let expected2 = r#"<rect id="z2" x="10" y="10" width="2" height="2"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r#"
+<circle id="z1" xy="+|v" r="2"/>
+<rect id="z2" xy="10" wh="2"/>
+"#;
+    let expected1 = r#"<circle id="z1" cx="11" cy="14" r="2"/>"#;
+    let expected2 = r#"<rect id="z2" x="10" y="10" width="2" height="2"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

@@ -1,4 +1,4 @@
-use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
+use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
 use itertools::Itertools;
 use std::fmt::{self, Display};
@@ -426,6 +426,7 @@ impl<'s> IntoIterator for &'s ClassList {
 pub enum ElRef {
     Id(String),
     Prev,
+    Next,
 }
 
 impl FromStr for ElRef {
@@ -447,6 +448,7 @@ impl Display for ElRef {
         match self {
             ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
             ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
+            ElRef::Next => write!(f, "{ELREF_NEXT}"),
         }
     }
 }
@@ -467,6 +469,8 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         }
     } else if let Some(s) = s.strip_prefix(ELREF_PREVIOUS) {
         return Ok((ElRef::Prev, s));
+    } else if let Some(s) = s.strip_prefix(ELREF_NEXT) {
+        return Ok((ElRef::Next, s));
     }
 
     Err(SvgdxError::ParseError(format!(
@@ -708,6 +712,7 @@ mod test {
         );
         assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev, "@bl"));
         assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev, ""));
+        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next, ""));
         assert!(extract_elref("id").is_err());
     }
 }
