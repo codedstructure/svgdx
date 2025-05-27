@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use super::SvgElement;
 use crate::constants::{
-    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
-    VAR_PREFIX,
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
+    SCALARSPEC_SEP, VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::path::path_bbox;
@@ -41,7 +41,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
-        if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
+        if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS, ELREF_NEXT]) {
             result.push_str(&value[..idx]);
             value = &value[idx..];
             if let Some(mut idx) = value[1..].find(word_break) {
@@ -412,13 +412,14 @@ impl SvgElement {
         // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
         // attempting to compute a bounding box.
         fn passthrough(value: &str) -> bool {
-            // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^' (which
-            // might be resolved later) then return Ok(None).
+            // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^'/'+'
+            // (which might be resolved later) then return Ok(None).
             // This will return `true` for things such as "10%" or "40mm".
             strp(value).is_err()
                 && !(value.contains(VAR_PREFIX)
                     || value.contains(ELREF_ID_PREFIX)
-                    || value.contains(ELREF_PREVIOUS))
+                    || value.contains(ELREF_PREVIOUS)
+                    || value.contains(ELREF_NEXT))
         }
         Ok(match self.name() {
             "point" | "text" => {

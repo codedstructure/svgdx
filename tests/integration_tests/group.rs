@@ -211,3 +211,22 @@ fn test_prev_el_from_group() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_next_el_group() {
+    // ISSUES: This fails if there isn't leading whitespace prior to the <svg> element.
+    //  - based on whether <svg> is event 0 or 1. Really odd!
+    // Document order is not preserved; '+' elements get inserted at strange points in the doc, not where expected.
+    // Perhaps orderindex on the element is being set in a way which injects it into the output container wrongly?
+    let input = r##"  <svg>
+<circle xy="+|v" r="1"/>
+<g>
+<rect wh="1"/>
+<rect xy="^|h 1" wh="1"/>
+</g>
+</svg>
+"##;
+    let expected = r#"<circle cx="1.5" cy="2" r="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

@@ -178,6 +178,7 @@ impl ElementMap for TransformerContext {
         match elref {
             ElRef::Id(id) => self.elem_map.get(id),
             ElRef::Prev => self.get_element_offset(-1),
+            ElRef::Next => self.get_element_offset(1),
         }
     }
 
@@ -324,6 +325,7 @@ impl TransformerContext {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
             ElRef::Prev => self.get_element_offset(-1),
+            ElRef::Next => self.get_element_offset(1),
         }
     }
 

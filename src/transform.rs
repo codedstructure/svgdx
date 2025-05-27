@@ -108,8 +108,10 @@ fn process_tags(
             let el = if let Some(el) = t.get_element_mut() {
                 // update early so reuse targets are available even if the element
                 // is not ready (e.g. within a specs block)
-                el.set_order_index(&idx);
-                context.update_element(&el);
+                if remain.is_empty() {
+                    el.set_order_index(&idx);
+                }
+                context.update_element(el);
                 Some(el.clone())
             } else {
                 None

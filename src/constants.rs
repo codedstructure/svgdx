@@ -11,6 +11,8 @@ pub const EDGESPEC_SEP: char = ':';
 
 /// ElRef referencing the previous element
 pub const ELREF_PREVIOUS: char = '^';
+/// ElRef referencing the next element
+pub const ELREF_NEXT: char = '+';
 /// ElRef referencing element with the given id, e.g. `#abc`
 pub const ELREF_ID_PREFIX: char = '#';
 

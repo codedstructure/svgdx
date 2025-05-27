@@ -3,7 +3,7 @@ use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::events::{OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events, process_events_with_index, EventGen};
+use crate::transform::{process_events_with_index, EventGen};
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
@@ -55,7 +55,8 @@ impl EventGen for Container {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
-                    process_events(inner_events, context)?
+                    let oi_base = Some(new_el.order_index.clone());
+                    process_events_with_index(inner_events, context, oi_base)?
                 };
                 events.extend(&evlist);
                 events.push(OutputEvent::End(self.0.name().to_owned()));
