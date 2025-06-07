@@ -1,4 +1,4 @@
-use super::SvgElement;
+use super::{Element, Layout, SvgElement};
 use crate::context::ElementMap;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};

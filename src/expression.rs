@@ -913,8 +913,8 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::context::{ElementMap, VariableMap};
-    use crate::elements::SvgElement;
-    use crate::geometry::{BoundingBox, Size};
+    use crate::elements::{Layout, SvgElement};
+    use crate::geometry::BoundingBox;
     use crate::types::ElRef;
     use assertables::{assert_in_delta, assert_lt};
     use rand::prelude::*;
@@ -954,10 +954,6 @@ mod tests {
 
         fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
             el.bbox()
-        }
-
-        fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
-            el.size(self)
         }
     }
 

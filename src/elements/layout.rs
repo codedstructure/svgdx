@@ -1,7 +1,7 @@
 use std::f32::consts::{FRAC_1_SQRT_2, SQRT_2};
 use std::str::FromStr;
 
-use super::SvgElement;
+use super::{Element, ElementTransform, SvgElement};
 use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
     VAR_PREFIX,
@@ -13,7 +13,7 @@ use crate::geometry::{
     strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
     TrblLength,
 };
-use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, strp};
+use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, split_compound_attr, strp};
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -112,8 +112,136 @@ fn split_relspec<'a, 'b>(
     }
 }
 
-impl SvgElement {
-    pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
+pub trait Layout: Sized + Element {
+    /// Resolve the position of the element, including any relative positioning
+    /// and size attributes.
+    fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()>;
+
+    fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()>;
+
+    /// Calculate the bounding box of the target shape inside self.
+    fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>>;
+
+    /// Get the size of the element, if it has one.
+    fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>>;
+
+    /// Get the bounding box of the element, if it has one.
+    fn bbox(&self) -> Result<Option<BoundingBox>>;
+
+    fn bbox_raw(&self) -> Result<Option<BoundingBox>>;
+
+    fn translated(&self, dx: f32, dy: f32) -> Result<Self>;
+
+    fn position_from_bbox(&mut self, bb: &BoundingBox, inscribe: bool);
+
+    fn resolve_size_delta(&mut self);
+
+    fn eval_size_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String>;
+
+    fn eval_pos_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String>;
+
+    fn pos_attr_helper(
+        &self,
+        remain: &str,
+        bbox: &BoundingBox,
+        attr_ss: ScalarSpec,
+    ) -> Result<String>;
+
+    fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)>;
+
+    fn is_size_attr(&self, name: &str) -> bool {
+        if self.name() == "text" || self.name() == "point" {
+            return false;
+        }
+        let mut size_attr = matches!(name, "width" | "height");
+        size_attr = size_attr || (self.name() == "circle" && name == "r");
+        size_attr = size_attr || (self.name() == "ellipse" && (name == "rx" || name == "ry"));
+        size_attr
+    }
+
+    fn is_pos_attr(&self, name: &str) -> bool {
+        // Position attributes are identical for all element types
+        matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
+    }
+
+    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()>;
+
+    fn eval_text_anchor(&mut self, ctx: &impl ContextView) -> Result<()>;
+
+    fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>>;
+
+    fn expand_compound_size(&mut self) {
+        if let Some(wh) = self.pop_attr("wh") {
+            // Split value into width and height
+            let (w, h) = split_compound_attr(&wh);
+            self.set_default_attr("width", &w);
+            self.set_default_attr("height", &h);
+        }
+        let name = self.name().to_owned();
+        if let ("ellipse", Some(rxy)) = (name.as_str(), self.pop_attr("rxy")) {
+            // Split value into rx and ry
+            let (rx, ry) = split_compound_attr(&rxy);
+            self.set_default_attr("rx", &rx);
+            self.set_default_attr("ry", &ry);
+        }
+        if let Some(dwh) = self.pop_attr("dwh") {
+            // Split value into dw and dh
+            let (dw, dh) = split_compound_attr(&dwh);
+            self.set_default_attr("dw", &dw);
+            self.set_default_attr("dh", &dh);
+        }
+    }
+
+    // Compound attributes, e.g.
+    // xy="#o" -> x="#o", y="#o"
+    // xy="#o 2" -> x="#o 2", y="#o 2"
+    // xy="#o 2 4" -> x="#o 2", y="#o 4"
+    fn expand_compound_pos(&mut self) {
+        // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
+        // before this point as xy is not considered a compound attribute in that case.
+        if let Some(xy) = self.pop_attr("xy") {
+            let (x, y) = split_compound_attr(&xy);
+            let (x_attr, y_attr) = match self.pop_attr("xy-loc").as_deref() {
+                Some("t") => ("cx", "y1"),
+                Some("tr") => ("x2", "y1"),
+                Some("r") => ("x2", "cy"),
+                Some("br") => ("x2", "y2"),
+                Some("b") => ("cx", "y2"),
+                Some("bl") => ("x1", "y2"),
+                Some("l") => ("x1", "cy"),
+                Some("c") => ("cx", "cy"),
+                _ => ("x", "y"),
+            };
+            self.set_default_attr(x_attr, &x);
+            self.set_default_attr(y_attr, &y);
+        }
+        if let Some(cxy) = self.pop_attr("cxy") {
+            let (cx, cy) = split_compound_attr(&cxy);
+            self.set_default_attr("cx", &cx);
+            self.set_default_attr("cy", &cy);
+        }
+        if let Some(xy1) = self.pop_attr("xy1") {
+            let (x1, y1) = split_compound_attr(&xy1);
+            self.set_default_attr("x1", &x1);
+            self.set_default_attr("y1", &y1);
+        }
+        if let Some(xy2) = self.pop_attr("xy2") {
+            let (x2, y2) = split_compound_attr(&xy2);
+            self.set_default_attr("x2", &x2);
+            self.set_default_attr("y2", &y2);
+        }
+        if let Some(dxy) = self.pop_attr("dxy") {
+            let (dx, dy) = split_compound_attr(&dxy);
+            self.set_default_attr("dx", &dx);
+            self.set_default_attr("dy", &dy);
+        }
+    }
+}
+
+impl SvgElement {}
+
+impl Layout for SvgElement {
+    fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
         // moved out of this function and called once per element (or this function
@@ -279,7 +407,7 @@ impl SvgElement {
         }
     }
 
-    pub fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>> {
+    fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>> {
         // NOTE: unlike bbox, this does not replace missing values with '0'.
         // Assumes any dw / dh have already been applied.
 
@@ -359,7 +487,7 @@ impl SvgElement {
         }
     }
 
-    pub fn bbox(&self) -> Result<Option<BoundingBox>> {
+    fn bbox(&self) -> Result<Option<BoundingBox>> {
         let mut el_bbox = if self.content_bbox.is_some() {
             // container elements (`g`, `symbol`, `clipPath` etc) set this
             // to the bbox of their contents
@@ -515,7 +643,7 @@ impl SvgElement {
         })
     }
 
-    pub fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
+    fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
         for (key, value) in &self.attrs {
             match key.as_str() {
@@ -693,21 +821,6 @@ impl SvgElement {
         Ok((dx, dy))
     }
 
-    fn is_size_attr(&self, name: &str) -> bool {
-        if self.name == "text" || self.name == "point" {
-            return false;
-        }
-        let mut size_attr = matches!(name, "width" | "height");
-        size_attr = size_attr || (self.name == "circle" && name == "r");
-        size_attr = size_attr || (self.name == "ellipse" && (name == "rx" || name == "ry"));
-        size_attr
-    }
-
-    fn is_pos_attr(&self, name: &str) -> bool {
-        // Position attributes are identical for all element types
-        matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
-    }
-
     fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
         for (key, value) in self.attrs.clone() {
             if self.is_size_attr(&key) {
@@ -775,7 +888,7 @@ impl SvgElement {
     ///   H - horizontal to the left
     ///   v - vertical below
     ///   V - vertical above
-    pub fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
+    fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
         let input = self.attrs.get("xy");
         if input.is_none() {
             return Ok(None);
@@ -839,72 +952,6 @@ impl SvgElement {
         }
         Ok(None)
     }
-
-    fn expand_compound_size(&mut self) {
-        if let Some(wh) = self.attrs.pop("wh") {
-            // Split value into width and height
-            let (w, h) = Self::split_compound_attr(&wh);
-            self.attrs.insert_first("width", w);
-            self.attrs.insert_first("height", h);
-        }
-        if let ("ellipse", Some(rxy)) = (self.name.as_str(), self.attrs.pop("rxy")) {
-            // Split value into rx and ry
-            let (rx, ry) = Self::split_compound_attr(&rxy);
-            self.attrs.insert_first("rx", rx);
-            self.attrs.insert_first("ry", ry);
-        }
-        if let Some(dwh) = self.attrs.pop("dwh") {
-            // Split value into dw and dh
-            let (dw, dh) = Self::split_compound_attr(&dwh);
-            self.attrs.insert_first("dw", dw);
-            self.attrs.insert_first("dh", dh);
-        }
-    }
-
-    // Compound attributes, e.g.
-    // xy="#o" -> x="#o", y="#o"
-    // xy="#o 2" -> x="#o 2", y="#o 2"
-    // xy="#o 2 4" -> x="#o 2", y="#o 4"
-    fn expand_compound_pos(&mut self) {
-        // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
-        // before this point as xy is not considered a compound attribute in that case.
-        if let Some(xy) = self.pop_attr("xy") {
-            let (x, y) = Self::split_compound_attr(&xy);
-            let (x_attr, y_attr) = match self.pop_attr("xy-loc").as_deref() {
-                Some("t") => ("cx", "y1"),
-                Some("tr") => ("x2", "y1"),
-                Some("r") => ("x2", "cy"),
-                Some("br") => ("x2", "y2"),
-                Some("b") => ("cx", "y2"),
-                Some("bl") => ("x1", "y2"),
-                Some("l") => ("x1", "cy"),
-                Some("c") => ("cx", "cy"),
-                _ => ("x", "y"),
-            };
-            self.attrs.insert_first(x_attr, x);
-            self.attrs.insert_first(y_attr, y);
-        }
-        if let Some(cxy) = self.pop_attr("cxy") {
-            let (cx, cy) = Self::split_compound_attr(&cxy);
-            self.attrs.insert_first("cx", cx);
-            self.attrs.insert_first("cy", cy);
-        }
-        if let Some(xy1) = self.pop_attr("xy1") {
-            let (x1, y1) = Self::split_compound_attr(&xy1);
-            self.attrs.insert_first("x1", x1);
-            self.attrs.insert_first("y1", y1);
-        }
-        if let Some(xy2) = self.pop_attr("xy2") {
-            let (x2, y2) = Self::split_compound_attr(&xy2);
-            self.attrs.insert_first("x2", x2);
-            self.attrs.insert_first("y2", y2);
-        }
-        if let Some(dxy) = self.pop_attr("dxy") {
-            let (dx, dy) = Self::split_compound_attr(&dxy);
-            self.attrs.insert_first("dx", dx);
-            self.attrs.insert_first("dy", dy);
-        }
-    }
 }
 
 #[cfg(test)]
@@ -914,35 +961,6 @@ mod tests {
     use crate::types::ElRef;
 
     use super::*;
-
-    #[test]
-    fn test_spread_attr() {
-        let (w, h) = SvgElement::split_compound_attr("10");
-        assert_eq!(w, "10");
-        assert_eq!(h, "10");
-        let (w, h) = SvgElement::split_compound_attr("10 20");
-        assert_eq!(w, "10");
-        assert_eq!(h, "20");
-        let (w, h) = SvgElement::split_compound_attr("#thing");
-        assert_eq!(w, "#thing");
-        assert_eq!(h, "#thing");
-        let (w, h) = SvgElement::split_compound_attr("#thing 50%");
-        assert_eq!(w, "#thing 50%");
-        assert_eq!(h, "#thing 50%");
-        let (w, h) = SvgElement::split_compound_attr("#thing 10 20");
-        assert_eq!(w, "#thing 10");
-        assert_eq!(h, "#thing 20");
-
-        let (x, y) = SvgElement::split_compound_attr("^a@tl");
-        assert_eq!(x, "^a@tl");
-        assert_eq!(y, "^a@tl");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 5");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5 7%");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 7%");
-    }
 
     #[test]
     fn test_eval_size_attr() {
@@ -1072,10 +1090,6 @@ mod tests {
 
         fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
             el.bbox()
-        }
-
-        fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
-            el.size(self)
         }
     }
 

@@ -1,16 +1,15 @@
 use super::{
     process_path_bearing, process_text_attr, ConfigElement, ConnectionType, Connector, Container,
-    DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement,
-    VarElement,
+    DefaultsElement, ForElement, GroupElement, IfElement, Layout, LoopElement, ReuseElement,
+    SpecsElement, VarElement,
 };
-use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expression::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::transform::EventGen;
-use crate::types::{attr_split_cycle, extract_urlref, strp, AttrMap, ClassList, OrderIndex};
+use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex};
 
 use core::fmt::Display;
 use std::collections::HashMap;
@@ -145,15 +144,346 @@ pub struct SvgElement {
 
 impl Display for SvgElement {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<{}", self.name)?;
-        if !self.attrs.is_empty() {
-            write!(f, " {}", self.attrs)?;
+        self.fmt_element(f)
+    }
+}
+
+pub trait Element: Sized + Clone {
+    fn name(&self) -> &str;
+    fn name_mut(&mut self) -> &mut String;
+    fn attrs(&self) -> &AttrMap;
+    fn attrs_mut(&mut self) -> &mut AttrMap;
+    fn classes(&self) -> &ClassList;
+    fn classes_mut(&mut self) -> &mut ClassList;
+
+    fn fmt_element(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<{}", self.name())?;
+        let attrs = self.attrs();
+        if !attrs.is_empty() {
+            write!(f, " {}", attrs)?;
         }
-        if !self.classes.is_empty() {
-            write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
+        let classes = self.classes();
+        if !classes.is_empty() {
+            write!(f, r#" class="{}""#, classes.to_vec().join(" "))?;
         }
         write!(f, ">")?;
         Ok(())
+    }
+
+    // The following methods shouldn't need overriding.
+
+    fn set_attr(&mut self, key: &str, value: &str) {
+        self.attrs_mut().insert(key.to_string(), value.to_string());
+    }
+
+    fn get_attr(&self, key: &str) -> Option<String> {
+        self.attrs().get(key).cloned()
+    }
+
+    fn has_attr(&self, key: &str) -> bool {
+        self.attrs().contains_key(key)
+    }
+
+    fn pop_attr(&mut self, key: &str) -> Option<String> {
+        self.attrs_mut().pop(key)
+    }
+
+    fn remove_attrs(&mut self, keys: &[&str]) {
+        for key in keys {
+            self.pop_attr(key);
+        }
+    }
+
+    fn get_attrs(&self) -> HashMap<String, String> {
+        self.attrs().to_vec().into_iter().collect()
+    }
+
+    fn set_default_attr(&mut self, key: &str, value: &str) {
+        if !self.has_attr(key) {
+            self.set_attr(key, value);
+        }
+    }
+
+    fn add_class(&mut self, class: &str) -> Self {
+        self.classes_mut().insert(class.to_string());
+        self.clone()
+    }
+
+    fn add_classes(&mut self, classes: &ClassList) {
+        for class in classes {
+            // update classes directly rather than use add_class which
+            // performs a clone() operation.
+            self.classes_mut().insert(class.to_string());
+        }
+    }
+
+    fn has_class(&self, class: &str) -> bool {
+        self.classes().contains(class)
+    }
+
+    /// Remove a class from the element, returning `true` if the class was present
+    fn pop_class(&mut self, class: &str) -> bool {
+        self.classes_mut().remove(class)
+    }
+
+    fn get_classes(&self) -> Vec<String> {
+        self.classes().to_vec()
+    }
+
+    fn replace_attrs(&mut self, attrs: AttrMap) {
+        *self.attrs_mut() = attrs;
+    }
+
+    #[must_use]
+    fn without_attr(&self, key: &str) -> Self {
+        let mut element = self.clone();
+        element.replace_attrs(
+            self.attrs()
+                .clone()
+                .into_iter()
+                .filter(|(k, _v)| k != key)
+                .collect(),
+        );
+        element
+    }
+
+    /// copy attributes, classes and indentation from another element,
+    /// returning the merged element
+    #[must_use]
+    fn with_attrs_from(&self, other: &Self) -> Self {
+        let mut attrs = self.attrs().clone();
+        for (k, v) in other.attrs() {
+            attrs.insert(k.clone(), v.clone());
+        }
+        let mut element = other.clone();
+        element.replace_attrs(attrs);
+        // Everything but the name and any attrs unique to the original element
+        // is from the other element.
+        *element.name_mut() = self.name().to_string();
+        element
+    }
+}
+
+impl Element for SvgElement {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn name_mut(&mut self) -> &mut String {
+        &mut self.name
+    }
+
+    fn attrs(&self) -> &AttrMap {
+        &self.attrs
+    }
+
+    fn attrs_mut(&mut self) -> &mut AttrMap {
+        &mut self.attrs
+    }
+
+    fn classes(&self) -> &ClassList {
+        &self.classes
+    }
+
+    fn classes_mut(&mut self) -> &mut ClassList {
+        &mut self.classes
+    }
+}
+
+pub trait ElementTransform: super::layout::Layout {
+    fn transmute(&mut self, _ctx: &impl ContextView) -> Result<()> {
+        Ok(())
+    }
+
+    /// Resolve any expressions in attributes.
+    fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
+        // Resolve any attributes
+        for (key, value) in self.get_attrs() {
+            if key == "__" {
+                // Raw comments are not evaluated
+                continue;
+            }
+            let replace = eval_attr(&value, ctx)?;
+            self.attrs_mut().insert(&key, &replace);
+        }
+        // Classes are handled separately to other attributes
+        for class in &self.get_classes() {
+            self.classes_mut().replace(class, eval_attr(class, ctx)?);
+        }
+
+        Ok(())
+    }
+
+    /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
+    /// Note `reuse` is not a standard SVG element, but is used here in similar
+    /// contexts to the `use` element.
+    fn is_graphics_element(&self) -> bool {
+        matches!(
+            self.name(),
+            "circle"
+                | "ellipse"
+                | "image"
+                | "line"
+                | "path"
+                | "polygon"
+                | "polyline"
+                | "rect"
+                | "text"
+                | "use"
+                // Following are non-standard.
+                | "reuse"
+        )
+    }
+
+    /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
+    /// Note `specs` is not a standard SVG element, but is used here in similar
+    /// contexts to the `defs` element.
+    #[allow(dead_code)]
+    fn is_container_element(&self) -> bool {
+        matches!(
+            self.name(),
+            "a" | "defs"
+                | "glyph"
+                | "g"
+                | "marker"
+                | "mask"
+                | "missing-glyph"
+                | "pattern"
+                | "svg"
+                | "switch"
+                | "symbol"
+                // Following are non-standard.
+                | "specs"
+        )
+    }
+
+    fn is_connector(&self) -> bool {
+        self.has_attr("start")
+            && self.has_attr("end")
+            && (self.name() == "line" || self.name() == "polyline")
+    }
+
+    fn handle_rotation(&mut self) -> Result<()> {
+        let angle = self.pop_attr("rotate");
+        if angle.is_none() {
+            return Ok(());
+        }
+        let angle = angle.unwrap();
+        let angle = strp(&angle)?;
+        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.center()) {
+            let mut rot_xfrm = TransformAttr::new();
+            rot_xfrm.rotate_around(angle, cx, cy);
+            if let Some(xfrm) = self.pop_attr("transform") {
+                // rotation should be the outermost transform, so prepend it
+                self.set_attr("transform", &format!("{rot_xfrm} {xfrm}"));
+            } else {
+                self.set_attr("transform", &rot_xfrm.to_string());
+            }
+        }
+        Ok(())
+    }
+
+    fn get_target_element(&self, _ctx: &impl ElementMap) -> Result<Self> {
+        Ok(self.clone())
+    }
+}
+
+impl ElementTransform for SvgElement {
+    fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+        if self.name() == "path" {
+            if let Some(d) = self.get_attr("d") {
+                if d.chars().any(|c| c == 'b' || c == 'B') {
+                    self.set_attr("d", &process_path_bearing(&d)?)
+                }
+            }
+        }
+
+        if self.is_connector() {
+            if let Ok(conn) = Connector::from_element(
+                self,
+                ctx,
+                if let Some(e_type) = self.get_attr("edge-type") {
+                    ConnectionType::from_str(&e_type)
+                } else if self.name() == "polyline" {
+                    ConnectionType::Corner
+                } else {
+                    ConnectionType::Straight
+                },
+            ) {
+                // replace with rendered connection element
+                *self = conn.render(ctx)?.without_attr("edge-type");
+            } else {
+                return Err(SvgdxError::InvalidData(
+                    "Cannot create connector".to_owned(),
+                ));
+            }
+        }
+
+        // Process dx / dy as translation offsets if not an element
+        // where they already have intrinsic meaning.
+        // TODO: would be nice to get rid of this; it's mostly handled
+        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
+        // then that won't do anything and this does.
+        if !matches!(self.name(), "text" | "tspan" | "feOffset") {
+            let dx = self.pop_attr("dx");
+            let dy = self.pop_attr("dy");
+            let mut d_x = None;
+            let mut d_y = None;
+            if let Some(dx) = dx {
+                d_x = Some(strp(&dx)?);
+            }
+            if let Some(dy) = dy {
+                d_y = Some(strp(&dy)?);
+            }
+            if d_x.is_some() || d_y.is_some() {
+                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
+            }
+        }
+
+        if self.name() == "use" {
+            // rotation requires a bbox to identify center of rotation; for `<use>`
+            // elements derive from context and inject via `content_bbox`. Allows
+            // handle_rotation to be independent of context.
+            if let Some(bbox) = ctx.get_element_bbox(self)? {
+                self.content_bbox = Some(bbox);
+            }
+        }
+        self.handle_rotation()?;
+
+        Ok(())
+    }
+
+    fn get_target_element(&self, ctx: &impl ElementMap) -> Result<Self> {
+        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
+        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
+        // cope with '^' where the target might not even have an id. Would be better
+        // to assign a dedicated internal ID to every element and use that.
+        // TODO: in addition to the above, '^' is already broken since it doesn't get
+        // captured in the 'remain' thing for deferred elements, and is always the same
+        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
+        // internal ID with each element so can follow a chain of these.
+        let mut seen: Vec<OrderIndex> = vec![];
+        let mut element = self;
+
+        while element.name() == "use" || element.name() == "reuse" {
+            let href = element
+                .get_attr("href")
+                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+            let elref = href.parse()?;
+            if let Some(el) = ctx.get_element(&elref) {
+                if seen.contains(&el.order_index) {
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "{} already seen",
+                        elref
+                    )));
+                }
+                seen.push(el.order_index.clone());
+                element = el;
+            } else {
+                return Err(SvgdxError::ReferenceError(elref));
+            }
+        }
+        Ok(element.clone())
     }
 }
 
@@ -183,70 +513,6 @@ impl SvgElement {
             event_range: None,
             content_bbox: None,
         }
-    }
-
-    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
-        if self.name == "path" {
-            if let Some(d) = self.get_attr("d") {
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(&d)?)
-                }
-            }
-        }
-
-        if self.is_connector() {
-            if let Ok(conn) = Connector::from_element(
-                self,
-                ctx,
-                if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(&e_type)
-                } else if self.name == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            ) {
-                // replace with rendered connection element
-                *self = conn.render(ctx)?.without_attr("edge-type");
-            } else {
-                return Err(SvgdxError::InvalidData(
-                    "Cannot create connector".to_owned(),
-                ));
-            }
-        }
-
-        // Process dx / dy as translation offsets if not an element
-        // where they already have intrinsic meaning.
-        // TODO: would be nice to get rid of this; it's mostly handled
-        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
-        // then that won't do anything and this does.
-        if !matches!(self.name.as_str(), "text" | "tspan" | "feOffset") {
-            let dx = self.pop_attr("dx");
-            let dy = self.pop_attr("dy");
-            let mut d_x = None;
-            let mut d_y = None;
-            if let Some(dx) = dx {
-                d_x = Some(strp(&dx)?);
-            }
-            if let Some(dy) = dy {
-                d_y = Some(strp(&dy)?);
-            }
-            if d_x.is_some() || d_y.is_some() {
-                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
-            }
-        }
-
-        if self.name == "use" {
-            // rotation requires a bbox to identify center of rotation; for `<use>`
-            // elements derive from context and inject via `content_bbox`. Allows
-            // handle_rotation to be independent of context.
-            if let Some(bbox) = ctx.get_element_bbox(self)? {
-                self.content_bbox = Some(bbox);
-            }
-        }
-        self.handle_rotation()?;
-
-        Ok(())
     }
 
     pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
@@ -375,291 +641,11 @@ impl SvgElement {
         self.event_range = Some(range);
     }
 
-    pub fn add_class(&mut self, class: &str) -> Self {
-        self.classes.insert(class.to_string());
-        self.clone()
-    }
-
-    pub fn add_classes(&mut self, classes: &ClassList) {
-        for class in classes {
-            // update classes directly rather than use add_class which
-            // performs a clone() operation.
-            self.classes.insert(class.to_string());
-        }
-    }
-
-    pub fn has_class(&self, class: &str) -> bool {
-        self.classes.contains(class)
-    }
-
-    /// Remove a class from the element, returning `true` if the class was present
-    pub fn pop_class(&mut self, class: &str) -> bool {
-        self.classes.remove(class)
-    }
-
-    pub fn get_classes(&self) -> Vec<String> {
-        self.classes.to_vec()
-    }
-
-    pub fn has_attr(&self, key: &str) -> bool {
-        self.attrs.contains_key(key)
-    }
-
-    fn replace_attrs(&mut self, attrs: AttrMap) {
-        self.attrs = attrs;
-    }
-
-    #[allow(dead_code)]
-    #[must_use]
-    fn with_attr(&self, key: &str, value: &str) -> Self {
-        let mut element = self.clone();
-        element.set_attr(key, value);
-        element
-    }
-
-    #[must_use]
-    pub fn without_attr(&self, key: &str) -> Self {
-        let attrs: Vec<(String, String)> = self
-            .attrs
-            .clone()
-            .into_iter()
-            .filter(|(k, _v)| k != key)
-            .collect();
-        let mut element = self.clone();
-        element.replace_attrs(attrs.into());
-        element
-    }
-
-    /// copy attributes, classes and indentation from another element,
-    /// returning the merged element
-    #[must_use]
-    pub fn with_attrs_from(&self, other: &Self) -> Self {
-        let mut attrs = self.attrs.clone();
-        for (k, v) in &other.attrs {
-            attrs.insert(k, v);
-        }
-        let mut element = other.clone();
-        element.replace_attrs(attrs);
-        // Everything but the name and any attrs unique to the original element
-        // is from the other element.
-        element.name.clone_from(&self.name);
-        element
-    }
-
-    pub fn pop_attr(&mut self, key: &str) -> Option<String> {
-        self.attrs.pop(key)
-    }
-
-    pub fn remove_attrs(&mut self, keys: &[&str]) {
-        for key in keys {
-            self.pop_attr(key);
-        }
-    }
-
-    pub fn get_attr(&self, key: &str) -> Option<String> {
-        self.attrs.get(key).map(|x| x.to_owned())
-    }
-
-    pub fn set_attr(&mut self, key: &str, value: &str) {
-        self.attrs.insert(key, value);
-    }
-
-    /// set an attribute key/value if the key does not already exist
-    pub fn set_default_attr(&mut self, key: &str, value: &str) {
-        if !self.has_attr(key) {
-            self.set_attr(key, value);
-        }
-    }
-
-    pub fn get_attrs(&self) -> HashMap<String, String> {
-        self.attrs.to_vec().into_iter().collect()
-    }
-
-    /// Resolve any expressions in attributes.
-    pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
-        // Resolve any attributes
-        for (key, value) in self.attrs.clone() {
-            if key == "__" {
-                // Raw comments are not evaluated
-                continue;
-            }
-            let replace = eval_attr(&value, ctx)?;
-            self.attrs.insert(&key, &replace);
-        }
-        // Classes are handled separately to other attributes
-        for class in &self.classes.clone() {
-            self.classes.replace(class, eval_attr(class, ctx)?);
-        }
-
-        Ok(())
-    }
-
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
-    /// Note `reuse` is not a standard SVG element, but is used here in similar
-    /// contexts to the `use` element.
-    pub fn is_graphics_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "circle"
-                | "ellipse"
-                | "image"
-                | "line"
-                | "path"
-                | "polygon"
-                | "polyline"
-                | "rect"
-                | "text"
-                | "use"
-                // Following are non-standard.
-                | "reuse"
-        )
-    }
-
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
-    /// Note `specs` is not a standard SVG element, but is used here in similar
-    /// contexts to the `defs` element.
-    #[allow(dead_code)]
-    pub fn is_container_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "a" | "defs"
-                | "glyph"
-                | "g"
-                | "marker"
-                | "mask"
-                | "missing-glyph"
-                | "pattern"
-                | "svg"
-                | "switch"
-                | "symbol"
-                // Following are non-standard.
-                | "specs"
-        )
-    }
-
     pub fn is_empty_element(&self) -> bool {
         if let Some((start, end)) = self.event_range {
             start == end
         } else {
             true
         }
-    }
-
-    pub fn is_connector(&self) -> bool {
-        self.has_attr("start")
-            && self.has_attr("end")
-            && (self.name == "line" || self.name == "polyline")
-    }
-
-    pub fn handle_rotation(&mut self) -> Result<()> {
-        let angle = self.pop_attr("rotate");
-        if angle.is_none() {
-            return Ok(());
-        }
-        let angle = angle.unwrap();
-        let angle = strp(&angle)?;
-        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.center()) {
-            let mut rot_xfrm = TransformAttr::new();
-            rot_xfrm.rotate_around(angle, cx, cy);
-            if let Some(xfrm) = self.pop_attr("transform") {
-                // rotation should be the outermost transform, so prepend it
-                self.set_attr("transform", &format!("{rot_xfrm} {xfrm}"));
-            } else {
-                self.set_attr("transform", &rot_xfrm.to_string());
-            }
-        }
-        Ok(())
-    }
-
-    pub fn get_target_element(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
-        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
-        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
-        // cope with '^' where the target might not even have an id. Would be better
-        // to assign a dedicated internal ID to every element and use that.
-        // TODO: in addition to the above, '^' is already broken since it doesn't get
-        // captured in the 'remain' thing for deferred elements, and is always the same
-        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
-        // internal ID with each element so can follow a chain of these.
-        let mut seen: Vec<OrderIndex> = vec![];
-        let mut element = self;
-
-        while element.name == "use" || element.name == "reuse" {
-            let href = element
-                .get_attr("href")
-                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
-            let elref = href.parse()?;
-            if let Some(el) = ctx.get_element(&elref) {
-                if seen.contains(&el.order_index) {
-                    return Err(SvgdxError::CircularRefError(format!(
-                        "{} already seen",
-                        elref
-                    )));
-                }
-                seen.push(el.order_index.clone());
-                element = el;
-            } else {
-                return Err(SvgdxError::ReferenceError(elref));
-            }
-        }
-        Ok(element.clone())
-    }
-
-    pub fn split_compound_attr(value: &str) -> (String, String) {
-        // wh="10" -> width="10", height="10"
-        // wh="10 20" -> width="10", height="20"
-        // wh="#thing" -> width="#thing", height="#thing"
-        // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
-        // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
-        if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
-            let mut parts = value.splitn(2, char::is_whitespace);
-            let prefix = parts.next().expect("nonempty");
-            if let Some(remain) = parts.next() {
-                let mut parts = attr_split_cycle(remain);
-                let x_suffix = parts.next().unwrap_or_default();
-                let y_suffix = parts.next().unwrap_or_default();
-                ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
-            } else {
-                (value.to_owned(), value.to_owned())
-            }
-        } else {
-            let mut parts = attr_split_cycle(value);
-            let x = parts.next().unwrap_or_default();
-            let y = parts.next().unwrap_or_default();
-            (x, y)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_spread_attr() {
-        let (w, h) = SvgElement::split_compound_attr("10");
-        assert_eq!(w, "10");
-        assert_eq!(h, "10");
-        let (w, h) = SvgElement::split_compound_attr("10 20");
-        assert_eq!(w, "10");
-        assert_eq!(h, "20");
-        let (w, h) = SvgElement::split_compound_attr("#thing");
-        assert_eq!(w, "#thing");
-        assert_eq!(h, "#thing");
-        let (w, h) = SvgElement::split_compound_attr("#thing 50%");
-        assert_eq!(w, "#thing 50%");
-        assert_eq!(h, "#thing 50%");
-        let (w, h) = SvgElement::split_compound_attr("#thing 10 20");
-        assert_eq!(w, "#thing 10");
-        assert_eq!(h, "#thing 20");
-
-        let (x, y) = SvgElement::split_compound_attr("^a@tl");
-        assert_eq!(x, "^a@tl");
-        assert_eq!(y, "^a@tl");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 5");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5 7%");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 7%");
     }
 }

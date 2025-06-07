@@ -1,4 +1,4 @@
-use super::SvgElement;
+use super::{Element, ElementTransform, Layout, SvgElement};
 use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 

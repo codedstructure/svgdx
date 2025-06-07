@@ -1,4 +1,4 @@
-use super::SvgElement;
+use super::{Element, SvgElement};
 use crate::context::TransformerContext;
 use crate::errors::{Result, SvgdxError};
 use crate::events::OutputList;

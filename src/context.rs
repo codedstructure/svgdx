@@ -1,8 +1,8 @@
-use crate::elements::SvgElement;
+use crate::elements::{Element, ElementTransform, Layout, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
-use crate::geometry::{BoundingBox, Size};
+use crate::geometry::BoundingBox;
 use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, ElRef};
 use crate::TransformConfig;
 
@@ -149,7 +149,6 @@ impl Default for TransformerContext {
 pub trait ElementMap {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
-    fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
 }
 
 pub trait VariableMap {
@@ -167,19 +166,12 @@ impl ElementMap for TransformerContext {
         }
     }
 
-    fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
-        let target_el = el.get_target_element(self)?;
-        let el_size = target_el.size(self)?;
-
-        Ok(el_size)
-    }
-
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
         let target_el = el.get_target_element(self)?;
         let mut el_bbox = target_el.bbox()?;
 
         // TODO: move following to element::bbox() ?
-        if el.name == "use" || el.name == "reuse" {
+        if el.name() == "use" || el.name() == "reuse" {
             // assumes el has already had position & attributes resolved
             let translate_x = el.get_attr("x");
             let translate_y = el.get_attr("y");

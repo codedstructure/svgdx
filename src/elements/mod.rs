@@ -18,3 +18,6 @@ use special::{ConfigElement, DefaultsElement, IfElement, SpecsElement, VarElemen
 use text::process_text_attr;
 
 pub use element::SvgElement;
+
+pub use element::{Element, ElementTransform};
+pub use layout::Layout;

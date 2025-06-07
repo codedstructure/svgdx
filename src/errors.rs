@@ -29,7 +29,7 @@ pub enum SvgdxError {
     MessageError(String),
     InternalLogicError(String),
     MultiError(HashMap<OrderIndex, (SvgElement, SvgdxError)>),
-    OtherError(Box<dyn std::error::Error>),
+    Other(Box<dyn std::error::Error>),
 }
 
 impl fmt::Display for SvgdxError {
@@ -62,7 +62,7 @@ impl fmt::Display for SvgdxError {
                 }
                 Ok(())
             }
-            SvgdxError::OtherError(source) => source.fmt(f),
+            SvgdxError::Other(source) => source.fmt(f),
         }
     }
 }
@@ -84,7 +84,7 @@ impl Error for SvgdxError {
             SvgdxError::MessageError(_) => None,
             SvgdxError::InternalLogicError(_) => None,
             SvgdxError::MultiError(_) => None,
-            SvgdxError::OtherError(e) => Some(&**e),
+            SvgdxError::Other(e) => Some(&**e),
         }
     }
 }
@@ -94,7 +94,7 @@ impl SvgdxError {
     where
         T: std::error::Error + 'static,
     {
-        SvgdxError::OtherError(Box::new(err))
+        SvgdxError::Other(Box::new(err))
     }
 }
 

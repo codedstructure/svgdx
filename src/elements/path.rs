@@ -1,4 +1,4 @@
-use super::SvgElement;
+use super::{Element, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::BoundingBox;
 

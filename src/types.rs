@@ -75,8 +75,33 @@ pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
     x.into_iter().cycle()
 }
 
+pub fn split_compound_attr(value: &str) -> (String, String) {
+    // wh="10" -> width="10", height="10"
+    // wh="10 20" -> width="10", height="20"
+    // wh="#thing" -> width="#thing", height="#thing"
+    // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
+    // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
+    if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
+        let mut parts = value.splitn(2, char::is_whitespace);
+        let prefix = parts.next().expect("nonempty");
+        if let Some(remain) = parts.next() {
+            let mut parts = attr_split_cycle(remain);
+            let x_suffix = parts.next().unwrap_or_default();
+            let y_suffix = parts.next().unwrap_or_default();
+            ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
+        } else {
+            (value.to_owned(), value.to_owned())
+        }
+    } else {
+        let mut parts = attr_split_cycle(value);
+        let x = parts.next().unwrap_or_default();
+        let y = parts.next().unwrap_or_default();
+        (x, y)
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct OrderIndex(Vec<usize>);
+pub struct OrderIndex(pub Vec<usize>);
 
 impl OrderIndex {
     pub fn new(idx: usize) -> Self {
@@ -95,6 +120,10 @@ impl OrderIndex {
         new_idx.push(idx);
 
         Self(new_idx)
+    }
+
+    pub fn depth(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -176,6 +205,7 @@ impl AttrMap {
         }
     }
 
+    /// set attribute iff it does not already exist
     pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
         let key = key.into();
         if !self.contains_key(&key) {
@@ -557,6 +587,35 @@ mod test {
         assert_eq!(parts.next(), Some(String::from("0")));
         assert_eq!(parts.next(), Some(String::from("1.5")));
         assert_eq!(parts.next(), Some(String::from("23")));
+    }
+
+    #[test]
+    fn test_spread_attr() {
+        let (w, h) = split_compound_attr("10");
+        assert_eq!(w, "10");
+        assert_eq!(h, "10");
+        let (w, h) = split_compound_attr("10 20");
+        assert_eq!(w, "10");
+        assert_eq!(h, "20");
+        let (w, h) = split_compound_attr("#thing");
+        assert_eq!(w, "#thing");
+        assert_eq!(h, "#thing");
+        let (w, h) = split_compound_attr("#thing 50%");
+        assert_eq!(w, "#thing 50%");
+        assert_eq!(h, "#thing 50%");
+        let (w, h) = split_compound_attr("#thing 10 20");
+        assert_eq!(w, "#thing 10");
+        assert_eq!(h, "#thing 20");
+
+        let (x, y) = split_compound_attr("^a@tl");
+        assert_eq!(x, "^a@tl");
+        assert_eq!(y, "^a@tl");
+        let (x, y) = split_compound_attr("^a@tl 5");
+        assert_eq!(x, "^a@tl 5");
+        assert_eq!(y, "^a@tl 5");
+        let (x, y) = split_compound_attr("^a@tl 5 7%");
+        assert_eq!(x, "^a@tl 5");
+        assert_eq!(y, "^a@tl 7%");
     }
 
     #[test]

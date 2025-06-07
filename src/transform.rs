@@ -1,5 +1,5 @@
 use crate::context::TransformerContext;
-use crate::elements::SvgElement;
+use crate::elements::{Element, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
@@ -187,6 +187,11 @@ impl Transformer {
     }
 
     pub fn transform(&mut self, reader: &mut dyn BufRead, writer: &mut dyn Write) -> Result<()> {
+        // let mut b  = String::with_capacity(1024 * 1024);
+        // reader.read_to_string(&mut b).unwrap();
+        // let x = document::read_tree(&b)?;
+        // println!("Read {:#?} elements", x);
+
         let input = InputList::from_reader(reader)?;
         self.context.set_events(input.events.clone());
         let output = process_events(input, &mut self.context)?;
