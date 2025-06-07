@@ -47,11 +47,9 @@ impl EventGen for SvgElement {
 
         let (ol, mut bbox) = res?;
 
-        if let (Some(el_bbox), Some(clip_id)) = (
-            bbox,
-            self.get_attr("clip-path")
-                .and_then(|url| extract_urlref(&url)),
-        ) {
+        if let (Some(el_bbox), Some(clip_id)) =
+            (bbox, self.get_attr("clip-path").and_then(extract_urlref))
+        {
             let clip_el = context
                 .get_element(&clip_id)
                 .ok_or(SvgdxError::ReferenceError(clip_id))?;
@@ -176,8 +174,8 @@ pub trait Element: Sized + Clone {
         self.attrs_mut().insert(key.to_string(), value.to_string());
     }
 
-    fn get_attr(&self, key: &str) -> Option<String> {
-        self.attrs().get(key).cloned()
+    fn get_attr(&self, key: &str) -> Option<&str> {
+        self.attrs().get(key).map(|s| s.as_str())
     }
 
     fn has_attr(&self, key: &str) -> bool {
@@ -393,7 +391,7 @@ impl ElementTransform for SvgElement {
         if self.name() == "path" {
             if let Some(d) = self.get_attr("d") {
                 if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(&d)?)
+                    self.set_attr("d", &process_path_bearing(d)?)
                 }
             }
         }
@@ -403,7 +401,7 @@ impl ElementTransform for SvgElement {
                 self,
                 ctx,
                 if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(&e_type)
+                    ConnectionType::from_str(e_type)
                 } else if self.name() == "polyline" {
                     ConnectionType::Corner
                 } else {
@@ -554,7 +552,7 @@ impl SvgElement {
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
-            let value = eval_attr(&comment, ctx)?;
+            let value = eval_attr(comment, ctx)?;
             events.push(OutputEvent::Comment(format!(" {value} ")));
             events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }

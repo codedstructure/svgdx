@@ -238,8 +238,6 @@ pub trait Layout: Sized + Element {
     }
 }
 
-impl SvgElement {}
-
 impl Layout for SvgElement {
     fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
@@ -260,13 +258,11 @@ impl Layout for SvgElement {
             self.eval_text_anchor(ctx)?;
         }
 
-        if let ("polyline" | "polygon", Some(points)) =
-            (self.name.as_str(), self.get_attr("points"))
-        {
-            self.set_attr("points", &expand_relspec(&points, ctx));
+        if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
+            self.set_attr("points", &expand_relspec(points, ctx));
         }
-        if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
-            self.set_attr("d", &expand_relspec(&d, ctx));
+        if let ("path", Some(d)) = (self.name(), self.get_attr("d")) {
+            self.set_attr("d", &expand_relspec(d, ctx));
         }
 
         // TODO: issue is that this could fail with a reference error
@@ -324,7 +320,7 @@ impl Layout for SvgElement {
 
         let mut bbox_list = vec![];
 
-        for elref in attr_split(&ref_list) {
+        for elref in attr_split(ref_list) {
             let elref = elref.parse()?;
             let el = ctx
                 .get_element(&elref)
@@ -377,9 +373,9 @@ impl Layout for SvgElement {
         match (target_shape, self.name.as_str()) {
             // rect inside circle
             ("rect", "circle") => {
-                if let Some(r) = self.attrs.get("r") {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let Some(r) = self.get_attr("r") {
+                    let cx = self.get_attr("cx").unwrap_or(&zstr);
+                    let cy = self.get_attr("cy").unwrap_or(&zstr);
                     let cx = strp(cx)?;
                     let cy = strp(cy)?;
                     let r = strp(r)? * FRAC_1_SQRT_2;
@@ -390,9 +386,9 @@ impl Layout for SvgElement {
             }
             // rect inside ellipse
             ("rect", "ellipse") => {
-                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let (Some(rx), Some(ry)) = (self.get_attr("rx"), self.get_attr("ry")) {
+                    let cx = self.get_attr("cx").unwrap_or(&zstr);
+                    let cy = self.get_attr("cy").unwrap_or(&zstr);
                     let cx = strp(cx)?;
                     let cy = strp(cy)?;
                     let rx = strp(rx)? * FRAC_1_SQRT_2;
@@ -415,10 +411,10 @@ impl Layout for SvgElement {
         // as intermediate (e.g. `wh` expansion) size attributes for other elements.
         let mut width = None;
         let mut height = None;
-        if let Some(w) = self.attrs.get("width") {
+        if let Some(w) = self.get_attr("width") {
             width = Some(strp(w)?);
         }
-        if let Some(h) = self.attrs.get("height") {
+        if let Some(h) = self.get_attr("height") {
             height = Some(strp(h)?);
         }
         match self.name.as_str() {
@@ -446,14 +442,14 @@ impl Layout for SvgElement {
                 height = Some(0.);
             }
             "circle" => {
-                if let Some(r) = self.attrs.get("r").map(|n| strp(n)).transpose()? {
+                if let Some(r) = self.get_attr("r").map(strp).transpose()? {
                     width = Some(r * 2.0);
                     height = Some(r * 2.0);
                 }
             }
             "ellipse" => {
-                let rx = self.attrs.get("rx").map(|n| strp(n)).transpose()?;
-                let ry = self.attrs.get("ry").map(|n| strp(n)).transpose()?;
+                let rx = self.get_attr("rx").map(strp).transpose()?;
+                let ry = self.get_attr("ry").map(strp).transpose()?;
                 if let Some(rx) = rx {
                     width = Some(rx * 2.0);
                 }
@@ -462,13 +458,13 @@ impl Layout for SvgElement {
                 }
             }
             "line" => {
-                let x1 = self.attrs.get("x1").map(|n| strp(n)).transpose()?;
-                let x2 = self.attrs.get("x2").map(|n| strp(n)).transpose()?;
+                let x1 = self.get_attr("x1").map(strp).transpose()?;
+                let x2 = self.get_attr("x2").map(strp).transpose()?;
                 if let (Some(x1), Some(x2)) = (x1, x2) {
                     width = Some((x2 - x1).abs());
                 }
-                let y1 = self.attrs.get("y1").map(|n| strp(n)).transpose()?;
-                let y2 = self.attrs.get("y2").map(|n| strp(n)).transpose()?;
+                let y1 = self.get_attr("y1").map(strp).transpose()?;
+                let y2 = self.get_attr("y2").map(strp).transpose()?;
                 if let (Some(y1), Some(y2)) = (y1, y2) {
                     height = Some((y2 - y1).abs());
                 }
@@ -523,8 +519,8 @@ impl Layout for SvgElement {
         }
         Ok(match self.name.as_str() {
             "point" | "text" => {
-                let x = self.attrs.get("x").unwrap_or(&zstr);
-                let y = self.attrs.get("y").unwrap_or(&zstr);
+                let x = self.get_attr("x").unwrap_or(&zstr);
+                let y = self.get_attr("y").unwrap_or(&zstr);
                 if passthrough(x) || passthrough(y) {
                     return Ok(None);
                 }
@@ -533,9 +529,9 @@ impl Layout for SvgElement {
                 Some(BoundingBox::new(x, y, x, y))
             }
             "box" | "rect" | "image" | "svg" | "foreignObject" => {
-                if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
-                    let x = self.attrs.get("x").unwrap_or(&zstr);
-                    let y = self.attrs.get("y").unwrap_or(&zstr);
+                if let (Some(w), Some(h)) = (self.get_attr("width"), self.get_attr("height")) {
+                    let x = self.get_attr("x").unwrap_or(&zstr);
+                    let y = self.get_attr("y").unwrap_or(&zstr);
                     if passthrough(x) || passthrough(y) || passthrough(w) || passthrough(h) {
                         return Ok(None);
                     }
@@ -549,10 +545,10 @@ impl Layout for SvgElement {
                 }
             }
             "line" => {
-                let x1 = self.attrs.get("x1").unwrap_or(&zstr);
-                let y1 = self.attrs.get("y1").unwrap_or(&zstr);
-                let x2 = self.attrs.get("x2").unwrap_or(&zstr);
-                let y2 = self.attrs.get("y2").unwrap_or(&zstr);
+                let x1 = self.get_attr("x1").unwrap_or(&zstr);
+                let y1 = self.get_attr("y1").unwrap_or(&zstr);
+                let x2 = self.get_attr("x2").unwrap_or(&zstr);
+                let y2 = self.get_attr("y2").unwrap_or(&zstr);
                 if passthrough(x1) || passthrough(y1) || passthrough(x2) || passthrough(y2) {
                     return Ok(None);
                 }
@@ -577,7 +573,7 @@ impl Layout for SvgElement {
                 let mut has_x = false;
                 let mut has_y = false;
 
-                if let Some(points) = self.attrs.get("points") {
+                if let Some(points) = self.get_attr("points") {
                     let mut idx = 0;
                     for point_ws in points.split_whitespace() {
                         for point in point_ws.split(',') {
@@ -609,9 +605,9 @@ impl Layout for SvgElement {
             }
             "path" => path_bbox(self)?,
             "circle" => {
-                if let Some(r) = self.attrs.get("r") {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let Some(r) = self.get_attr("r") {
+                    let cx = self.get_attr("cx").unwrap_or(&zstr);
+                    let cy = self.get_attr("cy").unwrap_or(&zstr);
                     if passthrough(cx) || passthrough(cy) || passthrough(r) {
                         return Ok(None);
                     }
@@ -624,9 +620,9 @@ impl Layout for SvgElement {
                 }
             }
             "ellipse" => {
-                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let (Some(rx), Some(ry)) = (self.get_attr("rx"), self.get_attr("ry")) {
+                    let cx = self.get_attr("cx").unwrap_or(&zstr);
+                    let cy = self.get_attr("cy").unwrap_or(&zstr);
                     if passthrough(cx) || passthrough(cy) || passthrough(rx) || passthrough(ry) {
                         return Ok(None);
                     }
@@ -705,20 +701,20 @@ impl Layout for SvgElement {
         // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
         let (w, h) = match self.name.as_str() {
             "circle" => {
-                let diam = self.get_attr("r").map(|r| 2. * strp(&r).unwrap_or(0.));
+                let diam = self.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
                 (diam, diam)
             }
             "ellipse" => (
                 self.get_attr("rx")
-                    .and_then(|rx| strp(&rx).ok())
+                    .and_then(|rx| strp(rx).ok())
                     .map(|x| x * 2.),
                 self.get_attr("ry")
-                    .and_then(|ry| strp(&ry).ok())
+                    .and_then(|ry| strp(ry).ok())
                     .map(|x| x * 2.),
             ),
             _ => (
-                self.get_attr("width").and_then(|w| strp(&w).ok()),
-                self.get_attr("height").and_then(|h| strp(&h).ok()),
+                self.get_attr("width").and_then(|w| strp(w).ok()),
+                self.get_attr("height").and_then(|h| strp(h).ok()),
             ),
         };
 
@@ -787,7 +783,7 @@ impl Layout for SvgElement {
             let mut loc = if self.name == "text" {
                 // text elements (currently) have no size, and default
                 // to center of the referenced element
-                LocSpec::from_str(&self.get_attr("text-loc").unwrap_or("c".to_owned()))?
+                LocSpec::from_str(self.get_attr("text-loc").unwrap_or("c"))?
             } else {
                 // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
                 // will set x2 to the 'x2' (i.e. right edge) of #abc
@@ -841,7 +837,7 @@ impl Layout for SvgElement {
     fn eval_text_anchor(&mut self, ctx: &impl ContextView) -> Result<()> {
         // we do some of this processing as part of positioning, but don't want
         // to be tightly coupled to that.
-        let input = self.attrs.get("xy");
+        let input = self.get_attr("xy");
         if let Some(input) = input {
             let (_, rel_loc) = split_relspec(input, ctx)?;
             let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
@@ -889,7 +885,7 @@ impl Layout for SvgElement {
     ///   v - vertical below
     ///   V - vertical above
     fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
-        let input = self.attrs.get("xy");
+        let input = self.get_attr("xy");
         if input.is_none() {
             return Ok(None);
         }

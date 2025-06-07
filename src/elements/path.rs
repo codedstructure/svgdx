@@ -269,7 +269,7 @@ impl PathParser {
 
 pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     if let Some(path_data) = element.get_attr("d") {
-        let mut pp = PathParser::new(&path_data);
+        let mut pp = PathParser::new(path_data);
         pp.evaluate()?;
         Ok(pp.get_bbox())
     } else {

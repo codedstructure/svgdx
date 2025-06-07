@@ -131,7 +131,7 @@ impl EventGen for IfElement {
             .get_attr("test")
             .ok_or_else(|| SvgdxError::MissingAttribute("test".to_owned()))?;
         if let Some(inner_events) = self.0.inner_events(context) {
-            if eval_condition(&test, context)? {
+            if eval_condition(test, context)? {
                 // opening if element is not included in the processed inner events to avoid
                 // infinite recursion...
                 return process_events(inner_events.clone(), context);

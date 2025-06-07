@@ -262,14 +262,14 @@ impl Position {
                 if element.get_attr("x1").is_none() {
                     element.set_attr("x1", &fstr(x1 + self.dx.unwrap_or(0.)));
                 } else if let Some(dx) = self.dx {
-                    if let Ok(x1) = strp(&element.get_attr("x1").unwrap_or(zstr.clone())) {
+                    if let Ok(x1) = strp(element.get_attr("x1").unwrap_or(&zstr)) {
                         element.set_attr("x1", &fstr(x1 + dx));
                     }
                 }
                 if element.get_attr("y1").is_none() {
                     element.set_attr("y1", &fstr(y1 + self.dy.unwrap_or(0.)));
                 } else if let Some(dy) = self.dy {
-                    if let Ok(y1) = strp(&element.get_attr("y1").unwrap_or(zstr.clone())) {
+                    if let Ok(y1) = strp(element.get_attr("y1").unwrap_or(&zstr)) {
                         element.set_attr("y1", &fstr(y1 + dy));
                     }
                 }
@@ -277,14 +277,14 @@ impl Position {
                 if element.get_attr("x2").is_none() {
                     element.set_attr("x2", &fstr(x2 + self.dx.unwrap_or(0.)));
                 } else if let Some(dx) = self.dx {
-                    if let Ok(x2) = strp(&element.get_attr("x2").unwrap_or(zstr.clone())) {
+                    if let Ok(x2) = strp(element.get_attr("x2").unwrap_or(&zstr)) {
                         element.set_attr("x2", &fstr(x2 + dx));
                     }
                 }
                 if element.get_attr("y2").is_none() {
                     element.set_attr("y2", &fstr(y2 + self.dy.unwrap_or(0.)));
                 } else if let Some(dy) = self.dy {
-                    if let Ok(y2) = strp(&element.get_attr("y2").unwrap_or(zstr.clone())) {
+                    if let Ok(y2) = strp(element.get_attr("y2").unwrap_or(&zstr)) {
                         element.set_attr("y2", &fstr(y2 + dy));
                     }
                 }
@@ -324,33 +324,33 @@ impl From<&SvgElement> for Position {
     fn from(value: &SvgElement) -> Self {
         let mut p = Position::new(&value.name);
 
-        p.dx = value.get_attr("dx").and_then(|dx| strp(dx.as_ref()).ok());
-        p.dy = value.get_attr("dy").and_then(|dy| strp(dy.as_ref()).ok());
+        p.dx = value.get_attr("dx").and_then(|dx| strp(dx).ok());
+        p.dy = value.get_attr("dy").and_then(|dy| strp(dy).ok());
 
         let x = value.get_attr("x1").or(value.get_attr("x"));
         let y = value.get_attr("y1").or(value.get_attr("y"));
-        if let Some(Ok(x)) = x.map(|x| strp(x.as_ref())) {
+        if let Some(Ok(x)) = x.map(strp) {
             p.xmin = Some(x);
         }
-        if let Some(Ok(y)) = y.map(|y| strp(y.as_ref())) {
+        if let Some(Ok(y)) = y.map(strp) {
             p.ymin = Some(y);
         }
 
         let x2 = value.get_attr("x2");
         let y2 = value.get_attr("y2");
-        if let Some(Ok(x2)) = x2.map(|x2| strp(x2.as_ref())) {
+        if let Some(Ok(x2)) = x2.map(strp) {
             p.xmax = Some(x2);
         }
-        if let Some(Ok(y2)) = y2.map(|y2| strp(y2.as_ref())) {
+        if let Some(Ok(y2)) = y2.map(strp) {
             p.ymax = Some(y2);
         }
 
         let cx = value.get_attr("cx");
         let cy = value.get_attr("cy");
-        if let Some(Ok(cx)) = cx.map(|cx| strp(cx.as_ref())) {
+        if let Some(Ok(cx)) = cx.map(strp) {
             p.cx = Some(cx);
         }
-        if let Some(Ok(cy)) = cy.map(|cy| strp(cy.as_ref())) {
+        if let Some(Ok(cy)) = cy.map(strp) {
             p.cy = Some(cy);
         }
 
@@ -362,10 +362,10 @@ impl From<&SvgElement> for Position {
         if !matches!(p.shape.as_str(), "reuse" | "use") {
             let w = value.get_attr("width");
             let h = value.get_attr("height");
-            if let Some(Ok(w)) = w.map(|w| strp(w.as_ref())) {
+            if let Some(Ok(w)) = w.map(strp) {
                 p.width = Some(w);
             }
-            if let Some(Ok(h)) = h.map(|h| strp(h.as_ref())) {
+            if let Some(Ok(h)) = h.map(strp) {
                 p.height = Some(h);
             }
         }
@@ -378,10 +378,10 @@ impl From<&SvgElement> for Position {
         if let "circle" | "ellipse" = value.name.as_str() {
             let rx = value.get_attr("rx").or(value.get_attr("r"));
             let ry = value.get_attr("ry").or(value.get_attr("r"));
-            if let Some(Ok(r)) = rx.map(|r| strp(r.as_ref())) {
+            if let Some(Ok(r)) = rx.map(strp) {
                 p.width = Some(r * 2.);
             }
-            if let Some(Ok(r)) = ry.map(|r| strp(r.as_ref())) {
+            if let Some(Ok(r)) = ry.map(strp) {
                 p.height = Some(r * 2.);
             }
         }

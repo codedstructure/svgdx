@@ -64,7 +64,7 @@ impl From<&SvgElement> for ElementMatch {
         let mut is_final = false;
         let mut is_init = false;
         if let Some(m) = el.get_attr("match") {
-            for m in attr_split(&m) {
+            for m in attr_split(m) {
                 match m.as_str() {
                     "final" => is_final = true,
                     "init" => is_init = true,
@@ -178,8 +178,8 @@ impl ElementMap for TransformerContext {
             if translate_x.is_some() || translate_y.is_some() {
                 if let Some(ref mut bbox) = &mut el_bbox {
                     el_bbox = Some(bbox.translated(
-                        translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
-                        translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
+                        translate_x.map(strp).unwrap_or(Ok(0.))?,
+                        translate_y.map(strp).unwrap_or(Ok(0.))?,
                     ));
                 }
             }
@@ -189,7 +189,7 @@ impl ElementMap for TransformerContext {
         // it works in both '^' contexts and root SVG bbox generation context.
         // Can't just move this to SvgElement::bbox() as it needs ElementMap.
         if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
-            let clip_id = extract_urlref(&clip_path).ok_or(SvgdxError::InvalidData(format!(
+            let clip_id = extract_urlref(clip_path).ok_or(SvgdxError::InvalidData(format!(
                 "Invalid clip-path attribute: {clip_path}"
             )))?;
             let clip_el = self
@@ -407,7 +407,7 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
-            let id = eval_attr(&id, self).unwrap_or(id);
+            let id = eval_attr(id, self).unwrap_or_else(|_| id.to_string());
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {
                 self.original_map.insert(id, el.clone());
             }
