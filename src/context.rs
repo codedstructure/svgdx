@@ -147,8 +147,9 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
-    fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
-    fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
+    type Elem: Layout;
+    fn get_element(&self, elref: &ElRef) -> Option<&Self::Elem>;
+    fn get_element_bbox(&self, el: &Self::Elem) -> Result<Option<BoundingBox>>;
 }
 
 pub trait VariableMap {
@@ -156,17 +157,19 @@ pub trait VariableMap {
     fn get_rng(&self) -> &RefCell<Pcg32>;
 }
 
-pub trait ContextView: ElementMap + VariableMap {}
+pub trait ContextView<T>: ElementMap<Elem = T> + VariableMap {}
 
 impl ElementMap for TransformerContext {
-    fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
+    type Elem = SvgElement;
+
+    fn get_element(&self, elref: &ElRef) -> Option<&Self::Elem> {
         match elref {
             ElRef::Id(id) => self.elem_map.get(id),
             ElRef::Prev => self.prev_element.as_ref(),
         }
     }
 
-    fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
+    fn get_element_bbox(&self, el: &Self::Elem) -> Result<Option<BoundingBox>> {
         let target_el = el.get_target_element(self)?;
         let mut el_bbox = target_el.bbox()?;
 
@@ -226,7 +229,7 @@ impl VariableMap for TransformerContext {
     }
 }
 
-impl ContextView for TransformerContext {}
+impl ContextView<SvgElement> for TransformerContext {}
 
 impl TransformerContext {
     pub fn new() -> Self {

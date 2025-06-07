@@ -1,3 +1,4 @@
+use crate::elements::Layout;
 use crate::errors::{Result, SvgdxError};
 use crate::expression::{EvalState, ExprValue};
 
@@ -182,10 +183,10 @@ impl FromStr for Function {
     }
 }
 
-pub fn eval_function(
+pub fn eval_function<'a, T: Layout + ToString>(
     fun: Function,
     args: &ExprValue,
-    eval_state: &mut EvalState,
+    eval_state: &mut EvalState<'a, T>,
 ) -> Result<ExprValue> {
     let e = match fun {
         Function::Swap => {

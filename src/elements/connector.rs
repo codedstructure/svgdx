@@ -77,7 +77,7 @@ fn closest_loc(
     this: &SvgElement,
     point: (f32, f32),
     conn_type: ConnectionType,
-    context: &impl ElementMap,
+    context: &impl ElementMap<Elem = SvgElement>,
 ) -> Result<LocSpec> {
     let mut min_dist_sq = f32::MAX;
     let mut min_loc = LocSpec::Center;
@@ -102,7 +102,7 @@ fn shortest_link(
     this: &SvgElement,
     that: &SvgElement,
     conn_type: ConnectionType,
-    context: &impl ElementMap,
+    context: &impl ElementMap<Elem = SvgElement>,
 ) -> Result<(LocSpec, LocSpec)> {
     let mut min_dist_sq = f32::MAX;
     let mut this_min_loc = LocSpec::Center;
@@ -144,7 +144,7 @@ impl Connector {
 
     pub fn from_element(
         element: &SvgElement,
-        elem_map: &impl ElementMap,
+        elem_map: &impl ElementMap<Elem = SvgElement>,
         conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
@@ -305,7 +305,7 @@ impl Connector {
         })
     }
 
-    pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
+    pub fn render(&self, ctx: &impl ElementMap<Elem = SvgElement>) -> Result<SvgElement> {
         let default_ratio_offset = Length::Ratio(0.5);
         let default_abs_offset = Length::Absolute(3.);
 

@@ -3,13 +3,15 @@ use super::{
     DefaultsElement, ForElement, GroupElement, IfElement, Layout, LoopElement, ReuseElement,
     SpecsElement, VarElement,
 };
+use crate::constants::RELPOS_SEP;
 use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::elements::layout::split_relspec;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expression::eval_attr;
-use crate::geometry::{BoundingBox, TransformAttr};
+use crate::geometry::{BoundingBox, DirSpec, LocSpec, Position, Size, TransformAttr};
 use crate::transform::EventGen;
-use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, OrderIndex};
 
 use core::fmt::Display;
 use std::collections::HashMap;
@@ -338,12 +340,12 @@ impl Element for SvgElement {
 }
 
 pub trait ElementTransform: super::layout::Layout {
-    fn transmute(&mut self, _ctx: &impl ContextView) -> Result<()> {
+    fn transmute(&mut self, _ctx: &impl ContextView<Self>) -> Result<()> {
         Ok(())
     }
 
     /// Resolve any expressions in attributes.
-    fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
+    fn eval_attributes(&mut self, ctx: &impl ContextView<Self>) -> Result<()> {
         // Resolve any attributes
         for (key, value) in self.get_attrs() {
             if key == "__" {
@@ -430,13 +432,89 @@ pub trait ElementTransform: super::layout::Layout {
         Ok(())
     }
 
-    fn get_target_element(&self, _ctx: &impl ElementMap) -> Result<Self> {
+    fn get_target_element(&self, _ctx: &impl ElementMap<Elem = Self>) -> Result<Self> {
         Ok(self.clone())
+    }
+
+    // TODO: pos_from_dirspec should really be in the Layout trait, but it requires
+    // get_target_element which is here...
+
+    /// Direction relative positioning - horizontally below, above, to the left, or to the
+    /// right of the referenced element.
+    /// ELREF '|' DIR ' ' [gap]
+    /// DIR values:
+    ///   h - horizontal to the right
+    ///   H - horizontal to the left
+    ///   v - vertical below
+    ///   V - vertical above
+    fn pos_from_dirspec(&self, ctx: &impl ContextView<Self>) -> Result<Option<Position>> {
+        let input = self.get_attr("xy");
+        if input.is_none() {
+            return Ok(None);
+        }
+        let input = input.unwrap();
+        if !input.contains(RELPOS_SEP) {
+            return Ok(None);
+        }
+        // element-relative position can only be applied via xy attribute
+        // containing RELPOS_SEP.
+        let (ref_el, remain) = split_relspec(input, ctx)?;
+        let ref_el = match ref_el {
+            Some(el) => el,
+            None => return Ok(None),
+        };
+        if let (Some(bbox), Some(skip_rp_sep)) = (
+            ctx.get_element_bbox(ref_el)?,
+            remain.strip_prefix(RELPOS_SEP),
+        ) {
+            let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
+            let (reldir, remain) = if let Some(split_idx) = parts {
+                let (a, b) = skip_rp_sep.split_at(split_idx);
+                (a, b.trim_start())
+            } else {
+                (skip_rp_sep, "")
+            };
+            let rel: DirSpec = reldir.parse()?;
+            // We won't have the full *position* of this element at this point, but hopefully
+            // we have enough to determine its size.
+            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
+            let gap = if !remain.is_empty() {
+                let mut parts = attr_split(remain);
+                strp(&parts.next().unwrap_or("0".to_string()))?
+            } else {
+                0.
+            };
+            let (x, y) = bbox.locspec(rel.to_locspec());
+            let (dx, dy) = match rel {
+                DirSpec::Above => (-this_width / 2., -(this_height + gap)),
+                DirSpec::Below => (-this_width / 2., gap),
+                DirSpec::InFront => (gap, -this_height / 2.),
+                DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
+            };
+
+            let mut pos = Position::new(self.name());
+            if self.name() == "use" {
+                // Need to determine top-left corner of the target bbox which
+                // may not be (0, 0), and offset by the equivalent amount.
+                if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
+                    let (tx, ty) = bbox.locspec(LocSpec::TopLeft);
+                    pos.xmin = Some(x + dx - tx);
+                    pos.ymin = Some(y + dy - ty);
+                }
+            } else {
+                pos.xmin = Some(x + dx);
+                pos.xmax = Some(x + dx + this_width);
+                pos.ymin = Some(y + dy);
+                pos.ymax = Some(y + dy + this_height);
+            }
+            return Ok(Some(pos));
+        }
+        Ok(None)
     }
 }
 
 impl ElementTransform for SvgElement {
-    fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+    fn transmute(&mut self, ctx: &impl ContextView<SvgElement>) -> Result<()> {
         if self.name() == "path" {
             if let Some(d) = self.get_attr("d") {
                 if d.chars().any(|c| c == 'b' || c == 'B') {
@@ -500,7 +578,7 @@ impl ElementTransform for SvgElement {
         Ok(())
     }
 
-    fn get_target_element(&self, ctx: &impl ElementMap) -> Result<Self> {
+    fn get_target_element(&self, ctx: &impl ElementMap<Elem = Self>) -> Result<Self> {
         // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
         // of a hack. In particular using `id` or `href` is insufficient, as doesn't
         // cope with '^' where the target might not even have an id. Would be better

@@ -9,6 +9,7 @@ use crate::constants::{
     VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
+use crate::elements::Layout;
 use crate::errors::{Result, SvgdxError};
 use crate::functions::{eval_function, Function};
 use crate::geometry::parse_el_scalar;
@@ -468,19 +469,19 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
     Ok(tokens)
 }
 
-pub struct EvalState<'a> {
+pub struct EvalState<'a, T: Layout> {
     tokens: Vec<Token>,
     index: usize,
-    pub context: &'a dyn ContextView,
+    pub context: &'a dyn ContextView<T>,
     // Used to check for circular variable references
     // Vec - likely to be few vars, and need stack behaviour
     checked_vars: Vec<String>,
 }
 
-impl<'a> EvalState<'a> {
+impl<'a, T: Layout + ToString> EvalState<'a, T> {
     fn new(
         tokens: impl IntoIterator<Item = Token>,
-        context: &'a dyn ContextView,
+        context: &'a dyn ContextView<T>,
         checked_vars: &[String],
     ) -> Self {
         Self {
@@ -590,17 +591,17 @@ impl<'a> EvalState<'a> {
     }
 }
 
-fn evaluate(
+fn evaluate<T: Layout + ToString>(
     tokens: impl IntoIterator<Item = Token> + std::fmt::Debug + Clone,
-    context: &impl ContextView,
+    context: &impl ContextView<T>,
 ) -> Result<ExprValue> {
     // This just forwards with initial empty checked_vars
     evaluate_inner(tokens, context, &[])
 }
 
-fn evaluate_inner(
+fn evaluate_inner<T: Layout + ToString>(
     tokens: impl IntoIterator<Item = Token> + std::fmt::Debug + Clone,
-    context: &impl ContextView,
+    context: &impl ContextView<T>,
     checked_vars: &[String],
 ) -> Result<ExprValue> {
     let mut eval_state = EvalState::new(tokens.clone(), context, checked_vars);
@@ -614,7 +615,7 @@ fn evaluate_inner(
     }
 }
 
-fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn expr_list<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     let mut out: Vec<ExprValue> = Vec::new();
     if let (Some(Token::OpenParen), Some(Token::CloseParen)) =
         (eval_state.prev(), eval_state.peek())
@@ -637,12 +638,12 @@ fn expr_list(eval_state: &mut EvalState) -> Result<ExprValue> {
     Ok(out.into())
 }
 
-fn expr(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn expr<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     logical(eval_state)
 }
 
 // Handle `or`, `and`, 'xor' operators, all left-to-right associative
-fn logical(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn logical<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     let mut e = comparison(eval_state)?;
     while let Some(Token::Symbol(s)) = eval_state.peek() {
         match s.parse::<LogicalOp>() {
@@ -663,7 +664,7 @@ fn logical(eval_state: &mut EvalState) -> Result<ExprValue> {
     Ok(e)
 }
 
-fn comparison(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn comparison<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     let t = term(eval_state)?;
     if let Ok(mut first) = t.one_number() {
         if let Some(Token::Symbol(s)) = eval_state.peek().cloned() {
@@ -687,7 +688,7 @@ fn comparison(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
-fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn term<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     let t = factor(eval_state)?;
     if let Ok(mut e) = t.one_number() {
         loop {
@@ -711,7 +712,7 @@ fn term(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
-fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn factor<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     let f = primary(eval_state)?;
     if let Ok(mut e) = f.one_number() {
         loop {
@@ -741,7 +742,7 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
-fn primary(eval_state: &mut EvalState) -> Result<ExprValue> {
+fn primary<T: Layout + ToString>(eval_state: &mut EvalState<T>) -> Result<ExprValue> {
     match eval_state.next() {
         Some(Token::Number(x)) => Ok(ExprValue::Number(x)),
         Some(Token::String(s)) => Ok(ExprValue::String(s)),
@@ -834,7 +835,7 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-fn eval_expr(value: &str, context: &impl ContextView) -> Result<String> {
+fn eval_expr<T: Layout>(value: &str, context: &impl ContextView<T>) -> Result<String> {
     // Note - must catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let mut result = String::new();
     let mut value = value;
@@ -859,14 +860,14 @@ fn eval_expr(value: &str, context: &impl ContextView) -> Result<String> {
 }
 
 /// Evaluate an expression.
-fn eval_str(value: &str, context: &impl ContextView) -> Result<String> {
+fn eval_str<T: Layout + ToString>(value: &str, context: &impl ContextView<T>) -> Result<String> {
     tokenize(value)
         .and_then(|tokens| evaluate(tokens, context))
         .map(|v| v.to_string())
 }
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
-pub fn eval_attr(value: &str, context: &impl ContextView) -> Result<String> {
+pub fn eval_attr<T: Layout>(value: &str, context: &impl ContextView<T>) -> Result<String> {
     // Step 1: Replace variables (which may contain element references, for example).
     // Note this is only a single pass, so variables could potentially reference other
     // variables which are resolved in eval_expr - provided they hold numeric values.
@@ -876,7 +877,7 @@ pub fn eval_attr(value: &str, context: &impl ContextView) -> Result<String> {
 }
 
 /// Evaluate a condition expression, returning true iff the result is non-zero
-pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
+pub fn eval_condition<T: Layout>(value: &str, context: &impl ContextView<T>) -> Result<bool> {
     // Conditions don't need surrounding by {{...}} since they always evaluate to
     // a single numeric expression, but allow for consistency with other attr values.
     let mut value = value;
@@ -893,7 +894,10 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
         .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
 }
 
-pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>> {
+pub fn eval_list<T: Layout + ToString>(
+    value: &str,
+    context: &impl ContextView<T>,
+) -> Result<Vec<String>> {
     // Lists don't need surrounding by {{...}} since they always evaluate to
     // a list of Strings, but allow for consistency with other attr values.
     let mut value = value;
@@ -948,6 +952,8 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
+        type Elem = SvgElement;
+
         fn get_element(&self, _elref: &ElRef) -> Option<&SvgElement> {
             None
         }
@@ -967,11 +973,11 @@ mod tests {
         }
     }
 
-    impl ContextView for TestContext {}
+    impl ContextView<SvgElement> for TestContext {}
 
     fn evaluate_one(
         tokens: impl IntoIterator<Item = Token>,
-        context: &impl ContextView,
+        context: &impl ContextView<SvgElement>,
     ) -> Result<f32> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         let e = expr(&mut eval_state)?;
@@ -986,7 +992,7 @@ mod tests {
 
     fn expr_check(
         tokens: impl IntoIterator<Item = Token>,
-        context: &impl ContextView,
+        context: &impl ContextView<SvgElement>,
     ) -> Result<ExprValue> {
         let mut eval_state = EvalState::new(tokens, context, &[]);
         expr(&mut eval_state)

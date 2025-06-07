@@ -21,7 +21,7 @@ use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, split_comp
 ///
 /// Infallible; any invalid refspec will be left unchanged (other
 /// than whitespace)
-fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
+fn expand_relspec(value: &str, ctx: &impl ElementMap<Elem = SvgElement>) -> String {
     // For most elements either a `#elem~X` or `#elem@X` form is required,
     // but for `<point>` elements a standalone `#elem` suffices.
 
@@ -60,7 +60,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     result
 }
 
-fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
+fn expand_single_relspec(value: &str, ctx: &impl ElementMap<Elem = SvgElement>) -> String {
     let elem_loc = |elem: &SvgElement, loc: LocSpec| {
         ctx.get_element_bbox(elem)
             .map(|bb| bb.map(|bb| bb.locspec(loc)))
@@ -95,10 +95,10 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
 ///
 /// If the input is not a relspec, the reference element is `None` and the remainder
 /// is the entire input string.
-fn split_relspec<'a, 'b>(
+pub(super) fn split_relspec<'a, 'b, T: Layout>(
     input: &'b str,
-    ctx: &'a impl ElementMap,
-) -> Result<(Option<&'a SvgElement>, &'b str)> {
+    ctx: &'a impl ElementMap<Elem = T>,
+) -> Result<(Option<&'a T>, &'b str)> {
     if let Ok((elref, remain)) = extract_elref(input) {
         if let Some(el) = ctx.get_element(&elref) {
             // Note: essential we don't trim `remain` - if it starts
@@ -112,18 +112,18 @@ fn split_relspec<'a, 'b>(
     }
 }
 
-pub trait Layout: Sized + Element {
+pub trait Layout: Sized + ToString + Element {
     /// Resolve the position of the element, including any relative positioning
     /// and size attributes.
-    fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()>;
+    fn resolve_position(&mut self, ctx: &impl ContextView<Self>) -> Result<()>;
 
-    fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()>;
+    fn handle_containment(&mut self, ctx: &impl ContextView<Self>) -> Result<()>;
 
     /// Calculate the bounding box of the target shape inside self.
     fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>>;
 
     /// Get the size of the element, if it has one.
-    fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>>;
+    fn size(&self, ctx: &impl ElementMap<Elem = Self>) -> Result<Option<Size>>;
 
     /// Get the bounding box of the element, if it has one.
     fn bbox(&self) -> Result<Option<BoundingBox>>;
@@ -134,20 +134,102 @@ pub trait Layout: Sized + Element {
 
     fn position_from_bbox(&mut self, bb: &BoundingBox, inscribe: bool);
 
-    fn resolve_size_delta(&mut self);
+    fn eval_size_attr(
+        &self,
+        name: &str,
+        value: &str,
+        ctx: &impl ElementMap<Elem = Self>,
+    ) -> Result<String> {
+        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
+            if let (Some(el), remain) = split_relspec(value, ctx)? {
+                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
+                    // default value - same 'type' as attr name, e.g. y2 => ymax
+                    let mut v = bbox.scalarspec(attr_ss);
+                    // "[~scalarspec][ delta]"
+                    let (ss_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+                    if let Some(ss) = ss_str.strip_prefix(SCALARSPEC_SEP) {
+                        v = bbox.scalarspec(ss.parse()?);
+                    }
+                    if let Ok(len) = strp_length(dxy) {
+                        v = len.adjust(v);
+                    }
+                    return Ok(fstr(v));
+                }
+            }
+        }
+        Ok(value.to_owned())
+    }
 
-    fn eval_size_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String>;
-
-    fn eval_pos_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String>;
+    fn eval_pos_attr(
+        &self,
+        name: &str,
+        value: &str,
+        ctx: &impl ElementMap<Elem = Self>,
+    ) -> Result<String> {
+        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
+            if let (Some(el), remain) = split_relspec(value, ctx)? {
+                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
+                    return self.pos_attr_helper(remain, &bbox, attr_ss);
+                }
+            }
+        }
+        Ok(value.to_owned())
+    }
 
     fn pos_attr_helper(
         &self,
         remain: &str,
         bbox: &BoundingBox,
         attr_ss: ScalarSpec,
-    ) -> Result<String>;
+    ) -> Result<String> {
+        // default value - same 'type' as attr name, e.g. y2 => ymax
+        let mut v = bbox.scalarspec(attr_ss);
 
-    fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)>;
+        // 'position' attribute, e.g. x/y/cx...
+        let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+        if let Some(ss) = loc_str.strip_prefix(SCALARSPEC_SEP) {
+            // "[~scalarspec][ delta]"
+            v = bbox.scalarspec(ss.parse()?);
+            if let Ok(len) = strp_length(dxy) {
+                v = len.adjust(v);
+            }
+        } else {
+            let mut loc = if self.name() == "text" {
+                // text elements (currently) have no size, and default
+                // to center of the referenced element
+                LocSpec::from_str(self.get_attr("text-loc").unwrap_or("c"))?
+            } else {
+                // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
+                // will set x2 to the 'x2' (i.e. right edge) of #abc
+                attr_ss.into()
+            };
+            // "[@loc][ dx dy]"
+            if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
+                loc = ls.parse()?;
+            } else if !loc_str.is_empty() {
+                return Err(SvgdxError::ParseError(format!(
+                    "Could not parse '{loc_str}' in this context",
+                )));
+            }
+            let (x, y) = bbox.locspec(loc);
+            let (dx, dy) = self.extract_dx_dy(dxy)?;
+            use ScalarSpec::*;
+            v = match attr_ss {
+                Minx | Maxx | Cx => x + dx,
+                Miny | Maxy | Cy => y + dy,
+                _ => v,
+            };
+        }
+        Ok(fstr(v).to_string())
+    }
+
+    /// Extract dx/dy from a string such as '10 20' or '10' (in which case both are 10)
+    fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)> {
+        let mut parts = attr_split_cycle(input);
+        let dx = strp(&parts.next().unwrap_or("0".to_string()))?;
+        let dy = strp(&parts.next().unwrap_or("0".to_string()))?;
+        Ok((dx, dy))
+    }
 
     fn is_size_attr(&self, name: &str) -> bool {
         if self.name() == "text" || self.name() == "point" {
@@ -164,11 +246,68 @@ pub trait Layout: Sized + Element {
         matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
     }
 
-    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()>;
+    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap<Elem = Self>) -> Result<()> {
+        for (key, value) in self.get_attrs() {
+            if self.is_size_attr(&key) {
+                let computed = self.eval_size_attr(&key, &value, ctx)?;
+                if strp(&computed).is_ok() {
+                    self.set_attr(&key, &computed);
+                }
+            } else if self.is_pos_attr(&key) {
+                let computed = self.eval_pos_attr(&key, &value, ctx)?;
+                if strp(&computed).is_ok() {
+                    self.set_attr(&key, &computed);
+                }
+            }
+        }
+        Ok(())
+    }
 
-    fn eval_text_anchor(&mut self, ctx: &impl ContextView) -> Result<()>;
+    // fn eval_text_anchor(&mut self, ctx: &impl ContextView<Self>) -> Result<()>;
 
-    fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>>;
+    fn eval_text_anchor(&mut self, ctx: &impl ContextView<Self>) -> Result<()> {
+        // we do some of this processing as part of positioning, but don't want
+        // to be tightly coupled to that.
+        let input = self.get_attr("xy");
+        if let Some(input) = input {
+            let (_, rel_loc) = split_relspec(input, ctx)?;
+            let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
+            if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
+                match rel.parse()? {
+                    DirSpec::Above => self.set_default_attr("text-loc", "t"),
+                    DirSpec::Below => self.set_default_attr("text-loc", "b"),
+                    DirSpec::InFront => self.set_default_attr("text-loc", "r"),
+                    DirSpec::Behind => self.set_default_attr("text-loc", "l"),
+                }
+            } else if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
+                if let Ok(loc_spec) = loc.parse::<LocSpec>() {
+                    match loc_spec {
+                        LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
+                        LocSpec::Top => self.set_default_attr("text-loc", "t"),
+                        LocSpec::TopRight => self.set_default_attr("text-loc", "tr"),
+                        LocSpec::Right => self.set_default_attr("text-loc", "r"),
+                        LocSpec::BottomRight => self.set_default_attr("text-loc", "br"),
+                        LocSpec::Bottom => self.set_default_attr("text-loc", "b"),
+                        LocSpec::BottomLeft => self.set_default_attr("text-loc", "bl"),
+                        LocSpec::Left => self.set_default_attr("text-loc", "l"),
+                        LocSpec::Center => self.set_default_attr("text-loc", "c"),
+                        LocSpec::TopEdge(_) => self.set_default_attr("text-loc", "t"),
+                        LocSpec::BottomEdge(_) => self.set_default_attr("text-loc", "b"),
+                        LocSpec::LeftEdge(_) => self.set_default_attr("text-loc", "l"),
+                        LocSpec::RightEdge(_) => self.set_default_attr("text-loc", "r"),
+                    }
+                } else {
+                    return Err(SvgdxError::InvalidData(format!(
+                        "Could not derive text anchor: '{}'",
+                        loc
+                    )));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    // fn pos_from_dirspec(&self, ctx: &impl ContextView<Self>) -> Result<Option<Position>>;
 
     fn expand_compound_size(&mut self) {
         if let Some(wh) = self.pop_attr("wh") {
@@ -236,10 +375,43 @@ pub trait Layout: Sized + Element {
             self.set_default_attr("dy", &dy);
         }
     }
+
+    fn resolve_size_delta(&mut self) {
+        // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
+        let (w, h) = match self.name() {
+            "circle" => {
+                let diam = self.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
+                (diam, diam)
+            }
+            "ellipse" => (
+                self.get_attr("rx")
+                    .and_then(|rx| strp(rx).ok())
+                    .map(|x| x * 2.),
+                self.get_attr("ry")
+                    .and_then(|ry| strp(ry).ok())
+                    .map(|x| x * 2.),
+            ),
+            _ => (
+                self.get_attr("width").and_then(|w| strp(w).ok()),
+                self.get_attr("height").and_then(|h| strp(h).ok()),
+            ),
+        };
+
+        if let Some(dw) = self.pop_attr("dw") {
+            if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
+                self.set_attr("width", &fstr(new_w));
+            }
+        }
+        if let Some(dh) = self.pop_attr("dh") {
+            if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
+                self.set_attr("height", &fstr(new_h));
+            }
+        }
+    }
 }
 
 impl Layout for SvgElement {
-    fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
+    fn resolve_position(&mut self, ctx: &impl ContextView<Self>) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
         // moved out of this function and called once per element (or this function
@@ -302,7 +474,7 @@ impl Layout for SvgElement {
         Ok(())
     }
 
-    fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
+    fn handle_containment(&mut self, ctx: &impl ContextView<Self>) -> Result<()> {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
@@ -403,7 +575,7 @@ impl Layout for SvgElement {
         }
     }
 
-    fn size(&self, ctx: &impl ElementMap) -> Result<Option<Size>> {
+    fn size(&self, ctx: &impl ElementMap<Elem = Self>) -> Result<Option<Size>> {
         // NOTE: unlike bbox, this does not replace missing values with '0'.
         // Assumes any dw / dh have already been applied.
 
@@ -696,258 +868,6 @@ impl Layout for SvgElement {
             _ => {}
         }
     }
-
-    fn resolve_size_delta(&mut self) {
-        // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
-        let (w, h) = match self.name() {
-            "circle" => {
-                let diam = self.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
-                (diam, diam)
-            }
-            "ellipse" => (
-                self.get_attr("rx")
-                    .and_then(|rx| strp(rx).ok())
-                    .map(|x| x * 2.),
-                self.get_attr("ry")
-                    .and_then(|ry| strp(ry).ok())
-                    .map(|x| x * 2.),
-            ),
-            _ => (
-                self.get_attr("width").and_then(|w| strp(w).ok()),
-                self.get_attr("height").and_then(|h| strp(h).ok()),
-            ),
-        };
-
-        if let Some(dw) = self.pop_attr("dw") {
-            if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
-                self.set_attr("width", &fstr(new_w));
-            }
-        }
-        if let Some(dh) = self.pop_attr("dh") {
-            if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
-                self.set_attr("height", &fstr(new_h));
-            }
-        }
-    }
-
-    fn eval_size_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
-        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
-            if let (Some(el), remain) = split_relspec(value, ctx)? {
-                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                    // default value - same 'type' as attr name, e.g. y2 => ymax
-                    let mut v = bbox.scalarspec(attr_ss);
-                    // "[~scalarspec][ delta]"
-                    let (ss_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-                    if let Some(ss) = ss_str.strip_prefix(SCALARSPEC_SEP) {
-                        v = bbox.scalarspec(ss.parse()?);
-                    }
-                    if let Ok(len) = strp_length(dxy) {
-                        v = len.adjust(v);
-                    }
-                    return Ok(fstr(v));
-                }
-            }
-        }
-        Ok(value.to_owned())
-    }
-
-    fn eval_pos_attr(&self, name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
-        if let Ok(attr_ss) = ScalarSpec::from_str(name) {
-            if let (Some(el), remain) = split_relspec(value, ctx)? {
-                if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                    return self.pos_attr_helper(remain, &bbox, attr_ss);
-                }
-            }
-        }
-        Ok(value.to_owned())
-    }
-
-    fn pos_attr_helper(
-        &self,
-        remain: &str,
-        bbox: &BoundingBox,
-        attr_ss: ScalarSpec,
-    ) -> Result<String> {
-        // default value - same 'type' as attr name, e.g. y2 => ymax
-        let mut v = bbox.scalarspec(attr_ss);
-
-        // 'position' attribute, e.g. x/y/cx...
-        let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-        if let Some(ss) = loc_str.strip_prefix(SCALARSPEC_SEP) {
-            // "[~scalarspec][ delta]"
-            v = bbox.scalarspec(ss.parse()?);
-            if let Ok(len) = strp_length(dxy) {
-                v = len.adjust(v);
-            }
-        } else {
-            let mut loc = if self.name() == "text" {
-                // text elements (currently) have no size, and default
-                // to center of the referenced element
-                LocSpec::from_str(self.get_attr("text-loc").unwrap_or("c"))?
-            } else {
-                // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
-                // will set x2 to the 'x2' (i.e. right edge) of #abc
-                attr_ss.into()
-            };
-            // "[@loc][ dx dy]"
-            if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
-                loc = ls.parse()?;
-            } else if !loc_str.is_empty() {
-                return Err(SvgdxError::ParseError(format!(
-                    "Could not parse '{loc_str}' in this context",
-                )));
-            }
-            let (x, y) = bbox.locspec(loc);
-            let (dx, dy) = self.extract_dx_dy(dxy)?;
-            use ScalarSpec::*;
-            v = match attr_ss {
-                Minx | Maxx | Cx => x + dx,
-                Miny | Maxy | Cy => y + dy,
-                _ => v,
-            };
-        }
-        Ok(fstr(v).to_string())
-    }
-
-    /// Extract dx/dy from a string such as '10 20' or '10' (in which case both are 10)
-    fn extract_dx_dy(&self, input: &str) -> Result<(f32, f32)> {
-        let mut parts = attr_split_cycle(input);
-        let dx = strp(&parts.next().unwrap_or("0".to_string()))?;
-        let dy = strp(&parts.next().unwrap_or("0".to_string()))?;
-        Ok((dx, dy))
-    }
-
-    fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
-        for (key, value) in self.get_attrs() {
-            if self.is_size_attr(&key) {
-                let computed = self.eval_size_attr(&key, &value, ctx)?;
-                if strp(&computed).is_ok() {
-                    self.set_attr(&key, &computed);
-                }
-            } else if self.is_pos_attr(&key) {
-                let computed = self.eval_pos_attr(&key, &value, ctx)?;
-                if strp(&computed).is_ok() {
-                    self.set_attr(&key, &computed);
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn eval_text_anchor(&mut self, ctx: &impl ContextView) -> Result<()> {
-        // we do some of this processing as part of positioning, but don't want
-        // to be tightly coupled to that.
-        let input = self.get_attr("xy");
-        if let Some(input) = input {
-            let (_, rel_loc) = split_relspec(input, ctx)?;
-            let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
-            if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
-                match rel.parse()? {
-                    DirSpec::Above => self.set_default_attr("text-loc", "t"),
-                    DirSpec::Below => self.set_default_attr("text-loc", "b"),
-                    DirSpec::InFront => self.set_default_attr("text-loc", "r"),
-                    DirSpec::Behind => self.set_default_attr("text-loc", "l"),
-                }
-            } else if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
-                if let Ok(loc_spec) = loc.parse::<LocSpec>() {
-                    match loc_spec {
-                        LocSpec::TopLeft => self.set_default_attr("text-loc", "tl"),
-                        LocSpec::Top => self.set_default_attr("text-loc", "t"),
-                        LocSpec::TopRight => self.set_default_attr("text-loc", "tr"),
-                        LocSpec::Right => self.set_default_attr("text-loc", "r"),
-                        LocSpec::BottomRight => self.set_default_attr("text-loc", "br"),
-                        LocSpec::Bottom => self.set_default_attr("text-loc", "b"),
-                        LocSpec::BottomLeft => self.set_default_attr("text-loc", "bl"),
-                        LocSpec::Left => self.set_default_attr("text-loc", "l"),
-                        LocSpec::Center => self.set_default_attr("text-loc", "c"),
-                        LocSpec::TopEdge(_) => self.set_default_attr("text-loc", "t"),
-                        LocSpec::BottomEdge(_) => self.set_default_attr("text-loc", "b"),
-                        LocSpec::LeftEdge(_) => self.set_default_attr("text-loc", "l"),
-                        LocSpec::RightEdge(_) => self.set_default_attr("text-loc", "r"),
-                    }
-                } else {
-                    return Err(SvgdxError::InvalidData(format!(
-                        "Could not derive text anchor: '{}'",
-                        loc
-                    )));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Direction relative positioning - horizontally below, above, to the left, or to the
-    /// right of the referenced element.
-    /// ELREF '|' DIR ' ' [gap]
-    /// DIR values:
-    ///   h - horizontal to the right
-    ///   H - horizontal to the left
-    ///   v - vertical below
-    ///   V - vertical above
-    fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
-        let input = self.get_attr("xy");
-        if input.is_none() {
-            return Ok(None);
-        }
-        let input = input.unwrap();
-        if !input.contains(RELPOS_SEP) {
-            return Ok(None);
-        }
-        // element-relative position can only be applied via xy attribute
-        // containing RELPOS_SEP.
-        let (ref_el, remain) = split_relspec(input, ctx)?;
-        let ref_el = match ref_el {
-            Some(el) => el,
-            None => return Ok(None),
-        };
-        if let (Some(bbox), Some(skip_rp_sep)) = (
-            ctx.get_element_bbox(ref_el)?,
-            remain.strip_prefix(RELPOS_SEP),
-        ) {
-            let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
-            let (reldir, remain) = if let Some(split_idx) = parts {
-                let (a, b) = skip_rp_sep.split_at(split_idx);
-                (a, b.trim_start())
-            } else {
-                (skip_rp_sep, "")
-            };
-            let rel: DirSpec = reldir.parse()?;
-            // We won't have the full *position* of this element at this point, but hopefully
-            // we have enough to determine its size.
-            let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
-            let gap = if !remain.is_empty() {
-                let mut parts = attr_split(remain);
-                strp(&parts.next().unwrap_or("0".to_string()))?
-            } else {
-                0.
-            };
-            let (x, y) = bbox.locspec(rel.to_locspec());
-            let (dx, dy) = match rel {
-                DirSpec::Above => (-this_width / 2., -(this_height + gap)),
-                DirSpec::Below => (-this_width / 2., gap),
-                DirSpec::InFront => (gap, -this_height / 2.),
-                DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
-            };
-
-            let mut pos = Position::new(self.name());
-            if self.name() == "use" {
-                // Need to determine top-left corner of the target bbox which
-                // may not be (0, 0), and offset by the equivalent amount.
-                if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {
-                    let (tx, ty) = bbox.locspec(LocSpec::TopLeft);
-                    pos.xmin = Some(x + dx - tx);
-                    pos.ymin = Some(y + dy - ty);
-                }
-            } else {
-                pos.xmin = Some(x + dx);
-                pos.xmax = Some(x + dx + this_width);
-                pos.ymin = Some(y + dy);
-                pos.ymax = Some(y + dy + this_height);
-            }
-            return Ok(Some(pos));
-        }
-        Ok(None)
-    }
 }
 
 #[cfg(test)]
@@ -1077,6 +997,8 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
+        type Elem = SvgElement;
+
         fn get_element(&self, id: &ElRef) -> Option<&SvgElement> {
             if let ElRef::Id(id) = id {
                 return self.elements.get(id);
