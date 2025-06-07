@@ -1,10 +1,10 @@
-use super::{Element, ElementTransform, Layout, SvgElement};
+use super::{Element, ElementTransform, Layout};
 use crate::geometry::LocSpec;
-use crate::types::{attr_split_cycle, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp, ClassList};
 
 use crate::errors::{Result, SvgdxError};
 
-fn get_text_value(element: &mut SvgElement) -> String {
+fn get_text_value<T: Element>(element: &mut T) -> String {
     let text_value = element
         .pop_attr("text")
         .expect("no text attr in process_text_attr");
@@ -36,7 +36,9 @@ fn text_string(text_value: &str) -> String {
     result
 }
 
-fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
+fn get_text_position<T: Layout + ToString>(
+    element: &mut T,
+) -> Result<(f32, f32, bool, LocSpec, ClassList)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -60,7 +62,9 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         }
     }
 
-    let mut text_classes = vec!["d-text".to_owned()];
+    let mut text_classes = ClassList::new();
+    text_classes.insert("d-text".to_owned());
+
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
     let text_anchor = text_loc_str.parse::<LocSpec>()?;
 
@@ -79,11 +83,11 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     } else if element.pop_class("d-text-inside") {
         false
     } else {
-        matches!(element.name.as_str(), "line" | "point" | "text")
+        matches!(element.name(), "line" | "point" | "text")
     };
     match text_anchor {
         ls if ls.is_top() => {
-            text_classes.push(
+            text_classes.insert(
                 match (outside, vertical) {
                     (false, false) => "d-text-top",
                     (true, false) => "d-text-bottom",
@@ -95,7 +99,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
             t_dy += if outside { -text_offset } else { text_offset };
         }
         ls if ls.is_bottom() => {
-            text_classes.push(
+            text_classes.insert(
                 match (outside, vertical) {
                     (false, false) => "d-text-bottom",
                     (true, false) => "d-text-top",
@@ -111,7 +115,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
 
     match text_anchor {
         ls if ls.is_left() => {
-            text_classes.push(
+            text_classes.insert(
                 match (outside, vertical) {
                     (false, false) => "d-text-left",
                     (true, false) => "d-text-right",
@@ -123,7 +127,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
             t_dx += if outside { -text_offset } else { text_offset };
         }
         ls if ls.is_right() => {
-            text_classes.push(
+            text_classes.insert(
                 match (outside, vertical) {
                     (false, false) => "d-text-right",
                     (true, false) => "d-text-left",
@@ -150,7 +154,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 
-pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
+pub fn process_text_attr<T: ElementTransform + ToString>(element: &T) -> Result<(T, Vec<T>)> {
     // Different conversions from line count to first-line offset based on whether
     // top, center, or bottom justification.
     const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
@@ -178,10 +182,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_pre = orig_elem.has_class("d-text-pre");
 
     // There will always be a text element; if not multiline this is the only element.
-    let mut text_elem = if orig_elem.name == "text" {
+    let mut text_elem = if orig_elem.name() == "text" {
         orig_elem.clone()
     } else {
-        SvgElement::new("text", &[])
+        T::new("text", &[])
     };
     text_elem.set_attr("x", &x_str);
     text_elem.set_attr("y", &y_str);
@@ -234,18 +238,18 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     ];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
-    for class in orig_elem.classes.clone().into_iter() {
+    for class in orig_elem.get_classes() {
         if class.starts_with("d-text-") {
             orig_elem.pop_class(&class);
         }
         if !text_ignore_classes.contains(&class.as_str())
             && !text_ignore_class_fns.iter().any(|f| f(&class))
         {
-            text_classes.push(class);
+            text_classes.insert(class);
         }
     }
-    text_elem.src_line = orig_elem.src_line;
-    text_elem.classes = text_classes.into();
+    text_elem.set_source_element(&orig_elem);
+    *text_elem.classes_mut() = text_classes;
 
     // Add this prior to copying over presentation attrs which take precedence
     if vertical {
@@ -276,7 +280,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             text_elem.set_attr(text_attr, &attr);
         }
     }
-    text_elem.text_content = Some(text_value.clone());
+    *text_elem.text_mut() = Some(text_value.clone());
     text_elements.push(text_elem);
     if multiline {
         // Determine position of first text line; others follow this based on line spacing
@@ -294,11 +298,11 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             (_, _, _) => WRAP_MID,
         };
 
-        let mut tspan_elem = SvgElement::new("tspan", &[]);
+        let mut tspan_elem = T::new("tspan", &[]);
         if let Some(ref style) = text_style {
             tspan_elem.set_attr("style", style);
         }
-        tspan_elem.src_line = orig_elem.src_line;
+        tspan_elem.set_source_element(&orig_elem);
         if vertical {
             tspan_elem.set_attr("y", &y_str);
             lines = lines.into_iter().rev().collect();
@@ -321,11 +325,11 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 text_fragment = text_fragment.replace(' ', NBSP);
             }
 
-            tspan.attrs.insert(
+            tspan.set_attr(
                 if vertical { "dx" } else { "dy" },
-                format!("{}em", fstr(line_offset)),
+                &format!("{}em", fstr(line_offset)),
             );
-            tspan.text_content = Some(if text_fragment.is_empty() {
+            *tspan.text_mut() = Some(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.
                 // Without this "a\n\nb" would render three tspans, but it would appear
                 // to have 'b' immediately below 'a' without a blank line between them.

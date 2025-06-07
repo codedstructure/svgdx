@@ -128,11 +128,11 @@ impl EventGen for OtherElement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
-    pub name: String,
+    name: String,
+    attrs: AttrMap,
+    classes: ClassList,
+    text_content: Option<String>,
     pub original: String,
-    pub attrs: AttrMap,
-    pub classes: ClassList,
-    pub text_content: Option<String>,
     pub order_index: OrderIndex,
     pub indent: usize,
     pub src_line: usize,
@@ -147,12 +147,15 @@ impl Display for SvgElement {
 }
 
 pub trait Element: Sized + Clone {
+    fn new(name: &str, attrs: &[(String, String)]) -> Self;
     fn name(&self) -> &str;
     fn name_mut(&mut self) -> &mut String;
     fn attrs(&self) -> &AttrMap;
     fn attrs_mut(&mut self) -> &mut AttrMap;
     fn classes(&self) -> &ClassList;
     fn classes_mut(&mut self) -> &mut ClassList;
+    fn text(&self) -> Option<&str>;
+    fn text_mut(&mut self) -> &mut Option<String>;
 
     fn fmt_element(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<{}", self.name())?;
@@ -167,6 +170,8 @@ pub trait Element: Sized + Clone {
         write!(f, ">")?;
         Ok(())
     }
+
+    fn set_source_element(&mut self, _other: &Self) {}
 
     // The following methods shouldn't need overriding.
 
@@ -194,6 +199,11 @@ pub trait Element: Sized + Clone {
 
     fn get_attrs(&self) -> HashMap<String, String> {
         self.attrs().to_vec().into_iter().collect()
+    }
+
+    /// Return *priority ordered* attributes
+    fn get_attrs_vec(&self) -> Vec<(String, String)> {
+        self.attrs().to_vec()
     }
 
     fn set_default_attr(&mut self, key: &str, value: &str) {
@@ -263,6 +273,33 @@ pub trait Element: Sized + Clone {
 }
 
 impl Element for SvgElement {
+    fn new(name: &str, attrs: &[(String, String)]) -> Self {
+        let mut attr_map = AttrMap::new();
+        let mut classes = ClassList::new();
+
+        for (key, value) in attrs {
+            if key == "class" {
+                for c in value.split(' ') {
+                    classes.insert(c.to_string());
+                }
+            } else {
+                attr_map.insert(key.to_string(), value.to_string());
+            }
+        }
+        Self {
+            name: name.to_string(),
+            original: format!("<{name} {}>", attr_map),
+            attrs: attr_map.clone(),
+            classes,
+            text_content: None,
+            order_index: OrderIndex::default(),
+            indent: 0,
+            src_line: 0,
+            event_range: None,
+            content_bbox: None,
+        }
+    }
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -285,6 +322,18 @@ impl Element for SvgElement {
 
     fn classes_mut(&mut self) -> &mut ClassList {
         &mut self.classes
+    }
+
+    fn text(&self) -> Option<&str> {
+        self.text_content.as_deref()
+    }
+
+    fn text_mut(&mut self) -> &mut Option<String> {
+        &mut self.text_content
+    }
+
+    fn set_source_element(&mut self, other: &Self) {
+        self.src_line = other.src_line;
     }
 }
 
@@ -486,33 +535,6 @@ impl ElementTransform for SvgElement {
 }
 
 impl SvgElement {
-    pub fn new(name: &str, attrs: &[(String, String)]) -> Self {
-        let mut attr_map = AttrMap::new();
-        let mut classes = ClassList::new();
-
-        for (key, value) in attrs {
-            if key == "class" {
-                for c in value.split(' ') {
-                    classes.insert(c.to_string());
-                }
-            } else {
-                attr_map.insert(key.to_string(), value.to_string());
-            }
-        }
-        Self {
-            name: name.to_string(),
-            original: format!("<{name} {}>", attr_map),
-            attrs: attr_map.clone(),
-            classes,
-            text_content: None,
-            order_index: OrderIndex::default(),
-            indent: 0,
-            src_line: 0,
-            event_range: None,
-            content_bbox: None,
-        }
-    }
-
     pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
         if let Some((start, end)) = self.event_range {
             // empty events will have end == start
@@ -580,8 +602,8 @@ impl SvgElement {
                 [] => {}
                 [elem] => {
                     events.push(OutputEvent::Start(elem.clone()));
-                    if let Some(value) = &elem.text_content {
-                        events.push(OutputEvent::Text(value.clone()));
+                    if let Some(value) = elem.text() {
+                        events.push(OutputEvent::Text(value.to_string()));
                     } else {
                         return Err(SvgdxError::InvalidData(
                             "Text element should have content".to_owned(),
@@ -599,8 +621,8 @@ impl SvgElement {
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
                         events.push(OutputEvent::Start(elem.clone()));
-                        if let Some(value) = &elem.text_content {
-                            events.push(OutputEvent::Text(value.clone()));
+                        if let Some(value) = elem.text() {
+                            events.push(OutputEvent::Text(value.to_string()));
                         } else {
                             return Err(SvgdxError::InvalidData(
                                 "Text element should have content".to_owned(),

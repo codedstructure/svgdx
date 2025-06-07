@@ -1,4 +1,4 @@
-use crate::elements::SvgElement;
+use crate::elements::{Element, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::types::OrderIndex;
 
@@ -469,7 +469,7 @@ impl OutputList {
             } else {
                 match &output_ev {
                     OutputEvent::Start(e) | OutputEvent::Empty(e) => {
-                        if e.name == name {
+                        if e.name() == name {
                             pivot = Some(output_ev);
                         } else {
                             before.push(output_ev);
@@ -512,18 +512,15 @@ impl SvgElement {
     ///
     /// Implemented as a method rather than a `From` impl to keep private
     fn into_bytesstart(self) -> BytesStart<'static> {
-        let mut bs = BytesStart::new(self.name);
-        for (k, v) in &self.attrs {
+        let mut bs = BytesStart::new(self.name().to_string());
+        // Attribute priority ordering happens here
+        for (k, v) in self.get_attrs_vec() {
             bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
         }
-        if !self.classes.is_empty() {
+        if !self.classes().is_empty() {
             bs.push_attribute(Attribute::from((
                 "class".as_bytes(),
-                self.classes
-                    .into_iter()
-                    .collect::<Vec<String>>()
-                    .join(" ")
-                    .as_bytes(),
+                self.get_classes().join(" ").as_bytes(),
             )));
         }
         bs

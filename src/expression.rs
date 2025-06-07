@@ -913,7 +913,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::context::{ElementMap, VariableMap};
-    use crate::elements::{Layout, SvgElement};
+    use crate::elements::{Element, Layout, SvgElement};
     use crate::geometry::BoundingBox;
     use crate::types::ElRef;
     use assertables::{assert_in_delta, assert_lt};

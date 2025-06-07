@@ -23,7 +23,7 @@ impl TryFrom<&SvgElement> for LoopDef {
     type Error = SvgdxError;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
-        if element.name != "loop" {
+        if element.name() != "loop" {
             return Err(SvgdxError::InvalidData(
                 "LoopType can only be created from a loop element".to_string(),
             ));

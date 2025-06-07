@@ -66,7 +66,7 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
             .map(|bb| bb.map(|bb| bb.locspec(loc)))
     };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
-        if rest.is_empty() && elem.name == "point" {
+        if rest.is_empty() && elem.name() == "point" {
             if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
@@ -254,7 +254,7 @@ impl Layout for SvgElement {
         self.resolve_size_delta();
 
         // ensure relatively-positioned text elements have appropriate anchors
-        if self.name == "text" && self.has_attr("text") {
+        if self.name() == "text" && self.has_attr("text") {
             self.eval_text_anchor(ctx)?;
         }
 
@@ -286,11 +286,11 @@ impl Layout for SvgElement {
         // }
 
         let mut p = Position::from(self as &SvgElement);
-        if self.name == "use" {
+        if self.name() == "use" {
             let el = self.get_target_element(ctx)?;
             if let Some(sz) = el.size(ctx)? {
                 p.update_size(&sz);
-                if el.name == "circle" || el.name == "ellipse" {
+                if let "circle" | "ellipse" = el.name() {
                     // The referenced element is defined by its center,
                     // but use elements are defined by top-left pos.
                     p.translate(sz.width / 4., sz.height / 4.);
@@ -333,7 +333,7 @@ impl Layout for SvgElement {
                     // circle/ellipses are is present and ref_list.len() > 1.
                     // Should probably fold the list and provide next element type
                     // as the target shape here
-                    el.inscribed_bbox(&self.name)
+                    el.inscribed_bbox(self.name())
                 };
                 if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
@@ -370,7 +370,7 @@ impl Layout for SvgElement {
     /// Calculate bounding box of target_shape inside self
     fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
         let zstr = "0".to_owned();
-        match (target_shape, self.name.as_str()) {
+        match (target_shape, self.name()) {
             // rect inside circle
             ("rect", "circle") => {
                 if let Some(r) = self.get_attr("r") {
@@ -417,7 +417,7 @@ impl Layout for SvgElement {
         if let Some(h) = self.get_attr("height") {
             height = Some(strp(h)?);
         }
-        match self.name.as_str() {
+        match self.name() {
             "use" | "reuse" => {
                 let target_el = self.get_target_element(ctx)?;
                 // Take a _copy_ of the target element and evaluate attributes
@@ -517,7 +517,7 @@ impl Layout for SvgElement {
                     || value.contains(ELREF_ID_PREFIX)
                     || value.contains(ELREF_PREVIOUS))
         }
-        Ok(match self.name.as_str() {
+        Ok(match self.name() {
             "point" | "text" => {
                 let x = self.get_attr("x").unwrap_or(&zstr);
                 let y = self.get_attr("y").unwrap_or(&zstr);
@@ -641,7 +641,7 @@ impl Layout for SvgElement {
 
     fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
-        for (key, value) in &self.attrs {
+        for (key, value) in &self.get_attrs() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
                     new_elem.set_attr(key, &fstr(strp(value)? + dx));
@@ -660,26 +660,26 @@ impl Layout for SvgElement {
         let height = bb.height();
         let (cx, cy) = bb.center();
         let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-        match self.name.as_str() {
+        match self.name() {
             "rect" | "box" => {
-                self.attrs.insert("x", fstr(x1));
-                self.attrs.insert("y", fstr(y1));
-                self.attrs.insert("width", fstr(width));
-                self.attrs.insert("height", fstr(height));
+                self.set_attr("x", &fstr(x1));
+                self.set_attr("y", &fstr(y1));
+                self.set_attr("width", &fstr(width));
+                self.set_attr("height", &fstr(height));
             }
             "circle" => {
-                self.attrs.insert("cx", fstr(cx));
-                self.attrs.insert("cy", fstr(cy));
+                self.set_attr("cx", &fstr(cx));
+                self.set_attr("cy", &fstr(cy));
                 let r = if inscribe {
                     0.5 * width.min(height)
                 } else {
                     0.5 * width.max(height) * SQRT_2
                 };
-                self.attrs.insert("r", fstr(r));
+                self.set_attr("r", &fstr(r));
             }
             "ellipse" => {
-                self.attrs.insert("cx", fstr(cx));
-                self.attrs.insert("cy", fstr(cy));
+                self.set_attr("cx", &fstr(cx));
+                self.set_attr("cy", &fstr(cy));
                 let rx = if inscribe {
                     0.5 * width
                 } else {
@@ -690,8 +690,8 @@ impl Layout for SvgElement {
                 } else {
                     0.5 * height * SQRT_2
                 };
-                self.attrs.insert("rx", fstr(rx));
-                self.attrs.insert("ry", fstr(ry));
+                self.set_attr("rx", &fstr(rx));
+                self.set_attr("ry", &fstr(ry));
             }
             _ => {}
         }
@@ -699,7 +699,7 @@ impl Layout for SvgElement {
 
     fn resolve_size_delta(&mut self) {
         // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
-        let (w, h) = match self.name.as_str() {
+        let (w, h) = match self.name() {
             "circle" => {
                 let diam = self.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
                 (diam, diam)
@@ -780,7 +780,7 @@ impl Layout for SvgElement {
                 v = len.adjust(v);
             }
         } else {
-            let mut loc = if self.name == "text" {
+            let mut loc = if self.name() == "text" {
                 // text elements (currently) have no size, and default
                 // to center of the referenced element
                 LocSpec::from_str(self.get_attr("text-loc").unwrap_or("c"))?
@@ -818,16 +818,16 @@ impl Layout for SvgElement {
     }
 
     fn eval_rel_attributes(&mut self, ctx: &impl ElementMap) -> Result<()> {
-        for (key, value) in self.attrs.clone() {
+        for (key, value) in self.get_attrs() {
             if self.is_size_attr(&key) {
                 let computed = self.eval_size_attr(&key, &value, ctx)?;
                 if strp(&computed).is_ok() {
-                    self.attrs.insert(key.clone(), computed);
+                    self.set_attr(&key, &computed);
                 }
             } else if self.is_pos_attr(&key) {
                 let computed = self.eval_pos_attr(&key, &value, ctx)?;
                 if strp(&computed).is_ok() {
-                    self.attrs.insert(key.clone(), computed);
+                    self.set_attr(&key, &computed);
                 }
             }
         }
@@ -929,8 +929,8 @@ impl Layout for SvgElement {
                 DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
             };
 
-            let mut pos = Position::new(self.name.clone());
-            if self.name.as_str() == "use" {
+            let mut pos = Position::new(self.name());
+            if self.name() == "use" {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
                 if let Some(bbox) = self.get_target_element(ctx)?.bbox()? {

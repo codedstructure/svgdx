@@ -183,7 +183,7 @@ impl Position {
 
     pub fn set_position_attrs(&self, element: &mut SvgElement) {
         // TODO: should this return a Result?
-        match (element.name.as_str(), self.to_bbox()) {
+        match (element.name(), self.to_bbox()) {
             ("g" | "path" | "polyline" | "polygon", _) => {
                 // These don't need a full bbox, and are always set via transform in any case.
                 self.position_via_transform(element);
@@ -199,10 +199,10 @@ impl Position {
                     element.set_attr("y", &fstr(self.y() + self.dy.unwrap_or(0.)));
                 }
                 element.remove_attrs(&["dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r"]);
-                if element.name != "use" {
+                if element.name() != "use" {
                     element.remove_attrs(&["width", "height"]);
                 }
-                if element.name != "text" {
+                if element.name() != "text" {
                     element.remove_attrs(&["dx", "dy"]);
                 }
             }
@@ -322,7 +322,7 @@ impl Position {
 impl From<&SvgElement> for Position {
     /// assumes SvgElement has already had compound attributes split
     fn from(value: &SvgElement) -> Self {
-        let mut p = Position::new(&value.name);
+        let mut p = Position::new(value.name());
 
         p.dx = value.get_attr("dx").and_then(|dx| strp(dx).ok());
         p.dy = value.get_attr("dy").and_then(|dy| strp(dy).ok());
@@ -375,7 +375,7 @@ impl From<&SvgElement> for Position {
         // can be defined by x/y/width/height etc, non-circle/ellipse elements
         // cannot use r/rx/ry. This is due to rx/ry having different meaning in
         // the context of rect elements.
-        if let "circle" | "ellipse" = value.name.as_str() {
+        if let "circle" | "ellipse" = value.name() {
             let rx = value.get_attr("rx").or(value.get_attr("r"));
             let ry = value.get_attr("ry").or(value.get_attr("r"));
             if let Some(Ok(r)) = rx.map(strp) {

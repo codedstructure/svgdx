@@ -31,7 +31,7 @@ impl ElementMatch {
     fn matches(&self, el: &SvgElement) -> bool {
         // early reject if element name doesn't match
         if let Some(match_el) = &self.element {
-            if el.name != *match_el {
+            if el.name() != *match_el {
                 return false;
             }
         }
@@ -42,10 +42,10 @@ impl ElementMatch {
         // otherwise iterate through matches
         for m in self.matches.iter() {
             if let Some((elem, class)) = m.split_once('.') {
-                if (elem.is_empty() || elem == el.name) && el.has_class(class) {
+                if (elem.is_empty() || elem == el.name()) && el.has_class(class) {
                     return true;
                 }
-            } else if *m == el.name {
+            } else if *m == el.name() {
                 return true;
             }
         }
@@ -55,10 +55,10 @@ impl ElementMatch {
 
 impl From<&SvgElement> for ElementMatch {
     fn from(el: &SvgElement) -> Self {
-        let element = if el.name == "_" {
+        let element = if el.name() == "_" {
             None
         } else {
-            Some(el.name.clone())
+            Some(el.name().to_string())
         };
         let mut matches = Vec::new();
         let mut is_final = false;
@@ -195,8 +195,7 @@ impl ElementMap for TransformerContext {
             let clip_el = self
                 .get_element(&clip_id)
                 .ok_or(SvgdxError::ReferenceError(clip_id))?;
-            if let ("clipPath", Some(clip_bbox)) =
-                (clip_el.name.as_str(), self.get_element_bbox(clip_el)?)
+            if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);
             }
@@ -328,11 +327,11 @@ impl TransformerContext {
                         }
                     }
                     if default.is_init() {
-                        classes = default_el.classes.clone();
-                        attrs = default_el.attrs.clone();
+                        classes = default_el.classes().clone();
+                        attrs = default_el.attrs().clone();
                     } else {
-                        classes.extend(&default_el.classes);
-                        attrs.update(&default_el.attrs);
+                        classes.extend(default_el.classes());
+                        attrs.update(default_el.attrs());
                     }
                     if default.is_final() {
                         break 'outer;

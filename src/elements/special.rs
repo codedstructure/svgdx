@@ -33,7 +33,7 @@ impl EventGen for ConfigElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_config = context.config.clone();
-        for (key, value) in &self.0.attrs {
+        for (key, value) in &self.0.get_attrs() {
             match key.as_str() {
                 "scale" => new_config.scale = value.parse()?,
                 "debug" => new_config.debug = value.parse()?,
@@ -95,7 +95,7 @@ impl EventGen for VarElement {
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
         let mut new_vars = Vec::new();
-        for (key, value) in self.0.attrs.clone() {
+        for (key, value) in self.0.get_attrs() {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
             if key != "_" && key != "__" {

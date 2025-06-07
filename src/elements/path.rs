@@ -1,4 +1,4 @@
-use super::{Element, SvgElement};
+use super::Layout;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::BoundingBox;
 
@@ -267,7 +267,7 @@ impl PathParser {
     }
 }
 
-pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
+pub fn path_bbox<T: Layout>(element: &T) -> Result<Option<BoundingBox>> {
     if let Some(path_data) = element.get_attr("d") {
         let mut pp = PathParser::new(path_data);
         pp.evaluate()?;
