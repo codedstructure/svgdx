@@ -1,4 +1,4 @@
-use crate::elements::{Element, SvgElement};
+use crate::elements::Element;
 use crate::geometry::{BoundingBox, Size};
 use crate::types::{fstr, strp};
 
@@ -181,7 +181,7 @@ impl Position {
         self.cy = self.cy.map(|y| y + dy);
     }
 
-    pub fn set_position_attrs(&self, element: &mut SvgElement) {
+    pub fn set_position_attrs(&self, element: &mut impl Element) {
         // TODO: should this return a Result?
         match (element.name(), self.to_bbox()) {
             ("g" | "path" | "polyline" | "polygon", _) => {
@@ -297,7 +297,7 @@ impl Position {
         }
     }
 
-    fn position_via_transform(&self, element: &mut SvgElement) {
+    fn position_via_transform(&self, element: &mut impl Element) {
         let (mut x, mut y) = (self.x(), self.y());
         if let Some(dx) = self.dx {
             x += dx;
@@ -319,9 +319,9 @@ impl Position {
     }
 }
 
-impl From<&SvgElement> for Position {
+impl<T: Element> From<&T> for Position {
     /// assumes SvgElement has already had compound attributes split
-    fn from(value: &SvgElement) -> Self {
+    fn from(value: &T) -> Self {
         let mut p = Position::new(value.name());
 
         p.dx = value.get_attr("dx").and_then(|dx| strp(dx).ok());

@@ -12,7 +12,7 @@ pub struct ReuseElement(pub SvgElement);
 impl EventGen for ReuseElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut reuse_element = self.0.clone();
 

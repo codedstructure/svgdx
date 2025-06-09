@@ -13,7 +13,7 @@ pub struct Container(pub SvgElement);
 impl EventGen for Container {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if let Some(inner_events) = self.0.inner_events(context) {
             // If there's only text/cdata events, apply to current element and render
@@ -84,7 +84,7 @@ pub struct GroupElement(pub SvgElement);
 impl EventGen for GroupElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.

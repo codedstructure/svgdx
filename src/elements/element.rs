@@ -19,7 +19,7 @@ use std::collections::HashMap;
 impl EventGen for SvgElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<Self>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         context.inc_depth()?;
         let res = match self.name.as_str() {
@@ -75,7 +75,7 @@ struct OtherElement(pub SvgElement);
 impl EventGen for OtherElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
@@ -339,7 +339,7 @@ impl Element for SvgElement {
     }
 }
 
-pub trait ElementTransform: super::layout::Layout {
+pub trait ElementTransform: Layout {
     fn transmute(&mut self, _ctx: &impl ContextView<Self>) -> Result<()> {
         Ok(())
     }
@@ -613,7 +613,7 @@ impl ElementTransform for SvgElement {
 }
 
 impl SvgElement {
-    pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
+    pub fn inner_events(&self, context: &TransformerContext<Self>) -> Option<InputList> {
         if let Some((start, end)) = self.event_range {
             // empty events will have end == start
             if end > start {
@@ -623,7 +623,7 @@ impl SvgElement {
         None
     }
 
-    pub fn all_events(&self, context: &TransformerContext) -> InputList {
+    pub fn all_events(&self, context: &TransformerContext<Self>) -> InputList {
         if let Some((start, end)) = self.event_range {
             InputList::from(&context.events[start..end + 1])
         } else {
@@ -633,7 +633,7 @@ impl SvgElement {
 
     /// Process a given `SvgElement` into a list of `SvgEvent`s
     // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
+    pub fn element_events(&self, ctx: &mut TransformerContext<Self>) -> Result<Vec<OutputEvent>> {
         let mut events = vec![];
 
         if ctx.config.debug {

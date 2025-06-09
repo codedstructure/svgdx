@@ -19,7 +19,7 @@ pub trait EventGen {
     /// Note some implementations may mutate the context (e.g. `var` elements).
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)>;
 }
 
@@ -50,7 +50,7 @@ fn is_real_svg(events: &InputList) -> bool {
 impl EventGen for Tag {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut events = OutputList::new();
         let mut bbox = None;
@@ -91,7 +91,7 @@ impl EventGen for Tag {
 
 fn process_tags(
     tags: &mut Vec<(OrderIndex, Tag)>,
-    context: &mut TransformerContext,
+    context: &mut TransformerContext<SvgElement>,
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
     bbb: &mut BoundingBoxBuilder,
 ) -> Result<Option<BoundingBox>> {
@@ -148,7 +148,7 @@ fn process_tags(
 
 pub fn process_events(
     input: InputList,
-    context: &mut TransformerContext,
+    context: &mut TransformerContext<SvgElement>,
 ) -> Result<(OutputList, Option<BoundingBox>)> {
     if is_real_svg(&input) {
         if context.get_top_element().is_none() {
@@ -176,7 +176,7 @@ pub fn process_events(
 }
 
 pub struct Transformer {
-    pub context: TransformerContext,
+    pub context: TransformerContext<SvgElement>,
 }
 
 impl Transformer {

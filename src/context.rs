@@ -1,4 +1,4 @@
-use crate::elements::{Element, ElementTransform, Layout, SvgElement};
+use crate::elements::{Element, ElementTransform, Layout};
 use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expression::eval_attr;
@@ -28,7 +28,7 @@ impl ElementMatch {
     fn is_final(&self) -> bool {
         self.is_final
     }
-    fn matches(&self, el: &SvgElement) -> bool {
+    fn matches(&self, el: &impl Element) -> bool {
         // early reject if element name doesn't match
         if let Some(match_el) = &self.element {
             if el.name() != *match_el {
@@ -53,8 +53,8 @@ impl ElementMatch {
     }
 }
 
-impl From<&SvgElement> for ElementMatch {
-    fn from(el: &SvgElement) -> Self {
+impl<T: Element> From<&T> for ElementMatch {
+    fn from(el: &T) -> Self {
         let element = if el.name() == "_" {
             None
         } else {
@@ -81,13 +81,22 @@ impl From<&SvgElement> for ElementMatch {
     }
 }
 
-#[derive(Debug, Default, Clone)]
-struct Scope {
+#[derive(Debug, Clone)]
+struct Scope<T: Element> {
     vars: HashMap<String, String>,
-    defaults: Vec<(ElementMatch, SvgElement)>,
+    defaults: Vec<(ElementMatch, T)>,
 }
 
-impl Scope {
+impl<T: Element> Default for Scope<T> {
+    fn default() -> Self {
+        Self {
+            vars: HashMap::new(),
+            defaults: Vec::new(),
+        }
+    }
+}
+
+impl<T: Element> Scope<T> {
     fn with_vars(vars: HashMap<String, String>) -> Self {
         Self {
             vars,
@@ -96,21 +105,21 @@ impl Scope {
     }
 }
 
-pub struct TransformerContext {
+pub struct TransformerContext<T: Layout + Element> {
     /// Current state of given element; may be updated as processing continues
-    elem_map: HashMap<String, SvgElement>,
+    elem_map: HashMap<String, T>,
     /// Original state of given element; used for `reuse` elements
-    original_map: HashMap<String, SvgElement>,
+    original_map: HashMap<String, T>,
     /// Stack of elements which have been started but not yet ended
     ///
     /// Note empty elements are normally not pushed onto the stack,
     /// but `<reuse>` elements are an exception during processing of
     /// the referenced element.
-    element_stack: Vec<SvgElement>,
+    element_stack: Vec<T>,
     /// The element which `^` refers to; some elements are ignored as 'previous'
-    prev_element: Option<SvgElement>,
+    prev_element: Option<T>,
     /// Stack of scoped variables etc
-    scope_stack: Vec<Scope>,
+    scope_stack: Vec<Scope<T>>,
     /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
     /// Current recursion depth
@@ -127,7 +136,7 @@ pub struct TransformerContext {
     pub config: TransformConfig,
 }
 
-impl Default for TransformerContext {
+impl<T: Layout + Element> Default for TransformerContext<T> {
     fn default() -> Self {
         Self {
             elem_map: HashMap::new(),
@@ -159,8 +168,8 @@ pub trait VariableMap {
 
 pub trait ContextView<T>: ElementMap<Elem = T> + VariableMap {}
 
-impl ElementMap for TransformerContext {
-    type Elem = SvgElement;
+impl<T: ElementTransform> ElementMap for TransformerContext<T> {
+    type Elem = T;
 
     fn get_element(&self, elref: &ElRef) -> Option<&Self::Elem> {
         match elref {
@@ -208,7 +217,7 @@ impl ElementMap for TransformerContext {
     }
 }
 
-impl VariableMap for TransformerContext {
+impl<T: Layout + Element> VariableMap for TransformerContext<T> {
     /// Lookup variable in either parent attribute values or global variables
     /// set using the `<var>` element.
     fn get_var(&self, name: &str) -> Option<String> {
@@ -229,9 +238,9 @@ impl VariableMap for TransformerContext {
     }
 }
 
-impl ContextView<SvgElement> for TransformerContext {}
+impl<T: ElementTransform> ContextView<T> for TransformerContext<T> {}
 
-impl TransformerContext {
+impl<T: ElementTransform> TransformerContext<T> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -266,7 +275,7 @@ impl TransformerContext {
         self.events = events;
     }
 
-    pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
+    pub fn get_original_element(&self, elref: &ElRef) -> Option<&T> {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
             ElRef::Prev => self.prev_element.as_ref(),
@@ -277,9 +286,9 @@ impl TransformerContext {
         self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }
 
-    fn ensure_scope(&mut self) -> &mut Scope {
+    fn ensure_scope(&mut self) -> &mut Scope<T> {
         if self.scope_stack.is_empty() {
-            let scope = Scope::default();
+            let scope = Scope::<T>::default();
             self.scope_stack.push(scope);
         }
 
@@ -288,7 +297,7 @@ impl TransformerContext {
             .expect("Scope-stack should be non-empty")
     }
 
-    pub fn set_element_default(&mut self, el: &SvgElement) {
+    pub fn set_element_default(&mut self, el: &T) {
         let scope = self.ensure_scope();
         let el_match = ElementMatch::from(el);
         let mut mod_el = el.clone();
@@ -298,7 +307,7 @@ impl TransformerContext {
         scope.defaults.push((el_match, mod_el));
     }
 
-    pub fn apply_defaults(&mut self, el: &mut SvgElement) {
+    pub fn apply_defaults(&mut self, el: &mut T) {
         // Build up the default element we're going to apply until
         // we hit a `final` match.
         // Later attribute values override earlier ones; classes
@@ -367,14 +376,14 @@ impl TransformerContext {
         scope.vars.insert(name.into(), value.into());
     }
 
-    pub fn push_element(&mut self, el: &SvgElement) {
+    pub fn push_element(&mut self, el: &T) {
         let attrs = el.get_attrs();
         self.element_stack.push(el.clone());
         let scope = Scope::with_vars(attrs);
         self.scope_stack.push(scope);
     }
 
-    pub fn pop_element(&mut self) -> Option<SvgElement> {
+    pub fn pop_element(&mut self) -> Option<T> {
         self.scope_stack.pop();
         self.element_stack.pop()
     }
@@ -399,15 +408,15 @@ impl TransformerContext {
         Ok(())
     }
 
-    pub fn get_top_element(&self) -> Option<SvgElement> {
+    pub fn get_top_element(&self) -> Option<T> {
         self.element_stack.last().cloned()
     }
 
-    pub fn set_prev_element(&mut self, el: &SvgElement) {
+    pub fn set_prev_element(&mut self, el: &T) {
         self.prev_element = Some(el.clone());
     }
 
-    pub fn update_element(&mut self, el: &SvgElement) {
+    pub fn update_element(&mut self, el: &T) {
         if let Some(id) = el.get_attr("id") {
             let id = eval_attr(id, self).unwrap_or_else(|_| id.to_string());
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {

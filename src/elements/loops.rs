@@ -62,7 +62,7 @@ pub struct LoopElement(pub SvgElement);
 impl EventGen for LoopElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let event_element = &self.0;
         let mut gen_events = OutputList::new();
@@ -157,7 +157,7 @@ pub struct ForElement(pub SvgElement);
 impl EventGen for ForElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let event_element = &self.0;
         let mut gen_events = OutputList::new();

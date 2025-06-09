@@ -4,6 +4,7 @@
 // and a set of `styles` entries (typically CSS rules).
 
 use crate::context::TransformerContext;
+use crate::elements::ElementTransform;
 use crate::errors::{Result, SvgdxError};
 use crate::types::fstr;
 use std::{collections::HashSet, str::FromStr};
@@ -479,7 +480,7 @@ pub struct ThemeBuilder {
 
 impl ThemeBuilder {
     pub fn new(
-        context: &TransformerContext,
+        context: &TransformerContext<impl ElementTransform>,
         elements: &HashSet<String>,
         classes: &HashSet<String>,
     ) -> Self {

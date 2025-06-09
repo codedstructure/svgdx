@@ -12,7 +12,7 @@ pub struct DefaultsElement(pub SvgElement);
 impl EventGen for DefaultsElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         for ev in self.0.inner_events(context).unwrap_or_default() {
             // we only care about Element-generating (i.e. start/empty) events
@@ -30,7 +30,7 @@ pub struct ConfigElement(pub SvgElement);
 impl EventGen for ConfigElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_config = context.config.clone();
         for (key, value) in &self.0.get_attrs() {
@@ -67,7 +67,7 @@ pub struct SpecsElement(pub SvgElement);
 impl EventGen for SpecsElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if context.in_specs {
             return Err(SvgdxError::DocumentError(
@@ -89,7 +89,7 @@ pub struct VarElement(pub SvgElement);
 impl EventGen for VarElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         // variables are updated 'in parallel' rather than one-by-one,
         // allowing e.g. swap in a single `<var>` element:
@@ -124,7 +124,7 @@ pub struct IfElement(pub SvgElement);
 impl EventGen for IfElement {
     fn generate_events(
         &self,
-        context: &mut TransformerContext,
+        context: &mut TransformerContext<SvgElement>,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let test = self
             .0
