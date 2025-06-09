@@ -1,4 +1,4 @@
-use super::{Element, Layout, SvgElement};
+use super::Layout;
 use crate::context::ElementMap;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
@@ -63,21 +63,21 @@ fn edge_locations(ctype: ConnectionType) -> Vec<LocSpec> {
 }
 
 #[derive(Clone)]
-pub struct Connector {
-    source_element: SvgElement,
-    start_el: Option<SvgElement>,
-    end_el: Option<SvgElement>,
+pub struct Connector<T: Layout> {
+    source_element: T,
+    start_el: Option<T>,
+    end_el: Option<T>,
     start: Endpoint,
     end: Endpoint,
     conn_type: ConnectionType,
     offset: Option<Length>,
 }
 
-fn closest_loc(
-    this: &SvgElement,
+fn closest_loc<T: Layout>(
+    this: &T,
     point: (f32, f32),
     conn_type: ConnectionType,
-    context: &impl ElementMap<Elem = SvgElement>,
+    context: &impl ElementMap<Elem = T>,
 ) -> Result<LocSpec> {
     let mut min_dist_sq = f32::MAX;
     let mut min_loc = LocSpec::Center;
@@ -98,11 +98,11 @@ fn closest_loc(
     Ok(min_loc)
 }
 
-fn shortest_link(
-    this: &SvgElement,
-    that: &SvgElement,
+fn shortest_link<T: Layout>(
+    this: &T,
+    that: &T,
     conn_type: ConnectionType,
-    context: &impl ElementMap<Elem = SvgElement>,
+    context: &impl ElementMap<Elem = T>,
 ) -> Result<(LocSpec, LocSpec)> {
     let mut min_dist_sq = f32::MAX;
     let mut this_min_loc = LocSpec::Center;
@@ -131,7 +131,7 @@ fn shortest_link(
     Ok((this_min_loc, that_min_loc))
 }
 
-impl Connector {
+impl<T: Layout> Connector<T> {
     fn loc_to_dir(loc: LocSpec) -> Option<Direction> {
         match loc {
             LocSpec::Top | LocSpec::TopEdge(_) => Some(Direction::Up),
@@ -143,8 +143,8 @@ impl Connector {
     }
 
     pub fn from_element(
-        element: &SvgElement,
-        elem_map: &impl ElementMap<Elem = SvgElement>,
+        element: &T,
+        elem_map: &impl ElementMap<Elem = T>,
         conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
@@ -167,8 +167,8 @@ impl Connector {
         // Needs to support explicit coordinate pairs or element references, and
         // for element references support given locations or not (in which case
         // the location is determined automatically to give the shortest distance)
-        let mut start_el: Option<&SvgElement> = None;
-        let mut end_el: Option<&SvgElement> = None;
+        let mut start_el: Option<&T> = None;
+        let mut end_el: Option<&T> = None;
         let mut start_loc: Option<LocSpec> = None;
         let mut end_loc: Option<LocSpec> = None;
         let mut start_point: Option<(f32, f32)> = None;
@@ -305,7 +305,7 @@ impl Connector {
         })
     }
 
-    pub fn render(&self, ctx: &impl ElementMap<Elem = SvgElement>) -> Result<SvgElement> {
+    pub fn render(&self, ctx: &impl ElementMap<Elem = T>) -> Result<T> {
         let default_ratio_offset = Length::Ratio(0.5);
         let default_abs_offset = Length::Absolute(3.);
 
@@ -337,7 +337,7 @@ impl Connector {
                     } else {
                         y1
                     };
-                SvgElement::new(
+                T::new(
                     "line",
                     &[
                         ("x1".to_string(), fstr(x1)),
@@ -368,7 +368,7 @@ impl Connector {
                     } else {
                         x1
                     };
-                SvgElement::new(
+                T::new(
                     "line",
                     &[
                         ("x1".to_string(), fstr(midpoint)),
@@ -379,7 +379,7 @@ impl Connector {
                 )
                 .with_attrs_from(&self.source_element)
             }
-            ConnectionType::Straight => SvgElement::new(
+            ConnectionType::Straight => T::new(
                 "line",
                 &[
                     ("x1".to_string(), fstr(x1)),
@@ -482,7 +482,7 @@ impl Connector {
                 }
                 // TODO: remove repeated points.
                 if points.len() == 2 {
-                    SvgElement::new(
+                    T::new(
                         "line",
                         &[
                             ("x1".to_string(), fstr(points[0].0)),
@@ -493,7 +493,7 @@ impl Connector {
                     )
                     .with_attrs_from(&self.source_element)
                 } else {
-                    SvgElement::new(
+                    T::new(
                         "polyline",
                         &[(
                             "points".to_string(),
