@@ -46,7 +46,7 @@ jobs:
       - name: Move docs to editor
         run: mv docs/mdbook/book editor/docs
       - name: Build WASM
-        run: ./wasm_build.sh
+        run: ./scripts/wasm_build.sh
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:

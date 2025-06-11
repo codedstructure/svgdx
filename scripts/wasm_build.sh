@@ -3,7 +3,8 @@
 # For (size) profiling use `--profiling` here and `cargo install twiggy`,
 # then `twiggy top editor/pkg/svgdx_bg.wasm`
 PROFILE_ARG="--release"  # One of `--dev`, `--profiling`, `--release`
-OUT_DIR="editor/pkg"
+MANIFEST_PATH=$(cargo locate-project --message-format plain)
+OUT_DIR="$(dirname $MANIFEST_PATH)/editor/pkg"
 
 echo "Ensuring wasm-pack is installed..."
 cargo install wasm-pack

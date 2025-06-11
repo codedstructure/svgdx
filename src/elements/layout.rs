@@ -769,7 +769,7 @@ impl SvgElement {
 
     /// Direction relative positioning - horizontally below, above, to the left, or to the
     /// right of the referenced element.
-    /// ELREF '|' DIR ' ' [gap]
+    /// `ELREF '|' DIR ' ' [gap]`
     /// DIR values:
     ///   h - horizontal to the right
     ///   H - horizontal to the left

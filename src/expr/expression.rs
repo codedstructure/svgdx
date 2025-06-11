@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use super::functions::{eval_function, Function};
 use crate::constants::{
-    ELREF_ID_PREFIX, ELREF_PREVIOUS, END_BRACE, EXPR_END, EXPR_START, OPEN_BRACE, VARBRACE,
+    ELREF_ID_PREFIX, ELREF_PREVIOUS, EXPR_END, EXPR_START, VAR_END_BRACE, VAR_OPEN_BRACE,
     VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
@@ -361,8 +361,8 @@ fn valid_symbol(s: &str) -> bool {
 
 fn tokenize_atom(input: &str) -> Result<Token> {
     if let Some(input) = input.strip_prefix(VAR_PREFIX) {
-        let var_name = if let Some(input) = input.strip_prefix(OPEN_BRACE) {
-            input.strip_suffix(END_BRACE)
+        let var_name = if let Some(input) = input.strip_prefix(VAR_OPEN_BRACE) {
+            input.strip_suffix(VAR_END_BRACE)
         } else {
             Some(input)
         };
@@ -787,20 +787,22 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
             }
             result.push_str(prefix);
             let remain = &remain[1..]; // skip '$'
-            if let Some(inner) = remain.strip_prefix(OPEN_BRACE) {
+            if let Some(inner) = remain.strip_prefix(VAR_OPEN_BRACE) {
                 value = inner;
-                if let Some(end_idx) = value.find(END_BRACE) {
+                if let Some(end_idx) = value.find(VAR_END_BRACE) {
                     let inner = &value[..end_idx];
                     if let Some(value) = context.get_var(inner) {
                         result.push_str(&value);
                     } else {
-                        result.push_str(VARBRACE);
+                        result.push(VAR_PREFIX);
+                        result.push(VAR_OPEN_BRACE);
                         result.push_str(inner);
-                        result.push('}');
+                        result.push(VAR_END_BRACE);
                     }
                     value = &value[end_idx + 1..]; // skip '}'
                 } else {
-                    result.push_str(VARBRACE);
+                    result.push(VAR_PREFIX);
+                    result.push(VAR_OPEN_BRACE);
                     result.push_str(value);
                     break;
                 }

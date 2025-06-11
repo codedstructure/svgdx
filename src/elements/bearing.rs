@@ -1,6 +1,6 @@
 //! Support for 'bearing' commands in SVG paths.
 //!
-//! See https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands
+//! See <https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands>
 //! for details.
 //!
 //! The bearing commands have sadly been removed from SVG2 due to lack of implementations,
@@ -143,6 +143,11 @@ impl PathBearing {
     }
 }
 
+/// Convert a path string containing bearing commands into a standard SVG path string.
+///
+/// Example: `<path d="m0 0 b60 h10 b120 h10 z"/>`
+///
+/// Becomes an equilateral triangle: `<path d="m0 0 l5 8.66l-10 0z"/>`
 pub fn process_path_bearing(data: &str) -> Result<String> {
     let mut pp = PathBearing::new(data);
     pp.evaluate()?;

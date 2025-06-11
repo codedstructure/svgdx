@@ -62,7 +62,7 @@ struct Arguments {
 
     /// Limit on number of iterations for loop elements
     ///
-    /// This helps prevent infinite loops when rendering <loop> elements.
+    /// This helps prevent infinite loops when rendering `<loop>` elements.
     #[arg(long, default_value = "1000")]
     loop_limit: u32,
 

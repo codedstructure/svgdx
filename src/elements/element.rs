@@ -494,7 +494,7 @@ impl SvgElement {
         Ok(())
     }
 
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
+    /// See <https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement>
     /// Note `reuse` is not a standard SVG element, but is used here in similar
     /// contexts to the `use` element.
     pub fn is_graphics_element(&self) -> bool {
@@ -515,7 +515,7 @@ impl SvgElement {
         )
     }
 
-    /// See https://www.w3.org/TR/SVG11/intro.html#TermContainerElement
+    /// See <https://www.w3.org/TR/SVG11/intro.html#TermContainerElement>
     /// Note `specs` is not a standard SVG element, but is used here in similar
     /// contexts to the `defs` element.
     #[allow(dead_code)]

@@ -7,111 +7,111 @@ use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Function {
-    /// abs(x) - absolute value of x
+    /// `abs(x)` -- absolute value of x
     Abs,
-    /// ceil(x) - ceiling of x
+    /// `ceil(x)` -- ceiling of x
     Ceil,
-    /// floor(x) - floor of x
+    /// `floor(x)` -- floor of x
     Floor,
-    /// fract(x) - fractional part of x
+    /// `fract(x)` -- fractional part of x
     Fract,
-    /// sign(x) - -1 for x < 0, 0 for x == 0, 1 for x > 0
+    /// `sign(x)` -- -1 for x < 0, 0 for x == 0, 1 for x > 0
     Sign,
-    /// divmod(x, n) - x // n, x % n
+    /// `divmod(x, n)` -- x // n, x % n
     DivMod,
-    /// sqrt(x) - square root of x
+    /// `sqrt(x)` -- square root of x
     Sqrt,
-    /// log(x) - (natural) log of x
+    /// `log(x)` -- (natural) log of x
     Log,
-    /// exp(x) - raise e to the power of x
+    /// `exp(x)` -- raise e to the power of x
     Exp,
-    /// pow(x, y) - raise x to the power of y
+    /// `pow(x, y)` -- raise x to the power of y
     Pow,
-    /// sin(x) - sine of x (x in degrees)
+    /// `sin(x)` -- sine of x (x in degrees)
     Sin,
-    /// cos(x) - cosine of x (x in degrees)
+    /// `cos(x)` -- cosine of x (x in degrees)
     Cos,
-    /// tan(x) - tangent of x (x in degrees)
+    /// `tan(x)` -- tangent of x (x in degrees)
     Tan,
-    /// asin(x) - arcsine of x degrees
+    /// `asin(x)` -- arcsine of x degrees
     Asin,
-    /// acos(x) - arccosine of x in degrees
+    /// `acos(x)` -- arccosine of x in degrees
     Acos,
-    /// atan(x) - arctangent of x in degrees
+    /// `atan(x)` -- arctangent of x in degrees
     Atan,
-    /// random() - generate uniform random number in range 0..1
+    /// `random()` -- generate uniform random number in range 0..1
     Random,
-    /// randint(min, max) - generate uniform random integer in range min..max
+    /// `randint(min, max)` -- generate uniform random integer in range min..max
     RandInt,
-    /// min(a, ...) - minimum of values
+    /// `min(a, ...)` -- minimum of values
     Min,
-    /// max(a, ...) - maximum of values
+    /// `max(a, ...)` -- maximum of values
     Max,
-    /// sum(a, ...) - sum of values
+    /// `sum(a, ...)` -- sum of values
     Sum,
-    /// product(a, ...) - product of values
+    /// `product(a, ...)` -- product of values
     Product,
-    /// mean(a, ...) - mean of values
+    /// `mean(a, ...)` -- mean of values
     Mean,
-    /// clamp(x, min, max) - return x, clamped between min and max
+    /// `clamp(x, min, max)` -- return x, clamped between min and max
     Clamp,
-    /// mix(start, end, amount) - linear interpolation between start and end
+    /// `mix(start, end, amount)` -- linear interpolation between start and end
     Mix,
-    /// eq(a, b) - 1 if a == b, 0 otherwise
+    /// `eq(a, b)` -- 1 if a == b, 0 otherwise
     Equal,
-    /// ne(a, b) - 1 if a != b, 0 otherwise
+    /// `ne(a, b)` -- 1 if a != b, 0 otherwise
     NotEqual,
-    /// lt(a, b) - 1 if a < b, 0 otherwise
+    /// `lt(a, b)` -- 1 if a < b, 0 otherwise
     LessThan,
-    /// le(a, b) - 1 if a <= b, 0 otherwise
+    /// `le(a, b)` -- 1 if a <= b, 0 otherwise
     LessThanEqual,
-    /// gt(a, b) - 1 if a > b, 0 otherwise
+    /// `gt(a, b)` -- 1 if a > b, 0 otherwise
     GreaterThan,
-    /// ge(a, b) - 1 if a >= b, 0 otherwise
+    /// `ge(a, b)` -- 1 if a >= b, 0 otherwise
     GreaterThanEqual,
-    /// if(cond, a, b) - if cond is non-zero, return a, else return b
+    /// `if(cond, a, b)` -- if cond is non-zero, return a, else return b
     If,
-    /// not(a) - 1 if a is zero, 0 otherwise
+    /// `not(a)` -- 1 if a is zero, 0 otherwise
     Not,
-    /// and(a, b) - 1 if both a and b are non-zero, 0 otherwise
+    /// `and(a, b)` -- 1 if both a and b are non-zero, 0 otherwise
     And,
-    /// or(a, b) - 1 if either a or b are non-zero, 0 otherwise
+    /// `or(a, b)` -- 1 if either a or b are non-zero, 0 otherwise
     Or,
-    /// xor(a, b) - 1 if either a or b are non-zero but not both, 0 otherwise
+    /// `xor(a, b)` -- 1 if either a or b are non-zero but not both, 0 otherwise
     Xor,
-    /// swap(a, b) - return (b, a)
+    /// `swap(a, b)` -- return (b, a)
     Swap,
-    /// r2p(x, y) - convert rectangular coordinates to polar
+    /// `r2p(x, y)` -- convert rectangular coordinates to polar
     Rect2Polar,
-    /// p2r(r, theta) - convert polar coordinates to rectangular
+    /// `p2r(r, theta)` -- convert polar coordinates to rectangular
     Polar2Rect,
-    /// select(n, a, b, ...) - select nth argument
+    /// `select(n, a, b, ...)` -- select nth argument
     Select,
-    /// addv(a1, a2, ..., aN, b1, b2, ...bN) - vector sum
+    /// `addv(a1, a2, ..., aN, b1, b2, ...bN)` -- vector sum
     Addv,
-    /// subv(a1, a2, ..., aN, b1, b2, ...bN) - vector difference
+    /// `subv(a1, a2, ..., aN, b1, b2, ...bN)` -- vector difference
     Subv,
-    /// scalev(s, a1, a2, ..., aN) - scale vector by s
+    /// `scalev(s, a1, a2, ..., aN)` -- scale vector by s
     Scalev,
-    /// head(a, ...) - first element of list
+    /// `head(a, ...)` -- first element of list
     Head,
-    /// tail(a, ...) - all but the first element of list
+    /// `tail(a, ...)` -- all but the first element of list
     Tail,
-    /// empty(a, ...) - 1 if list is empty, 0 otherwise
+    /// `empty(a, ...)` -- 1 if list is empty, 0 otherwise
     Empty,
-    /// count(a, ...) - number of elements in list
+    /// `count(a, ...)` -- number of elements in list
     Count,
-    /// in(x, a, ...) - 1 if x is in list, 0 otherwise
+    /// `in(x, a, ...)` -- 1 if x is in list, 0 otherwise
     In,
-    /// split(sep, a) - split string a into list of substrings using sep
+    /// `split(sep, a)` -- split string a into list of substrings using sep
     Split,
-    /// splitw(a) - split string on whitespace
+    /// `splitw(a)` -- split string on whitespace
     Splitw,
-    /// Trim(a) - remove leading and trailing whitespace
+    /// `trim(a)` -- remove leading and trailing whitespace
     Trim,
-    /// join(sep, a, ...) - join list of strings into a single string
+    /// `join(sep, a, ...)` -- join list of strings into a single string
     Join,
-    /// _(a) - return a as text
+    /// `_(a)` -- return a as text
     Text,
 }
 

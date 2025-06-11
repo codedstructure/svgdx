@@ -117,13 +117,13 @@ pub struct TransformerContext {
     current_depth: u32,
     /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
-    /// Are we in a <specs> block?
+    /// Are we in a `<specs>` block?
     pub in_specs: bool,
     /// The event-representation of the entire input SVG
     pub events: Vec<InputEvent>,
     /// id used by top-level SVG element if local_styles is true
     pub local_style_id: Option<String>,
-    /// Config of transformer processing; updated by <config> elements
+    /// Config of transformer processing; updated by `<config>` elements
     pub config: TransformConfig,
 }
 
