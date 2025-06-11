@@ -5,7 +5,7 @@ use notify_debouncer_mini::new_debouncer;
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 
 use crate::errors::{Result, SvgdxError};
-use crate::themes::ThemeType;
+use crate::style::ThemeType;
 use crate::{transform_file, TransformConfig};
 
 /// Command line arguments

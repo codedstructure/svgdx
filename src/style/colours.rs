@@ -1,4 +1,4 @@
-// List taken from https://www.w3.org/TR/SVG11/types.html#ColorKeywords
+/// List taken from <https://www.w3.org/TR/SVG11/types.html#ColorKeywords>
 pub static COLOUR_LIST: &[&str] = &[
     "aliceblue",
     "antiquewhite",
@@ -151,9 +151,9 @@ pub static COLOUR_LIST: &[&str] = &[
     "none",
 ];
 
-// The following - a subset of `COLOUR_LIST` - are (subjectively) 'dark'
-// and by default will have white text rather than black when used as a
-// fill style (e.g. `d-fill-brown`)
+/// The following - a subset of `COLOUR_LIST` - are (subjectively) 'dark'
+/// and by default will have white text rather than black when used as a
+/// fill style (e.g. `d-fill-brown`)
 pub static DARK_COLOURS: &[&str] = &[
     "black",
     "blue",

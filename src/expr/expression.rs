@@ -4,13 +4,13 @@ use std::str::FromStr;
 
 use itertools::Itertools;
 
+use super::functions::{eval_function, Function};
 use crate::constants::{
     ELREF_ID_PREFIX, ELREF_PREVIOUS, END_BRACE, EXPR_END, EXPR_START, OPEN_BRACE, VARBRACE,
     VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Result, SvgdxError};
-use crate::functions::{eval_function, Function};
 use crate::geometry::parse_el_scalar;
 use crate::types::fstr;
 

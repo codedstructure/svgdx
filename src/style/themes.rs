@@ -8,7 +8,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::types::fstr;
 use std::{collections::HashSet, str::FromStr};
 
-use crate::colours::{COLOUR_LIST, DARK_COLOURS};
+use super::colours::{COLOUR_LIST, DARK_COLOURS};
 
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]

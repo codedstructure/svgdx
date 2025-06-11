@@ -7,7 +7,7 @@ use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
-use crate::expression::eval_attr;
+use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::transform::EventGen;
 use crate::types::{attr_split_cycle, extract_urlref, strp, AttrMap, ClassList, OrderIndex};

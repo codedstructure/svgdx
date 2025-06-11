@@ -3,7 +3,7 @@ use crate::elements::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
-use crate::themes::ThemeBuilder;
+use crate::style::ThemeBuilder;
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
 use crate::TransformConfig;
 

@@ -26,7 +26,6 @@
 //! println!("{output}");
 //! ```
 
-use themes::ThemeType;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
@@ -42,22 +41,21 @@ use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
 pub mod cli;
-mod colours;
 mod constants;
 mod context;
 mod elements;
 mod errors;
 mod events;
-mod expression;
-mod functions;
+mod expr;
 mod geometry;
 #[cfg(feature = "server")]
 pub mod server;
-mod themes;
+mod style;
 mod transform;
 mod types;
 
 pub use errors::Result;
+use style::ThemeType;
 use transform::Transformer;
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used

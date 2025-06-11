@@ -1,5 +1,5 @@
+use super::expression::{EvalState, ExprValue};
 use crate::errors::{Result, SvgdxError};
-use crate::expression::{EvalState, ExprValue};
 
 use itertools::Itertools;
 use rand::Rng;
