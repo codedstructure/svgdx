@@ -150,6 +150,9 @@ pub trait ElementMap {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
+    fn get_target_element(&self, el: &SvgElement) -> Result<SvgElement> {
+        Ok(el.clone())
+    }
 }
 
 pub trait VariableMap {
@@ -168,14 +171,49 @@ impl ElementMap for TransformerContext {
     }
 
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
-        let target_el = el.get_target_element(self)?;
+        let target_el = self.get_target_element(el)?;
         let el_size = target_el.size(self)?;
 
         Ok(el_size)
     }
 
+    fn get_target_element(&self, el: &SvgElement) -> Result<SvgElement> {
+        use crate::types::OrderIndex; // used for circular reference detection
+
+        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
+        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
+        // cope with '^' where the target might not even have an id. Would be better
+        // to assign a dedicated internal ID to every element and use that.
+        // TODO: in addition to the above, '^' is already broken since it doesn't get
+        // captured in the 'remain' thing for deferred elements, and is always the same
+        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
+        // internal ID with each element so can follow a chain of these.
+        let mut seen: Vec<OrderIndex> = vec![];
+        let mut element = el;
+
+        while element.name == "use" || element.name == "reuse" {
+            let href = element
+                .get_attr("href")
+                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+            let elref = href.parse()?;
+            if let Some(el) = self.get_element(&elref) {
+                if seen.contains(&el.order_index) {
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "{} already seen",
+                        elref
+                    )));
+                }
+                seen.push(el.order_index.clone());
+                element = el;
+            } else {
+                return Err(SvgdxError::ReferenceError(elref));
+            }
+        }
+        Ok(element.clone())
+    }
+
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
-        let target_el = el.get_target_element(self)?;
+        let target_el = self.get_target_element(el)?;
         let mut el_bbox = target_el.bbox()?;
 
         // TODO: move following to element::bbox() ?

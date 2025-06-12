@@ -3,14 +3,13 @@ use super::{
     DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement,
     VarElement,
 };
-use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::transform::EventGen;
-use crate::types::{attr_split_cycle, extract_urlref, strp, AttrMap, ClassList, OrderIndex};
+use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex};
 
 use core::fmt::Display;
 use std::collections::HashMap;
@@ -545,7 +544,7 @@ impl SvgElement {
         }
     }
 
-    pub fn is_connector(&self) -> bool {
+    fn is_connector(&self) -> bool {
         self.has_attr("start")
             && self.has_attr("end")
             && (self.name == "line" || self.name == "polyline")
@@ -569,97 +568,5 @@ impl SvgElement {
             }
         }
         Ok(())
-    }
-
-    pub fn get_target_element(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
-        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
-        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
-        // cope with '^' where the target might not even have an id. Would be better
-        // to assign a dedicated internal ID to every element and use that.
-        // TODO: in addition to the above, '^' is already broken since it doesn't get
-        // captured in the 'remain' thing for deferred elements, and is always the same
-        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
-        // internal ID with each element so can follow a chain of these.
-        let mut seen: Vec<OrderIndex> = vec![];
-        let mut element = self;
-
-        while element.name == "use" || element.name == "reuse" {
-            let href = element
-                .get_attr("href")
-                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
-            let elref = href.parse()?;
-            if let Some(el) = ctx.get_element(&elref) {
-                if seen.contains(&el.order_index) {
-                    return Err(SvgdxError::CircularRefError(format!(
-                        "{} already seen",
-                        elref
-                    )));
-                }
-                seen.push(el.order_index.clone());
-                element = el;
-            } else {
-                return Err(SvgdxError::ReferenceError(elref));
-            }
-        }
-        Ok(element.clone())
-    }
-
-    pub fn split_compound_attr(value: &str) -> (String, String) {
-        // wh="10" -> width="10", height="10"
-        // wh="10 20" -> width="10", height="20"
-        // wh="#thing" -> width="#thing", height="#thing"
-        // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
-        // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
-        if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
-            let mut parts = value.splitn(2, char::is_whitespace);
-            let prefix = parts.next().expect("nonempty");
-            if let Some(remain) = parts.next() {
-                let mut parts = attr_split_cycle(remain);
-                let x_suffix = parts.next().unwrap_or_default();
-                let y_suffix = parts.next().unwrap_or_default();
-                ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
-            } else {
-                (value.to_owned(), value.to_owned())
-            }
-        } else {
-            let mut parts = attr_split_cycle(value);
-            let x = parts.next().unwrap_or_default();
-            let y = parts.next().unwrap_or_default();
-            (x, y)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_spread_attr() {
-        let (w, h) = SvgElement::split_compound_attr("10");
-        assert_eq!(w, "10");
-        assert_eq!(h, "10");
-        let (w, h) = SvgElement::split_compound_attr("10 20");
-        assert_eq!(w, "10");
-        assert_eq!(h, "20");
-        let (w, h) = SvgElement::split_compound_attr("#thing");
-        assert_eq!(w, "#thing");
-        assert_eq!(h, "#thing");
-        let (w, h) = SvgElement::split_compound_attr("#thing 50%");
-        assert_eq!(w, "#thing 50%");
-        assert_eq!(h, "#thing 50%");
-        let (w, h) = SvgElement::split_compound_attr("#thing 10 20");
-        assert_eq!(w, "#thing 10");
-        assert_eq!(h, "#thing 20");
-
-        let (x, y) = SvgElement::split_compound_attr("^a@tl");
-        assert_eq!(x, "^a@tl");
-        assert_eq!(y, "^a@tl");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 5");
-        let (x, y) = SvgElement::split_compound_attr("^a@tl 5 7%");
-        assert_eq!(x, "^a@tl 5");
-        assert_eq!(y, "^a@tl 7%");
     }
 }
