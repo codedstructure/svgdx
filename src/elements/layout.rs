@@ -135,10 +135,10 @@ impl SvgElement {
         if let ("polyline" | "polygon", Some(points)) =
             (self.name.as_str(), self.get_attr("points"))
         {
-            self.set_attr("points", &expand_relspec(&points, ctx));
+            self.set_attr("points", &expand_relspec(points, ctx));
         }
         if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
-            self.set_attr("d", &expand_relspec(&d, ctx));
+            self.set_attr("d", &expand_relspec(d, ctx));
         }
 
         // TODO: issue is that this could fail with a reference error
@@ -196,7 +196,7 @@ impl SvgElement {
 
         let mut bbox_list = vec![];
 
-        for elref in attr_split(&ref_list) {
+        for elref in attr_split(ref_list) {
             let elref = elref.parse()?;
             let el = ctx
                 .get_element(&elref)
@@ -245,13 +245,13 @@ impl SvgElement {
 
     /// Calculate bounding box of target_shape inside self
     fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
-        let zstr = "0".to_owned();
+        let zstr = "0";
         match (target_shape, self.name.as_str()) {
-            // rect inside circle
+            // rect inside circ
             ("rect", "circle") => {
-                if let Some(r) = self.attrs.get("r") {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let Some(r) = self.get_attr("r") {
+                    let cx = self.get_attr("cx").unwrap_or(zstr);
+                    let cy = self.get_attr("cy").unwrap_or(zstr);
                     let cx = strp(cx)?;
                     let cy = strp(cy)?;
                     let r = strp(r)? * FRAC_1_SQRT_2;
@@ -262,9 +262,9 @@ impl SvgElement {
             }
             // rect inside ellipse
             ("rect", "ellipse") => {
-                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let (Some(rx), Some(ry)) = (self.get_attr("rx"), self.get_attr("ry")) {
+                    let cx = self.get_attr("cx").unwrap_or(zstr);
+                    let cy = self.get_attr("cy").unwrap_or(zstr);
                     let cx = strp(cx)?;
                     let cy = strp(cy)?;
                     let rx = strp(rx)? * FRAC_1_SQRT_2;
@@ -287,10 +287,10 @@ impl SvgElement {
         // as intermediate (e.g. `wh` expansion) size attributes for other elements.
         let mut width = None;
         let mut height = None;
-        if let Some(w) = self.attrs.get("width") {
+        if let Some(w) = self.get_attr("width") {
             width = Some(strp(w)?);
         }
-        if let Some(h) = self.attrs.get("height") {
+        if let Some(h) = self.get_attr("height") {
             height = Some(strp(h)?);
         }
         match self.name.as_str() {
@@ -318,14 +318,14 @@ impl SvgElement {
                 height = Some(0.);
             }
             "circle" => {
-                if let Some(r) = self.attrs.get("r").map(|n| strp(n)).transpose()? {
+                if let Some(r) = self.get_attr("r").map(strp).transpose()? {
                     width = Some(r * 2.0);
                     height = Some(r * 2.0);
                 }
             }
             "ellipse" => {
-                let rx = self.attrs.get("rx").map(|n| strp(n)).transpose()?;
-                let ry = self.attrs.get("ry").map(|n| strp(n)).transpose()?;
+                let rx = self.get_attr("rx").map(strp).transpose()?;
+                let ry = self.get_attr("ry").map(strp).transpose()?;
                 if let Some(rx) = rx {
                     width = Some(rx * 2.0);
                 }
@@ -334,13 +334,13 @@ impl SvgElement {
                 }
             }
             "line" => {
-                let x1 = self.attrs.get("x1").map(|n| strp(n)).transpose()?;
-                let x2 = self.attrs.get("x2").map(|n| strp(n)).transpose()?;
+                let x1 = self.get_attr("x1").map(strp).transpose()?;
+                let x2 = self.get_attr("x2").map(strp).transpose()?;
                 if let (Some(x1), Some(x2)) = (x1, x2) {
                     width = Some((x2 - x1).abs());
                 }
-                let y1 = self.attrs.get("y1").map(|n| strp(n)).transpose()?;
-                let y2 = self.attrs.get("y2").map(|n| strp(n)).transpose()?;
+                let y1 = self.get_attr("y1").map(strp).transpose()?;
+                let y2 = self.get_attr("y2").map(strp).transpose()?;
                 if let (Some(y1), Some(y2)) = (y1, y2) {
                     height = Some((y2 - y1).abs());
                 }
@@ -380,7 +380,7 @@ impl SvgElement {
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
         // these to be set to have a bounding box.
-        let zstr = "0".to_owned();
+        let zstr = "0";
         // if not a number and not a refspec, pass it through without computing a bbox
         // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
         // attempting to compute a bounding box.
@@ -395,8 +395,8 @@ impl SvgElement {
         }
         Ok(match self.name.as_str() {
             "point" | "text" => {
-                let x = self.attrs.get("x").unwrap_or(&zstr);
-                let y = self.attrs.get("y").unwrap_or(&zstr);
+                let x = self.get_attr("x").unwrap_or(zstr);
+                let y = self.get_attr("y").unwrap_or(zstr);
                 if passthrough(x) || passthrough(y) {
                     return Ok(None);
                 }
@@ -405,9 +405,9 @@ impl SvgElement {
                 Some(BoundingBox::new(x, y, x, y))
             }
             "box" | "rect" | "image" | "svg" | "foreignObject" => {
-                if let (Some(w), Some(h)) = (self.attrs.get("width"), self.attrs.get("height")) {
-                    let x = self.attrs.get("x").unwrap_or(&zstr);
-                    let y = self.attrs.get("y").unwrap_or(&zstr);
+                if let (Some(w), Some(h)) = (self.get_attr("width"), self.get_attr("height")) {
+                    let x = self.get_attr("x").unwrap_or(zstr);
+                    let y = self.get_attr("y").unwrap_or(zstr);
                     if passthrough(x) || passthrough(y) || passthrough(w) || passthrough(h) {
                         return Ok(None);
                     }
@@ -421,10 +421,10 @@ impl SvgElement {
                 }
             }
             "line" => {
-                let x1 = self.attrs.get("x1").unwrap_or(&zstr);
-                let y1 = self.attrs.get("y1").unwrap_or(&zstr);
-                let x2 = self.attrs.get("x2").unwrap_or(&zstr);
-                let y2 = self.attrs.get("y2").unwrap_or(&zstr);
+                let x1 = self.get_attr("x1").unwrap_or(zstr);
+                let y1 = self.get_attr("y1").unwrap_or(zstr);
+                let x2 = self.get_attr("x2").unwrap_or(zstr);
+                let y2 = self.get_attr("y2").unwrap_or(zstr);
                 if passthrough(x1) || passthrough(y1) || passthrough(x2) || passthrough(y2) {
                     return Ok(None);
                 }
@@ -449,7 +449,7 @@ impl SvgElement {
                 let mut has_x = false;
                 let mut has_y = false;
 
-                if let Some(points) = self.attrs.get("points") {
+                if let Some(points) = self.get_attr("points") {
                     let mut idx = 0;
                     for point_ws in points.split_whitespace() {
                         for point in point_ws.split(',') {
@@ -481,9 +481,9 @@ impl SvgElement {
             }
             "path" => path_bbox(self)?,
             "circle" => {
-                if let Some(r) = self.attrs.get("r") {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let Some(r) = self.get_attr("r") {
+                    let cx = self.get_attr("cx").unwrap_or(zstr);
+                    let cy = self.get_attr("cy").unwrap_or(zstr);
                     if passthrough(cx) || passthrough(cy) || passthrough(r) {
                         return Ok(None);
                     }
@@ -496,9 +496,9 @@ impl SvgElement {
                 }
             }
             "ellipse" => {
-                if let (Some(rx), Some(ry)) = (self.attrs.get("rx"), self.attrs.get("ry")) {
-                    let cx = self.attrs.get("cx").unwrap_or(&zstr);
-                    let cy = self.attrs.get("cy").unwrap_or(&zstr);
+                if let (Some(rx), Some(ry)) = (self.get_attr("rx"), self.get_attr("ry")) {
+                    let cx = self.get_attr("cx").unwrap_or(zstr);
+                    let cy = self.get_attr("cy").unwrap_or(zstr);
                     if passthrough(cx) || passthrough(cy) || passthrough(rx) || passthrough(ry) {
                         return Ok(None);
                     }
@@ -517,13 +517,13 @@ impl SvgElement {
 
     pub fn translated(&self, dx: f32, dy: f32) -> Result<Self> {
         let mut new_elem = self.clone();
-        for (key, value) in &self.attrs {
+        for (key, value) in self.get_attrs() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    new_elem.set_attr(key, &fstr(strp(value)? + dx));
+                    new_elem.set_attr(&key, &fstr(strp(&value)? + dx));
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    new_elem.set_attr(key, &fstr(strp(value)? + dy));
+                    new_elem.set_attr(&key, &fstr(strp(&value)? + dy));
                 }
                 _ => (),
             }
@@ -540,7 +540,7 @@ impl SvgElement {
     ///   v - vertical below
     ///   V - vertical above
     pub fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
-        let input = self.attrs.get("xy");
+        let input = self.get_attr("xy");
         if input.is_none() {
             return Ok(None);
         }
@@ -612,24 +612,24 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
     let (x1, y1) = bb.locspec(LocSpec::TopLeft);
     match element.name.as_str() {
         "rect" | "box" => {
-            element.attrs.insert("x", fstr(x1));
-            element.attrs.insert("y", fstr(y1));
-            element.attrs.insert("width", fstr(width));
-            element.attrs.insert("height", fstr(height));
+            element.set_attr("x", &fstr(x1));
+            element.set_attr("y", &fstr(y1));
+            element.set_attr("width", &fstr(width));
+            element.set_attr("height", &fstr(height));
         }
         "circle" => {
-            element.attrs.insert("cx", fstr(cx));
-            element.attrs.insert("cy", fstr(cy));
+            element.set_attr("cx", &fstr(cx));
+            element.set_attr("cy", &fstr(cy));
             let r = if inscribe {
                 0.5 * width.min(height)
             } else {
                 0.5 * width.max(height) * SQRT_2
             };
-            element.attrs.insert("r", fstr(r));
+            element.set_attr("r", &fstr(r));
         }
         "ellipse" => {
-            element.attrs.insert("cx", fstr(cx));
-            element.attrs.insert("cy", fstr(cy));
+            element.set_attr("cx", &fstr(cx));
+            element.set_attr("cy", &fstr(cy));
             let rx = if inscribe {
                 0.5 * width
             } else {
@@ -640,8 +640,8 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
             } else {
                 0.5 * height * SQRT_2
             };
-            element.attrs.insert("rx", fstr(rx));
-            element.attrs.insert("ry", fstr(ry));
+            element.set_attr("rx", &fstr(rx));
+            element.set_attr("ry", &fstr(ry));
         }
         _ => {}
     }
@@ -651,22 +651,22 @@ fn resolve_size_delta(element: &mut SvgElement) {
     // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
     let (w, h) = match element.name.as_str() {
         "circle" => {
-            let diam = element.get_attr("r").map(|r| 2. * strp(&r).unwrap_or(0.));
+            let diam = element.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
             (diam, diam)
         }
         "ellipse" => (
             element
                 .get_attr("rx")
-                .and_then(|rx| strp(&rx).ok())
+                .and_then(|rx| strp(rx).ok())
                 .map(|x| x * 2.),
             element
                 .get_attr("ry")
-                .and_then(|ry| strp(&ry).ok())
+                .and_then(|ry| strp(ry).ok())
                 .map(|x| x * 2.),
         ),
         _ => (
-            element.get_attr("width").and_then(|w| strp(&w).ok()),
-            element.get_attr("height").and_then(|h| strp(&h).ok()),
+            element.get_attr("width").and_then(|w| strp(w).ok()),
+            element.get_attr("height").and_then(|h| strp(h).ok()),
         ),
     };
 
@@ -740,7 +740,7 @@ fn pos_attr_helper(
         let mut loc = if element.name == "text" {
             // text elements (currently) have no size, and default
             // to center of the referenced element
-            LocSpec::from_str(&element.get_attr("text-loc").unwrap_or("c".to_owned()))?
+            LocSpec::from_str(element.get_attr("text-loc").unwrap_or("c"))?
         } else {
             // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
             // will set x2 to the 'x2' (i.e. right edge) of #abc
@@ -777,16 +777,16 @@ fn is_size_attr(element: &SvgElement, name: &str) -> bool {
 }
 
 fn eval_rel_attributes(element: &mut SvgElement, ctx: &impl ElementMap) -> Result<()> {
-    for (key, value) in element.attrs.clone() {
+    for (key, value) in element.get_attrs() {
         if is_size_attr(element, &key) {
             let computed = eval_size_attr(&key, &value, ctx)?;
             if strp(&computed).is_ok() {
-                element.attrs.insert(key.clone(), computed);
+                element.set_attr(&key, &computed);
             }
         } else if is_pos_attr(&key) {
             let computed = eval_pos_attr(element, &key, &value, ctx)?;
             if strp(&computed).is_ok() {
-                element.attrs.insert(key.clone(), computed);
+                element.set_attr(&key, &computed);
             }
         }
     }
@@ -796,7 +796,7 @@ fn eval_rel_attributes(element: &mut SvgElement, ctx: &impl ElementMap) -> Resul
 fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<()> {
     // we do some of this processing as part of positioning, but don't want
     // to be tightly coupled to that.
-    let input = element.attrs.get("xy");
+    let input = element.get_attr("xy");
     if let Some(input) = input {
         let (_, rel_loc) = split_relspec(input, ctx)?;
         let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
@@ -849,23 +849,25 @@ fn extract_dx_dy(input: &str) -> Result<(f32, f32)> {
 }
 
 fn expand_compound_size(el: &mut SvgElement) {
-    if let Some(wh) = el.attrs.pop("wh") {
+    if let Some(wh) = el.pop_attr("wh") {
         // Split value into width and height
         let (w, h) = split_compound_attr(&wh);
-        el.attrs.insert_first("width", w);
-        el.attrs.insert_first("height", h);
+        el.set_default_attr("width", &w);
+        el.set_default_attr("height", &h);
     }
-    if let ("ellipse", Some(rxy)) = (el.name.as_str(), el.attrs.pop("rxy")) {
-        // Split value into rx and ry
-        let (rx, ry) = split_compound_attr(&rxy);
-        el.attrs.insert_first("rx", rx);
-        el.attrs.insert_first("ry", ry);
+    if el.name == "ellipse" {
+        if let Some(rxy) = el.pop_attr("rxy") {
+            // Split value into rx and ry
+            let (rx, ry) = split_compound_attr(&rxy);
+            el.set_default_attr("rx", &rx);
+            el.set_default_attr("ry", &ry);
+        }
     }
-    if let Some(dwh) = el.attrs.pop("dwh") {
+    if let Some(dwh) = el.pop_attr("dwh") {
         // Split value into dw and dh
         let (dw, dh) = split_compound_attr(&dwh);
-        el.attrs.insert_first("dw", dw);
-        el.attrs.insert_first("dh", dh);
+        el.set_default_attr("dw", &dw);
+        el.set_default_attr("dh", &dh);
     }
 }
 
@@ -889,28 +891,28 @@ fn expand_compound_pos(el: &mut SvgElement) {
             Some("c") => ("cx", "cy"),
             _ => ("x", "y"),
         };
-        el.attrs.insert_first(x_attr, x);
-        el.attrs.insert_first(y_attr, y);
+        el.set_default_attr(x_attr, &x);
+        el.set_default_attr(y_attr, &y);
     }
     if let Some(cxy) = el.pop_attr("cxy") {
         let (cx, cy) = split_compound_attr(&cxy);
-        el.attrs.insert_first("cx", cx);
-        el.attrs.insert_first("cy", cy);
+        el.set_default_attr("cx", &cx);
+        el.set_default_attr("cy", &cy);
     }
     if let Some(xy1) = el.pop_attr("xy1") {
         let (x1, y1) = split_compound_attr(&xy1);
-        el.attrs.insert_first("x1", x1);
-        el.attrs.insert_first("y1", y1);
+        el.set_default_attr("x1", &x1);
+        el.set_default_attr("y1", &y1);
     }
     if let Some(xy2) = el.pop_attr("xy2") {
         let (x2, y2) = split_compound_attr(&xy2);
-        el.attrs.insert_first("x2", x2);
-        el.attrs.insert_first("y2", y2);
+        el.set_default_attr("x2", &x2);
+        el.set_default_attr("y2", &y2);
     }
     if let Some(dxy) = el.pop_attr("dxy") {
         let (dx, dy) = split_compound_attr(&dxy);
-        el.attrs.insert_first("dx", dx);
-        el.attrs.insert_first("dy", dy);
+        el.set_default_attr("dx", &dx);
+        el.set_default_attr("dy", &dy);
     }
 }
 

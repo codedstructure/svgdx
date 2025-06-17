@@ -47,11 +47,9 @@ impl EventGen for SvgElement {
 
         let (ol, mut bbox) = res?;
 
-        if let (Some(el_bbox), Some(clip_id)) = (
-            bbox,
-            self.get_attr("clip-path")
-                .and_then(|url| extract_urlref(&url)),
-        ) {
+        if let (Some(el_bbox), Some(clip_id)) =
+            (bbox, self.get_attr("clip-path").and_then(extract_urlref))
+        {
             let clip_el = context
                 .get_element(&clip_id)
                 .ok_or(SvgdxError::ReferenceError(clip_id))?;
@@ -148,8 +146,9 @@ impl Display for SvgElement {
         if !self.attrs.is_empty() {
             write!(f, " {}", self.attrs)?;
         }
-        if !self.classes.is_empty() {
-            write!(f, r#" class="{}""#, self.classes.to_vec().join(" "))?;
+        let c = self.get_classes();
+        if !c.is_empty() {
+            write!(f, r#" class="{}""#, c.join(" "))?;
         }
         write!(f, ">")?;
         Ok(())
@@ -188,7 +187,7 @@ impl SvgElement {
         if self.name == "path" {
             if let Some(d) = self.get_attr("d") {
                 if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(&d)?)
+                    self.set_attr("d", &process_path_bearing(d)?)
                 }
             }
         }
@@ -198,7 +197,7 @@ impl SvgElement {
                 self,
                 ctx,
                 if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(&e_type)
+                    ConnectionType::from_str(e_type)
                 } else if self.name == "polyline" {
                     ConnectionType::Corner
                 } else {
@@ -287,7 +286,7 @@ impl SvgElement {
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
-            let value = eval_attr(&comment, ctx)?;
+            let value = eval_attr(comment, ctx)?;
             events.push(OutputEvent::Comment(format!(" {value} ")));
             events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
         }
@@ -455,8 +454,8 @@ impl SvgElement {
         }
     }
 
-    pub fn get_attr(&self, key: &str) -> Option<String> {
-        self.attrs.get(key).map(|x| x.to_owned())
+    pub fn get_attr(&self, key: &str) -> Option<&str> {
+        self.attrs.get(key).map(|s| s.as_str())
     }
 
     pub fn set_attr(&mut self, key: &str, value: &str) {
@@ -483,11 +482,15 @@ impl SvgElement {
                 continue;
             }
             let replace = eval_attr(&value, ctx)?;
-            self.attrs.insert(&key, &replace);
+            self.set_attr(&key, &replace);
         }
         // Classes are handled separately to other attributes
-        for class in &self.classes.clone() {
-            self.classes.replace(class, eval_attr(class, ctx)?);
+        for class in &self.get_classes() {
+            self.pop_class(class);
+            let new = eval_attr(class, ctx)?;
+            for class in new.split_whitespace() {
+                self.add_class(class);
+            }
         }
 
         Ok(())

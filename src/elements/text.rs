@@ -234,7 +234,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     ];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
-    for class in orig_elem.classes.clone().into_iter() {
+    for class in orig_elem.get_classes() {
         if class.starts_with("d-text-") {
             orig_elem.pop_class(&class);
         }
@@ -321,9 +321,9 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 text_fragment = text_fragment.replace(' ', NBSP);
             }
 
-            tspan.attrs.insert(
+            tspan.set_attr(
                 if vertical { "dx" } else { "dy" },
-                format!("{}em", fstr(line_offset)),
+                &format!("{}em", fstr(line_offset)),
             );
             tspan.text_content = Some(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.

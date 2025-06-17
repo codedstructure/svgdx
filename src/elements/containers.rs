@@ -47,9 +47,7 @@ impl EventGen for Container {
                 }
                 new_el.eval_attributes(context)?;
                 if context.config.add_metadata {
-                    new_el
-                        .attrs
-                        .insert("data-src-line", self.0.src_line.to_string());
+                    new_el.set_attr("data-src-line", &self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
                 events.push(OutputEvent::Start(new_el.clone()));

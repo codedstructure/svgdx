@@ -68,7 +68,7 @@ impl EventGen for ReuseElement {
                 "rotate" | "text-rotate" => {
                     // any existing rotation is built on by the reuse element
                     if let Some(inst_rot) = instance_element.get_attr(&attr) {
-                        let inst_rot = strp(&inst_rot)?;
+                        let inst_rot = strp(inst_rot)?;
                         let rot = strp(&value)?;
                         instance_element.set_attr(&attr, &fstr(inst_rot + rot));
                     } else {
@@ -102,7 +102,7 @@ impl EventGen for ReuseElement {
         // was on the `reuse` element.
         let ref_id = instance_element.pop_attr("id");
         if let Some(inst_id) = reuse_element.get_attr("id") {
-            instance_element.set_attr("id", &inst_id);
+            instance_element.set_attr("id", inst_id);
             context.update_element(&reuse_element);
         }
         // the instanced element should have the same indent as the original
@@ -110,7 +110,7 @@ impl EventGen for ReuseElement {
         instance_element.set_indent(reuse_element.indent);
         instance_element.set_src_line(reuse_element.src_line);
         if let Some(inst_style) = reuse_element.get_attr("style") {
-            instance_element.set_attr("style", &inst_style);
+            instance_element.set_attr("style", inst_style);
         }
         instance_element.add_classes(&reuse_element.classes);
         if let Some(ref_id) = ref_id {
@@ -148,11 +148,12 @@ impl EventGen for ReuseElement {
             // so we create a new list including that and process it.
             let mut new_events = InputList::new();
             let tag_name = instance_element.name.clone();
+            let outer_events = instance_element.all_events(context);
             let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
             start_ev.index = start;
             start_ev.alt_idx = Some(end);
             new_events.push(start_ev);
-            new_events.extend(&InputList::from(&context.events[start + 1..end]));
+            new_events.extend(&outer_events);
             let mut end_ev = InputEvent::from(OutputEvent::End(tag_name));
             end_ev.index = end;
             end_ev.alt_idx = Some(start);

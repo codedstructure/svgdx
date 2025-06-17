@@ -33,19 +33,19 @@ impl EventGen for ConfigElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_config = context.config.clone();
-        for (key, value) in &self.0.attrs {
+        for (key, value) in self.0.get_attrs() {
             match key.as_str() {
                 "scale" => new_config.scale = value.parse()?,
                 "debug" => new_config.debug = value.parse()?,
                 "add-auto-styles" => new_config.add_auto_styles = value.parse()?,
                 "use-local-styles" => new_config.use_local_styles = value.parse()?,
                 "border" => new_config.border = value.parse()?,
-                "background" => new_config.background.clone_from(value),
+                "background" => new_config.background = value,
                 "loop-limit" => new_config.loop_limit = value.parse()?,
                 "var-limit" => new_config.var_limit = value.parse()?,
                 "depth-limit" => new_config.depth_limit = value.parse()?,
                 "font-size" => new_config.font_size = value.parse()?,
-                "font-family" => new_config.font_family.clone_from(value),
+                "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
                 "svg-style" => new_config.svg_style = Some(value.clone()),
@@ -95,7 +95,7 @@ impl EventGen for VarElement {
         // allowing e.g. swap in a single `<var>` element:
         // `<var a="$b" b="$a" />`
         let mut new_vars = Vec::new();
-        for (key, value) in self.0.attrs.clone() {
+        for (key, value) in self.0.get_attrs() {
             // Note comments in `var` elements are permitted (and encouraged!)
             // in the input, but not propagated to the output.
             if key != "_" && key != "__" {
@@ -131,7 +131,7 @@ impl EventGen for IfElement {
             .get_attr("test")
             .ok_or_else(|| SvgdxError::MissingAttribute("test".to_owned()))?;
         if let Some(inner_events) = self.0.inner_events(context) {
-            if eval_condition(&test, context)? {
+            if eval_condition(test, context)? {
                 // opening if element is not included in the processed inner events to avoid
                 // infinite recursion...
                 return process_events(inner_events.clone(), context);
