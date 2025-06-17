@@ -131,7 +131,7 @@ pub struct SvgElement {
     pub name: String,
     pub original: String,
     pub attrs: AttrMap,
-    pub classes: ClassList,
+    classes: ClassList,
     pub text_content: Option<String>,
     pub order_index: OrderIndex,
     pub indent: usize,
@@ -383,6 +383,19 @@ impl SvgElement {
             // update classes directly rather than use add_class which
             // performs a clone() operation.
             self.classes.insert(class.to_string());
+        }
+    }
+
+    pub fn add_classes_from(&mut self, other: &Self) {
+        for class in other.get_classes() {
+            self.add_class(&class);
+        }
+    }
+
+    pub fn set_classes(&mut self, classes: &Vec<String>) {
+        self.classes.clear();
+        for class in classes {
+            self.add_class(class);
         }
     }
 

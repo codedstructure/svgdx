@@ -287,6 +287,10 @@ impl ClassList {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.classes.clear();
+    }
+
     /// Insert the given class into the `ClassList`.
     pub fn insert(&mut self, class: impl Into<String>) {
         let class = class.into();

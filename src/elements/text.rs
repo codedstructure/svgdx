@@ -245,7 +245,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
     text_elem.src_line = orig_elem.src_line;
-    text_elem.classes = text_classes.into();
+    text_elem.set_classes(&text_classes);
 
     // Add this prior to copying over presentation attrs which take precedence
     if vertical {

@@ -112,7 +112,7 @@ impl EventGen for ReuseElement {
         if let Some(inst_style) = reuse_element.get_attr("style") {
             instance_element.set_attr("style", inst_style);
         }
-        instance_element.add_classes(&reuse_element.classes);
+        instance_element.add_classes_from(&reuse_element);
         if let Some(ref_id) = ref_id {
             instance_element.add_class(&ref_id);
         }

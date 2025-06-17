@@ -3,7 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, ElRef};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -347,7 +347,7 @@ impl TransformerContext {
         // we hit a `final` match.
         // Later attribute values override earlier ones; classes
         // are appended to existing classes.
-        let mut classes = ClassList::new();
+        let mut classes = Vec::new();
         let mut attrs = AttrMap::new();
 
         // For style, text-style and transform attributes we augment rather than
@@ -374,10 +374,10 @@ impl TransformerContext {
                         }
                     }
                     if default.is_init() {
-                        classes = default_el.classes.clone();
+                        classes = default_el.get_classes();
                         attrs = default_el.attrs.clone();
                     } else {
-                        classes.extend(&default_el.classes);
+                        classes.extend(default_el.get_classes());
                         attrs.update(&default_el.attrs);
                     }
                     if default.is_final() {
@@ -390,7 +390,9 @@ impl TransformerContext {
         for (key, value) in &attrs {
             el.set_default_attr(key, value);
         }
-        el.add_classes(&classes);
+        for c in classes.iter() {
+            el.add_class(c);
+        }
 
         // join style/transform attributes with the most local last
         for (a_name, ref mut a_list, sep) in augment_types {
