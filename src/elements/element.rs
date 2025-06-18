@@ -128,7 +128,7 @@ impl EventGen for OtherElement {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
-    pub name: String,
+    name: String,
     pub original: String,
     pub attrs: AttrMap,
     classes: ClassList,
@@ -371,6 +371,10 @@ impl SvgElement {
 
     pub fn set_event_range(&mut self, range: (usize, usize)) {
         self.event_range = Some(range);
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn add_class(&mut self, class: &str) -> Self {

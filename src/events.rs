@@ -469,7 +469,7 @@ impl OutputList {
             } else {
                 match &output_ev {
                     OutputEvent::Start(e) | OutputEvent::Empty(e) => {
-                        if e.name == name {
+                        if e.name() == name {
                             pivot = Some(output_ev);
                         } else {
                             before.push(output_ev);
@@ -512,7 +512,7 @@ impl SvgElement {
     ///
     /// Implemented as a method rather than a `From` impl to keep private
     fn into_bytesstart(self) -> BytesStart<'static> {
-        let mut bs = BytesStart::new(self.name.to_owned());
+        let mut bs = BytesStart::new(self.name().to_owned());
         for (k, v) in &self.attrs {
             bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
         }

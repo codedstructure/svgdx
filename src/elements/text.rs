@@ -79,7 +79,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     } else if element.pop_class("d-text-inside") {
         false
     } else {
-        matches!(element.name.as_str(), "line" | "point" | "text")
+        matches!(element.name(), "line" | "point" | "text")
     };
     match text_anchor {
         ls if ls.is_top() => {
@@ -178,7 +178,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_pre = orig_elem.has_class("d-text-pre");
 
     // There will always be a text element; if not multiline this is the only element.
-    let mut text_elem = if orig_elem.name == "text" {
+    let mut text_elem = if orig_elem.name() == "text" {
         orig_elem.clone()
     } else {
         SvgElement::new("text", &[])

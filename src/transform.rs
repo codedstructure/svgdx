@@ -36,7 +36,7 @@ fn is_real_svg(events: &InputList) -> bool {
         if let Ok(el) = SvgElement::try_from(ev.clone()) {
             // "Real" SVG documents will have an `xmlns` attribute with
             // the value "http://www.w3.org/2000/svg"
-            if el.name == "svg" {
+            if el.name() == "svg" {
                 if let Some(val) = el.get_attr("xmlns") {
                     return val == "http://www.w3.org/2000/svg";
                 }
@@ -281,7 +281,7 @@ impl Transformer {
         for output_ev in events.iter() {
             match output_ev {
                 OutputEvent::Start(e) | OutputEvent::Empty(e) => {
-                    element_set.insert(e.name.clone());
+                    element_set.insert(e.name().to_owned());
                     class_set.extend(e.get_classes());
                 }
                 _ => {}

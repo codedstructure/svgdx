@@ -118,7 +118,7 @@ impl EventGen for ReuseElement {
         }
 
         // reuse of a symbol element wraps the resulting content in a new <g> element
-        if instance_element.name == "symbol" {
+        if instance_element.name() == "symbol" {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
@@ -137,7 +137,7 @@ impl EventGen for ReuseElement {
         } else if let Some(sz) = instance_size {
             pos.update_size(&sz);
         }
-        pos.update_shape(&instance_element.name);
+        pos.update_shape(instance_element.name());
         pos.set_position_attrs(&mut instance_element);
 
         let res = if let (false, Some((start, end))) = (
@@ -147,7 +147,7 @@ impl EventGen for ReuseElement {
             // we've changed the initial (and possibly closing) tag of the instance element,
             // so we create a new list including that and process it.
             let mut new_events = InputList::new();
-            let tag_name = instance_element.name.clone();
+            let tag_name = instance_element.name().to_owned();
             let outer_events = instance_element.all_events(context);
             let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
             start_ev.index = start;

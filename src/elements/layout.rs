@@ -66,7 +66,7 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
             .map(|bb| bb.map(|bb| bb.locspec(loc)))
     };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
-        if rest.is_empty() && elem.name == "point" {
+        if rest.is_empty() && elem.name() == "point" {
             if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
@@ -128,16 +128,14 @@ impl SvgElement {
         resolve_size_delta(self);
 
         // ensure relatively-positioned text elements have appropriate anchors
-        if self.name == "text" && self.has_attr("text") {
+        if self.name() == "text" && self.has_attr("text") {
             eval_text_anchor(self, ctx)?;
         }
 
-        if let ("polyline" | "polygon", Some(points)) =
-            (self.name.as_str(), self.get_attr("points"))
-        {
+        if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
             self.set_attr("points", &expand_relspec(points, ctx));
         }
-        if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
+        if let ("path", Some(d)) = (self.name(), self.get_attr("d")) {
             self.set_attr("d", &expand_relspec(d, ctx));
         }
 
@@ -162,11 +160,11 @@ impl SvgElement {
         // }
 
         let mut p = Position::from(self as &SvgElement);
-        if self.name == "use" {
+        if self.name() == "use" {
             let el = ctx.get_target_element(self)?;
             if let Some(sz) = el.size(ctx)? {
                 p.update_size(&sz);
-                if el.name == "circle" || el.name == "ellipse" {
+                if let "circle" | "ellipse" = el.name() {
                     // The referenced element is defined by its center,
                     // but use elements are defined by top-left pos.
                     p.translate(sz.width / 4., sz.height / 4.);
@@ -209,7 +207,7 @@ impl SvgElement {
                     // circle/ellipses are is present and ref_list.len() > 1.
                     // Should probably fold the list and provide next element type
                     // as the target shape here
-                    el.inscribed_bbox(&self.name)
+                    el.inscribed_bbox(self.name())
                 };
                 if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
@@ -246,7 +244,7 @@ impl SvgElement {
     /// Calculate bounding box of target_shape inside self
     fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
         let zstr = "0";
-        match (target_shape, self.name.as_str()) {
+        match (target_shape, self.name()) {
             // rect inside circ
             ("rect", "circle") => {
                 if let Some(r) = self.get_attr("r") {
@@ -293,7 +291,7 @@ impl SvgElement {
         if let Some(h) = self.get_attr("height") {
             height = Some(strp(h)?);
         }
-        match self.name.as_str() {
+        match self.name() {
             "use" | "reuse" => {
                 let target_el = ctx.get_target_element(self)?;
                 // Take a _copy_ of the target element and evaluate attributes
@@ -393,7 +391,7 @@ impl SvgElement {
                     || value.contains(ELREF_ID_PREFIX)
                     || value.contains(ELREF_PREVIOUS))
         }
-        Ok(match self.name.as_str() {
+        Ok(match self.name() {
             "point" | "text" => {
                 let x = self.get_attr("x").unwrap_or(zstr);
                 let y = self.get_attr("y").unwrap_or(zstr);
@@ -584,8 +582,8 @@ impl SvgElement {
                 DirSpec::Behind => (-(this_width + gap), -this_height / 2.),
             };
 
-            let mut pos = Position::new(self.name.clone());
-            if self.name.as_str() == "use" {
+            let mut pos = Position::new(self.name());
+            if self.name() == "use" {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
                 if let Some(bbox) = ctx.get_target_element(self)?.bbox()? {
@@ -610,7 +608,7 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
     let height = bb.height();
     let (cx, cy) = bb.center();
     let (x1, y1) = bb.locspec(LocSpec::TopLeft);
-    match element.name.as_str() {
+    match element.name() {
         "rect" | "box" => {
             element.set_attr("x", &fstr(x1));
             element.set_attr("y", &fstr(y1));
@@ -649,7 +647,7 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
 
 fn resolve_size_delta(element: &mut SvgElement) {
     // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
-    let (w, h) = match element.name.as_str() {
+    let (w, h) = match element.name() {
         "circle" => {
             let diam = element.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
             (diam, diam)
@@ -737,7 +735,7 @@ fn pos_attr_helper(
             v = len.adjust(v);
         }
     } else {
-        let mut loc = if element.name == "text" {
+        let mut loc = if element.name() == "text" {
             // text elements (currently) have no size, and default
             // to center of the referenced element
             LocSpec::from_str(element.get_attr("text-loc").unwrap_or("c"))?
@@ -767,12 +765,12 @@ fn pos_attr_helper(
 }
 
 fn is_size_attr(element: &SvgElement, name: &str) -> bool {
-    if element.name == "text" || element.name == "point" {
+    if element.name() == "text" || element.name() == "point" {
         return false;
     }
     let mut size_attr = matches!(name, "width" | "height");
-    size_attr = size_attr || (element.name == "circle" && name == "r");
-    size_attr = size_attr || (element.name == "ellipse" && (name == "rx" || name == "ry"));
+    size_attr = size_attr || (element.name() == "circle" && name == "r");
+    size_attr = size_attr || (element.name() == "ellipse" && (name == "rx" || name == "ry"));
     size_attr
 }
 
@@ -855,7 +853,7 @@ fn expand_compound_size(el: &mut SvgElement) {
         el.set_default_attr("width", &w);
         el.set_default_attr("height", &h);
     }
-    if el.name == "ellipse" {
+    if el.name() == "ellipse" {
         if let Some(rxy) = el.pop_attr("rxy") {
             // Split value into rx and ry
             let (rx, ry) = split_compound_attr(&rxy);
