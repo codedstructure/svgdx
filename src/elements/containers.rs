@@ -31,7 +31,7 @@ impl EventGen for Container {
                     break;
                 }
             }
-            if let (true, Some(text)) = (self.0.is_graphics_element(), &inner_text) {
+            if let (true, Some(text)) = (is_graphics_element(&self.0), &inner_text) {
                 let mut el = self.0.clone();
                 el.set_attr("text", text);
                 if let Some((start, _end)) = self.0.event_range {
@@ -136,4 +136,47 @@ impl EventGen for GroupElement {
         };
         Ok((events, result_bb))
     }
+}
+
+/// See <https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement>
+/// Note `reuse` is not a standard SVG element, but is used here in similar
+/// contexts to the `use` element.
+fn is_graphics_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "circle"
+                | "ellipse"
+                | "image"
+                | "line"
+                | "path"
+                | "polygon"
+                | "polyline"
+                | "rect"
+                | "text"
+                | "use"
+                // Following are non-standard.
+                | "reuse"
+    )
+}
+
+/// See <https://www.w3.org/TR/SVG11/intro.html#TermContainerElement>
+/// Note `specs` is not a standard SVG element, but is used here in similar
+/// contexts to the `defs` element.
+#[allow(dead_code)]
+fn is_container_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "a" | "defs"
+                | "glyph"
+                | "g"
+                | "marker"
+                | "mask"
+                | "missing-glyph"
+                | "pattern"
+                | "svg"
+                | "switch"
+                | "symbol"
+                // Following are non-standard.
+                | "specs"
+    )
 }

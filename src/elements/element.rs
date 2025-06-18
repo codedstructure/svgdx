@@ -1,7 +1,7 @@
 use super::{
-    process_path_bearing, process_text_attr, ConfigElement, ConnectionType, Connector, Container,
-    DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement,
-    VarElement,
+    is_connector, process_path_bearing, process_text_attr, ConfigElement, ConnectionType,
+    Connector, Container, DefaultsElement, ForElement, GroupElement, IfElement, LoopElement,
+    ReuseElement, SpecsElement, VarElement,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::errors::{Result, SvgdxError};
@@ -20,7 +20,7 @@ impl EventGen for SvgElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         context.inc_depth()?;
-        let res = match self.name.as_str() {
+        let res = match self.name() {
             "loop" => LoopElement(self.clone()).generate_events(context),
             "config" => ConfigElement(self.clone()).generate_events(context),
             "reuse" => ReuseElement(self.clone()).generate_events(context),
@@ -183,196 +183,6 @@ impl SvgElement {
         }
     }
 
-    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
-        if self.name == "path" {
-            if let Some(d) = self.get_attr("d") {
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(d)?)
-                }
-            }
-        }
-
-        if self.is_connector() {
-            if let Ok(conn) = Connector::from_element(
-                self,
-                ctx,
-                if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(e_type)
-                } else if self.name == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            ) {
-                // replace with rendered connection element
-                *self = conn.render(ctx)?.without_attr("edge-type");
-            } else {
-                return Err(SvgdxError::InvalidData(
-                    "Cannot create connector".to_owned(),
-                ));
-            }
-        }
-
-        // Process dx / dy as translation offsets if not an element
-        // where they already have intrinsic meaning.
-        // TODO: would be nice to get rid of this; it's mostly handled
-        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
-        // then that won't do anything and this does.
-        if !matches!(self.name.as_str(), "text" | "tspan" | "feOffset") {
-            let dx = self.pop_attr("dx");
-            let dy = self.pop_attr("dy");
-            let mut d_x = None;
-            let mut d_y = None;
-            if let Some(dx) = dx {
-                d_x = Some(strp(&dx)?);
-            }
-            if let Some(dy) = dy {
-                d_y = Some(strp(&dy)?);
-            }
-            if d_x.is_some() || d_y.is_some() {
-                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
-            }
-        }
-
-        if self.name == "use" {
-            // rotation requires a bbox to identify center of rotation; for `<use>`
-            // elements derive from context and inject via `content_bbox`. Allows
-            // handle_rotation to be independent of context.
-            if let Some(bbox) = ctx.get_element_bbox(self)? {
-                self.content_bbox = Some(bbox);
-            }
-        }
-        self.handle_rotation()?;
-
-        Ok(())
-    }
-
-    pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
-        if let Some((start, end)) = self.event_range {
-            // empty events will have end == start
-            if end > start {
-                return Some(InputList::from(&context.events[start + 1..end]));
-            }
-        }
-        None
-    }
-
-    pub fn all_events(&self, context: &TransformerContext) -> InputList {
-        if let Some((start, end)) = self.event_range {
-            InputList::from(&context.events[start..end + 1])
-        } else {
-            InputList::new()
-        }
-    }
-
-    /// Process a given `SvgElement` into a list of `SvgEvent`s
-    // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
-        let mut events = vec![];
-
-        if ctx.config.debug {
-            // Prefix replaced element(s) with a representation of the original element
-            //
-            // Replace double quote with backtick to avoid messy XML entity conversion
-            // (i.e. &quot; or &apos; if single quotes were used)
-            events.push(OutputEvent::Comment(
-                format!(" {} ", self.original)
-                    .replace('"', "`")
-                    .replace(['<', '>'], ""),
-            ));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // Standard comment: expressions & variables are evaluated.
-        if let Some(comment) = self.get_attr("_") {
-            // Expressions in comments are evaluated
-            let value = eval_attr(comment, ctx)?;
-            events.push(OutputEvent::Comment(format!(" {value} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // 'Raw' comment: no evaluation of expressions occurs here
-        if let Some(comment) = self.get_attr("__") {
-            events.push(OutputEvent::Comment(format!(" {comment} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-        }
-
-        // Some elements don't generate text themselves, but can have
-        // associated text.
-        // TODO: refactor this method to handle text event gen better
-        let phantom = matches!(self.name.as_str(), "point" | "box");
-
-        if self.has_attr("text") {
-            let (orig_elem, text_elements) = process_text_attr(self)?;
-            if orig_elem.name != "text" && !phantom {
-                // We only care about the original element if it wasn't a text element
-                // (otherwise we generate a useless empty text element for the original)
-                events.push(OutputEvent::Empty(orig_elem));
-                events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-            }
-            match text_elements.as_slice() {
-                [] => {}
-                [elem] => {
-                    events.push(OutputEvent::Start(elem.clone()));
-                    if let Some(value) = &elem.text_content {
-                        events.push(OutputEvent::Text(value.clone()));
-                    } else {
-                        return Err(SvgdxError::InvalidData(
-                            "Text element should have content".to_owned(),
-                        ));
-                    }
-                    events.push(OutputEvent::End("text".to_string()));
-                }
-                _ => {
-                    // Multiple text spans
-                    let text_elem = &text_elements[0];
-                    events.push(OutputEvent::Start(text_elem.clone()));
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    for elem in &text_elements[1..] {
-                        // Note: we can't insert a newline/last_indent here as whitespace
-                        // following a tspan is compressed to a single space and causes
-                        // misalignment - see https://stackoverflow.com/q/41364908
-                        events.push(OutputEvent::Start(elem.clone()));
-                        if let Some(value) = &elem.text_content {
-                            events.push(OutputEvent::Text(value.clone()));
-                        } else {
-                            return Err(SvgdxError::InvalidData(
-                                "Text element should have content".to_owned(),
-                            ));
-                        }
-                        events.push(OutputEvent::End("tspan".to_string()));
-                    }
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    events.push(OutputEvent::End("text".to_string()));
-                }
-            }
-        } else if !phantom {
-            if self.is_empty_element() {
-                events.push(OutputEvent::Empty(self.clone()));
-            } else {
-                events.push(OutputEvent::Start(self.clone()));
-            }
-        }
-
-        Ok(events)
-    }
-
-    pub fn set_indent(&mut self, indent: usize) {
-        self.indent = indent;
-    }
-
-    pub fn set_src_line(&mut self, line: usize) {
-        self.src_line = line;
-    }
-
-    pub fn set_order_index(&mut self, order_index: &OrderIndex) {
-        self.order_index = order_index.clone();
-    }
-
-    pub fn set_event_range(&mut self, range: (usize, usize)) {
-        self.event_range = Some(range);
-    }
-
     pub fn name(&self) -> &str {
         &self.name
     }
@@ -489,6 +299,208 @@ impl SvgElement {
     pub fn get_attrs(&self) -> HashMap<String, String> {
         self.attrs.to_vec().into_iter().collect()
     }
+}
+
+impl SvgElement {
+    pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
+        if let Some((start, end)) = self.event_range {
+            // empty events will have end == start
+            if end > start {
+                return Some(InputList::from(&context.events[start + 1..end]));
+            }
+        }
+        None
+    }
+
+    pub fn all_events(&self, context: &TransformerContext) -> InputList {
+        if let Some((start, end)) = self.event_range {
+            InputList::from(&context.events[start..end + 1])
+        } else {
+            InputList::new()
+        }
+    }
+
+    /// Process a given `SvgElement` into a list of `SvgEvent`s
+    // TODO: would be nice to make this infallible and have any potential errors handled earlier.
+    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
+        let mut events = vec![];
+
+        if ctx.config.debug {
+            // Prefix replaced element(s) with a representation of the original element
+            //
+            // Replace double quote with backtick to avoid messy XML entity conversion
+            // (i.e. &quot; or &apos; if single quotes were used)
+            events.push(OutputEvent::Comment(
+                format!(" {} ", self.original)
+                    .replace('"', "`")
+                    .replace(['<', '>'], ""),
+            ));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        // Standard comment: expressions & variables are evaluated.
+        if let Some(comment) = self.get_attr("_") {
+            // Expressions in comments are evaluated
+            let value = eval_attr(comment, ctx)?;
+            events.push(OutputEvent::Comment(format!(" {value} ")));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        // 'Raw' comment: no evaluation of expressions occurs here
+        if let Some(comment) = self.get_attr("__") {
+            events.push(OutputEvent::Comment(format!(" {comment} ")));
+            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+        }
+
+        // Some elements don't generate text themselves, but can have
+        // associated text.
+        // TODO: refactor this method to handle text event gen better
+        let phantom = matches!(self.name(), "point" | "box");
+
+        if self.has_attr("text") {
+            let (orig_elem, text_elements) = process_text_attr(self)?;
+            if orig_elem.name != "text" && !phantom {
+                // We only care about the original element if it wasn't a text element
+                // (otherwise we generate a useless empty text element for the original)
+                events.push(OutputEvent::Empty(orig_elem));
+                events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            }
+            match text_elements.as_slice() {
+                [] => {}
+                [elem] => {
+                    events.push(OutputEvent::Start(elem.clone()));
+                    if let Some(value) = &elem.text_content {
+                        events.push(OutputEvent::Text(value.clone()));
+                    } else {
+                        return Err(SvgdxError::InvalidData(
+                            "Text element should have content".to_owned(),
+                        ));
+                    }
+                    events.push(OutputEvent::End("text".to_string()));
+                }
+                _ => {
+                    // Multiple text spans
+                    let text_elem = &text_elements[0];
+                    events.push(OutputEvent::Start(text_elem.clone()));
+                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    for elem in &text_elements[1..] {
+                        // Note: we can't insert a newline/last_indent here as whitespace
+                        // following a tspan is compressed to a single space and causes
+                        // misalignment - see https://stackoverflow.com/q/41364908
+                        events.push(OutputEvent::Start(elem.clone()));
+                        if let Some(value) = &elem.text_content {
+                            events.push(OutputEvent::Text(value.clone()));
+                        } else {
+                            return Err(SvgdxError::InvalidData(
+                                "Text element should have content".to_owned(),
+                            ));
+                        }
+                        events.push(OutputEvent::End("tspan".to_string()));
+                    }
+                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(OutputEvent::End("text".to_string()));
+                }
+            }
+        } else if !phantom {
+            if self.is_empty_element() {
+                events.push(OutputEvent::Empty(self.clone()));
+            } else {
+                events.push(OutputEvent::Start(self.clone()));
+            }
+        }
+
+        Ok(events)
+    }
+
+    pub fn set_indent(&mut self, indent: usize) {
+        self.indent = indent;
+    }
+
+    pub fn set_src_line(&mut self, line: usize) {
+        self.src_line = line;
+    }
+
+    pub fn set_order_index(&mut self, order_index: &OrderIndex) {
+        self.order_index = order_index.clone();
+    }
+
+    pub fn set_event_range(&mut self, range: (usize, usize)) {
+        self.event_range = Some(range);
+    }
+
+    pub fn is_empty_element(&self) -> bool {
+        if let Some((start, end)) = self.event_range {
+            start == end
+        } else {
+            true
+        }
+    }
+}
+
+impl SvgElement {
+    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+        if self.name == "path" {
+            if let Some(d) = self.get_attr("d") {
+                if d.chars().any(|c| c == 'b' || c == 'B') {
+                    self.set_attr("d", &process_path_bearing(d)?)
+                }
+            }
+        }
+
+        if is_connector(self) {
+            if let Ok(conn) = Connector::from_element(
+                self,
+                ctx,
+                if let Some(e_type) = self.get_attr("edge-type") {
+                    ConnectionType::from_str(e_type)
+                } else if self.name() == "polyline" {
+                    ConnectionType::Corner
+                } else {
+                    ConnectionType::Straight
+                },
+            ) {
+                // replace with rendered connection element
+                *self = conn.render(ctx)?.without_attr("edge-type");
+            } else {
+                return Err(SvgdxError::InvalidData(
+                    "Cannot create connector".to_owned(),
+                ));
+            }
+        }
+
+        // Process dx / dy as translation offsets if not an element
+        // where they already have intrinsic meaning.
+        // TODO: would be nice to get rid of this; it's mostly handled
+        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
+        // then that won't do anything and this does.
+        if !matches!(self.name(), "text" | "tspan" | "feOffset") {
+            let dx = self.pop_attr("dx");
+            let dy = self.pop_attr("dy");
+            let mut d_x = None;
+            let mut d_y = None;
+            if let Some(dx) = dx {
+                d_x = Some(strp(&dx)?);
+            }
+            if let Some(dy) = dy {
+                d_y = Some(strp(&dy)?);
+            }
+            if d_x.is_some() || d_y.is_some() {
+                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
+            }
+        }
+
+        if self.name() == "use" {
+            // rotation requires a bbox to identify center of rotation; for `<use>`
+            // elements derive from context and inject via `content_bbox`. Allows
+            // handle_rotation to be independent of context.
+            if let Some(bbox) = ctx.get_element_bbox(self)? {
+                self.content_bbox = Some(bbox);
+            }
+        }
+        self.handle_rotation()?;
+
+        Ok(())
+    }
 
     /// Resolve any expressions in attributes.
     pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
@@ -511,63 +523,6 @@ impl SvgElement {
         }
 
         Ok(())
-    }
-
-    /// See <https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement>
-    /// Note `reuse` is not a standard SVG element, but is used here in similar
-    /// contexts to the `use` element.
-    pub fn is_graphics_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "circle"
-                | "ellipse"
-                | "image"
-                | "line"
-                | "path"
-                | "polygon"
-                | "polyline"
-                | "rect"
-                | "text"
-                | "use"
-                // Following are non-standard.
-                | "reuse"
-        )
-    }
-
-    /// See <https://www.w3.org/TR/SVG11/intro.html#TermContainerElement>
-    /// Note `specs` is not a standard SVG element, but is used here in similar
-    /// contexts to the `defs` element.
-    #[allow(dead_code)]
-    pub fn is_container_element(&self) -> bool {
-        matches!(
-            self.name.as_str(),
-            "a" | "defs"
-                | "glyph"
-                | "g"
-                | "marker"
-                | "mask"
-                | "missing-glyph"
-                | "pattern"
-                | "svg"
-                | "switch"
-                | "symbol"
-                // Following are non-standard.
-                | "specs"
-        )
-    }
-
-    pub fn is_empty_element(&self) -> bool {
-        if let Some((start, end)) = self.event_range {
-            start == end
-        } else {
-            true
-        }
-    }
-
-    fn is_connector(&self) -> bool {
-        self.has_attr("start")
-            && self.has_attr("end")
-            && (self.name == "line" || self.name == "polyline")
     }
 
     pub fn handle_rotation(&mut self) -> Result<()> {
