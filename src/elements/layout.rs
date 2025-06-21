@@ -167,7 +167,7 @@ impl SvgElement {
                 if let "circle" | "ellipse" = el.name() {
                     // The referenced element is defined by its center,
                     // but use elements are defined by top-left pos.
-                    p.translate(sz.width / 4., sz.height / 4.);
+                    p.translate(sz.width / 2., sz.height / 2.);
                 }
             }
         }

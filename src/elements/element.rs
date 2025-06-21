@@ -79,7 +79,6 @@ impl EventGen for OtherElement {
         let mut e = self.0.clone();
         e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
         e.transmute(context)?;
-        e.resolve_position(context)?;
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
         if bb.is_some() {

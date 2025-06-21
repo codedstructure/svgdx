@@ -869,12 +869,35 @@ fn eval_str(value: &str, context: &impl ContextView) -> Result<String> {
 
 /// Evaluate attribute value including {{arithmetic}} and ${variable} expressions
 pub fn eval_attr(value: &str, context: &impl ContextView) -> Result<String> {
-    // Step 1: Replace variables (which may contain element references, for example).
-    // Note this is only a single pass, so variables could potentially reference other
-    // variables which are resolved in eval_expr - provided they hold numeric values.
-    let value = eval_vars(value, context);
-    // Step 2: Evaluate expressions, which could fail with e.g. ReferenceError
-    eval_expr(&value, context)
+    let mut orig_value = value.to_string();
+    let mut value = orig_value.clone();
+
+    // Repeat until we've had 10 passes or it didn't change.
+    // This is to allow for nested variables, e.g. "$a + $b" where $a or $b
+    // could be a variable that contains an expression, or "$$a" where $a is
+    // the name of another variable.
+    //
+    // TODO: would be better to move repeated evaluation into the recursive descent
+    // parser and support 'indirect' variables only in eval_expr(); currently tokenisation
+    // gets confused by e.g. "$$$a".
+    for _ in 0..10 {
+        // Step 1: Replace variables (which may contain element references, for example).
+        // Note this is only a single pass, so variables could potentially reference other
+        // variables which are resolved in eval_expr - provided they hold numeric values.
+        value = eval_vars(&value, context);
+        // Step 2: Evaluate expressions, which could fail with e.g. ReferenceError
+        value = eval_expr(&value, context)?;
+
+        if value == orig_value {
+            // No change, so we can stop
+            break;
+        }
+
+        // Update value for next iteration
+        orig_value = value.clone();
+    }
+
+    Ok(value)
 }
 
 /// Evaluate a condition expression, returning true iff the result is non-zero

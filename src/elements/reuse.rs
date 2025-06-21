@@ -54,11 +54,6 @@ impl EventGen for ReuseElement {
         instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
-        instance_element
-            .resolve_position(context)
-            .inspect_err(|_| {
-                context.pop_element();
-            })?;
         let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
