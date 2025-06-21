@@ -513,7 +513,7 @@ impl SvgElement {
     /// Implemented as a method rather than a `From` impl to keep private
     fn into_bytesstart(self) -> BytesStart<'static> {
         let mut bs = BytesStart::new(self.name().to_owned());
-        for (k, v) in &self.attrs {
+        for (k, v) in self.get_attrs() {
             bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
         }
         let c = self.get_classes();

@@ -12,7 +12,6 @@ use crate::transform::EventGen;
 use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex};
 
 use core::fmt::Display;
-use std::collections::HashMap;
 
 impl EventGen for SvgElement {
     fn generate_events(
@@ -129,7 +128,7 @@ impl EventGen for OtherElement {
 pub struct SvgElement {
     name: String,
     pub original: String,
-    pub attrs: AttrMap,
+    attrs: AttrMap,
     classes: ClassList,
     pub text_content: Option<String>,
     pub order_index: OrderIndex,
@@ -295,8 +294,9 @@ impl SvgElement {
         }
     }
 
-    pub fn get_attrs(&self) -> HashMap<String, String> {
-        self.attrs.to_vec().into_iter().collect()
+    /// order-preserving attribute list
+    pub fn get_attrs(&self) -> Vec<(String, String)> {
+        self.attrs.to_vec()
     }
 }
 

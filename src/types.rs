@@ -149,6 +149,10 @@ impl AttrMap {
         Self { attrs: Vec::new() }
     }
 
+    pub fn clear(&mut self) {
+        self.attrs.clear();
+    }
+
     pub fn is_empty(&self) -> bool {
         self.attrs.is_empty()
     }

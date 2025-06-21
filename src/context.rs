@@ -88,7 +88,15 @@ struct Scope {
 }
 
 impl Scope {
-    fn with_vars(vars: HashMap<String, String>) -> Self {
+    fn with_vars<K, V>(vars: &[(K, V)]) -> Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let vars = vars
+            .iter()
+            .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+            .collect();
         Self {
             vars,
             ..Default::default()
@@ -373,11 +381,12 @@ impl TransformerContext {
                         }
                     }
                     if default.is_init() {
-                        classes = default_el.get_classes();
-                        attrs = default_el.attrs.clone();
-                    } else {
-                        classes.extend(default_el.get_classes());
-                        attrs.update(&default_el.attrs);
+                        classes.clear();
+                        attrs.clear();
+                    }
+                    classes.extend(default_el.get_classes());
+                    for (key, value) in default_el.get_attrs() {
+                        attrs.insert(key, value);
                     }
                     if default.is_final() {
                         break 'outer;
@@ -415,7 +424,7 @@ impl TransformerContext {
     pub fn push_element(&mut self, el: &SvgElement) {
         let attrs = el.get_attrs();
         self.element_stack.push(el.clone());
-        let scope = Scope::with_vars(attrs);
+        let scope = Scope::with_vars(&attrs);
         self.scope_stack.push(scope);
     }
 

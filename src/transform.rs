@@ -202,8 +202,10 @@ impl Transformer {
         let mut new_svg_attrs = AttrMap::new();
         let mut orig_svg_attrs = HashMap::new();
         if let OutputEvent::Start(orig_svg) = first_svg {
-            new_svg_attrs = orig_svg.attrs.clone();
-            orig_svg_attrs = orig_svg.get_attrs();
+            for (k, v) in orig_svg.get_attrs() {
+                new_svg_attrs.insert(k, v);
+            }
+            orig_svg_attrs = orig_svg.get_attrs().into_iter().collect();
         }
         if !orig_svg_attrs.contains_key("version") {
             new_svg_attrs.insert("version", "1.1");
