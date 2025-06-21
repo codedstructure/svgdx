@@ -4,6 +4,10 @@ use crate::errors::{Result, SvgdxError};
 use crate::geometry::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
 use crate::types::{attr_split, fstr, strp};
 
+pub fn is_connector(el: &SvgElement) -> bool {
+    el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Direction {
     Up,

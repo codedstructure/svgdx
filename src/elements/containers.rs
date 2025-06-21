@@ -31,7 +31,7 @@ impl EventGen for Container {
                     break;
                 }
             }
-            if let (true, Some(text)) = (self.0.is_graphics_element(), &inner_text) {
+            if let (true, Some(text)) = (is_graphics_element(&self.0), &inner_text) {
                 let mut el = self.0.clone();
                 el.set_attr("text", text);
                 if let Some((start, _end)) = self.0.event_range {
@@ -42,14 +42,12 @@ impl EventGen for Container {
                 let mut new_el = self.0.clone();
                 // Special case <svg> elements with an xmlns attribute - passed through
                 // transparently, with no bbox calculation.
-                if new_el.name == "svg" && new_el.get_attr("xmlns").is_some() {
+                if new_el.name() == "svg" && new_el.get_attr("xmlns").is_some() {
                     return Ok((self.0.all_events(context).into(), None));
                 }
                 new_el.eval_attributes(context)?;
                 if context.config.add_metadata {
-                    new_el
-                        .attrs
-                        .insert("data-src-line", self.0.src_line.to_string());
+                    new_el.set_attr("data-src-line", &self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
                 events.push(OutputEvent::Start(new_el.clone()));
@@ -60,9 +58,9 @@ impl EventGen for Container {
                     process_events(inner_events, context)?
                 };
                 events.extend(&evlist);
-                events.push(OutputEvent::End(self.0.name.clone()));
+                events.push(OutputEvent::End(self.0.name().to_owned()));
 
-                if self.0.name == "defs" {
+                if self.0.name() == "defs" {
                     bbox = None;
                 } else if bbox.is_some() {
                     new_el.content_bbox = bbox;
@@ -117,7 +115,7 @@ impl EventGen for GroupElement {
         if self.0.is_empty_element() {
             events.push(OutputEvent::Empty(new_el.clone()));
         } else {
-            let el_name = new_el.name.clone();
+            let el_name = new_el.name().to_owned();
             events.push(OutputEvent::Start(new_el.clone()));
             events.extend(&inner);
             events.push(OutputEvent::End(el_name));
@@ -127,7 +125,7 @@ impl EventGen for GroupElement {
         context.update_element(&new_el);
         context.set_prev_element(&new_el);
 
-        let result_bb = if self.0.name == "symbol" {
+        let result_bb = if self.0.name() == "symbol" {
             // symbols have a size which needs storing in context for evaluating
             // bbox of 'use' elements referencing them, but they don't contribute
             // to the parent bbox.
@@ -138,4 +136,47 @@ impl EventGen for GroupElement {
         };
         Ok((events, result_bb))
     }
+}
+
+/// See <https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement>
+/// Note `reuse` is not a standard SVG element, but is used here in similar
+/// contexts to the `use` element.
+fn is_graphics_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "circle"
+                | "ellipse"
+                | "image"
+                | "line"
+                | "path"
+                | "polygon"
+                | "polyline"
+                | "rect"
+                | "text"
+                | "use"
+                // Following are non-standard.
+                | "reuse"
+    )
+}
+
+/// See <https://www.w3.org/TR/SVG11/intro.html#TermContainerElement>
+/// Note `specs` is not a standard SVG element, but is used here in similar
+/// contexts to the `defs` element.
+#[allow(dead_code)]
+fn is_container_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "a" | "defs"
+                | "glyph"
+                | "g"
+                | "marker"
+                | "mask"
+                | "missing-glyph"
+                | "pattern"
+                | "svg"
+                | "switch"
+                | "symbol"
+                // Following are non-standard.
+                | "specs"
+    )
 }

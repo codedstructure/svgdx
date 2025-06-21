@@ -10,7 +10,7 @@ mod special;
 mod text;
 
 use bearing::process_path_bearing;
-use connector::{ConnectionType, Connector};
+use connector::{is_connector, ConnectionType, Connector};
 use containers::{Container, GroupElement};
 use loops::{ForElement, LoopElement};
 use reuse::ReuseElement;

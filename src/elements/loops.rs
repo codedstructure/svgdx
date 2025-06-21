@@ -23,7 +23,7 @@ impl TryFrom<&SvgElement> for LoopDef {
     type Error = SvgdxError;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
-        if element.name != "loop" {
+        if element.name() != "loop" {
             return Err(SvgdxError::InvalidData(
                 "LoopType can only be created from a loop element".to_string(),
             ));
@@ -31,19 +31,19 @@ impl TryFrom<&SvgElement> for LoopDef {
         let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
             // Note we don't parse attributes here as they might be expressions,
             // and we don't have access to a context to evaluate them
-            let start = element.get_attr("start").unwrap_or("0".to_string());
-            let step = element.get_attr("step").unwrap_or("1".to_string());
-            Some((loop_var, start, step))
+            let start = element.get_attr("start").unwrap_or("0");
+            let step = element.get_attr("step").unwrap_or("1");
+            Some((loop_var.to_string(), start.to_string(), step.to_string()))
         } else {
             None
         };
         let loop_type;
         if let Some(count) = element.get_attr("count") {
-            loop_type = LoopType::Repeat(count);
+            loop_type = LoopType::Repeat(count.to_string());
         } else if let Some(while_expr) = element.get_attr("while") {
-            loop_type = LoopType::While(while_expr);
+            loop_type = LoopType::While(while_expr.to_string());
         } else if let Some(until_expr) = element.get_attr("until") {
-            loop_type = LoopType::Until(until_expr);
+            loop_type = LoopType::Until(until_expr.to_string());
         } else {
             return Err(SvgdxError::MissingAttribute(
                 "count | while | until".to_string(),
@@ -142,9 +142,9 @@ impl TryFrom<&SvgElement> for ForDef {
             .get_attr("data")
             .ok_or_else(|| SvgdxError::MissingAttribute("data".to_string()))?;
         Ok(Self {
-            var_name,
-            idx_name,
-            data,
+            var_name: var_name.to_string(),
+            idx_name: idx_name.map(|s| s.to_string()),
+            data: data.to_string(),
         })
     }
 }

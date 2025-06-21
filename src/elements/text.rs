@@ -79,7 +79,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     } else if element.pop_class("d-text-inside") {
         false
     } else {
-        matches!(element.name.as_str(), "line" | "point" | "text")
+        matches!(element.name(), "line" | "point" | "text")
     };
     match text_anchor {
         ls if ls.is_top() => {
@@ -178,7 +178,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let text_pre = orig_elem.has_class("d-text-pre");
 
     // There will always be a text element; if not multiline this is the only element.
-    let mut text_elem = if orig_elem.name == "text" {
+    let mut text_elem = if orig_elem.name() == "text" {
         orig_elem.clone()
     } else {
         SvgElement::new("text", &[])
@@ -234,7 +234,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     ];
     // Split classes into text-related and non-text-related and
     // assign to appropriate elements.
-    for class in orig_elem.classes.clone().into_iter() {
+    for class in orig_elem.get_classes() {
         if class.starts_with("d-text-") {
             orig_elem.pop_class(&class);
         }
@@ -245,7 +245,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
     text_elem.src_line = orig_elem.src_line;
-    text_elem.classes = text_classes.into();
+    text_elem.set_classes(&text_classes);
 
     // Add this prior to copying over presentation attrs which take precedence
     if vertical {
@@ -321,9 +321,9 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                 text_fragment = text_fragment.replace(' ', NBSP);
             }
 
-            tspan.attrs.insert(
+            tspan.set_attr(
                 if vertical { "dx" } else { "dy" },
-                format!("{}em", fstr(line_offset)),
+                &format!("{}em", fstr(line_offset)),
             );
             tspan.text_content = Some(if text_fragment.is_empty() {
                 // Empty tspans don't take up vertical space, so use a zero-width space.

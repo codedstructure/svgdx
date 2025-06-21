@@ -54,11 +54,6 @@ impl EventGen for ReuseElement {
         instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
-        instance_element
-            .resolve_position(context)
-            .inspect_err(|_| {
-                context.pop_element();
-            })?;
         let instance_size = instance_element.size(context)?;
 
         // Override 'default' attr values in the target
@@ -68,7 +63,7 @@ impl EventGen for ReuseElement {
                 "rotate" | "text-rotate" => {
                     // any existing rotation is built on by the reuse element
                     if let Some(inst_rot) = instance_element.get_attr(&attr) {
-                        let inst_rot = strp(&inst_rot)?;
+                        let inst_rot = strp(inst_rot)?;
                         let rot = strp(&value)?;
                         instance_element.set_attr(&attr, &fstr(inst_rot + rot));
                     } else {
@@ -102,7 +97,7 @@ impl EventGen for ReuseElement {
         // was on the `reuse` element.
         let ref_id = instance_element.pop_attr("id");
         if let Some(inst_id) = reuse_element.get_attr("id") {
-            instance_element.set_attr("id", &inst_id);
+            instance_element.set_attr("id", inst_id);
             context.update_element(&reuse_element);
         }
         // the instanced element should have the same indent as the original
@@ -110,15 +105,15 @@ impl EventGen for ReuseElement {
         instance_element.set_indent(reuse_element.indent);
         instance_element.set_src_line(reuse_element.src_line);
         if let Some(inst_style) = reuse_element.get_attr("style") {
-            instance_element.set_attr("style", &inst_style);
+            instance_element.set_attr("style", inst_style);
         }
-        instance_element.add_classes(&reuse_element.classes);
+        instance_element.add_classes_from(&reuse_element);
         if let Some(ref_id) = ref_id {
             instance_element.add_class(&ref_id);
         }
 
         // reuse of a symbol element wraps the resulting content in a new <g> element
-        if instance_element.name == "symbol" {
+        if instance_element.name() == "symbol" {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
@@ -137,7 +132,7 @@ impl EventGen for ReuseElement {
         } else if let Some(sz) = instance_size {
             pos.update_size(&sz);
         }
-        pos.update_shape(&instance_element.name);
+        pos.update_shape(instance_element.name());
         pos.set_position_attrs(&mut instance_element);
 
         let res = if let (false, Some((start, end))) = (
@@ -147,12 +142,13 @@ impl EventGen for ReuseElement {
             // we've changed the initial (and possibly closing) tag of the instance element,
             // so we create a new list including that and process it.
             let mut new_events = InputList::new();
-            let tag_name = instance_element.name.clone();
+            let tag_name = instance_element.name().to_owned();
+            let outer_events = instance_element.all_events(context);
             let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
             start_ev.index = start;
             start_ev.alt_idx = Some(end);
             new_events.push(start_ev);
-            new_events.extend(&InputList::from(&context.events[start + 1..end]));
+            new_events.extend(&outer_events);
             let mut end_ev = InputEvent::from(OutputEvent::End(tag_name));
             end_ev.index = end;
             end_ev.alt_idx = Some(start);

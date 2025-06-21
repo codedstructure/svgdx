@@ -3,7 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, ElRef};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -31,7 +31,7 @@ impl ElementMatch {
     fn matches(&self, el: &SvgElement) -> bool {
         // early reject if element name doesn't match
         if let Some(match_el) = &self.element {
-            if el.name != *match_el {
+            if el.name() != *match_el {
                 return false;
             }
         }
@@ -42,10 +42,10 @@ impl ElementMatch {
         // otherwise iterate through matches
         for m in self.matches.iter() {
             if let Some((elem, class)) = m.split_once('.') {
-                if (elem.is_empty() || elem == el.name) && el.has_class(class) {
+                if (elem.is_empty() || elem == el.name()) && el.has_class(class) {
                     return true;
                 }
-            } else if *m == el.name {
+            } else if *m == el.name() {
                 return true;
             }
         }
@@ -55,16 +55,16 @@ impl ElementMatch {
 
 impl From<&SvgElement> for ElementMatch {
     fn from(el: &SvgElement) -> Self {
-        let element = if el.name == "_" {
+        let element = if el.name() == "_" {
             None
         } else {
-            Some(el.name.clone())
+            Some(el.name().to_owned())
         };
         let mut matches = Vec::new();
         let mut is_final = false;
         let mut is_init = false;
         if let Some(m) = el.get_attr("match") {
-            for m in attr_split(&m) {
+            for m in attr_split(m) {
                 match m.as_str() {
                     "final" => is_final = true,
                     "init" => is_init = true,
@@ -88,7 +88,15 @@ struct Scope {
 }
 
 impl Scope {
-    fn with_vars(vars: HashMap<String, String>) -> Self {
+    fn with_vars<K, V>(vars: &[(K, V)]) -> Self
+    where
+        K: AsRef<str>,
+        V: AsRef<str>,
+    {
+        let vars = vars
+            .iter()
+            .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
+            .collect();
         Self {
             vars,
             ..Default::default()
@@ -150,6 +158,9 @@ pub trait ElementMap {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
+    fn get_target_element(&self, el: &SvgElement) -> Result<SvgElement> {
+        Ok(el.clone())
+    }
 }
 
 pub trait VariableMap {
@@ -168,26 +179,61 @@ impl ElementMap for TransformerContext {
     }
 
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
-        let target_el = el.get_target_element(self)?;
+        let target_el = self.get_target_element(el)?;
         let el_size = target_el.size(self)?;
 
         Ok(el_size)
     }
 
+    fn get_target_element(&self, el: &SvgElement) -> Result<SvgElement> {
+        use crate::types::OrderIndex; // used for circular reference detection
+
+        // TODO: this uses OrderIndex to uniquely identify elements, but that's a bit
+        // of a hack. In particular using `id` or `href` is insufficient, as doesn't
+        // cope with '^' where the target might not even have an id. Would be better
+        // to assign a dedicated internal ID to every element and use that.
+        // TODO: in addition to the above, '^' is already broken since it doesn't get
+        // captured in the 'remain' thing for deferred elements, and is always the same
+        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
+        // internal ID with each element so can follow a chain of these.
+        let mut seen: Vec<OrderIndex> = vec![];
+        let mut element = el;
+
+        while let "use" | "reuse" = element.name() {
+            let href = element
+                .get_attr("href")
+                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+            let elref = href.parse()?;
+            if let Some(el) = self.get_element(&elref) {
+                if seen.contains(&el.order_index) {
+                    return Err(SvgdxError::CircularRefError(format!(
+                        "{} already seen",
+                        elref
+                    )));
+                }
+                seen.push(el.order_index.clone());
+                element = el;
+            } else {
+                return Err(SvgdxError::ReferenceError(elref));
+            }
+        }
+        Ok(element.clone())
+    }
+
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
-        let target_el = el.get_target_element(self)?;
+        let target_el = self.get_target_element(el)?;
         let mut el_bbox = target_el.bbox()?;
 
         // TODO: move following to element::bbox() ?
-        if el.name == "use" || el.name == "reuse" {
+        if let "use" | "reuse" = el.name() {
             // assumes el has already had position & attributes resolved
             let translate_x = el.get_attr("x");
             let translate_y = el.get_attr("y");
             if translate_x.is_some() || translate_y.is_some() {
                 if let Some(ref mut bbox) = &mut el_bbox {
                     el_bbox = Some(bbox.translated(
-                        translate_x.map(|tx| strp(&tx)).unwrap_or(Ok(0.))?,
-                        translate_y.map(|ty| strp(&ty)).unwrap_or(Ok(0.))?,
+                        translate_x.map(strp).unwrap_or(Ok(0.))?,
+                        translate_y.map(strp).unwrap_or(Ok(0.))?,
                     ));
                 }
             }
@@ -197,14 +243,13 @@ impl ElementMap for TransformerContext {
         // it works in both '^' contexts and root SVG bbox generation context.
         // Can't just move this to SvgElement::bbox() as it needs ElementMap.
         if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
-            let clip_id = extract_urlref(&clip_path).ok_or(SvgdxError::InvalidData(format!(
+            let clip_id = extract_urlref(clip_path).ok_or(SvgdxError::InvalidData(format!(
                 "Invalid clip-path attribute: {clip_path}"
             )))?;
             let clip_el = self
                 .get_element(&clip_id)
                 .ok_or(SvgdxError::ReferenceError(clip_id))?;
-            if let ("clipPath", Some(clip_bbox)) =
-                (clip_el.name.as_str(), self.get_element_bbox(clip_el)?)
+            if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);
             }
@@ -309,7 +354,7 @@ impl TransformerContext {
         // we hit a `final` match.
         // Later attribute values override earlier ones; classes
         // are appended to existing classes.
-        let mut classes = ClassList::new();
+        let mut classes = Vec::new();
         let mut attrs = AttrMap::new();
 
         // For style, text-style and transform attributes we augment rather than
@@ -336,11 +381,12 @@ impl TransformerContext {
                         }
                     }
                     if default.is_init() {
-                        classes = default_el.classes.clone();
-                        attrs = default_el.attrs.clone();
-                    } else {
-                        classes.extend(&default_el.classes);
-                        attrs.update(&default_el.attrs);
+                        classes.clear();
+                        attrs.clear();
+                    }
+                    classes.extend(default_el.get_classes());
+                    for (key, value) in default_el.get_attrs() {
+                        attrs.insert(key, value);
                     }
                     if default.is_final() {
                         break 'outer;
@@ -352,7 +398,9 @@ impl TransformerContext {
         for (key, value) in &attrs {
             el.set_default_attr(key, value);
         }
-        el.add_classes(&classes);
+        for c in classes.iter() {
+            el.add_class(c);
+        }
 
         // join style/transform attributes with the most local last
         for (a_name, ref mut a_list, sep) in augment_types {
@@ -376,7 +424,7 @@ impl TransformerContext {
     pub fn push_element(&mut self, el: &SvgElement) {
         let attrs = el.get_attrs();
         self.element_stack.push(el.clone());
-        let scope = Scope::with_vars(attrs);
+        let scope = Scope::with_vars(&attrs);
         self.scope_stack.push(scope);
     }
 
@@ -415,7 +463,7 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
-            let id = eval_attr(&id, self).unwrap_or(id);
+            let id = eval_attr(id, self).unwrap_or(id.to_string());
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {
                 self.original_map.insert(id, el.clone());
             }
