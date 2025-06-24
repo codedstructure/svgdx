@@ -553,16 +553,14 @@ impl SvgElement {
             Some(el) => el,
             None => return Ok(None),
         };
-        if let (Some(bbox), Some(skip_rp_sep)) = (
-            ctx.get_element_bbox(ref_el)?,
-            remain.strip_prefix(RELPOS_SEP),
-        ) {
-            let parts = skip_rp_sep.find(|c: char| c.is_whitespace());
+        let remain = remain.trim_start_matches(RELPOS_SEP);
+        if let Some(bbox) = ctx.get_element_bbox(ref_el)? {
+            let parts = remain.find(|c: char| c.is_whitespace());
             let (reldir, remain) = if let Some(split_idx) = parts {
-                let (a, b) = skip_rp_sep.split_at(split_idx);
+                let (a, b) = remain.split_at(split_idx);
                 (a, b.trim_start())
             } else {
-                (skip_rp_sep, "")
+                (remain, "")
             };
             let rel: DirSpec = reldir.parse()?;
             // We won't have the full *position* of this element at this point, but hopefully
@@ -597,9 +595,10 @@ impl SvgElement {
                 pos.ymin = Some(y + dy);
                 pos.ymax = Some(y + dy + this_height);
             }
-            return Ok(Some(pos));
+            Ok(Some(pos))
+        } else {
+            Err(SvgdxError::MissingBoundingBox(format!("No bbox: {input}")))
         }
-        Ok(None)
     }
 }
 
