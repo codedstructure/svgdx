@@ -117,11 +117,15 @@ impl EventGen for ReuseElement {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
 
-        let mut pos = if let Some(dirspec_pos) = reuse_element.pos_from_dirspec(context)? {
-            dirspec_pos
-        } else {
-            reuse_element.resolve_position(context)?;
-            Position::from(&reuse_element)
+        let mut pos = match reuse_element
+            .extract_relpos()
+            .map(|relpos| reuse_element.pos_from_dirspec(&relpos, context))
+        {
+            Some(Ok(Some(relpos))) => relpos,
+            _ => {
+                reuse_element.resolve_position(context)?;
+                Position::try_from(&reuse_element)?
+            }
         };
 
         let inst_el = context

@@ -1,5 +1,6 @@
-use crate::constants::{ELREF_ID_PREFIX, ELREF_PREVIOUS};
+use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
+use itertools::Itertools;
 use std::fmt::{self, Display};
 use std::str::FromStr;
 
@@ -108,6 +109,24 @@ impl OrderIndex {
         Self(vec![idx])
     }
 
+    pub fn depth(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn step(&mut self) {
+        if let Some(v) = self.0.last_mut() {
+            *v += 1;
+        }
+    }
+
+    pub fn down(&mut self) {
+        *self = self.with_index(1);
+    }
+
+    pub fn up(&mut self) {
+        self.0.pop().expect("OrderIndex underflow");
+    }
+
     pub fn with_sub_index(&self, other: &Self) -> Self {
         let mut new_idx = self.0.clone();
         new_idx.extend(other.0.iter());
@@ -120,6 +139,18 @@ impl OrderIndex {
         new_idx.push(idx);
 
         Self(new_idx)
+    }
+
+    /// is `other` a strict prefix of self?
+    pub fn has_prefix(&self, other: &Self) -> bool {
+        // other is shorter and all elements match
+        other.0.len() < self.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
+    }
+}
+
+impl Display for OrderIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{{{}}}", self.0.iter().map(|i| i.to_string()).join("."))
     }
 }
 
@@ -395,6 +426,7 @@ impl<'s> IntoIterator for &'s ClassList {
 pub enum ElRef {
     Id(String),
     Prev,
+    Next,
 }
 
 impl FromStr for ElRef {
@@ -416,6 +448,7 @@ impl Display for ElRef {
         match self {
             ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
             ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
+            ElRef::Next => write!(f, "{ELREF_NEXT}"),
         }
     }
 }
@@ -436,6 +469,8 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         }
     } else if let Some(s) = s.strip_prefix(ELREF_PREVIOUS) {
         return Ok((ElRef::Prev, s));
+    } else if let Some(s) = s.strip_prefix(ELREF_NEXT) {
+        return Ok((ElRef::Next, s));
     }
 
     Err(SvgdxError::ParseError(format!(
@@ -640,6 +675,24 @@ mod test {
     }
 
     #[test]
+    fn test_order_index_prefix() {
+        let idx1 = OrderIndex(vec![1]);
+        let idx2 = OrderIndex(vec![1, 2]);
+        let idx3 = OrderIndex(vec![1, 2, 1]);
+        let idx4 = OrderIndex(vec![1, 2, 2]);
+        assert!(idx2.has_prefix(&idx1));
+        assert!(idx3.has_prefix(&idx1));
+        assert!(idx3.has_prefix(&idx2));
+        assert!(idx4.has_prefix(&idx1));
+        assert!(idx4.has_prefix(&idx2));
+        assert!(!idx4.has_prefix(&idx3));
+        assert!(!idx1.has_prefix(&idx2));
+        assert!(!idx1.has_prefix(&idx3));
+        // x is not a prefix of x
+        assert!(!idx1.has_prefix(&idx1));
+    }
+
+    #[test]
     fn test_extract_elref() {
         assert_eq!(
             extract_elref("#id@tl:10%").unwrap(),
@@ -659,6 +712,7 @@ mod test {
         );
         assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev, "@bl"));
         assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev, ""));
+        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next, ""));
         assert!(extract_elref("id").is_err());
     }
 }

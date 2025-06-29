@@ -19,6 +19,8 @@ impl EventGen for SvgElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         context.inc_depth()?;
+        // early update: may be updated further during processing
+        context.update_element(self);
         let res = match self.name() {
             "loop" => LoopElement(self.clone()).generate_events(context),
             "config" => ConfigElement(self.clone()).generate_events(context),
@@ -80,9 +82,6 @@ impl EventGen for OtherElement {
         e.transmute(context)?;
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
-        if bb.is_some() {
-            context.set_prev_element(&e);
-        }
         let events = e.element_events(context)?;
         for svg_ev in events {
             let is_empty = matches!(svg_ev, OutputEvent::Empty(_));
@@ -94,6 +93,10 @@ impl EventGen for OtherElement {
                         new_el.set_attr(&k, &v);
                     }
                 }
+
+                // TODO: have a range of debug options to include/exclude
+                // new_el.set_attr("_oi", &e.order_index.to_string());
+
                 // Any 'class' attribute values are stored separately as a HashSet;
                 // collect those into the BytesStart object
                 if !e.classes.is_empty() {
@@ -115,9 +118,9 @@ impl EventGen for OtherElement {
             output.push(adapted);
         }
         if self.0.name == "point" {
-            // point elements have no bounding box, and are primarily used for
-            // update_element() side-effects, e.g. setting prev_element.
-            // (They can generate text though, so not rejected earlier.
+            // point elements don't contribute to parent bounding box,
+            // and are primarily used for update_element() side-effects.
+            // (They can generate text though, so not rejected earlier.)
             bb = None;
         }
         Ok((output, bb))
@@ -464,27 +467,6 @@ impl SvgElement {
                 return Err(SvgdxError::InvalidData(
                     "Cannot create connector".to_owned(),
                 ));
-            }
-        }
-
-        // Process dx / dy as translation offsets if not an element
-        // where they already have intrinsic meaning.
-        // TODO: would be nice to get rid of this; it's mostly handled
-        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
-        // then that won't do anything and this does.
-        if !matches!(self.name(), "text" | "tspan" | "feOffset") {
-            let dx = self.pop_attr("dx");
-            let dy = self.pop_attr("dy");
-            let mut d_x = None;
-            let mut d_y = None;
-            if let Some(dx) = dx {
-                d_x = Some(strp(&dx)?);
-            }
-            if let Some(dy) = dy {
-                d_y = Some(strp(&dy)?);
-            }
-            if d_x.is_some() || d_y.is_some() {
-                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
             }
         }
 

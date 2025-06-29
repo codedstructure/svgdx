@@ -1,13 +1,13 @@
-use crate::elements::SvgElement;
+use crate::elements::{is_layout_element, SvgElement};
 use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
@@ -115,8 +115,10 @@ pub struct TransformerContext {
     /// but `<reuse>` elements are an exception during processing of
     /// the referenced element.
     element_stack: Vec<SvgElement>,
-    /// The element which `^` refers to; some elements are ignored as 'previous'
-    prev_element: Option<SvgElement>,
+    /// Tree of handled elements, used for previous element lookup
+    index_map: BTreeMap<OrderIndex, SvgElement>,
+    /// Current order index of the element being processed
+    current_index: OrderIndex,
     /// Stack of scoped variables etc
     scope_stack: Vec<Scope>,
     /// Pcg32 is used as it is both seedable and portable.
@@ -141,7 +143,8 @@ impl Default for TransformerContext {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
             element_stack: Vec::new(),
-            prev_element: None,
+            index_map: BTreeMap::new(),
+            current_index: OrderIndex::new(0),
             scope_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             local_style_id: None,
@@ -174,7 +177,8 @@ impl ElementMap for TransformerContext {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.elem_map.get(id),
-            ElRef::Prev => self.prev_element.as_ref(),
+            ElRef::Prev => self.get_element_offset(-1),
+            ElRef::Next => self.get_element_offset(1),
         }
     }
 
@@ -320,7 +324,8 @@ impl TransformerContext {
     pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
-            ElRef::Prev => self.prev_element.as_ref(),
+            ElRef::Prev => self.get_element_offset(-1),
+            ElRef::Next => self.get_element_offset(1),
         }
     }
 
@@ -457,16 +462,46 @@ impl TransformerContext {
         self.element_stack.last().cloned()
     }
 
-    pub fn set_prev_element(&mut self, el: &SvgElement) {
-        self.prev_element = Some(el.clone());
-    }
-
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
             let id = eval_attr(id, self).unwrap_or(id.to_string());
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {
                 self.original_map.insert(id, el.clone());
             }
+        }
+        self.current_index = el.order_index.clone();
+        self.index_map.insert(el.order_index.clone(), el.clone());
+    }
+
+    fn get_element_offset(&self, offset: isize) -> Option<&SvgElement> {
+        let current = &self.current_index;
+        if offset == 0 {
+            return self.index_map.get(current);
+        }
+
+        // first element in a container etc should be able to reference the
+        // previous element which will be at a higher level (lower depth).  but
+        // first element *after* a container should not be able to see something
+        // *inside* that container.  Loops / if / etc shouldn't count as
+        // descending...
+
+        if offset > 0 {
+            self.index_map
+                .range(current..)
+                .filter(|(oi, _)| oi.depth() <= current.depth())
+                .filter(|(_, el)| is_layout_element(el))
+                .nth(offset as usize)
+                .map(|(_, value)| value)
+        } else {
+            self.index_map
+                .range(..current)
+                .rev()
+                .filter(|(oi, _)| oi.depth() <= current.depth())
+                .filter(|(_, el)| is_layout_element(el))
+                // when scanning backwards, ignore any parent elements, e.g. a <g> we're inside of
+                .filter(|(oi, _)| !current.has_prefix(oi))
+                .nth((-offset - 1) as usize)
+                .map(|(_, value)| value)
         }
     }
 }

@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use super::SvgElement;
 use crate::constants::{
-    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
-    VAR_PREFIX,
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
+    SCALARSPEC_SEP, VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::path::path_bbox;
@@ -41,7 +41,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
-        if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
+        if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS, ELREF_NEXT]) {
             result.push_str(&value[..idx]);
             value = &value[idx..];
             if let Some(mut idx) = value[1..].find(word_break) {
@@ -112,7 +112,43 @@ fn split_relspec<'a, 'b>(
     }
 }
 
+// Elements which have a bounding box, including graphical elements
+// and selected containers.
+pub fn is_layout_element(el: &SvgElement) -> bool {
+    matches!(
+        el.name(),
+        "circle"
+            | "ellipse"
+            | "image"
+            | "line"
+            | "path"
+            | "polygon"
+            | "polyline"
+            | "rect"
+            | "text"
+            | "use"
+            // Following are non-standard.
+            | "reuse"
+            // Following also have at least some level of layout
+            | "g"
+            | "symbol"
+            | "clipPath"
+            | "box"
+            | "point"
+            | "svg"
+            | "foreignObject"
+    )
+}
+
+// Elements wh
 impl SvgElement {
+    pub(crate) fn extract_relpos(&mut self) -> Option<String> {
+        if self.get_attr("xy").unwrap_or_default().contains(RELPOS_SEP) {
+            return Some(self.pop_attr("xy").unwrap().to_string());
+        }
+        None
+    }
+
     pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
@@ -142,9 +178,10 @@ impl SvgElement {
         // TODO: issue is that this could fail with a reference error
         // which would be resolved by expand_relspec, though that requires
         // eval_rel_attributes to be called first...
-        if let Some(pos) = self.pos_from_dirspec(ctx)? {
-            self.pop_attr("xy");
-            pos.set_position_attrs(self);
+        if let Some(relpos) = self.extract_relpos() {
+            if let Some(pos) = self.pos_from_dirspec(&relpos, ctx)? {
+                pos.set_position_attrs(self);
+            }
         }
         // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
         expand_compound_pos(self);
@@ -159,7 +196,7 @@ impl SvgElement {
         //     self.set_attr("d", &expand_relspec(&d, ctx));
         // }
 
-        let mut p = Position::from(self as &SvgElement);
+        let mut p = Position::try_from(self as &SvgElement)?;
         if self.name() == "use" {
             let el = ctx.get_target_element(self)?;
             if let Some(sz) = el.size(ctx)? {
@@ -374,6 +411,15 @@ impl SvgElement {
     }
 
     fn bbox_raw(&self) -> Result<Option<BoundingBox>> {
+        // TODO: this is a hack; forward references (i.e. '+') may cause bounding box
+        // evaluation of an element which hasn't had attributes expanded yet, and if
+        // there is otherwise sufficient info (e.g. with x/y etc assumed zero) for a bbox.
+        // Should probably pre-expand attributes first...
+        for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
+            if self.has_attr(key) {
+                return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+            }
+        }
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
@@ -383,13 +429,14 @@ impl SvgElement {
         // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
         // attempting to compute a bounding box.
         fn passthrough(value: &str) -> bool {
-            // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^' (which
-            // might be resolved later) then return Ok(None).
+            // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^'/'+'
+            // (which might be resolved later) then return Ok(None).
             // This will return `true` for things such as "10%" or "40mm".
             strp(value).is_err()
                 && !(value.contains(VAR_PREFIX)
                     || value.contains(ELREF_ID_PREFIX)
-                    || value.contains(ELREF_PREVIOUS))
+                    || value.contains(ELREF_PREVIOUS)
+                    || value.contains(ELREF_NEXT))
         }
         Ok(match self.name() {
             "point" | "text" => {
@@ -537,12 +584,11 @@ impl SvgElement {
     ///   H - horizontal to the left
     ///   v - vertical below
     ///   V - vertical above
-    pub fn pos_from_dirspec(&self, ctx: &impl ContextView) -> Result<Option<Position>> {
-        let input = self.get_attr("xy");
-        if input.is_none() {
-            return Ok(None);
-        }
-        let input = input.unwrap();
+    pub fn pos_from_dirspec(
+        &self,
+        input: &str,
+        ctx: &impl ContextView,
+    ) -> Result<Option<Position>> {
         if !input.contains(RELPOS_SEP) {
             return Ok(None);
         }
@@ -876,20 +922,26 @@ fn expand_compound_pos(el: &mut SvgElement) {
     // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
     // before this point as xy is not considered a compound attribute in that case.
     if let Some(xy) = el.pop_attr("xy") {
-        let (x, y) = split_compound_attr(&xy);
-        let (x_attr, y_attr) = match el.pop_attr("xy-loc").as_deref() {
-            Some("t") => ("cx", "y1"),
-            Some("tr") => ("x2", "y1"),
-            Some("r") => ("x2", "cy"),
-            Some("br") => ("x2", "y2"),
-            Some("b") => ("cx", "y2"),
-            Some("bl") => ("x1", "y2"),
-            Some("l") => ("x1", "cy"),
-            Some("c") => ("cx", "cy"),
-            _ => ("x", "y"),
-        };
-        el.set_default_attr(x_attr, &x);
-        el.set_default_attr(y_attr, &y);
+        if xy.contains(RELPOS_SEP) {
+            // xy is a relative position spec, e.g. `xy="#abc|h 5 10"`
+            // which is not a compound attribute, so restore it.
+            el.set_attr("xy", &xy);
+        } else {
+            let (x, y) = split_compound_attr(&xy);
+            let (x_attr, y_attr) = match el.pop_attr("xy-loc").as_deref() {
+                Some("t") => ("cx", "y1"),
+                Some("tr") => ("x2", "y1"),
+                Some("r") => ("x2", "cy"),
+                Some("br") => ("x2", "y2"),
+                Some("b") => ("cx", "y2"),
+                Some("bl") => ("x1", "y2"),
+                Some("l") => ("x1", "cy"),
+                Some("c") => ("cx", "cy"),
+                _ => ("x", "y"),
+            };
+            el.set_default_attr(x_attr, &x);
+            el.set_default_attr(y_attr, &y);
+        }
     }
     if let Some(cxy) = el.pop_attr("cxy") {
         let (cx, cy) = split_compound_attr(&cxy);

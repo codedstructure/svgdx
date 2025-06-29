@@ -83,8 +83,8 @@ fn test_attr_priority() {
 
 #[test]
 fn test_attr_priority_delta() {
-    let input = r#"<rect xy="3 4" x="10" dx="2"/>"#;
-    let expected = r#"<rect x="12" y="4"/>"#;
+    let input = r#"<rect xy="3 4" x="10" dx="2" wh="1"/>"#;
+    let expected = r#"<rect x="12" y="4" width="1" height="1"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<rect wh="7 8" width="12" dw="-1"/>"#;

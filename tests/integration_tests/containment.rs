@@ -293,3 +293,51 @@ fn test_inside_surround_invalid() {
     let output = transform_str_default(input);
     assert!(output.is_err());
 }
+
+#[test]
+fn test_surround_previous() {
+    let input = r##"
+<rect id="a" wh="10" />
+<rect xy="20" wh="10" />
+<rect id="c" surround="^ #a" />
+"##;
+    let expected = r#"<rect id="c" x="0" y="0" width="30" height="30" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_surround_previous_defer() {
+    // checks that bbox from '^' is used at point of reference,
+    // not at point where everything can be resolved.
+    let input = r##"
+<rect xy="20" wh="10" />
+<rect id="c" surround="^ #a" />
+<rect id="a" xy="5" wh="10" />
+"##;
+    let expected = r#"<rect id="c" x="5" y="5" width="25" height="25" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_surround_next() {
+    let input = r##"
+<rect id="a" surround="+" />
+<circle cxy="5 10" r="2" />
+"##;
+    let expected = r#"<rect id="a" x="3" y="8" width="4" height="4" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect id="a" surround="+" />
+<g>
+    <rect wh="10" />
+    <rect xy="^|h" wh="^" />
+</g>
+"##;
+    let expected = r#"<rect id="a" x="0" y="0" width="20" height="10" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
