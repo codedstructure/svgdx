@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0 - 2025-06-29]
+
+- Added: support for 'next' references using '+', analogous to 'previous'
+  references using '^'. This is useful to place elements 'behind' what comes
+  next, for example with `<rect surround="+" margin="2"/>` or similar.
+  See the [content.xml](examples/content.xml) example.
+
+- Fixed: previous element references ('^') where the previous element had
+  not yet been fully resolved.
+
 - Refactor: codebase reorganisation to extract element and geometry modules.
 
 - Fixed: various positioning issues (including universal layout attributes)

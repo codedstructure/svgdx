@@ -1,6 +1,6 @@
 [package]
 name = "svgdx"
-version = "0.20.0"
+version = "0.21.0"
 description = "create SVG diagrams easily"
 authors = ["Ben Bass <benbass@codedstructure.net>"]
 repository = "https://github.com/codedstructure/svgdx"
@@ -16,7 +16,7 @@ cli = ["shlex", "notify", "notify-debouncer-mini", "clap", "tempfile"]
 server = ["axum", "clap", "hyper", "serde", "serde_derive", "tokio", "webbrowser"]
 
 [dependencies]
-quick-xml = "0.37.2"
+quick-xml = "0.38.0"
 itertools = "0.14.0"
 rand = { version = "0.9", default-features = false }
 rand_pcg = "0.9"

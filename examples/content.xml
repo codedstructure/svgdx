@@ -1,0 +1,10 @@
+<svg>
+  <defaults><rect class="d-softshadow"/></defaults>
+  <rect surround="+" margin="10 3 3" text="content" text-loc="tl" class="d-text-bold d-fill-silver"/>
+  <g>
+    <defaults><rect class="d-fill-azure"/></defaults>
+    <rect wh="30 10" text="beginning"/>
+    <rect xy="^|v 2" wh="30 20" text="middle"/>
+    <rect xy="^|v 2" wh="30 5" text="end"/>
+  </g>
+</svg>
