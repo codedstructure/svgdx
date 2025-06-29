@@ -470,27 +470,6 @@ impl SvgElement {
             }
         }
 
-        // Process dx / dy as translation offsets if not an element
-        // where they already have intrinsic meaning.
-        // TODO: would be nice to get rid of this; it's mostly handled
-        // in `set_position_attrs`, but if there is no bbox (e.g. no width/height)
-        // then that won't do anything and this does.
-        if !matches!(self.name(), "text" | "tspan" | "feOffset") {
-            let dx = self.pop_attr("dx");
-            let dy = self.pop_attr("dy");
-            let mut d_x = None;
-            let mut d_y = None;
-            if let Some(dx) = dx {
-                d_x = Some(strp(&dx)?);
-            }
-            if let Some(dy) = dy {
-                d_y = Some(strp(&dy)?);
-            }
-            if d_x.is_some() || d_y.is_some() {
-                *self = self.translated(d_x.unwrap_or_default(), d_y.unwrap_or_default())?;
-            }
-        }
-
         if self.name() == "use" {
             // rotation requires a bbox to identify center of rotation; for `<use>`
             // elements derive from context and inject via `content_bbox`. Allows

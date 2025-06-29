@@ -1,4 +1,5 @@
 use crate::elements::SvgElement;
+use crate::errors::SvgdxError;
 use crate::geometry::{BoundingBox, Size};
 use crate::types::{fstr, strp};
 
@@ -319,39 +320,43 @@ impl Position {
     }
 }
 
-impl From<&SvgElement> for Position {
+impl TryFrom<&SvgElement> for Position {
+    type Error = SvgdxError;
+
     /// assumes SvgElement has already had compound attributes split
-    fn from(value: &SvgElement) -> Self {
+    fn try_from(value: &SvgElement) -> Result<Self, Self::Error> {
         let mut p = Position::new(value.name());
 
-        p.dx = value.get_attr("dx").and_then(|dx| strp(dx).ok());
-        p.dy = value.get_attr("dy").and_then(|dy| strp(dy).ok());
-
-        let x = value.get_attr("x1").or(value.get_attr("x"));
-        let y = value.get_attr("y1").or(value.get_attr("y"));
-        if let Some(Ok(x)) = x.map(strp) {
-            p.xmin = Some(x);
-        }
-        if let Some(Ok(y)) = y.map(strp) {
-            p.ymin = Some(y);
-        }
-
-        let x2 = value.get_attr("x2");
-        let y2 = value.get_attr("y2");
-        if let Some(Ok(x2)) = x2.map(strp) {
-            p.xmax = Some(x2);
-        }
-        if let Some(Ok(y2)) = y2.map(strp) {
-            p.ymax = Some(y2);
+        // some elements have a special meaning for dx/dx; we don't
+        // do anything in that case.
+        if !matches!(value.name(), "text" | "tspan" | "feOffset") {
+            if let Some(dx) = value.get_attr("dx") {
+                p.dx = Some(strp(dx)?);
+            }
+            if let Some(dy) = value.get_attr("dy") {
+                p.dy = Some(strp(dy)?);
+            }
         }
 
-        let cx = value.get_attr("cx");
-        let cy = value.get_attr("cy");
-        if let Some(Ok(cx)) = cx.map(strp) {
-            p.cx = Some(cx);
+        if let Some(x) = value.get_attr("x1").or(value.get_attr("x")) {
+            p.xmin = Some(strp(x)?);
         }
-        if let Some(Ok(cy)) = cy.map(strp) {
-            p.cy = Some(cy);
+        if let Some(y) = value.get_attr("y1").or(value.get_attr("y")) {
+            p.ymin = Some(strp(y)?);
+        }
+
+        if let Some(x2) = value.get_attr("x2") {
+            p.xmax = Some(strp(x2)?);
+        }
+        if let Some(y2) = value.get_attr("y2") {
+            p.ymax = Some(strp(y2)?);
+        }
+
+        if let Some(cx) = value.get_attr("cx") {
+            p.cx = Some(strp(cx)?);
+        }
+        if let Some(cy) = value.get_attr("cy") {
+            p.cy = Some(strp(cy)?);
         }
 
         // In theory `<use>` elements can have width/height attrs, but only if
@@ -360,13 +365,11 @@ impl From<&SvgElement> for Position {
         // width/height to be used as context variables.
         // See https://www.w3.org/TR/SVG2/struct.html#UseElement
         if !matches!(p.shape.as_str(), "reuse" | "use") {
-            let w = value.get_attr("width");
-            let h = value.get_attr("height");
-            if let Some(Ok(w)) = w.map(strp) {
-                p.width = Some(w);
+            if let Some(w) = value.get_attr("width") {
+                p.width = Some(strp(w)?);
             }
-            if let Some(Ok(h)) = h.map(strp) {
-                p.height = Some(h);
+            if let Some(h) = value.get_attr("height") {
+                p.height = Some(strp(h)?);
             }
         }
 
@@ -376,17 +379,15 @@ impl From<&SvgElement> for Position {
         // cannot use r/rx/ry. This is due to rx/ry having different meaning in
         // the context of rect elements.
         if let "circle" | "ellipse" = value.name() {
-            let rx = value.get_attr("rx").or(value.get_attr("r"));
-            let ry = value.get_attr("ry").or(value.get_attr("r"));
-            if let Some(Ok(r)) = rx.map(strp) {
-                p.width = Some(r * 2.);
+            if let Some(rx) = value.get_attr("rx").or(value.get_attr("r")) {
+                p.width = Some(strp(rx)? * 2.);
             }
-            if let Some(Ok(r)) = ry.map(strp) {
-                p.height = Some(r * 2.);
+            if let Some(ry) = value.get_attr("ry").or(value.get_attr("r")) {
+                p.height = Some(strp(ry)? * 2.);
             }
         }
 
-        p
+        Ok(p)
     }
 }
 
