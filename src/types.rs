@@ -3,6 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use itertools::Itertools;
 use std::fmt::{self, Display};
 use std::num::NonZeroU8;
+use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
 /// Return a 'minimal' representation of the given number
@@ -155,13 +156,102 @@ impl Display for OrderIndex {
     }
 }
 
+/// `OrderedMap` - an order preserving map for low-cardinality string pairs.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct OrderedMap(Vec<(String, String)>);
+
+impl OrderedMap {
+    pub fn new() -> Self {
+        Self(Vec::new())
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Insert-or-update the given key/value into the `AttrMap`.
+    /// If the key is already present, update in place; otherwise append.
+    pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        let key = key.into();
+        let value = value.into();
+        if let Some((_, v)) = self.0.iter_mut().find(|(k, _)| *k == key) {
+            *v = value;
+        } else {
+            self.0.push((key, value));
+        }
+    }
+
+    pub fn update(&mut self, other: &Self) {
+        for (k, v) in &other.0 {
+            self.insert(k.clone(), v.clone());
+        }
+    }
+
+    /// Insert-or-update the given key/value into the `AttrMap`.
+    /// If the key is already present, update in place; otherwise append.
+    pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        let key = key.into();
+        if !self.contains_key(&key) {
+            self.insert(key, value.into());
+        }
+    }
+
+    pub fn contains_key(&self, key: impl Into<String>) -> bool {
+        let key = key.into();
+        self.0.iter().any(|(k, _)| *k == key)
+    }
+
+    pub fn get(&self, key: impl Into<String>) -> Option<&String> {
+        let key = key.into();
+        self.0.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> + '_ {
+        self.0.iter().map(|(k, v)| (k, v))
+    }
+
+    pub fn pop(&mut self, key: impl Into<String>) -> Option<String> {
+        let key = key.into();
+        if let Some(pos) = self.0.iter().position(|(k, _)| *k == key) {
+            Some(self.0.remove(pos).1)
+        } else {
+            None
+        }
+    }
+
+    pub fn to_vec(&self) -> Vec<(String, String)> {
+        self.0.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+}
+
 /// `AttrMap` - an order preserving map for storing element attributes.
 ///
 /// Reordered on insert to provide partial ordering of attributes,
 /// e.g. 'id' before 'x' before 'width', etc.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AttrMap {
-    attrs: Vec<(String, String)>,
+    attrs: OrderedMap,
+}
+
+impl Deref for AttrMap {
+    type Target = OrderedMap;
+
+    fn deref(&self) -> &Self::Target {
+        &self.attrs
+    }
+}
+impl DerefMut for AttrMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.attrs
+    }
 }
 
 impl Display for AttrMap {
@@ -178,15 +268,9 @@ impl Display for AttrMap {
 
 impl AttrMap {
     pub fn new() -> Self {
-        Self { attrs: Vec::new() }
-    }
-
-    pub fn clear(&mut self) {
-        self.attrs.clear();
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.attrs.is_empty()
+        Self {
+            attrs: OrderedMap::new(),
+        }
     }
 
     fn priority(key: &str) -> usize {
@@ -213,71 +297,21 @@ impl AttrMap {
     }
 
     fn reorder(&mut self) {
-        self.attrs.sort_by_key(|(k, _)| Self::priority(k));
+        self.attrs.0.sort_by_key(|(k, _)| Self::priority(k));
     }
 
-    /// Insert-or-update the given key/value into the `AttrMap`.
-    /// If the key is already present, update in place; otherwise append.
     pub fn insert(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        let key = key.into();
-        let value = value.into();
-        if let Some((_, v)) = self.attrs.iter_mut().find(|(k, _)| *k == key) {
-            *v = value;
-        } else {
-            self.attrs.push((key, value));
-        }
+        self.attrs.insert(key, value);
         // TODO: if many attributes are being inserted, might want to defer this
         self.reorder();
-    }
-
-    pub fn update(&mut self, other: &Self) {
-        // TODO: defer the reorder until the end
-        for (k, v) in &other.attrs {
-            self.insert(k.clone(), v.clone());
-        }
-    }
-
-    pub fn insert_first(&mut self, key: impl Into<String>, value: impl Into<String>) {
-        let key = key.into();
-        if !self.contains_key(&key) {
-            self.insert(key, value.into());
-        }
-    }
-
-    pub fn contains_key(&self, key: impl Into<String>) -> bool {
-        let key = key.into();
-        self.attrs.iter().any(|(k, _)| *k == key)
-    }
-
-    pub fn get(&self, key: impl Into<String>) -> Option<&String> {
-        let key = key.into();
-        self.attrs.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> + '_ {
-        self.attrs.iter().map(|(k, v)| (k, v))
-    }
-
-    pub fn pop(&mut self, key: impl Into<String>) -> Option<String> {
-        let key = key.into();
-        if let Some(pos) = self.attrs.iter().position(|(k, _)| *k == key) {
-            Some(self.attrs.remove(pos).1)
-        } else {
-            None
-        }
-    }
-
-    pub fn to_vec(&self) -> Vec<(String, String)> {
-        self.attrs
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
     }
 }
 
 impl From<Vec<(String, String)>> for AttrMap {
     fn from(value: Vec<(String, String)>) -> Self {
-        let mut am = Self { attrs: value };
+        let mut am = Self {
+            attrs: OrderedMap(value),
+        };
         am.reorder();
         am
     }
@@ -295,7 +329,7 @@ impl IntoIterator for AttrMap {
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.attrs.into_iter()
+        self.attrs.0.into_iter()
     }
 }
 
@@ -307,7 +341,83 @@ impl<'s> IntoIterator for &'s AttrMap {
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.attrs.iter().map(|(k, v)| (k, v))
+        self.attrs.0.iter().map(|(k, v)| (k, v))
+    }
+}
+
+/// `StyleMap` - an order preserving map for storing element styles.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct StyleMap {
+    styles: OrderedMap,
+}
+
+impl Deref for StyleMap {
+    type Target = OrderedMap;
+
+    fn deref(&self) -> &Self::Target {
+        &self.styles
+    }
+}
+
+impl DerefMut for StyleMap {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.styles
+    }
+}
+
+impl Display for StyleMap {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (idx, (k, v)) in self.styles.iter().enumerate() {
+            write!(f, r"{}:{}", k, v)?;
+            if idx < self.styles.len() - 1 {
+                write!(f, "; ")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl StyleMap {
+    pub fn new() -> Self {
+        Self {
+            styles: OrderedMap::new(),
+        }
+    }
+}
+
+impl From<Vec<(String, String)>> for StyleMap {
+    fn from(value: Vec<(String, String)>) -> Self {
+        Self {
+            styles: OrderedMap(value),
+        }
+    }
+}
+
+impl FromIterator<(String, String)> for StyleMap {
+    fn from_iter<I: IntoIterator<Item = (String, String)>>(iter: I) -> Self {
+        let am_vec = iter.into_iter().collect::<Vec<_>>();
+        am_vec.into()
+    }
+}
+
+impl IntoIterator for StyleMap {
+    type Item = (String, String);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.styles.0.into_iter()
+    }
+}
+
+impl<'s> IntoIterator for &'s StyleMap {
+    type Item = (&'s String, &'s String);
+    type IntoIter = std::iter::Map<
+        std::slice::Iter<'s, (String, String)>,
+        fn(&(String, String)) -> (&String, &String),
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.styles.0.iter().map(|(k, v)| (k, v))
     }
 }
 
@@ -602,6 +712,26 @@ mod test {
         ];
         let am: AttrMap = two_attrs.clone().into_iter().collect();
         assert_eq!(am.to_vec(), two_attrs);
+    }
+
+    #[test]
+    fn test_stylemap() {
+        let mut sm = StyleMap::new();
+        sm.insert("fill", "red");
+        sm.insert("font-size", "12px");
+        sm.insert("stroke-width", "0");
+        sm.insert("fill", "blue"); // update existing key
+        let expected = vec![
+            ("fill".to_string(), "blue".to_string()),
+            ("font-size".to_string(), "12px".to_string()),
+            ("stroke-width".to_string(), "0".to_string()),
+        ];
+        assert_eq!(sm.to_vec(), expected);
+
+        assert_eq!(
+            format!("{sm}"),
+            r#"fill:blue; font-size:12px; stroke-width:0"#
+        );
     }
 
     #[test]
