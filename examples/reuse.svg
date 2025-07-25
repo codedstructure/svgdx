@@ -19,7 +19,7 @@
       a 5 2.5 0 0 0 -10 0
       v 35
       a 5 2.5 0 0 0 10 0
-      v -35" style="fill:red" class="pipeline"/>
+      v -35" style="fill: red" class="pipeline"/>
 
   <path id="p1" d="M 30 15
       a 10 5 0 0 0 20 0
@@ -33,11 +33,11 @@
       a 10 5 0 0 0 -20 0
       v 10
       a 10 5 0 0 0 20 0
-      v -10" style="stroke-width: 0.1; fill: limegreen;" class="pipeline"/>
+      v -10" style="stroke-width: 0.1; fill: limegreen" class="pipeline"/>
 
   <rect id="border" x="26" y="8" width="28" height="39" class="d-surround"/>
-  <path d="M 26 8 l 2 -2 h 28 l -2 2 z M 54 8 v 39 l 2 -2 v -39 z" style="fill:lightgrey" class="box3d"/>
+  <path d="M 26 8 l 2 -2 h 28 l -2 2 z M 54 8 v 39 l 2 -2 v -39 z" style="fill: lightgrey" class="box3d"/>
 
   <rect id="box" x="10" y="60" width="40" height="10"/>
-  <path d="M 10 60 l 2 -2 h 40 l -2 2 z M 50 60 v 10 l 2 -2 v -10 z" style="fill:lightgrey" class="box3d"/>
+  <path d="M 10 60 l 2 -2 h 40 l -2 2 z M 50 60 v 10 l 2 -2 v -10 z" style="fill: lightgrey" class="box3d"/>
 </svg>

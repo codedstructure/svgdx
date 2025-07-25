@@ -71,7 +71,7 @@
         h 22
         a 4 8 0 0 1 0 16
         h -22" transform="translate(45, 20)" class="pipeline_h"/>
-    <rect x="43" y="18" width="34" height="19" style="fill:none"/>
+    <rect x="43" y="18" width="34" height="19" style="fill: none"/>
 
     <path d="M 0 2.5
         a 5 2.5 0 0 0 10 0
