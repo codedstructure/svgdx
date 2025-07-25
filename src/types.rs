@@ -368,7 +368,7 @@ impl DerefMut for StyleMap {
 impl Display for StyleMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.styles.iter().enumerate() {
-            write!(f, r"{}:{}", k, v)?;
+            write!(f, r"{k}:{v}")?;
             if idx < self.styles.len() - 1 {
                 write!(f, "; ")?;
             }
