@@ -3,7 +3,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex};
+use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex, StyleMap};
 use crate::TransformConfig;
 
 use std::cell::RefCell;
@@ -356,21 +356,29 @@ impl TransformerContext {
     pub fn apply_defaults(&mut self, el: &mut SvgElement) {
         // Build up the default element we're going to apply until
         // we hit a `final` match.
-        // Later attribute values override earlier ones; classes
-        // are appended to existing classes.
+        // Later attribute values override earlier ones; classes and
+        // style rules are appended to existing values.
         let mut classes = Vec::new();
         let mut attrs = AttrMap::new();
+        let mut styles = StyleMap::new();
 
-        // For style, text-style and transform attributes we augment rather than
-        // replace the existing value, similar to the behaviour of classes.
-        let mut style_list = Vec::new();
-        let mut text_style_list = Vec::new();
+        type StoS = Box<dyn Fn(String) -> String>;
+        fn rt_ts(ts: String) -> String {
+            // Slight hack: round-trip text-style through parse/to_string
+            // to de-duplicate any styles. This isn't ideal, but `text-style`
+            // is just a normal attribute, unlike `style` which is special-cased
+            // in `SvgElement`.
+            ts.parse::<StyleMap>().map(|m| m.to_string()).unwrap_or(ts)
+        }
+
+        // For transform attributes we augment rather than replace,
+        // similar to the behaviour of classes/styles.
         let mut transform_list = Vec::new();
-        let augment_types = &mut [
-            // attribute name, value list, separator
-            ("style", &mut style_list, "; "),
-            ("text-style", &mut text_style_list, "; "),
-            ("transform", &mut transform_list, " "),
+        let mut text_style_list = Vec::new();
+        let augment_types: &mut [(_, _, _, StoS)] = &mut [
+            // attribute name, value list, separator, round-trip function
+            ("text-style", &mut text_style_list, "; ", Box::new(rt_ts)),
+            ("transform", &mut transform_list, " ", Box::new(|t| t)),
         ];
 
         // Note we iterate through all scopes from outer inwards, updating
@@ -379,16 +387,18 @@ impl TransformerContext {
             for (default, default_el) in &scope.defaults {
                 if default.matches(el) {
                     let mut default_el = default_el.clone();
-                    for (a_name, ref mut a_list, _) in &mut *augment_types {
+                    for (a_name, ref mut a_list, _, f) in &mut *augment_types {
                         if let Some(local) = default_el.pop_attr(a_name) {
-                            a_list.push(local);
+                            a_list.push(f(local));
                         }
                     }
                     if default.is_init() {
                         classes.clear();
                         attrs.clear();
+                        styles.clear();
                     }
                     classes.extend(default_el.get_classes());
+                    styles.extend(default_el.get_styles());
                     for (key, value) in default_el.get_attrs() {
                         attrs.insert(key, value);
                     }
@@ -406,13 +416,19 @@ impl TransformerContext {
             el.add_class(c);
         }
 
+        let orig_styles = el.get_styles().clone();
+        // tack original styles onto the end of the list to take priority
+        for (s, v) in styles.iter().chain(orig_styles.iter()) {
+            el.add_style(s, v);
+        }
+
         // join style/transform attributes with the most local last
-        for (a_name, ref mut a_list, sep) in augment_types {
+        for (a_name, ref mut a_list, sep, f) in augment_types {
             if !a_list.is_empty() {
                 if let Some(local) = el.pop_attr(a_name) {
                     a_list.push(local);
                 }
-                let value = a_list.join(sep);
+                let value = f(a_list.join(sep));
                 // Note set_attr rather than set_default_attr as we replace
                 // with newly constructed value
                 el.set_attr(a_name, &value);
