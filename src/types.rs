@@ -160,6 +160,12 @@ impl Display for OrderIndex {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct OrderedMap(Vec<(String, String)>);
 
+impl FromIterator<(std::string::String, std::string::String)> for OrderedMap {
+    fn from_iter<I: IntoIterator<Item = (String, String)>>(iter: I) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
 impl OrderedMap {
     pub fn new() -> Self {
         Self(Vec::new())
@@ -189,7 +195,7 @@ impl OrderedMap {
         }
     }
 
-    pub fn update(&mut self, other: &Self) {
+    pub fn extend(&mut self, other: &Self) {
         for (k, v) in &other.0 {
             self.insert(k.clone(), v.clone());
         }
@@ -345,7 +351,7 @@ impl<'s> IntoIterator for &'s AttrMap {
     }
 }
 
-/// `StyleMap` - an order preserving map for storing element styles.
+/// An order preserving map for storing element styles.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct StyleMap {
     styles: OrderedMap,
@@ -368,12 +374,31 @@ impl DerefMut for StyleMap {
 impl Display for StyleMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.styles.iter().enumerate() {
-            write!(f, r"{k}:{v}")?;
+            write!(f, r"{k}: {v}")?;
             if idx < self.styles.len() - 1 {
                 write!(f, "; ")?;
             }
         }
         Ok(())
+    }
+}
+
+impl FromStr for StyleMap {
+    type Err = SvgdxError;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let mut styles = Self::new();
+        for rule in s.split(';').filter_map(|kv| {
+            let mut parts = kv.splitn(2, ':');
+            if let (Some(key), Some(value)) = (parts.next(), parts.next()) {
+                Some((key.trim().to_string(), value.trim().to_string()))
+            } else {
+                None
+            }
+        }) {
+            styles.insert(rule.0, rule.1);
+        }
+        Ok(styles)
     }
 }
 
@@ -730,7 +755,7 @@ mod test {
 
         assert_eq!(
             format!("{sm}"),
-            r#"fill:blue; font-size:12px; stroke-width:0"#
+            r#"fill: blue; font-size: 12px; stroke-width: 0"#
         );
     }
 

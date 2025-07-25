@@ -538,9 +538,26 @@ impl SvgElement {
     ///
     /// Implemented as a method rather than a `From` impl to keep private
     fn into_bytesstart(self) -> BytesStart<'static> {
+        let mut style_attr = None;
         let mut bs = BytesStart::new(self.name().to_owned());
         for (k, v) in self.get_attrs() {
-            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+            if k == "style" {
+                // generally `style` shouldn't exists in attrs, but it will if
+                // malformed, to support round-tripping.
+                style_attr = Some(v.clone());
+            } else {
+                bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+            }
+        }
+        let s = self.get_styles();
+        let style = match (style_attr, s.to_string().as_str()) {
+            (Some(attr), "") => attr,
+            (None, s) if !s.is_empty() => s.to_string(),
+            (Some(attr), s) if !s.is_empty() => format!("{attr};{s}"),
+            _ => String::new(),
+        };
+        if !style.is_empty() {
+            bs.push_attribute(Attribute::from(("style".as_bytes(), style.as_bytes())));
         }
         let c = self.get_classes();
         if !c.is_empty() {

@@ -201,3 +201,14 @@ fn test_style_grid() {
     assert_not_contains!(output, expected1);
     assert_not_contains!(output, expected2);
 }
+
+#[test]
+fn test_style_vars() {
+    let input = r#"
+<var c="red"/>
+<rect wh="10" style="fill: $c;stroke: green"/>
+"#;
+    let expected_style = r#"<rect width="10" height="10" style="fill: red; stroke: green"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_style);
+}
