@@ -11,7 +11,7 @@
   </style>
     <defs>
       <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-        <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+        <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2"/>
       </marker>
       <pattern id="grid-1" width="1" height="1" patternUnits="userSpaceOnUse" viewBox="0,0,10,10">
         <line x1="0" y1="0" x2="10" y2="0" style="stroke: rgba(0, 0, 255, 0.6)"/>

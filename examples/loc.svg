@@ -9,7 +9,7 @@
     ]]>
   </style>
     <rect id="base" x="10" y="10" width="10" height="10" margin="3 1"/>
-    <rect x="0" y="10" width="10" height="10" style="fill:blue"/>
-    <rect x="20" y="10" width="10" height="10" style="fill:green"/>
-    <rect x="20" y="0" width="10" height="10" style="fill:red"/>
+    <rect x="0" y="10" width="10" height="10" style="fill: blue"/>
+    <rect x="20" y="10" width="10" height="10" style="fill: green"/>
+    <rect x="20" y="0" width="10" height="10" style="fill: red"/>
 </svg>
