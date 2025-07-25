@@ -34,7 +34,7 @@ impl FromStr for ThemeType {
             "light" => Ok(Self::Light),
             "dark" => Ok(Self::Dark),
             _ => Err(SvgdxError::InvalidData(format!(
-                "Unknown theme '{s}' (available themes: default, bold, fine, glass, light, dark)"
+                "Unknown theme '{s}' (available themes: default, bold, fine, glass, light, dark)",
             ))),
         }
     }
@@ -66,26 +66,34 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
     for (class, rule) in [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
-        ("d-text", "text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }"),
-        ("d-text-top", "text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }"),
-        ("d-text-bottom", "text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }"),
-        ("d-text-left", "text.d-text-left, text.d-text-left * { text-anchor: start; }"),
-        ("d-text-right", "text.d-text-right, text.d-text-right * { text-anchor: end; }"),
-        ("d-text-top-vertical", "text.d-text-top-vertical, text.d-text-top-vertical * { text-anchor: start; }"),
-        ("d-text-bottom-vertical", "text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }"),
-        ("d-text-left-vertical", "text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }"),
-        ("d-text-right-vertical", "text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }"),
+        ("d-text", "text-anchor: middle; dominant-baseline: central;"),
+        ("d-text-top", "dominant-baseline: text-before-edge;"),
+        ("d-text-bottom", "dominant-baseline: text-after-edge;"),
+        ("d-text-left", "text-anchor: start;"),
+        ("d-text-right", "text-anchor: end;"),
+        ("d-text-top-vertical", "text-anchor: start;"),
+        ("d-text-bottom-vertical", "text-anchor: end;"),
+        (
+            "d-text-left-vertical",
+            "dominant-baseline: text-after-edge;",
+        ),
+        (
+            "d-text-right-vertical",
+            "dominant-baseline: text-before-edge;",
+        ),
         // Default is sans-serif 'normal' text.
-        ("d-text-bold", "text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }"),
+        ("d-text-bold", "font-weight: bold;"),
         // Allow explicitly setting 'normal' font-weight, as themes may set a non-normal default.
-        ("d-text-normal", "text.d-text-normal, tspan.d-text-normal, text.d-text-normal * { font-weight: normal; }"),
-        ("d-text-light", "text.d-text-light, tspan.d-text-light, text.d-text-light * { font-weight: 100; }"),
-        ("d-text-italic", "text.d-text-italic, tspan.d-text-italic, text.d-text-italic * { font-style: italic; }"),
-        ("d-text-monospace", "text.d-text-monospace, tspan.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
-        ("d-text-pre", "text.d-text-pre, tspan.d-text-pre, text.d-text-pre * { font-family: monospace; }"),
+        ("d-text-normal", "font-weight: normal;"),
+        ("d-text-light", "font-weight: 100;"),
+        ("d-text-italic", "font-style: italic;"),
+        ("d-text-monospace", "font-family: monospace;"),
+        ("d-text-pre", "font-family: monospace;"),
     ] {
         if tb.has_class(class) {
-            tb.add_style(rule);
+            tb.add_style(&format!(
+                "text.{class}, tspan.{class}, text.{class} * {{ {rule} }}"
+            ));
         }
     }
 
@@ -100,10 +108,9 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
     ];
     for (class, size) in text_sizes {
         if tb.has_class(class) {
+            let size = fstr(size);
             tb.add_style(&format!(
-                "text.{0}, tspan.{0}, text.{0} * {{ font-size: {1}px; }}",
-                class,
-                fstr(size)
+                "text.{class}, tspan.{class}, text.{class} * {{ font-size: {size}px; }}"
             ));
         }
     }
@@ -120,10 +127,9 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
             // Selector must be more specific than e.g. `d-thinner`,
             // and must appear after any colour styles, where
             // `d-text-ol-[colour]` provides a default stroke-width.
+            let width = fstr(width);
             tb.add_style(&format!(
-                "text.{0}, tspan.{0}, text.{0} * {{ stroke-width: {1}; }}",
-                class,
-                fstr(width)
+                "text.{class}, tspan.{class}, text.{class} * {{ stroke-width: {width}; }}",
             ));
         }
     }
@@ -137,7 +143,8 @@ fn append_stroke_width_styles(tb: &mut ThemeBuilder, base: f32) {
         ("d-thicker", base * 4.),
     ] {
         if tb.has_class(class) {
-            tb.add_style(&format!(".{class} {{ stroke-width: {}; }}", fstr(width)));
+            let width = fstr(width);
+            tb.add_style(&format!(".{class} {{ stroke-width: {width}; }}"));
         }
     }
 }
