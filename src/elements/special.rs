@@ -5,6 +5,7 @@ use crate::events::OutputList;
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
+use crate::AutoStyleMode;
 
 #[derive(Debug, Clone)]
 pub struct DefaultsElement(pub SvgElement);
@@ -37,8 +38,17 @@ impl EventGen for ConfigElement {
             match key.as_str() {
                 "scale" => new_config.scale = value.parse()?,
                 "debug" => new_config.debug = value.parse()?,
-                "add-auto-styles" => new_config.add_auto_styles = value.parse()?,
+                // deprecated - use `auto-style-mode` instead
+                "add-auto-styles" => {
+                    new_config.auto_style_mode = if value.parse()? {
+                        AutoStyleMode::Css
+                    } else {
+                        AutoStyleMode::None
+                    }
+                }
+                // deprecated - use `auto-style-mode="inline"` instead
                 "use-local-styles" => new_config.use_local_styles = value.parse()?,
+                "auto-style-mode" => new_config.auto_style_mode = value.parse()?,
                 "border" => new_config.border = value.parse()?,
                 "background" => new_config.background = value,
                 "loop-limit" => new_config.loop_limit = value.parse()?,

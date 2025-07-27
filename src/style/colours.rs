@@ -54,9 +54,9 @@ pub static COLOUR_LIST: &[&str] = &[
     "gold",
     "goldenrod",
     "gray",
-    "grey",
     "green",
     "greenyellow",
+    "grey",
     "honeydew",
     "hotpink",
     "indianred",
@@ -102,6 +102,8 @@ pub static COLOUR_LIST: &[&str] = &[
     "moccasin",
     "navajowhite",
     "navy",
+    // Also include 'none' which is a valid stroke & fill value
+    "none",
     "oldlace",
     "olive",
     "olivedrab",
@@ -147,8 +149,6 @@ pub static COLOUR_LIST: &[&str] = &[
     "whitesmoke",
     "yellow",
     "yellowgreen",
-    // Also include 'none' which is a valid stroke & fill value
-    "none",
 ];
 
 /// The following - a subset of `COLOUR_LIST` - are (subjectively) 'dark'
@@ -193,8 +193,8 @@ pub static DARK_COLOURS: &[&str] = &[
     "fuchsia",
     "goldenrod",
     "gray",
-    "grey",
     "green",
+    "grey",
     "hotpink",
     "indianred",
     "indigo",
@@ -233,3 +233,42 @@ pub static DARK_COLOURS: &[&str] = &[
     "teal",
     "tomato",
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test that the COLOUR_LIST and DARK_COLOURS are sorted, allowing
+    /// binary search to be used.
+
+    #[test]
+    fn test_colour_list_sorted() {
+        // Ensure COLOUR_LIST is sorted for binary search
+        let mut sorted = COLOUR_LIST.to_vec();
+        sorted.sort();
+        assert_eq!(COLOUR_LIST, sorted);
+    }
+
+    #[test]
+    fn test_dark_colours_sorted() {
+        // Ensure DARK_COLOURS is sorted for binary search
+        let mut sorted = DARK_COLOURS.to_vec();
+        sorted.sort();
+        assert_eq!(DARK_COLOURS, sorted);
+    }
+
+    #[test]
+    fn test_colour_binsearch() {
+        // Test binary search on COLOUR_LIST
+        let colour = "darkblue";
+        let index = COLOUR_LIST.binary_search(&colour);
+        assert!(index.is_ok());
+        assert_eq!(COLOUR_LIST[index.unwrap()], colour);
+
+        // Test binary search on DARK_COLOURS
+        let dark_colour = "darkred";
+        let dark_index = DARK_COLOURS.binary_search(&dark_colour);
+        assert!(dark_index.is_ok());
+        assert_eq!(DARK_COLOURS[dark_index.unwrap()], dark_colour);
+    }
+}

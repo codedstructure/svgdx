@@ -5,7 +5,7 @@ use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::ThemeBuilder;
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
-use crate::TransformConfig;
+use crate::{AutoStyleMode, TransformConfig};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{BufRead, Write};
@@ -297,7 +297,7 @@ impl Transformer {
         .write_to(writer)
     }
 
-    fn write_auto_styles(&self, events: &mut OutputList, writer: &mut dyn Write) -> Result<()> {
+    fn build_theme_builder(&self, events: &OutputList) -> ThemeBuilder {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
         let mut element_set = HashSet::new();
@@ -311,14 +311,16 @@ impl Transformer {
                 _ => {}
             }
         }
-
-        let indent = 2;
         let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
         tb.build();
-        let auto_defs = tb.get_defs();
-        let auto_styles = tb.get_styles();
+        tb
+    }
 
+    fn write_auto_style_defs(&self, tb: &ThemeBuilder, writer: &mut dyn Write) -> Result<()> {
+        let indent = 2;
         let indent_line = |n| format!("\n{}", " ".repeat(n));
+
+        let auto_defs = tb.get_defs();
         if !auto_defs.is_empty() {
             let mut defs_events = vec![
                 OutputEvent::Text(indent_line(indent)),
@@ -339,6 +341,14 @@ impl Transformer {
             ]);
             OutputList::from(defs_events).write_to(writer)?;
         }
+        Ok(())
+    }
+
+    fn write_auto_style_css(&self, tb: &ThemeBuilder, writer: &mut dyn Write) -> Result<()> {
+        let indent = 2;
+        let indent_line = |n| format!("\n{}", " ".repeat(n));
+
+        let auto_styles = tb.get_styles();
         if !auto_styles.is_empty() {
             let mut style_events = vec![
                 OutputEvent::Text(indent_line(indent)),
@@ -403,8 +413,12 @@ impl Transformer {
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && self.context.config.add_auto_styles {
-            self.write_auto_styles(&mut events, writer)?;
+        if has_svg_element {
+            let tb = self.build_theme_builder(&events);
+            self.write_auto_style_defs(&tb, writer)?;
+            if self.context.config.auto_style_mode == AutoStyleMode::Css {
+                self.write_auto_style_css(&tb, writer)?;
+            }
         }
 
         events.write_to(writer)

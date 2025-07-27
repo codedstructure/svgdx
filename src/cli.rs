@@ -6,7 +6,7 @@ use std::{path::Path, sync::mpsc::channel, time::Duration};
 
 use crate::errors::{Result, SvgdxError};
 use crate::style::ThemeType;
-use crate::{transform_file, TransformConfig};
+use crate::{transform_file, AutoStyleMode, TransformConfig};
 
 /// Command line arguments
 #[derive(Parser)]
@@ -38,6 +38,7 @@ struct Arguments {
 
     /// Don't add referenced styles automatically
     #[arg(long)]
+    #[deprecated(note = "use `auto-style-mode` instead")]
     no_auto_styles: bool,
 
     /// Make styles local to this document using CSS nesting.
@@ -46,7 +47,12 @@ struct Arguments {
     /// especially if they use different themes.
     /// May not work in all SVG applications.
     #[arg(long)]
+    #[deprecated(note = "use `auto-style-mode` instead")]
     use_local_styles: bool,
+
+    /// Auto-style mode to use
+    #[arg(long, default_value = "css")]
+    auto_style_mode: AutoStyleMode,
 
     /// Default background colour if auto-styles are active
     #[arg(long, default_value = "default")]
@@ -143,7 +149,15 @@ impl Config {
                 debug: args.debug,
                 scale: args.scale,
                 border: args.border,
-                add_auto_styles: !args.no_auto_styles,
+                #[allow(deprecated)]
+                auto_style_mode: if args.no_auto_styles {
+                    AutoStyleMode::None
+                } else if args.use_local_styles {
+                    AutoStyleMode::Inline
+                } else {
+                    args.auto_style_mode
+                },
+                #[allow(deprecated)]
                 use_local_styles: args.use_local_styles,
                 background: args.background,
                 seed: args.seed,
