@@ -150,7 +150,6 @@ fn append_stroke_width_styles(tb: &mut ThemeBuilder, base: f32) {
 }
 
 fn append_colour_styles(tb: &mut ThemeBuilder) {
-    //, classes: &HashSet<String>) {
     // Colours
     // - d-colour sets a 'default' colour for shape outlines and text
     // - d-fill-colour sets the colour for shape fills, and sets a text colour

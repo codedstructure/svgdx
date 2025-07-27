@@ -215,13 +215,16 @@ impl OrderedMap {
         self.0.iter().any(|(k, _)| *k == key)
     }
 
-    pub fn get(&self, key: impl Into<String>) -> Option<&String> {
+    pub fn get(&self, key: impl Into<String>) -> Option<&str> {
         let key = key.into();
-        self.0.iter().find(|(k, _)| *k == key).map(|(_, v)| v)
+        self.0
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, v)| v.as_ref())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&String, &String)> + '_ {
-        self.0.iter().map(|(k, v)| (k, v))
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> + '_ {
+        self.0.iter().map(|(k, v)| (k.as_ref(), v.as_ref()))
     }
 
     pub fn pop(&mut self, key: impl Into<String>) -> Option<String> {
@@ -340,14 +343,21 @@ impl IntoIterator for AttrMap {
 }
 
 impl<'s> IntoIterator for &'s AttrMap {
-    type Item = (&'s String, &'s String);
+    type Item = (&'s str, &'s str);
     type IntoIter = std::iter::Map<
         std::slice::Iter<'s, (String, String)>,
-        fn(&(String, String)) -> (&String, &String),
+        fn(&(String, String)) -> (&str, &str),
     >;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.attrs.0.iter().map(|(k, v)| (k, v))
+        // can't just use a closure here because of lifetime issues
+        fn to_str_pair((k, v): &(String, String)) -> (&str, &str) {
+            (k.as_str(), v.as_str())
+        }
+        self.attrs
+            .0
+            .iter()
+            .map(to_str_pair as fn(&(String, String)) -> (&str, &str))
     }
 }
 
@@ -690,32 +700,26 @@ mod test {
         assert!(am.contains_key("e"));
         assert!(!am.contains_key("z"));
 
-        let target_state = vec![
-            ("c".to_string(), "1".to_string()),
-            ("a".to_string(), "2".to_string()),
-            ("f".to_string(), "30".to_string()),
-            ("e".to_string(), "4".to_string()),
-        ];
+        let target_state = vec![("c", "1"), ("a", "2"), ("f", "30"), ("e", "4")];
 
-        let target_state_ref = target_state
+        let target_state_owned = target_state
             .iter()
-            .map(|v| (&v.0, &v.1))
+            .map(|v| (v.0.to_owned(), v.1.to_owned()))
             .collect::<Vec<_>>();
 
         // check into_iter() works
-        assert_eq!(am.clone().into_iter().collect::<Vec<_>>(), target_state);
+        assert_eq!(
+            am.clone().into_iter().collect::<Vec<_>>(),
+            target_state_owned
+        );
 
-        assert_eq!(am.iter().collect::<Vec<_>>(), target_state_ref);
+        assert_eq!(am.iter().collect::<Vec<_>>(), target_state);
 
         am.pop("a");
 
         assert_eq!(
             am.iter().collect::<Vec<_>>(),
-            vec![
-                (&"c".to_string(), &"1".to_string()),
-                (&"f".to_string(), &"30".to_string()),
-                (&"e".to_string(), &"4".to_string())
-            ]
+            vec![("c", "1"), ("f", "30"), ("e", "4")]
         );
 
         // Check iteration (ref and owned) over the AttrMap works...

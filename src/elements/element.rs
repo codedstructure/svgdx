@@ -8,6 +8,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
+use crate::style::{apply_auto_styles, AutoStyleMode};
 use crate::transform::EventGen;
 use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex, StyleMap};
 
@@ -78,6 +79,12 @@ impl EventGen for OtherElement {
         let mut e = self.0.clone();
         e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
         e.transmute(context)?;
+
+        if context.config.auto_style_mode == AutoStyleMode::Inline {
+            // Apply auto-styles if enabled
+            apply_auto_styles(&mut e);
+        }
+
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
         let events = e.element_events(context)?;
@@ -247,14 +254,26 @@ impl SvgElement {
         self.styles.insert(key.to_string(), value.to_string());
     }
 
+    pub fn add_auto_style(&mut self, key: &str, value: &str) {
+        // Add a style only if it doesn't already exist
+        if !self.styles.contains_key(key) {
+            self.add_style(key, value);
+        }
+    }
+
     pub fn add_styles_from(&mut self, other: &Self) {
         for (key, value) in &other.styles {
+            // TODO: should this be an add_auto_style?
             self.add_style(key, value);
         }
     }
 
     pub fn get_styles(&self) -> &StyleMap {
         &self.styles
+    }
+
+    pub fn set_styles(&mut self, styles: StyleMap) {
+        self.styles = styles;
     }
 
     pub fn set_style_from(&mut self, style: &str) {
@@ -322,7 +341,7 @@ impl SvgElement {
     }
 
     pub fn get_attr(&self, key: &str) -> Option<&str> {
-        self.attrs.get(key).map(|s| s.as_str())
+        self.attrs.get(key)
     }
 
     pub fn set_attr(&mut self, key: &str, value: &str) {
@@ -399,7 +418,15 @@ impl SvgElement {
         let phantom = matches!(self.name(), "point" | "box");
 
         if self.has_attr("text") {
-            let (orig_elem, text_elements) = process_text_attr(self)?;
+            let (orig_elem, mut text_elements) = process_text_attr(self)?;
+
+            if ctx.config.auto_style_mode == AutoStyleMode::Inline {
+                for t_el in &mut text_elements {
+                    // Apply auto-styles to text elements
+                    apply_auto_styles(t_el);
+                }
+            }
+
             if orig_elem.name != "text" && !phantom {
                 // We only care about the original element if it wasn't a text element
                 // (otherwise we generate a useless empty text element for the original)
