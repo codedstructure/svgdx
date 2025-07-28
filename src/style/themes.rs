@@ -324,7 +324,7 @@ fn pattern_defs(
     }
     tb.add_defs(&format!(
         r#"<pattern id="{ptn_id}" x="0" y="0" width="{spacing}" height="{spacing}"{rotate} patternUnits="userSpaceOnUse" >
-  <rect width="100%" height="100%" style="stroke: none;"/>
+  <rect width="100%" height="100%" style="stroke: none; fill: none"/>
   {lines}
 </pattern>"#,
     ));

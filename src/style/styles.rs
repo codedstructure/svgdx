@@ -12,6 +12,10 @@ pub fn apply_auto_styles(element: &mut SvgElement) {
     if matches!(element.name(), "text" | "tspan") {
         text_styles(element, &mut style);
     }
+    arrow_styles(element, &mut style);
+    dash_styles(element, &mut style);
+    pattern_styles(element, &mut style);
+    shadow_styles(element, &mut style);
 
     tidy_styles(element, &mut style);
 
@@ -157,6 +161,65 @@ fn text_styles(element: &mut SvgElement, style: &mut StyleMap) {
     }
 
     // TODO: text sizes etc
+}
+
+fn arrow_styles(element: &mut SvgElement, style: &mut StyleMap) {
+    if element.has_class("d-arrow") {
+        style.insert("marker-end", "url(#d-arrow)");
+    }
+    if element.has_class("d-biarrow") {
+        style.insert("marker-start", "url(#d-arrow)");
+        style.insert("marker-end", "url(#d-arrow)");
+    }
+}
+
+fn dash_styles(element: &mut SvgElement, style: &mut StyleMap) {
+    // TODO: flow classes
+    if element.has_class("d-dash") {
+        style.insert("stroke-dasharray", "1 1.5");
+    }
+    if element.has_class("d-dot") {
+        style.insert("stroke-dasharray", "0 1");
+    }
+    if element.has_class("d-dot-dash") {
+        style.insert("stroke-dasharray", "0 1 1.5 1 0 1.5");
+    }
+}
+
+fn pattern_styles(element: &SvgElement, style: &mut StyleMap) {
+    const PATTERN_CLASSES: &[&str] = &[
+        "d-grid",
+        "d-grid-h",
+        "d-grid-v",
+        "d-hatch",
+        "d-crosshatch",
+        "d-stipple",
+    ];
+
+    for class in element.get_classes() {
+        for &ptn_class in PATTERN_CLASSES {
+            let is_exact = class == ptn_class;
+            let is_numbered = !is_exact
+                && class
+                    .strip_prefix(&format!("{ptn_class}-"))
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .is_some_and(|n| n <= 100);
+
+            if is_exact || is_numbered {
+                let fill_url = format!("url(#{})", class.trim_start_matches("d-"));
+                style.insert("fill", fill_url);
+            }
+        }
+    }
+}
+
+fn shadow_styles(element: &mut SvgElement, style: &mut StyleMap) {
+    if element.has_class("d-softshadow") {
+        style.insert("filter", "url(#d-softshadow)");
+    }
+    if element.has_class("d-hardshadow") {
+        style.insert("filter", "url(#d-hardshadow)");
+    }
 }
 
 fn tidy_styles(element: &mut SvgElement, style: &mut StyleMap) {
