@@ -387,72 +387,7 @@ fn d_hardshadow(tb: &mut ThemeBuilder, _: &str) {
     );
 }
 
-trait Theme: Clone {
-    fn build(&self, tb: &mut ThemeBuilder) {
-        let mut outer_svg = String::from("svg");
-        if let Some(id) = &tb.local_style_id {
-            outer_svg = format!("svg#{id}");
-        }
-        // Any background style needs to be prior to potential CSS nesting from local_id
-        // - it isn't a descendant of the local_id element, but that element itself.
-        if tb.background != "default" {
-            tb.add_style(&format!(
-                "{} {{ background: {}; }}",
-                outer_svg, tb.background
-            ));
-        } else {
-            tb.add_style(&format!(
-                "{} {{ background: {}; }}",
-                outer_svg,
-                self.default_background()
-            ));
-        }
-        if let Some(id) = &tb.local_style_id {
-            // Start a nested CSS block for styles to ensure they don't leak
-            // to surrounding document.
-            tb.add_style(&format!("#{id} {{"));
-        }
-        self.append_early_styles(tb);
-        // Must be before any colour styles which need to override this
-        if tb.has_class("d-surround") {
-            tb.add_style(".d-surround { fill: none; }");
-        }
-
-        append_common_styles(
-            tb,
-            &self.default_fill(),
-            &self.default_stroke(),
-            self.default_stroke_width(),
-        );
-        // Colour styles must appear before text styles, at least so
-        // d-text-ol-[colour] (which sets a default stroke-width) can be
-        // overridden by the text style `d-text-ol-[thickness]`.
-        append_colour_styles(tb);
-
-        append_stroke_width_styles(tb, self.default_stroke_width());
-        if tb.elements.contains("text") {
-            append_text_styles(tb);
-        }
-
-        append_arrow_styles(tb);
-        append_dash_styles(tb);
-        append_pattern_styles(tb, &self.default_stroke());
-
-        type Tfn = dyn Fn(&mut ThemeBuilder, &str);
-        for (class, build_fn) in [
-            ("d-softshadow", &d_softshadow as &Tfn),
-            ("d-hardshadow", &d_hardshadow as &Tfn),
-        ] {
-            if tb.has_class(class) {
-                build_fn(tb, &self.default_stroke());
-            }
-        }
-        self.append_late_styles(tb);
-        // Close the nested CSS block if we opened one.
-        if tb.local_style_id.is_some() {
-            tb.add_style("}");
-        }
-    }
+trait Theme {
     fn default_fill(&self) -> String {
         String::from("white")
     }
@@ -465,8 +400,77 @@ trait Theme: Clone {
     fn default_stroke_width(&self) -> f32 {
         0.5
     }
-    fn append_early_styles(&self, _tb: &mut ThemeBuilder) {}
-    fn append_late_styles(&self, _tb: &mut ThemeBuilder) {}
+    fn default_font_weight(&self) -> Option<String> {
+        None
+    }
+}
+
+fn build_theme(theme: &dyn Theme, tb: &mut ThemeBuilder) {
+    let mut outer_svg = String::from("svg");
+    if let Some(id) = &tb.local_style_id {
+        outer_svg = format!("svg#{id}");
+    }
+    // Any background style needs to be prior to potential CSS nesting from local_id
+    // - it isn't a descendant of the local_id element, but that element itself.
+    if tb.background != "default" {
+        tb.add_style(&format!(
+            "{} {{ background: {}; }}",
+            outer_svg, tb.background
+        ));
+    } else {
+        tb.add_style(&format!(
+            "{} {{ background: {}; }}",
+            outer_svg,
+            theme.default_background()
+        ));
+    }
+    if let Some(id) = &tb.local_style_id {
+        // Start a nested CSS block for styles to ensure they don't leak
+        // to surrounding document.
+        tb.add_style(&format!("#{id} {{"));
+    }
+    // Must be before any colour styles which need to override this
+    if tb.has_class("d-surround") {
+        tb.add_style(".d-surround { fill: none; }");
+    }
+
+    append_common_styles(
+        tb,
+        &theme.default_fill(),
+        &theme.default_stroke(),
+        theme.default_stroke_width(),
+    );
+    // Colour styles must appear before text styles, at least so
+    // d-text-ol-[colour] (which sets a default stroke-width) can be
+    // overridden by the text style `d-text-ol-[thickness]`.
+    append_colour_styles(tb);
+
+    append_stroke_width_styles(tb, theme.default_stroke_width());
+    if tb.elements.contains("text") {
+        append_text_styles(tb);
+        // TODO: theme should be provided to append_text_styles
+        if let Some(weight) = theme.default_font_weight() {
+            tb.add_style(&format!("text, tspan {{ font-weight: {weight}; }}"));
+        }
+    }
+
+    append_arrow_styles(tb);
+    append_dash_styles(tb);
+    append_pattern_styles(tb, &theme.default_stroke());
+
+    type Tfn = dyn Fn(&mut ThemeBuilder, &str);
+    for (class, build_fn) in [
+        ("d-softshadow", &d_softshadow as &Tfn),
+        ("d-hardshadow", &d_hardshadow as &Tfn),
+    ] {
+        if tb.has_class(class) {
+            build_fn(tb, &theme.default_stroke());
+        }
+    }
+    // Close the nested CSS block if we opened one.
+    if tb.local_style_id.is_some() {
+        tb.add_style("}");
+    }
 }
 
 pub struct ThemeBuilder {
@@ -501,14 +505,15 @@ impl ThemeBuilder {
         }
     }
     pub fn build(&mut self) {
-        match self.theme {
-            ThemeType::Default => DefaultTheme {}.build(self),
-            ThemeType::Bold => BoldTheme {}.build(self),
-            ThemeType::Fine => FineTheme {}.build(self),
-            ThemeType::Glass => GlassTheme {}.build(self),
-            ThemeType::Light => LightTheme {}.build(self),
-            ThemeType::Dark => DarkTheme {}.build(self),
-        }
+        let theme: Box<dyn Theme> = match self.theme {
+            ThemeType::Default => Box::new(DefaultTheme {}),
+            ThemeType::Bold => Box::new(BoldTheme {}),
+            ThemeType::Fine => Box::new(FineTheme {}),
+            ThemeType::Glass => Box::new(GlassTheme {}),
+            ThemeType::Light => Box::new(LightTheme {}),
+            ThemeType::Dark => Box::new(DarkTheme {}),
+        };
+        build_theme(&*theme, self);
     }
     fn has_class(&self, s: &str) -> bool {
         self.classes.iter().any(|x| x == s)
@@ -539,8 +544,8 @@ impl Theme for DefaultTheme {}
 pub struct FineTheme;
 
 impl Theme for FineTheme {
-    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
-        tb.add_style("text,tspan {font-weight: 100}");
+    fn default_font_weight(&self) -> Option<String> {
+        Some(String::from("100"))
     }
     fn default_stroke_width(&self) -> f32 {
         0.2
@@ -550,8 +555,8 @@ impl Theme for FineTheme {
 #[derive(Debug, Clone)]
 pub struct BoldTheme;
 impl Theme for BoldTheme {
-    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
-        tb.add_style("text,tspan {font-weight: 900}");
+    fn default_font_weight(&self) -> Option<String> {
+        Some(String::from("900"))
     }
     fn default_stroke_width(&self) -> f32 {
         1.
@@ -561,9 +566,9 @@ impl Theme for BoldTheme {
 #[derive(Debug, Clone)]
 pub struct GlassTheme;
 impl Theme for GlassTheme {
-    fn append_early_styles(&self, tb: &mut ThemeBuilder) {
-        tb.add_style("rect, circle, ellipse, polygon { opacity: 0.7; }");
-    }
+    // TODO: consider opacity: 0.7 for enclosed elements; though
+    // maybe just having the default fill translucent is enough.
+    // (and possibly any additional colour styles we introduce)
     fn default_fill(&self) -> String {
         String::from("rgba(0, 30, 50, 0.15)")
     }
