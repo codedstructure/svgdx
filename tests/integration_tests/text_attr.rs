@@ -383,11 +383,11 @@ fn test_text_inset_dxy() {
 #[test]
 fn test_text_style() {
     let input = r#"
-<rect xy="0" wh="10" text="thing" text-style="font-size: 2em; font-weight: bold"/>
+<rect xy="0" wh="10" text="thing" text-style="font-size: 2em; font-weight: bold;"/>
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" style="font-size: 2em; font-weight: bold" class="d-text">thing</text>
+<text x="5" y="5" style="font-size: 2em; font-weight: bold;" class="d-text">thing</text>
 "#;
 
     assert_eq!(
@@ -401,8 +401,8 @@ fn test_text_style() {
 "#;
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
-<text x="5" y="5" style="font-size: 2em" class="d-text">
-<tspan x="5" dy="-0.525em" style="font-size: 2em">two</tspan><tspan x="5" dy="1.05em" style="font-size: 2em">lines</tspan>
+<text x="5" y="5" style="font-size: 2em;" class="d-text">
+<tspan x="5" dy="-0.525em" style="font-size: 2em;">two</tspan><tspan x="5" dy="1.05em" style="font-size: 2em;">lines</tspan>
 </text>
 "#;
 

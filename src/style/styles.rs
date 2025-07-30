@@ -179,9 +179,16 @@ fn dash_styles(element: &mut SvgElement, style: &mut StyleMap) {
         style.insert("stroke-dasharray", "1 1.5");
     }
     if element.has_class("d-dot") {
+        // TODO: this only works with stroke-linecap: round...
+        // we could include it here, or throughout for lines?
+        // maybe all lines should have round linecap/join?
+        // I quite like not having it for d-dash though, but
+        // may want to adjust the dasharray there.
+        style.insert("stroke-linecap", "round");
         style.insert("stroke-dasharray", "0 1");
     }
     if element.has_class("d-dot-dash") {
+        style.insert("stroke-linecap", "round");
         style.insert("stroke-dasharray", "0 1 1.5 1 0 1.5");
     }
 }

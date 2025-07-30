@@ -401,6 +401,18 @@ impl From<Vec<OutputEvent>> for OutputList {
     }
 }
 
+impl Extend<OutputEvent> for OutputList {
+    fn extend<T: IntoIterator<Item = OutputEvent>>(&mut self, iter: T) {
+        self.events.extend(iter);
+    }
+}
+
+impl<'a> Extend<&'a OutputEvent> for OutputList {
+    fn extend<T: IntoIterator<Item = &'a OutputEvent>>(&mut self, iter: T) {
+        self.events.extend(iter.into_iter().cloned());
+    }
+}
+
 impl From<InputList> for OutputList {
     fn from(value: InputList) -> Self {
         Self {
@@ -418,6 +430,11 @@ impl OutputList {
         self.events.is_empty()
     }
 
+    #[allow(dead_code)]
+    pub fn len(&self) -> usize {
+        self.events.len()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = &OutputEvent> + '_ {
         self.events.iter()
     }
@@ -425,10 +442,6 @@ impl OutputList {
     pub fn push(&mut self, ev: impl Into<OutputEvent>) {
         let ev = ev.into();
         self.events.push(ev.clone());
-    }
-
-    pub fn extend(&mut self, other: &OutputList) {
-        self.events.extend(other.events.clone());
     }
 
     fn blank_line_remover(s: &str) -> String {

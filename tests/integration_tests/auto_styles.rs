@@ -3,14 +3,14 @@ use svgdx::transform_str_default;
 
 #[test]
 fn test_style_stroke_colour() {
-    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-red" /></svg>"#;
+    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-red" text="T"/></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-red { stroke: red; }"#;
     assert_contains!(output, expected_style);
     let expected_style = r#"text.d-red, tspan.d-red, text.d-red * { fill: red; stroke: white; }"#;
     assert_contains!(output, expected_style);
 
-    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-black" /></svg>"#;
+    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-black" text="T"/></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-black { stroke: black; }"#;
     assert_contains!(output, expected_style);
@@ -19,7 +19,7 @@ fn test_style_stroke_colour() {
     assert_contains!(output, expected_style);
 
     // Check special case that d-none does not set text fill
-    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-none" /></svg>"#;
+    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-none" text="T"/></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-none { stroke: none; }"#;
     assert_contains!(output, expected_style);
@@ -29,19 +29,19 @@ fn test_style_stroke_colour() {
 
 #[test]
 fn test_style_fill_colour() {
-    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-red" /></svg>"#;
+    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-red" text="test"/></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-fill-red { fill: red; }"#;
     assert_contains!(output, expected_style);
-    let expected_style = r#"text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }"#;
+    let expected_style =
+        r#"text.d-fill-red, tspan.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }"#;
     assert_contains!(output, expected_style);
 
-    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-lightgrey" /></svg>"#;
+    let colour_input = r#"<svg><rect xy="0" wh="20" class="d-fill-lightgrey" text="test"/></svg>"#;
     let output = transform_str_default(colour_input).unwrap();
     let expected_style = r#".d-fill-lightgrey { fill: lightgrey; }"#;
     assert_contains!(output, expected_style);
-    let expected_style =
-        r#"text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }"#;
+    let expected_style = r#"text.d-fill-lightgrey, tspan.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }"#;
     assert_contains!(output, expected_style);
 }
 
@@ -208,7 +208,7 @@ fn test_style_vars() {
 <var c="red"/>
 <rect wh="10" style="fill: $c;stroke: green"/>
 "#;
-    let expected_style = r#"<rect width="10" height="10" style="fill: red; stroke: green"/>"#;
+    let expected_style = r#"<rect width="10" height="10" style="fill: red; stroke: green;"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_style);
 }

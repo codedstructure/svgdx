@@ -384,9 +384,9 @@ impl DerefMut for StyleMap {
 impl Display for StyleMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.styles.iter().enumerate() {
-            write!(f, r"{k}: {v}")?;
+            write!(f, r"{k}: {v};")?;
             if idx < self.styles.len() - 1 {
-                write!(f, "; ")?;
+                write!(f, " ")?;
             }
         }
         Ok(())
@@ -759,7 +759,7 @@ mod test {
 
         assert_eq!(
             format!("{sm}"),
-            r#"fill: blue; font-size: 12px; stroke-width: 0"#
+            r#"fill: blue; font-size: 12px; stroke-width: 0;"#
         );
     }
 

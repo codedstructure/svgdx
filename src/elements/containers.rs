@@ -77,7 +77,7 @@ impl EventGen for Container {
                     let oi_base = Some(new_el.order_index.clone());
                     process_events_with_index(inner_events, context, oi_base)?
                 };
-                events.extend(&evlist);
+                events.extend(evlist);
                 events.push(OutputEvent::End(self.0.name().to_owned()));
 
                 if is_container_element(&new_el) {
@@ -139,7 +139,7 @@ impl EventGen for GroupElement {
         } else {
             let el_name = new_el.name().to_owned();
             events.push(OutputEvent::Start(new_el.clone()));
-            events.extend(&inner);
+            events.extend(inner);
             events.push(OutputEvent::End(el_name));
         }
 
