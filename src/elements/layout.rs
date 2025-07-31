@@ -869,8 +869,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                 }
             } else {
                 return Err(SvgdxError::InvalidData(format!(
-                    "Could not derive text anchor: '{}'",
-                    loc
+                    "Could not derive text anchor: '{loc}'"
                 )));
             }
         }

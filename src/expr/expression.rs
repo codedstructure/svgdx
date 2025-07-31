@@ -79,7 +79,7 @@ impl Display for ExprValue {
         match self {
             Self::Number(n) => write!(f, "{}", fstr(*n)),
             Self::String(s) => write!(f, "'{}'", escape(s)),
-            Self::Text(t) => write!(f, "{}", t),
+            Self::Text(t) => write!(f, "{t}"),
             Self::List(_) => {
                 write!(f, "{}", self.flatten().into_iter().join(", "))
             }
@@ -763,8 +763,7 @@ fn primary(eval_state: &mut EvalState) -> Result<ExprValue> {
             Ok(e)
         }
         Some(tok) => Err(SvgdxError::ParseError(format!(
-            "Invalid token in primary(): {:?}",
-            tok
+            "Invalid token in primary(): {tok:?}"
         ))),
         None => Err(SvgdxError::ParseError("Unexpected end of input".to_owned())),
     }

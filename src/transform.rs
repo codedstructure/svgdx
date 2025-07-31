@@ -264,8 +264,8 @@ impl Transformer {
                 // if neither present, assume user units are mm, scaled by config.scale
                 let width = fstr(bb.width() * self.context.config.scale);
                 let height = fstr(bb.height() * self.context.config.scale);
-                let new_width = format!("{}mm", width);
-                let new_height = format!("{}mm", height);
+                let new_width = format!("{width}mm");
+                let new_height = format!("{height}mm");
                 new_svg_attrs.insert("width", new_width.as_str());
                 new_svg_attrs.insert("height", new_height.as_str());
             } else if orig_height.is_none() {
@@ -449,7 +449,7 @@ mod tests {
             </svg>"#,
         ];
         for input in real_inputs {
-            assert!(is_real_svg(&input.parse().unwrap()), "{:?}", input);
+            assert!(is_real_svg(&input.parse().unwrap()), "{input:?}");
         }
 
         let unreal_inputs = [
@@ -469,7 +469,7 @@ mod tests {
             r#"<rect width="100" height="100"/>"#,
         ];
         for input in unreal_inputs {
-            assert!(!is_real_svg(&input.parse().unwrap()), "{:?}", input);
+            assert!(!is_real_svg(&input.parse().unwrap()), "{input:?}");
         }
     }
 

@@ -31,14 +31,12 @@ impl EventGen for SvgElement {
             "defaults" => DefaultsElement(self.clone()).generate_events(context),
             "for" => ForElement(self.clone()).generate_events(context),
             "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
-            _ => {
-                match self.event_range {
-                    Some((start, end)) if start != end => {
-                        return Container(self.clone()).generate_events(context);
-                    }
-                    _ => OtherElement(self.clone()).generate_events(context)
+            _ => match self.event_range {
+                Some((start, end)) if start != end => {
+                    return Container(self.clone()).generate_events(context);
                 }
-            }
+                _ => OtherElement(self.clone()).generate_events(context),
+            },
         };
         // Ideally would have a single 'if bbox, set prev_element' here,
         // but is used for attribute lookup as well as bbox, so need the
@@ -172,7 +170,7 @@ impl SvgElement {
         }
         Self {
             name: name.to_string(),
-            original: format!("<{name} {}>", attr_map),
+            original: format!("<{name} {attr_map}>"),
             attrs: attr_map.clone(),
             classes,
             text_content: None,

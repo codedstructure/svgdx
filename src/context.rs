@@ -211,8 +211,7 @@ impl ElementMap for TransformerContext {
             if let Some(el) = self.get_element(&elref) {
                 if seen.contains(&el.order_index) {
                     return Err(SvgdxError::CircularRefError(format!(
-                        "{} already seen",
-                        elref
+                        "{elref} already seen"
                     )));
                 }
                 seen.push(el.order_index.clone());

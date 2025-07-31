@@ -309,7 +309,7 @@ impl Position {
         if x != 0. || y != 0. {
             let mut xy_xfrm = format!("translate({x}, {y})");
             if let Some(exist_xfrm) = element.get_attr("transform") {
-                xy_xfrm = format!("{} {}", exist_xfrm, xy_xfrm);
+                xy_xfrm = format!("{exist_xfrm} {xy_xfrm}");
             }
             element.set_attr("transform", &xy_xfrm);
             element.remove_attrs(&[

@@ -54,7 +54,7 @@ impl fmt::Display for SvgdxError {
             SvgdxError::DocumentError(reason) => write!(f, "Document error: {reason}"),
             SvgdxError::MissingAttribute(attr) => write!(f, "Element missing attribute '{attr}'"),
             SvgdxError::MissingBoundingBox(reason) => write!(f, "Missing bounding box: {reason}"),
-            SvgdxError::MessageError(reason) => write!(f, "{}", reason),
+            SvgdxError::MessageError(reason) => write!(f, "{reason}"),
             SvgdxError::InternalLogicError(reason) => write!(f, "Internal logic error: {reason}"),
             SvgdxError::MultiError(errors) => {
                 for (_, (el, err)) in errors.iter().sorted_by(|a, b| a.0.cmp(b.0)) {

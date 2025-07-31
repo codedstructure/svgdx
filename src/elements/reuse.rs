@@ -74,7 +74,7 @@ impl EventGen for ReuseElement {
                     // append to any existing transform
                     let mut xfrm = value.clone();
                     if let Some(inst_xfrm) = instance_element.get_attr("transform") {
-                        xfrm = format!("{} {}", inst_xfrm, xfrm);
+                        xfrm = format!("{inst_xfrm} {xfrm}");
                     }
                     instance_element.set_attr("transform", &xfrm);
                 }

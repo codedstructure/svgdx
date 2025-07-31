@@ -166,7 +166,7 @@ pub struct AttrMap {
 impl Display for AttrMap {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (idx, (k, v)) in self.attrs.iter().enumerate() {
-            write!(f, r#"{}="{}""#, k, v)?;
+            write!(f, r#"{k}="{v}""#)?;
             if idx < self.attrs.len() - 1 {
                 write!(f, " ")?;
             }
@@ -446,7 +446,7 @@ impl FromStr for ElRef {
 impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
+            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{id}"),
             ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
             ElRef::Next => write!(f, "{ELREF_NEXT}"),
         }

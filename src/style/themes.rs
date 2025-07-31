@@ -34,8 +34,7 @@ impl FromStr for ThemeType {
             "light" => Ok(Self::Light),
             "dark" => Ok(Self::Dark),
             _ => Err(SvgdxError::InvalidData(format!(
-                "Unknown theme '{}' (available themes: default, bold, fine, glass, light, dark)",
-                s
+                "Unknown theme '{s}' (available themes: default, bold, fine, glass, light, dark)"
             ))),
         }
     }
@@ -344,7 +343,7 @@ fn append_pattern_styles(tb: &mut ThemeBuilder, t_stroke: &str) {
         if tb.has_class(ptn_class) {
             pattern_defs(tb, t_stroke, ptn_class, 1, ptn_type, ptn_rotate);
         }
-        let spec_class = format!("{}-", ptn_class);
+        let spec_class = format!("{ptn_class}-");
 
         let classes: Vec<_> = tb
             .classes
@@ -386,7 +385,7 @@ trait Theme: Clone {
     fn build(&self, tb: &mut ThemeBuilder) {
         let mut outer_svg = String::from("svg");
         if let Some(id) = &tb.local_style_id {
-            outer_svg = format!("svg#{}", id);
+            outer_svg = format!("svg#{id}");
         }
         // Any background style needs to be prior to potential CSS nesting from local_id
         // - it isn't a descendant of the local_id element, but that element itself.
@@ -405,7 +404,7 @@ trait Theme: Clone {
         if let Some(id) = &tb.local_style_id {
             // Start a nested CSS block for styles to ensure they don't leak
             // to surrounding document.
-            tb.add_style(&format!("#{} {{", id));
+            tb.add_style(&format!("#{id} {{"));
         }
         self.append_early_styles(tb);
         // Must be before any colour styles which need to override this

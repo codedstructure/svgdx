@@ -86,9 +86,9 @@ fn test_style_text_attributes() {
         ("d-text-largest", 9.),
     ];
     for (class, size) in text_sizes {
-        let input = format!(r#"<svg><text xy="0" class="{}">Hello!</text></svg>"#, class);
+        let input = format!(r#"<svg><text xy="0" class="{class}">Hello!</text></svg>"#);
         let output = transform_str_default(&input).unwrap();
-        let expected_style = format!("text.{0}, text.{0} * {{ font-size: {1}px; }}", class, size);
+        let expected_style = format!("text.{class}, text.{class} * {{ font-size: {size}px; }}");
         assert_contains!(output, &expected_style);
     }
 }

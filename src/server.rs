@@ -60,7 +60,7 @@ async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResp
             Response::builder()
                 .status(400)
                 .header("Content-Type", "text/plain")
-                .body(Body::from(format!("Error: {}", e)))
+                .body(Body::from(format!("Error: {e}")))
                 .unwrap()
         })
 }
@@ -169,7 +169,7 @@ pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) 
         .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/api/transform", post(transform));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
-    println!("Listening on: http://{}", addr);
+    println!("Listening on: http://{addr}");
     if let Some(ready) = ready {
         ready.send(()).await.unwrap();
     }

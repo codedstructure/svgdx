@@ -432,8 +432,5 @@ fn test_nonempty_position() {
 fn test_nonempty_position_dirspec() {
     let input = r#"<rect xy="5" wh="5"><title>thing</title></rect><rect id="a" xy="^|h" wh="5"/>"#;
     let expected = r#"<rect id="a" x="10" y="5" width="5" height="5"/>"#;
-    assert_contains!(
-        transform_str_default(input).unwrap(),
-        expected
-    );
+    assert_contains!(transform_str_default(input).unwrap(), expected);
 }
