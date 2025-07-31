@@ -32,12 +32,12 @@ impl EventGen for SvgElement {
             "for" => ForElement(self.clone()).generate_events(context),
             "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
             _ => {
-                if let Some((start, end)) = self.event_range {
-                    if start != end {
+                match self.event_range {
+                    Some((start, end)) if start != end => {
                         return Container(self.clone()).generate_events(context);
                     }
+                    _ => OtherElement(self.clone()).generate_events(context)
                 }
-                OtherElement(self.clone()).generate_events(context)
             }
         };
         // Ideally would have a single 'if bbox, set prev_element' here,

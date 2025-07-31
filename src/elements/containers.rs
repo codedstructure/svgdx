@@ -31,6 +31,13 @@ impl EventGen for Container {
                     break;
                 }
             }
+            if let Some(text) = &inner_text {
+                let mut el = self.0.clone();
+                el.set_attr("text", text);
+                if let Some((start, _end)) = self.0.event_range {
+                    el.event_range = Some((start, start)); // emulate an Empty element
+                }
+            }
             if let (true, Some(text)) = (is_graphics_element(&self.0), &inner_text) {
                 let mut el = self.0.clone();
                 el.set_attr("text", text);
@@ -40,6 +47,18 @@ impl EventGen for Container {
                 el.generate_events(context)
             } else {
                 let mut new_el = self.0.clone();
+                let mut bbox = None;
+
+                if is_graphics_element(&new_el) {
+                    // TODO: this duplicates part of the `OtherElement::generate_events`
+                    // logic; should really be based on graphics vs container element
+                    // rather than whether the XML element is empty or not.
+                    new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
+                    new_el.transmute(context)?;
+                    context.update_element(&new_el);
+                    bbox = new_el.bbox()?;
+                }
+
                 // Special case <svg> elements with an xmlns attribute - passed through
                 // transparently, with no bbox calculation.
                 if new_el.name() == "svg" && new_el.get_attr("xmlns").is_some() {
@@ -51,7 +70,7 @@ impl EventGen for Container {
                 }
                 let mut events = OutputList::new();
                 events.push(OutputEvent::Start(new_el.clone()));
-                let (evlist, mut bbox) = if inner_text.is_some() {
+                let (evlist, inner_bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
@@ -60,6 +79,10 @@ impl EventGen for Container {
                 };
                 events.extend(&evlist);
                 events.push(OutputEvent::End(self.0.name().to_owned()));
+
+                if is_container_element(&new_el) {
+                    bbox = inner_bbox;
+                }
 
                 if self.0.name() == "defs" {
                     bbox = None;
@@ -173,6 +196,8 @@ fn is_container_element(el: &SvgElement) -> bool {
                 | "svg"
                 | "switch"
                 | "symbol"
+                // Following not listed as a 'container element', but acts like it
+                | "clipPath"
                 // Following are non-standard.
                 | "specs"
     )

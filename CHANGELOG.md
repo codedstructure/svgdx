@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: position and attribute expansion for non-empty graphics elements,
+  such as a `<rect>` containing a `<title>` child element.
+
 ## [0.21.0 - 2025-06-29]
 
 - Added: support for 'next' references using '+', analogous to 'previous'

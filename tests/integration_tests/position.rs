@@ -417,3 +417,23 @@ fn test_non_rect_scalar() {
     assert_contains!(result, expected1);
     assert_contains!(result, expected2);
 }
+
+#[test]
+fn test_nonempty_position() {
+    let input = r#"<rect xy="3 5" wh="1"><title>thing</title></rect>"#;
+    let expected = r#"<rect x="3" y="5" width="1" height="1"><title>thing</title></rect>"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_nonempty_position_dirspec() {
+    let input = r#"<rect xy="5" wh="5"><title>thing</title></rect><rect id="a" xy="^|h" wh="5"/>"#;
+    let expected = r#"<rect id="a" x="10" y="5" width="5" height="5"/>"#;
+    assert_contains!(
+        transform_str_default(input).unwrap(),
+        expected
+    );
+}
