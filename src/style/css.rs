@@ -31,7 +31,8 @@ pub(super) fn append_text_styles(tb: &mut ThemeBuilder) {
     if !tb.has_element("text") {
         return;
     }
-    for (class, rule) in [
+
+    let text_pos_rules = [
         // Text alignment - default centered horizontally and vertically
         // These are intended to be composable, e.g. "d-text-top d-text-right"
         ("d-text", "text-anchor: middle; dominant-baseline: central;"),
@@ -49,6 +50,15 @@ pub(super) fn append_text_styles(tb: &mut ThemeBuilder) {
             "d-text-right-vertical",
             "dominant-baseline: text-before-edge;",
         ),
+    ];
+    for (class, rule) in text_pos_rules {
+        if tb.has_class(class) {
+            // text-position classes must be specified on the outer text element
+            tb.add_style(&format!("text.{class}, text.{class} * {{ {rule} }}"));
+        }
+    }
+
+    let text_style_rules = [
         // Default is sans-serif 'normal' text.
         ("d-text-bold", "font-weight: bold;"),
         // Allow explicitly setting 'normal' font-weight, as themes may set a non-normal default.
@@ -57,7 +67,8 @@ pub(super) fn append_text_styles(tb: &mut ThemeBuilder) {
         ("d-text-italic", "font-style: italic;"),
         ("d-text-monospace", "font-family: monospace;"),
         ("d-text-pre", "font-family: monospace;"),
-    ] {
+    ];
+    for (class, rule) in text_style_rules {
         if tb.has_class(class) {
             tb.add_style(&format!(
                 "text.{class}, tspan.{class}, text.{class} * {{ {rule} }}"
@@ -65,7 +76,7 @@ pub(super) fn append_text_styles(tb: &mut ThemeBuilder) {
         }
     }
 
-    let text_sizes = vec![
+    let text_sizes = [
         ("d-text-smallest", tb.font_size * 0.333333),
         ("d-text-smaller", tb.font_size * 0.5),
         ("d-text-small", tb.font_size * 0.666666),
@@ -82,7 +93,7 @@ pub(super) fn append_text_styles(tb: &mut ThemeBuilder) {
             ));
         }
     }
-    let text_ol_widths = vec![
+    let text_ol_widths = [
         ("d-text-ol", 0.5), // Must be first, so other classes can override
         ("d-text-ol-thinner", 0.125),
         ("d-text-ol-thin", 0.25),
@@ -213,7 +224,7 @@ pub(super) fn append_arrow_styles(tb: &mut ThemeBuilder) {
 pub(super) fn append_dash_styles(tb: &mut ThemeBuilder) {
     // Dash / dot / flow: stroke-dasharray should have an even number of entries and the 'from'
     // keyframe stroke-dashoffset should be (a multiple of) the sum of the dasharray values.
-    let flow_style = vec![
+    let flow_style = [
         ("d-flow-slower", "4"),
         ("d-flow-slow", "2"),
         ("d-flow", "1"),
