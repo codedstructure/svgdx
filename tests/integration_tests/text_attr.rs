@@ -614,3 +614,20 @@ fn test_multiline_outside() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_md() {
+    let input = r#"
+<rect xy="0" wh="10" md="m*ult*i\nline" text-loc="br" class="d-text-outside"/>
+"#;
+    let expected = r#"
+<rect x=\"0\" y=\"0\" width=\"10\" height=\"10\"/>
+<text x=\"11\" y=\"11\" class=\"d-text d-text-top d-text-left\">
+<tspan x=\"11\" dy=\"0em\">m</tspan><tspan dy=\"0em\" class=\"d-text-italic\">ult</tspan><tspan dy=\"0em\">i</tspan><tspan x=\"11\" dy=\"1.05em\">line</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
