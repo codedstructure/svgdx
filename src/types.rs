@@ -425,8 +425,8 @@ impl<'s> IntoIterator for &'s ClassList {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElRef {
     Id(String),
-    Prev,
-    Next,
+    Prev(u32),
+    Next(u32),
 }
 
 impl FromStr for ElRef {
@@ -446,9 +446,13 @@ impl FromStr for ElRef {
 impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{id}"),
-            ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
-            ElRef::Next => write!(f, "{ELREF_NEXT}"),
+            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
+            ElRef::Prev(1) => write!(f, "{ELREF_PREVIOUS}"),
+            ElRef::Prev(2) => write!(f, "{ELREF_PREVIOUS}{ELREF_PREVIOUS}"),
+            ElRef::Prev(num) => write!(f, "{ELREF_PREVIOUS}{num}{ELREF_PREVIOUS}"),
+            ElRef::Next(1) => write!(f, "{ELREF_NEXT}"),
+            ElRef::Next(2) => write!(f, "{ELREF_NEXT}{ELREF_NEXT}"),
+            ElRef::Next(num) => write!(f, "{ELREF_NEXT}{num}{ELREF_NEXT}"),
         }
     }
 }
@@ -457,6 +461,8 @@ impl Display for ElRef {
 pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
     let first_char_match = |c: char| c.is_alphabetic() || c == '_';
     let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+
+    let ret_s;
 
     if let Some(s) = s.strip_prefix(ELREF_ID_PREFIX) {
         if s.starts_with(first_char_match) {
@@ -468,9 +474,55 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
             }
         }
     } else if let Some(s) = s.strip_prefix(ELREF_PREVIOUS) {
-        return Ok((ElRef::Prev, s));
+        let mut num = 1;
+        let mut s = s;
+        while let Some(new_s) = s.strip_prefix(ELREF_PREVIOUS) {
+            s = new_s;
+            num += 1;
+        }
+
+        if num == 1 {
+            // not doing multi ^^^^^
+            if let Some((a, b)) = s.split_once(ELREF_PREVIOUS) {
+                if let Ok(val) = a.parse() {
+                    num = val;
+                    ret_s = b;
+                } else {
+                    ret_s = s;
+                }
+            } else {
+                ret_s = s;
+            }
+        } else {
+            ret_s = s;
+        }
+
+        return Ok((ElRef::Prev(num), ret_s));
     } else if let Some(s) = s.strip_prefix(ELREF_NEXT) {
-        return Ok((ElRef::Next, s));
+        let mut num = 1;
+        let mut s = s;
+        while let Some(new_s) = s.strip_prefix(ELREF_PREVIOUS) {
+            s = new_s;
+            num += 1;
+        }
+
+        if num == 1 {
+            // not doing multi ^^^^^
+            if let Some((a, b)) = s.split_once(ELREF_PREVIOUS) {
+                if let Ok(val) = a.parse() {
+                    num = val;
+                    ret_s = b;
+                } else {
+                    ret_s = s;
+                }
+            } else {
+                ret_s = s;
+            }
+        } else {
+            ret_s = s;
+        }
+
+        return Ok((ElRef::Next(num), ret_s));
     }
 
     Err(SvgdxError::ParseError(format!(
@@ -710,9 +762,13 @@ mod test {
             extract_elref("#id_a@xyz 2 3").unwrap(),
             (ElRef::Id("id_a".to_string()), "@xyz 2 3")
         );
-        assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev, "@bl"));
-        assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev, ""));
-        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next, ""));
+        assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev(1), "@bl"));
+        assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev(1), ""));
+        assert_eq!(extract_elref("^^^^").unwrap(), (ElRef::Prev(4), ""));
+        assert_eq!(extract_elref("^3^").unwrap(), (ElRef::Prev(3), ""));
+        assert_eq!(extract_elref("^3^^").unwrap(), (ElRef::Prev(3), "^"));
+        assert_eq!(extract_elref("^^3^").unwrap(), (ElRef::Prev(2), "3^"));
+        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next(1), ""));
         assert!(extract_elref("id").is_err());
     }
 }
