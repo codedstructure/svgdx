@@ -18,7 +18,7 @@
       .d-fill-yellow { fill: yellow; }
       text.d-fill-yellow, text.d-fill-yellow * { fill: black; stroke: white; }
       .d-red { stroke: red; }
-      text.d-red, text.d-red * { fill: red; stroke: white; }
+      text.d-red, tspan.d-red, text.d-red * { fill: red; stroke: white; }
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       .d-dash { stroke-dasharray: 1 1.5; }
       .d-dot { stroke-dasharray: 0 1; }

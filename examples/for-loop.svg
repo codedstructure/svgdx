@@ -57,8 +57,8 @@
       .d-fill-darkgray { fill: darkgray; }
       text.d-fill-darkgray, text.d-fill-darkgray * { fill: white; stroke: black; }
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bold, text.d-text-bold * { font-weight: bold; }
-      text.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
+      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
+      text.d-text-ol, tspan.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
     ]]>
   </style>
   <title>The first few named SVG colours</title>

@@ -76,13 +76,13 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
         ("d-text-left-vertical", "text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }"),
         ("d-text-right-vertical", "text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }"),
         // Default is sans-serif 'normal' text.
-        ("d-text-bold", "text.d-text-bold, text.d-text-bold * { font-weight: bold; }"),
+        ("d-text-bold", "text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }"),
         // Allow explicitly setting 'normal' font-weight, as themes may set a non-normal default.
-        ("d-text-normal", "text.d-text-normal, text.d-text-normal * { font-weight: normal; }"),
-        ("d-text-light", "text.d-text-light, text.d-text-light * { font-weight: 100; }"),
-        ("d-text-italic", "text.d-text-italic, text.d-text-italic * { font-style: italic; }"),
-        ("d-text-monospace", "text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
-        ("d-text-pre", "text.d-text-pre, text.d-text-pre * { font-family: monospace; }"),
+        ("d-text-normal", "text.d-text-normal, tspan.d-text-normal, text.d-text-normal * { font-weight: normal; }"),
+        ("d-text-light", "text.d-text-light, tspan.d-text-light, text.d-text-light * { font-weight: 100; }"),
+        ("d-text-italic", "text.d-text-italic, tspan.d-text-italic, text.d-text-italic * { font-style: italic; }"),
+        ("d-text-monospace", "text.d-text-monospace, tspan.d-text-monospace, text.d-text-monospace * { font-family: monospace; }"),
+        ("d-text-pre", "text.d-text-pre, tspan.d-text-pre, text.d-text-pre * { font-family: monospace; }"),
     ] {
         if tb.has_class(class) {
             tb.add_style(rule);
@@ -101,7 +101,7 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
     for (class, size) in text_sizes {
         if tb.has_class(class) {
             tb.add_style(&format!(
-                "text.{0}, text.{0} * {{ font-size: {1}px; }}",
+                "text.{0}, tspan.{0}, text.{0} * {{ font-size: {1}px; }}",
                 class,
                 fstr(size)
             ));
@@ -121,7 +121,7 @@ fn append_text_styles(tb: &mut ThemeBuilder) {
             // and must appear after any colour styles, where
             // `d-text-ol-[colour]` provides a default stroke-width.
             tb.add_style(&format!(
-                "text.{0}, text.{0} * {{ stroke-width: {1}; }}",
+                "text.{0}, tspan.{0}, text.{0} * {{ stroke-width: {1}; }}",
                 class,
                 fstr(width)
             ));
@@ -178,7 +178,7 @@ fn append_colour_styles(tb: &mut ThemeBuilder) {
                     "black"
                 };
                 tb.add_style(&format!(
-                    "text.d-{colour}, text.d-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
+                    "text.d-{colour}, tspan.d-{colour}, text.d-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
                 ));
             }
         }
@@ -192,7 +192,7 @@ fn append_colour_styles(tb: &mut ThemeBuilder) {
             };
             // Must be at least as specific as d-fill-colour
             tb.add_style(&format!(
-                "text.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
+                "text.d-text-{colour}, tspan.d-text-{colour}, text.d-text-{colour} * {{ fill: {colour}; stroke: {text_stroke}; }}"
             ));
         }
     }
@@ -200,7 +200,7 @@ fn append_colour_styles(tb: &mut ThemeBuilder) {
         if tb.has_class(&format!("d-text-ol-{colour}")) {
             // Must be at least as specific as d-fill-colour
             tb.add_style(&format!(
-                "text.d-text-ol-{colour}, text.d-text-ol-{colour} * {{ stroke: {colour}; stroke-width: 0.5; }}"
+                "text.d-text-ol-{colour}, tspan.d-text-ol-{colour}, text.d-text-ol-{colour} * {{ stroke: {colour}; stroke-width: 0.5; }}"
             ));
         }
     }

@@ -15,7 +15,7 @@
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
       text.d-text-left, text.d-text-left * { text-anchor: start; }
-      text.d-text-large, text.d-text-large * { font-size: 4.5px; }
+      text.d-text-large, tspan.d-text-large, text.d-text-large * { font-size: 4.5px; }
     ]]>
   </style>
   <!-- 2024 Calendar -->

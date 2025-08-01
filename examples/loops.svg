@@ -13,7 +13,7 @@
       .d-fill-silver { fill: silver; }
       text.d-fill-silver, text.d-fill-silver * { fill: black; stroke: white; }
       .d-red { stroke: red; }
-      text.d-red, text.d-red * { fill: red; stroke: white; }
+      text.d-red, tspan.d-red, text.d-red * { fill: red; stroke: white; }
       .d-thick { stroke-width: 1; }
     ]]>
   </style>

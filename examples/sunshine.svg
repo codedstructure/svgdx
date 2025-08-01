@@ -9,7 +9,7 @@
       .d-fill-gold { fill: gold; }
       text.d-fill-gold, text.d-fill-gold * { fill: black; stroke: white; }
       .d-gold { stroke: gold; }
-      text.d-gold, text.d-gold * { fill: gold; stroke: black; }
+      text.d-gold, tspan.d-gold, text.d-gold * { fill: gold; stroke: black; }
       .d-none { stroke: none; }
       .d-thick { stroke-width: 1; }
     ]]>

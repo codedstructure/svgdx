@@ -29,7 +29,7 @@
       .d-fill-whitesmoke { fill: whitesmoke; }
       text.d-fill-whitesmoke, text.d-fill-whitesmoke * { fill: black; stroke: white; }
       .d-blue { stroke: blue; }
-      text.d-blue, text.d-blue * { fill: blue; stroke: white; }
+      text.d-blue, tspan.d-blue, text.d-blue * { fill: blue; stroke: white; }
       .d-thin { stroke-width: 0.25; }
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }

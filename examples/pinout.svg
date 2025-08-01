@@ -9,8 +9,8 @@
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-left, text.d-text-left * { text-anchor: start; }
       text.d-text-right, text.d-text-right * { text-anchor: end; }
-      text.d-text-bold, text.d-text-bold * { font-weight: bold; }
-      text.d-text-large, text.d-text-large * { font-size: 3px; }
+      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
+      text.d-text-large, tspan.d-text-large, text.d-text-large * { font-size: 3px; }
     ]]>
   </style>
   <rect id="ic1" width="10" height="15"/>

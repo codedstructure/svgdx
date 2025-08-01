@@ -16,13 +16,13 @@
       .d-fill-grey { fill: grey; }
       text.d-fill-grey, text.d-fill-grey * { fill: white; stroke: black; }
       .d-darkred { stroke: darkred; }
-      text.d-darkred, text.d-darkred * { fill: darkred; stroke: white; }
-      text.d-text-silver, text.d-text-silver * { fill: silver; stroke: black; }
-      text.d-text-ol-black, text.d-text-ol-black * { stroke: black; stroke-width: 0.5; }
+      text.d-darkred, tspan.d-darkred, text.d-darkred * { fill: darkred; stroke: white; }
+      text.d-text-silver, tspan.d-text-silver, text.d-text-silver * { fill: silver; stroke: black; }
+      text.d-text-ol-black, tspan.d-text-ol-black, text.d-text-ol-black * { stroke: black; stroke-width: 0.5; }
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bold, text.d-text-bold * { font-weight: bold; }
-      text.d-text-italic, text.d-text-italic * { font-style: italic; }
-      text.d-text-small, text.d-text-small * { font-size: 2px; }
+      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
+      text.d-text-italic, tspan.d-text-italic, text.d-text-italic * { font-style: italic; }
+      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
       .d-flow-slow { animation: 2s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }
       @keyframes d-flow-animation { from {stroke-dashoffset: 5;} to {stroke-dashoffset: 0;} }
       .d-hardshadow { filter: url(#d-hardshadow); }

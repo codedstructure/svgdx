@@ -24,8 +24,8 @@
       text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
       text.d-text-left, text.d-text-left * { text-anchor: start; }
       text.d-text-right, text.d-text-right * { text-anchor: end; }
-      text.d-text-small, text.d-text-small * { font-size: 2px; }
-      text.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
+      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
+      text.d-text-ol, tspan.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
       line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
       marker path { fill: inherit; }
       .d-dash { stroke-dasharray: 1 1.5; }

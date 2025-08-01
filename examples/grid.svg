@@ -21,13 +21,13 @@
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: #93a1a1; }
       text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: #93a1a1; paint-order: stroke; stroke: #002b36; }
       .d-blue { stroke: blue; }
-      text.d-blue, text.d-blue * { fill: blue; stroke: white; }
+      text.d-blue, tspan.d-blue, text.d-blue * { fill: blue; stroke: white; }
       .d-gold { stroke: gold; }
-      text.d-gold, text.d-gold * { fill: gold; stroke: black; }
+      text.d-gold, tspan.d-gold, text.d-gold * { fill: gold; stroke: black; }
       .d-green { stroke: green; }
-      text.d-green, text.d-green * { fill: green; stroke: white; }
+      text.d-green, tspan.d-green, text.d-green * { fill: green; stroke: white; }
       .d-red { stroke: red; }
-      text.d-red, text.d-red * { fill: red; stroke: white; }
+      text.d-red, tspan.d-red, text.d-red * { fill: red; stroke: white; }
       .d-grid {fill: url(#grid)}
       .d-grid-5 {fill: url(#grid-5)}
       .d-grid-10 {fill: url(#grid-10)}

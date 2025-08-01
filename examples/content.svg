@@ -21,7 +21,7 @@
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
       text.d-text-left, text.d-text-left * { text-anchor: start; }
-      text.d-text-bold, text.d-text-bold * { font-weight: bold; }
+      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
       .d-softshadow { filter: url(#d-softshadow); }
     ]]>
   </style>

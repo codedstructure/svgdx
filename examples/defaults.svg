@@ -16,8 +16,8 @@
       text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
       text.d-text-right, text.d-text-right * { text-anchor: end; }
-      text.d-text-monospace, text.d-text-monospace * { font-family: monospace; }
-      text.d-text-small, text.d-text-small * { font-size: 2px; }
+      text.d-text-monospace, tspan.d-text-monospace, text.d-text-monospace * { font-family: monospace; }
+      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
       .d-dash { stroke-dasharray: 1 1.5; }
     ]]>
   </style>

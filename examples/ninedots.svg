@@ -9,11 +9,11 @@
       .d-fill-black { fill: black; }
       text.d-fill-black, text.d-fill-black * { fill: white; stroke: black; }
       .d-darkgrey { stroke: darkgrey; }
-      text.d-darkgrey, text.d-darkgrey * { fill: darkgrey; stroke: white; }
+      text.d-darkgrey, tspan.d-darkgrey, text.d-darkgrey * { fill: darkgrey; stroke: white; }
       .d-dimgrey { stroke: dimgrey; }
-      text.d-dimgrey, text.d-dimgrey * { fill: dimgrey; stroke: white; }
+      text.d-dimgrey, tspan.d-dimgrey, text.d-dimgrey * { fill: dimgrey; stroke: white; }
       .d-silver { stroke: silver; }
-      text.d-silver, text.d-silver * { fill: silver; stroke: black; }
+      text.d-silver, tspan.d-silver, text.d-silver * { fill: silver; stroke: black; }
       .d-flow { animation: 1s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }
       @keyframes d-flow-animation { from {stroke-dashoffset: 5;} to {stroke-dashoffset: 0;} }
     ]]>

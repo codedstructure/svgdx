@@ -11,9 +11,9 @@
       text.d-text-bottom-vertical, text.d-text-bottom-vertical * { text-anchor: end; }
       text.d-text-left-vertical, text.d-text-left-vertical * { dominant-baseline: text-after-edge; }
       text.d-text-right-vertical, text.d-text-right-vertical * { dominant-baseline: text-before-edge; }
-      text.d-text-small, text.d-text-small * { font-size: 2px; }
-      text.d-text-medium, text.d-text-medium * { font-size: 3px; }
-      text.d-text-large, text.d-text-large * { font-size: 4.5px; }
+      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
+      text.d-text-medium, tspan.d-text-medium, text.d-text-medium * { font-size: 3px; }
+      text.d-text-large, tspan.d-text-large, text.d-text-large * { font-size: 4.5px; }
     ]]>
   </style>
   <!-- top row -->

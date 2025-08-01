@@ -18,7 +18,7 @@
       .d-fill-skyblue { fill: skyblue; }
       text.d-fill-skyblue, text.d-fill-skyblue * { fill: black; stroke: white; }
       .d-gold { stroke: gold; }
-      text.d-gold, text.d-gold * { fill: gold; stroke: black; }
+      text.d-gold, tspan.d-gold, text.d-gold * { fill: gold; stroke: black; }
       .d-none { stroke: none; }
       .d-thick { stroke-width: 1; }
     ]]>
