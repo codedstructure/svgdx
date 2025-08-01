@@ -325,6 +325,8 @@ enum Token {
     Mul,
     /// A literal '/' for division
     Div,
+    /// A literal '//' for integer division
+    IntDiv,
     /// A literal '%' for mod operation
     Mod,
     /// Internal-only token used for separating otherwise
@@ -426,7 +428,14 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             '+' => Token::Add,
             '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,
-            '/' => Token::Div,
+            '/' => {
+                if buffer.is_empty() && tokens.last() == Some(&Token::Div) {
+                    tokens.pop();
+                    Token::IntDiv
+                } else {
+                    Token::Div
+                }
+            }
             '%' => Token::Mod,
             ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
@@ -723,6 +732,10 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
                 Some(Token::Div) => {
                     eval_state.advance();
                     e /= primary(eval_state)?.one_number()?;
+                }
+                Some(Token::IntDiv) => {
+                    eval_state.advance();
+                    e = ((e as i32) / (primary(eval_state)?.one_number()? as i32)) as f32;
                 }
                 Some(Token::Mod) => {
                     eval_state.advance();
@@ -1673,8 +1686,8 @@ mod tests {
         let ctx = TestContext::new();
         for (expr, expected) in [
             (
-                "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
-                "10, 23, 5, 1, 2.5",
+                "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2, 3//2}}",
+                "10, 23, 5, 1, 2.5, 1",
             ),
             ("{{3, 2, swap(1, 2)}}", "3, 2, 2, 1"),
             ("{{p2r(10, 0)}}", "10, 0"),
