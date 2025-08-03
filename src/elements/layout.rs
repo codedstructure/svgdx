@@ -45,7 +45,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
             result.push_str(&value[..idx]);
             value = &value[idx..];
             if let Some(mut idx) = value[1..].find(word_break) {
-                if value.chars().next() == Some(ELREF_ID_PREFIX) {
+                if value.starts_with(ELREF_ID_PREFIX) {
                     idx += 1; // account for ignoring # in word break search
                 } else {
                     // account for ignoring ^/+/^^^/^n^ in word break search
@@ -63,7 +63,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
                             last_safe_id = idx + 1;
                         }
                     }
-                    while let Some(x) = chars.next() {
+                    for x in chars {
                         if x != t && !x.is_numeric() {
                             break;
                         }

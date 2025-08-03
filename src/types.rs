@@ -446,7 +446,7 @@ impl FromStr for ElRef {
 impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{}", id),
+            ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{id}"),
             ElRef::Prev(1) => write!(f, "{ELREF_PREVIOUS}"),
             ElRef::Prev(2) => write!(f, "{ELREF_PREVIOUS}{ELREF_PREVIOUS}"),
             ElRef::Prev(num) => write!(f, "{ELREF_PREVIOUS}{num}{ELREF_PREVIOUS}"),
@@ -501,14 +501,14 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
     } else if let Some(s) = s.strip_prefix(ELREF_NEXT) {
         let mut num = 1;
         let mut s = s;
-        while let Some(new_s) = s.strip_prefix(ELREF_PREVIOUS) {
+        while let Some(new_s) = s.strip_prefix(ELREF_NEXT) {
             s = new_s;
             num += 1;
         }
 
         if num == 1 {
             // not doing multi ^^^^^
-            if let Some((a, b)) = s.split_once(ELREF_PREVIOUS) {
+            if let Some((a, b)) = s.split_once(ELREF_NEXT) {
                 if let Ok(val) = a.parse() {
                     num = val;
                     ret_s = b;
@@ -769,6 +769,10 @@ mod test {
         assert_eq!(extract_elref("^3^^").unwrap(), (ElRef::Prev(3), "^"));
         assert_eq!(extract_elref("^^3^").unwrap(), (ElRef::Prev(2), "3^"));
         assert_eq!(extract_elref("+").unwrap(), (ElRef::Next(1), ""));
+        assert_eq!(extract_elref("++++").unwrap(), (ElRef::Next(4), ""));
+        assert_eq!(extract_elref("+31+").unwrap(), (ElRef::Next(31), ""));
+        assert_eq!(extract_elref("+3++").unwrap(), (ElRef::Next(3), "+"));
+        assert_eq!(extract_elref("++3+").unwrap(), (ElRef::Next(2), "3+"));
         assert!(extract_elref("id").is_err());
     }
 }
