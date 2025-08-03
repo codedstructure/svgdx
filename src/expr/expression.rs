@@ -325,6 +325,8 @@ enum Token {
     Mul,
     /// A literal '/' for division
     Div,
+    /// A literal '//' for integer division
+    IntDiv,
     /// A literal '%' for mod operation
     Mod,
     /// Internal-only token used for separating otherwise
@@ -426,7 +428,14 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
             '+' => Token::Add,
             '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,
-            '/' => Token::Div,
+            '/' => {
+                if buffer.is_empty() && tokens.last() == Some(&Token::Div) {
+                    tokens.pop();
+                    Token::IntDiv
+                } else {
+                    Token::Div
+                }
+            }
             '%' => Token::Mod,
             ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
@@ -723,6 +732,10 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
                 Some(Token::Div) => {
                     eval_state.advance();
                     e /= primary(eval_state)?.one_number()?;
+                }
+                Some(Token::IntDiv) => {
+                    eval_state.advance();
+                    e = e.div_euclid(primary(eval_state)?.one_number()?);
                 }
                 Some(Token::Mod) => {
                     eval_state.advance();
@@ -1060,6 +1073,8 @@ mod tests {
             ("6 - 9", -3.),
             ("-4 * 5", -20.),
             ("60 / 12", 5.),
+            ("11 // 4", 2.),
+            ("-11 // 4", -3.), // ensure -a // b is rounds down
             ("63 % 4", 3.),
             ("-1 % 4", 3.), // ensure -a % b is non-negative
             ("-4 * 4", -16.),
@@ -1673,8 +1688,8 @@ mod tests {
         let ctx = TestContext::new();
         for (expr, expected) in [
             (
-                "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2}}",
-                "10, 23, 5, 1, 2.5",
+                "{{10, 20 + 3, 2+3  , eq(123, 123), 5/2, 3//2}}",
+                "10, 23, 5, 1, 2.5, 1",
             ),
             ("{{3, 2, swap(1, 2)}}", "3, 2, 2, 1"),
             ("{{p2r(10, 0)}}", "10, 0"),
