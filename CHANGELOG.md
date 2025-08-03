@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: integer division with `//`.
+
 - Added: support for text style and colour classes in `<tspan>` elements.
 
 - Fixed: position and attribute expansion for non-empty graphics elements,
