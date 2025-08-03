@@ -735,7 +735,7 @@ fn factor(eval_state: &mut EvalState) -> Result<ExprValue> {
                 }
                 Some(Token::IntDiv) => {
                     eval_state.advance();
-                    e = ((e as i32) / (primary(eval_state)?.one_number()? as i32)) as f32;
+                    e = e.div_euclid(primary(eval_state)?.one_number()?);
                 }
                 Some(Token::Mod) => {
                     eval_state.advance();
@@ -1073,6 +1073,8 @@ mod tests {
             ("6 - 9", -3.),
             ("-4 * 5", -20.),
             ("60 / 12", 5.),
+            ("11 // 4", 2.),
+            ("-11 // 4", -3.), // ensure -a // b is rounds down
             ("63 % 4", 3.),
             ("-1 % 4", 3.), // ensure -a % b is non-negative
             ("-4 * 4", -16.),
