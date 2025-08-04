@@ -78,6 +78,7 @@ pub struct Connector {
     end: Endpoint,
     conn_type: ConnectionType,
     offset: Option<Length>,
+    corner_radius: f32,
 }
 
 fn closest_loc(
@@ -241,6 +242,13 @@ impl Connector {
             None
         };
 
+        let corner_radius = if let Some(rad) = element.pop_attr("corner-radius") {
+            (&rad).parse()
+                .map_err(|_| SvgdxError::ParseError("Invalid corner-radius".to_owned()))?
+        } else {
+            0.0
+        };
+
         // This could probably be tidier, trying to deal with lots of combinations.
         // Needs to support explicit coordinate pairs or element references, and
         // for element references support given locations or not (in which case
@@ -336,6 +344,7 @@ impl Connector {
             end_el: end_el.cloned(),
             conn_type,
             offset,
+            corner_radius,
         })
     }
 
@@ -764,8 +773,20 @@ impl Connector {
                     abs_offset_set,
                 )?;
 
+
+
                 // TODO: remove repeated points.
-                if points.len() == 2 {
+                if self.corner_radius != 0.0{
+                    SvgElement::new(
+                        "path",
+                        &[(
+                            "d".to_string(),
+                            Self::points_to_path(points,self.corner_radius)
+                        )],
+                    )
+                    .with_attrs_from(&self.source_element)
+                }
+                else if points.len() == 2 {
                     SvgElement::new(
                         "line",
                         &[
@@ -793,5 +814,54 @@ impl Connector {
             }
         };
         Ok(conn_element)
+    }
+
+    fn points_to_path(points: Vec<(f32,f32)>, max_radius: f32) -> String{
+        let mut result = String::new();
+        let mut radii = vec![];
+        for i in 1..(points.len()-1){
+            let mut d1 = (points[i].0-points[i-1].0).abs() + (points[i].1-points[i-1].1).abs();
+            let mut d2 = (points[i+1].0-points[i].0).abs() + (points[i+1].1-points[i].1).abs();
+            if i != 1{
+                d1 = d1/2.0;
+            }
+            if i != points.len()-2{
+                d2 = d2/2.0;
+            }
+            let radius = d1.min(d2).min(max_radius);
+            radii.push(radius);
+        }
+
+        let mut pos = points[0];
+        result += &("M ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+
+        for i in 1..(points.len()-1){
+            let dx1 = points[i].0-pos.0;
+            let dy1 = points[i].1-pos.1;
+            let dx2 = points[i+1].0-points[i].0;
+            let dy2 = points[i+1].1-points[i].1;
+            
+            pos.0 = pos.0 + dx1 - dx1*radii[i-1]/(dx1*dx1+dy1*dy1).sqrt();
+            pos.1 = pos.1 + dy1 - dy1*radii[i-1]/(dx1*dx1+dy1*dy1).sqrt();
+            
+            result += &("L ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+
+            let mut new_pos = points[i];
+            
+            new_pos.0 = new_pos.0 + dx2*radii[i-1]/(dx2*dx2+dy2*dy2).sqrt();
+            new_pos.1 = new_pos.1 + dy2*radii[i-1]/(dx2*dx2+dy2*dy2).sqrt();
+
+            let cl = (dx1*dy2 - dy1*dx2) > 0.0;
+            let cl_str = if cl {"1"} else{"0"};
+
+            result += &("a ".to_owned() + &radii[i-1].to_string() + "," + &radii[i-1].to_string() + " 0 0 " + cl_str + " " + &(new_pos.0-pos.0).to_string() + "," + &(new_pos.1-pos.1).to_string() + "\n");
+
+            pos = new_pos;
+
+        }
+        pos = points[points.len()-1];
+        result += &("L ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+
+        return result;
     }
 }
