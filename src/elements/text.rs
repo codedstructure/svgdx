@@ -20,10 +20,10 @@ fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<u32>) {
 
     let mut state_per_char = vec![0; parsed_string.len()];
 
-    for i in 0..sections.len() {
-        let bit = sections[i].code_bold_italic;
-        for j in sections[i].start_ind..sections[i].end_ind {
-            state_per_char[j] |= 1 << bit;
+    for s in sections {
+        let bit = s.code_bold_italic;
+        for i in s.start_ind..s.end_ind {
+            state_per_char[i] |= 1 << bit;
         }
     }
 
@@ -55,14 +55,13 @@ struct SectionData {
 struct DelimiterData {
     ind: usize, // goes just before this char
     char_type: char,
-    num_delimiters: u32,
+    num_delimiters: usize,
     is_active: bool,
     could_open: bool,
     could_close: bool,
 }
 
-fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
-    let mut sections = vec![];
+fn md_parse_escapes_and_delimiters(text_value: &str) -> (Vec<char>, Vec<DelimiterData>) {
     let mut result = vec![];
     let mut delimiters = vec![DelimiterData {
         ind: 0,
@@ -77,17 +76,16 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
     // first pass process \ and find delimiters
     for c in text_value.chars() {
         let mut add = true;
-        if c == '\\' {
-            if !escaped {
+        match (c, escaped) {
+            ('\\', false) => {
                 add = false;
                 escaped = true;
-            } else {
-                escaped = false;
             }
-        }
-        // the delimiters
-        else if c == '`' || c == '_' || c == '*' {
-            if !escaped {
+            ('\\', true) => {
+                escaped = true;
+            }
+            // the delimiters
+            ('`', false) | ('_', false) | ('*', false) => {
                 let last = delimiters.last_mut().expect("garenteed not to be empty");
                 if c == last.char_type && last.ind == result.len() {
                     // is a continuation
@@ -103,25 +101,31 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
                     });
                 }
                 add = false;
-            } else {
-                escaped = true;
             }
-        } else if escaped {
-            if c == 'n' {
+            ('`', true) | ('_', true) | ('*', true) => {
+                escaped = false;
+            }
+            ('n', true) => {
                 add = false;
                 result.push('\n');
-            } else {
+                escaped = false;
+            }
+            (_, true) => {
                 // was not an escape
                 result.push('\\');
+                escaped = false;
             }
-            escaped = false;
+            (_, false) => {}
         }
-
         if add {
             result.push(c);
         }
     }
 
+    return (result, delimiters);
+}
+
+fn md_parse_set_delimiter_open_close(result: &Vec<char>, delimiters: &mut Vec<DelimiterData>) {
     // set could open/close
     for i in 0..delimiters.len() {
         let prev_char;
@@ -142,18 +146,23 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             next_char = result[delimiters[i].ind];
         }
 
-        if next_char.is_whitespace() {
-            delimiters[i].could_open = false;
-        }
-        if prev_char.is_whitespace() {
-            delimiters[i].could_close = false;
-        }
-        if !next_char.is_whitespace()
-            && !prev_char.is_whitespace()
-            && delimiters[i].char_type == '_'
-        {
-            delimiters[i].could_open = false;
-            delimiters[i].could_close = false;
+        match (prev_char.is_whitespace(), next_char.is_whitespace()) {
+            (false, false) => {
+                if delimiters[i].char_type == '_' {
+                    delimiters[i].could_open = false;
+                    delimiters[i].could_close = false;
+                }
+            }
+            (true, false) => {
+                delimiters[i].could_close = false;
+            }
+            (false, true) => {
+                delimiters[i].could_open = false;
+            }
+            (true, true) => {
+                delimiters[i].could_open = false;
+                delimiters[i].could_close = false;
+            }
         }
 
         if next_char.is_ascii_punctuation()
@@ -167,7 +176,10 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             delimiters[i].could_close = false;
         }
     }
+}
 
+fn md_parse_eval_sections(delimiters: &mut Vec<DelimiterData>) -> Vec<SectionData> {
+    let mut sections = vec![];
     let stack_bottom = 0; // because I have a null element in it
     let mut current_position = stack_bottom + 1;
     let mut opener_a = [stack_bottom; 3];
@@ -188,11 +200,10 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             '*' => &mut opener_a,
             '_' => &mut opener_d,
             '`' => &mut opener_t,
-            _ => panic!(),
+            _ => panic!("this cant happen as current_position starts at 0 and all other delimiters are of above types"),
         };
 
-        let min = opener_min[(delimiters[current_position].num_delimiters % 3) as usize]
-            .max(stack_bottom);
+        let min = opener_min[delimiters[current_position].num_delimiters % 3].max(stack_bottom);
         let mut opener_ind = current_position - 1;
         while opener_ind > min {
             // found opener
@@ -214,8 +225,7 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
 
         if opener_ind == min {
             // not found a opener
-            opener_min[(delimiters[current_position].num_delimiters % 3) as usize] =
-                current_position - 1;
+            opener_min[delimiters[current_position].num_delimiters % 3] = current_position - 1;
             current_position += 1;
         } else {
             delimiters[current_position].could_open = false;
@@ -228,17 +238,15 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             sections.push(SectionData {
                 start_ind: delimiters[opener_ind].ind,
                 end_ind: delimiters[current_position].ind,
-                code_bold_italic: if code {
-                    0
-                } else if strong {
-                    1
-                } else {
-                    2
+                code_bold_italic: match (code, strong) {
+                    (true, _) => 0,
+                    (_, true) => 1,
+                    (_, _) => 2,
                 },
             });
 
-            delimiters[opener_ind].num_delimiters -= 1 + (strong as u32);
-            delimiters[current_position].num_delimiters -= 1 + (strong as u32);
+            delimiters[opener_ind].num_delimiters -= 1 + (strong as usize);
+            delimiters[current_position].num_delimiters -= 1 + (strong as usize);
 
             if delimiters[opener_ind].num_delimiters == 0 {
                 delimiters[opener_ind].is_active = false;
@@ -248,35 +256,41 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
                 current_position += 1;
             }
 
-            for i in (opener_ind + 1)..current_position {
-                delimiters[i].is_active = false;
+            for d in &mut delimiters[(opener_ind + 1)..current_position] {
+                d.is_active = false;
             }
         }
     }
+    return sections;
+}
+
+fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
+    let (mut result, mut delimiters) = md_parse_escapes_and_delimiters(text_value);
+    md_parse_set_delimiter_open_close(&result, &mut delimiters);
+    let mut sections = md_parse_eval_sections(&mut delimiters);
 
     let mut final_result = vec![];
 
     // work from the back to avoid index invalidation
-    for i in (0..delimiters.len()).rev() {
-        while delimiters[i].ind < result.len() {
+    for d in delimiters.into_iter().rev() {
+        while d.ind < result.len() {
             if let Some(thing) = result.pop() {
                 final_result.push(thing);
             }
         }
 
-        for j in 0..sections.len() {
+        for s in sections.iter_mut() {
             // if start needs to be after or equal
-            if sections[j].start_ind >= delimiters[i].ind {
-                sections[j].start_ind += delimiters[i].num_delimiters as usize;
+            if s.start_ind >= d.ind {
+                s.start_ind += d.num_delimiters as usize;
             }
-            if sections[j].end_ind > delimiters[i].ind {
+            if s.end_ind > d.ind {
                 // if end needs to be after
-                sections[j].end_ind += delimiters[i].num_delimiters as usize;
+                s.end_ind += d.num_delimiters as usize;
             }
         }
-        for _ in 0..delimiters[i].num_delimiters {
-            final_result.push(delimiters[i].char_type);
-        }
+        let mut temp = vec![d.char_type; d.num_delimiters];
+        final_result.append(&mut temp);
     }
 
     return (final_result.into_iter().rev().collect(), sections);
@@ -571,7 +585,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
 
-    if !multielement{
+    if !multielement {
         if line_types[0][0] & (1 << 0) != 0 {
             text_classes.push("d-text-monospace".to_string());
         }
