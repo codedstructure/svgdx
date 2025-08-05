@@ -190,7 +190,6 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             '`' => &mut opener_t,
             _ => panic!(),
         };
-        println!("{} {:?}", current_position, delimiters);
 
         let min = opener_min[(delimiters[current_position].num_delimiters % 3) as usize]
             .max(stack_bottom);
@@ -206,6 +205,7 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
                         != delimiters[current_position].num_delimiters % 3
                 {
                 } else {
+                    // found valid opener
                     break;
                 }
             }
@@ -237,7 +237,6 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
                 },
             });
 
-            println!("{} {} {}", opener_ind, current_position, strong);
             delimiters[opener_ind].num_delimiters -= 1 + (strong as u32);
             delimiters[current_position].num_delimiters -= 1 + (strong as u32);
 
@@ -254,7 +253,6 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             }
         }
     }
-    println!();
 
     let mut final_result = vec![];
 
@@ -423,27 +421,6 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 
-fn get_text_len(mono: bool, text: String) -> f32 {
-    if mono {
-        return 0.6 * text.len() as f32;
-    }
-    let mut length = 0.0;
-
-    let long = ['m', 'w'];
-    let short = ['f', 'i', 'j', 'l', 'r', 't'];
-    for i in text.chars() {
-        if long.contains(&i) {
-            length += 0.8;
-        } else if short.contains(&i) {
-            length += 0.33;
-        } else {
-            length += 0.6;
-        }
-    }
-
-    return length;
-}
-
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
     // Different conversions from line count to first-line offset based on whether
     // top, center, or bottom justification.
@@ -520,9 +497,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         }
     }
     let line_count = lines.len();
-    println!("{:?}", text_values[0].lines().collect::<Vec<_>>());
-    println!("{:?}", text_values);
-    println!("{:?}", lines);
 
     let multielement = line_count > 1 || text_values.len() > 1;
     let vertical = orig_elem.has_class("d-text-vertical");
@@ -594,6 +568,18 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             && !text_ignore_class_fns.iter().any(|f| f(&class))
         {
             text_classes.push(class);
+        }
+    }
+
+    if !multielement{
+        if line_types[0][0] & (1 << 0) != 0 {
+            text_classes.push("d-text-monospace".to_string());
+        }
+        if line_types[0][0] & (1 << 1) != 0 {
+            text_classes.push("d-text-bold".to_string());
+        }
+        if line_types[0][0] & (1 << 2) != 0 {
+            text_classes.push("d-text-italic".to_string());
         }
     }
     text_elem.src_line = orig_elem.src_line;
