@@ -778,41 +778,65 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             // show tooltip in status bar
             statusbar.innerText = e.target.dataset.info;
         } else if (svg !== null && e.target.closest('div > svg') === svg) {
-            // highlight source of this element in editor
+            // Clear any previously highlighted lines.
+            // TODO: if there is only ever one highlighted line, would be
+            // much more efficient to just store that lineNumber than iterate
+            // over all the lines...
             for (let i= 0; i < editor.lineCount(); i++) {
                 editor.removeLineClass(i, "background", "hover-line");
-            }
-            let hover_element = e.target;
-            if (e.target.tagName === 'tspan') {
-                hover_element = e.target.closest('text');
-            }
-            if (hover_element.dataset.srcLine) {
-                const lineNumber = parseInt(hover_element.dataset.srcLine);
-                editor.addLineClass(lineNumber - 1, "background", "hover-line");
             }
             // display mouse position in SVG user-space coordinates
             const svgPos = clientToSvg(svg, e.clientX, e.clientY);
             const pos_text = `${svgPos.x.toFixed(2)}, ${svgPos.y.toFixed(2)}`;
             let status_text = pos_text.padEnd(20, ' ');
-            const target_tag = hover_element.tagName;
-            if (target_tag !== null) {
-                status_text += ` ${target_tag}`;
-            }
-            const target_id = hover_element.getAttribute('id');
-            if (target_id !== null) {
-                status_text += ` id="${target_id}"`;
-            }
-            const target_href = hover_element.getAttribute('href');
-            if (target_href !== null) {
-                status_text += ` href="${target_href}"`;
-            }
-            const target_class = hover_element.getAttribute('class');
-            if (target_class !== null) {
-                status_text += ` class="${target_class}"`;
+
+            // don't report on the background.
+            if (e.target !== svg) {
+                // highlight source line of this element in editor
+                let hover_element = e.target;
+                if (e.target.tagName === 'tspan') {
+                    hover_element = e.target.closest('text');
+                }
+
+                if (hover_element.dataset.srcLine) {
+                    const lineNumber = parseInt(hover_element.dataset.srcLine);
+                    editor.addLineClass(lineNumber - 1, "background", "hover-line");
+                    status_text += ` ${lineNumber}:`;
+                }
+                const target_tag = hover_element.tagName;
+                if (target_tag !== null) {
+                    status_text += ` ${target_tag}`;
+                }
+                const target_id = hover_element.getAttribute('id');
+                if (target_id !== null) {
+                    status_text += ` id="${target_id}"`;
+                }
+                const target_href = hover_element.getAttribute('href');
+                if (target_href !== null) {
+                    status_text += ` href="${target_href}"`;
+                }
+                const target_class = hover_element.getAttribute('class');
+                if (target_class !== null) {
+                    status_text += ` class="${target_class}"`;
+                }
             }
             statusbar.innerText = status_text;
         } else {
             statusbar.innerText = "svgdx editor";
+        }
+    });
+
+    // Double-click on an element allows quickly editing corresponding line
+    document.addEventListener('dblclick', (e) => {
+        const svg = svgOutputContainer.querySelector('svg');
+        // Must be an element within the SVG output, not the background
+        if (svg !== null && e.target.closest('div > svg') === svg && e.target !== svg) {
+            const srcLineData = e.target.dataset.srcLine;
+            if (srcLineData) {
+                const lineNumber = parseInt(srcLineData);
+                editor.setCursor(lineNumber - 1, 0); // row, column
+                editor.focus();
+            }
         }
     });
 })();
