@@ -893,6 +893,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                     LocSpec::BottomEdge(_) => element.set_default_attr("text-loc", "b"),
                     LocSpec::LeftEdge(_) => element.set_default_attr("text-loc", "l"),
                     LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
+                    LocSpec::PureLength(_) => element.set_default_attr("text-loc", "c"),// not sure
                 }
             } else {
                 return Err(SvgdxError::InvalidData(format!(

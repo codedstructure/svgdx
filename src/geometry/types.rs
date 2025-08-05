@@ -139,6 +139,7 @@ pub enum LocSpec {
     RightEdge(Length),
     BottomEdge(Length),
     LeftEdge(Length),
+    PureLength(Length),
 }
 
 impl LocSpec {
@@ -193,6 +194,7 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
+                        "" => Ok(Self::PureLength(len)),
                         _ => Err(SvgdxError::InvalidData(format!(
                             "Invalid LocSpec format {value}"
                         ))),

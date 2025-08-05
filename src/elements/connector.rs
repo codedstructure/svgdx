@@ -221,6 +221,542 @@ impl Connector {
         return Ok((t_el, t_loc, t_point, t_dir));
     }
 
+    fn get_point_along_line(
+        el: &SvgElement,
+        dist: f32,
+    ) -> Result<(f32,f32)>{
+        let name = el.name();
+
+        if name == "line"{
+            if let (Some(x1),Some(y1),Some(x2),Some(y2)) = (el.get_attr("x1"),el.get_attr("y1"),el.get_attr("x2"), el.get_attr("y2")){
+                let x1: f32 = x1.parse()?;
+                let y1: f32 = y1.parse()?;
+                let x2: f32 = x2.parse()?;
+                let y2: f32 = y2.parse()?;
+                if x1 == x2 && y1 == y2{
+                    return Ok((x1,y1));
+                }
+                let len = ((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)).sqrt();
+                let rat = dist/len;
+                return Ok((x1 + rat*(x2-x1), y1 + rat*(y2-y1)));
+            }
+        }
+        if name == "polyline"{
+            if let Some(points) = el.get_attr("points"){
+                let points = points.split(", ");
+                let mut cummulative_dist = 0.0;
+                let mut lastx = 0.0;
+                let mut lasty = 0.0;
+                let mut first_point = true;
+                for p in points{
+                    let mut this_point = p.split_whitespace();
+                    if let (Some(x),Some(y)) = (this_point.next(),this_point.next()){
+                        let x: f32 = x.parse()?;
+                        let y: f32 = y.parse()?;
+
+                        if !first_point{
+                            let len = ((lastx-x)*(lastx-x) + (lasty-y)*(lasty-y)).sqrt();
+                            if cummulative_dist + len > dist{
+                                let rat = (dist-cummulative_dist)/len;
+                                return Ok((lastx*(1.0-rat) + rat*x, lasty*(1.0-rat) + rat*y));
+                            }
+                            cummulative_dist += len;
+                        }
+                        else if dist < 0.0{// clamp to start
+                            return Ok((x,y));
+                        }
+                        lastx = x;
+                        lasty = y;
+                    }
+
+                    first_point = false;
+                }
+                return Ok((lastx, lasty));
+            }
+        }
+        if name == "path"{
+            if let Some(d) = el.get_attr("d"){
+
+                let replaced_commas = d.replace(&[','], &" ");
+                let items = replaced_commas.split_whitespace();
+
+                let mut cummulative_distance = 0.0;
+                let mut pos = (0.0,0.0);
+                let mut last_stable_pos = pos;
+                let mut r = 0.0;
+                let mut large_arc_flag = false;
+                let mut sweeping_flag = false;
+
+                let mut op = ' ';
+                let mut arg_num = 0;
+                for item in items{
+                    if item.starts_with(&['a','A','c','C','h','H','l','L','m','M','q','Q','s','S','t','T','v','V','z','Z']){
+                        if let Some(c) = item.chars().next(){
+                            op = c;
+                            arg_num = 0;
+                            if dist < 0.0 && !['m','M'].contains(&c){// clamping the start
+                                return Ok(last_stable_pos);
+                            }
+                        }
+                    }
+                    else{
+                        if ['c','C','q','Q','s','S','t','T','z','Z'].contains(&op){
+                            todo!("not yet impl path parsing");
+                        }
+                        else if op == 'm'{
+                            if arg_num == 0{
+                                pos.0 += item.parse::<f32>()?;
+                            }
+                            else if arg_num == 1{
+                                pos.1 += item.parse::<f32>()?;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'M'{
+                            if arg_num == 0{
+                                pos.0 = item.parse::<f32>()?;
+                            }
+                            else if arg_num == 1{
+                                pos.1 = item.parse::<f32>()?;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'h' || op == 'H'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'h'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                                let d = (pos.0-last_stable_pos.0).abs();
+                                if cummulative_distance + d > dist{
+                                    let r = (dist-cummulative_distance)/d;
+                                    return Ok((last_stable_pos.0*(1.0-r) + pos.0*r,pos.1));
+                                }
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'v' || op == 'V'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'v'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+                                let d = (pos.1-last_stable_pos.1).abs();
+                                if cummulative_distance + d > dist{
+                                    let r = (dist-cummulative_distance)/d;
+                                    return Ok((pos.0, last_stable_pos.1*(1.0-r) + pos.1*r));
+                                }
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'l' || op == 'L'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'l'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                            }
+                            else if arg_num == 1{
+                                let val = item.parse::<f32>()?;
+                                if op == 'l'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+                                let d = ((last_stable_pos.0-pos.0)*(last_stable_pos.0-pos.0) + (last_stable_pos.1-pos.1)*(last_stable_pos.1-pos.1)).sqrt();
+                                if cummulative_distance + d > dist{
+                                    let r = (dist-cummulative_distance)/d;
+                                    return Ok((last_stable_pos.0*(1.0-r) + pos.0*r,last_stable_pos.1*(1.0-r) + pos.1*r));
+                                }
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'a' || op == 'A'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                r = val;
+                            }
+                            else if arg_num == 1{
+                                let val = item.parse::<f32>()?;
+                                if r != val{
+                                    return Err(SvgdxError::ParseError("path length not supported for non circle elipse".to_string()));
+                                }
+                            }
+                            else if arg_num == 2{
+                                // unused as not mean anything for circle
+                            }
+                            else if arg_num == 3{
+                                let val = item.parse::<u32>()?;
+                                large_arc_flag = val != 0;
+                            }
+                            else if arg_num == 4{
+                                let val = item.parse::<u32>()?;
+                                sweeping_flag = val != 0;
+                            }
+                            else if arg_num == 5{
+                                let val = item.parse::<f32>()?;
+                                if op == 'a'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                            }
+                            else if arg_num == 6{
+                                let val = item.parse::<f32>()?;
+                                if op == 'a'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+
+
+                                let d2 = (last_stable_pos.0-pos.0)*(last_stable_pos.0-pos.0) + (last_stable_pos.1-pos.1)*(last_stable_pos.1-pos.1);
+                                let d = d2.sqrt();
+                                
+                                let desc = r*r - d2/4.0;
+                                let mid_point = ((last_stable_pos.0 + pos.0)*0.5,(last_stable_pos.1 + pos.1)*0.5);
+                                let centre;
+                                if desc <= 0.0{
+                                    centre = mid_point;
+                                }
+                                else{
+                                    let inv_d = 1.0/d;
+                                    let perp = ((last_stable_pos.1-pos.1)*inv_d,(pos.0-last_stable_pos.0)*inv_d);
+                                    let sign = large_arc_flag ^ sweeping_flag;// which circle to use
+                                    let len = if sign {desc.sqrt()} else {-desc.sqrt()};
+                                    centre = (mid_point.0 + perp.0*len,mid_point.1 + perp.1*len);
+                                }
+                                let ang_1 = (last_stable_pos.1-centre.1).atan2(last_stable_pos.0-centre.0);
+                                let ang_2 = (pos.1-centre.1).atan2(pos.0-centre.0);
+                                
+                                let mut shortest_arc_angle = ang_2-ang_1;
+                                if shortest_arc_angle < -std::f32::consts::PI{
+                                    shortest_arc_angle += std::f32::consts::PI*2.0;
+                                }
+                                else if shortest_arc_angle > std::f32::consts::PI{
+                                    shortest_arc_angle -= std::f32::consts::PI*2.0;
+                                }
+                                let arc_angle = if large_arc_flag {(std::f32::consts::PI*2.0-shortest_arc_angle.abs())*shortest_arc_angle.signum()} else {shortest_arc_angle};
+                                let arc_length = arc_angle.abs()*r;
+
+                                if cummulative_distance + arc_length > dist{
+                                    let ratio = (dist-cummulative_distance)/arc_length;
+                                    let final_angle = ang_1 + arc_angle*ratio;
+                                    
+                                    return Ok((centre.0 + r*(final_angle).cos(), centre.1 + r*(final_angle).sin()));
+                                }
+
+                                cummulative_distance += arc_length;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        }
+
+                        arg_num += 1;
+                    }
+                }
+                return Ok(pos);
+            }
+        }
+
+        return Err(SvgdxError::MissingAttribute("in either line, polyline or path".to_string()))
+    }
+
+    fn get_line_length(
+        el: &SvgElement,
+    ) -> Result<f32>{
+        let name = el.name();
+
+        let mut sum = 0.0;
+        if name == "line"{
+            if let (Some(x1),Some(y1),Some(x2),Some(y2)) = (el.get_attr("x1"),el.get_attr("y1"),el.get_attr("x2"), el.get_attr("y2")){
+                let x1: f32 = x1.parse()?;
+                let y1: f32 = y1.parse()?;
+                let x2: f32 = x2.parse()?;
+                let y2: f32 = y2.parse()?;
+                sum += ((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2)).sqrt();
+            }
+        }
+        if name == "polyline"{
+            if let Some(points) = el.get_attr("points"){
+                let points = points.split(", ");
+                let mut lastx: f32 = 0.0;
+                let mut lasty: f32 = 0.0;
+                let mut first_point = true;
+                for p in points{
+                    let mut this_point = p.split_whitespace();
+                    if let (Some(x),Some(y)) = (this_point.next(),this_point.next()){
+                        let x: f32 = x.parse()?;
+                        let y: f32 = y.parse()?;
+
+                        if !first_point{
+                            let len: f32 = ((lastx-x)*(lastx-x) + (lasty-y)*(lasty-y)).sqrt();
+                            sum += len;
+                        }
+                        lastx = x;
+                        lasty = y;
+                    }
+
+                    first_point = false;
+                }
+            }
+        }
+        if name == "path"{
+
+            if let Some(d) = el.get_attr("d"){
+
+                let replaced_commas = d.replace(&[','], &" ");
+                let items = replaced_commas.split_whitespace();
+
+                let mut cummulative_distance = 0.0;
+                let mut pos = (0.0,0.0);
+                let mut last_stable_pos = pos;
+                let mut r = 0.0;
+                let mut large_arc_flag = false;
+                let mut sweeping_flag = false;
+
+                let mut op = ' ';
+                let mut arg_num = 0;
+                for item in items{
+                    if item.starts_with(&['a','A','c','C','h','H','l','L','m','M','q','Q','s','S','t','T','v','V','z','Z']){
+                        if let Some(c) = item.chars().next(){
+                            op = c;
+                            arg_num = 0;
+                        }
+                    }
+                    else{
+                        if ['c','C','q','Q','s','S','t','T','z','Z'].contains(&op){
+                            todo!("not yet impl path parsing");
+                        }
+                        else if op == 'm'{
+                            if arg_num == 0{
+                                pos.0 += item.parse::<f32>()?;
+                            }
+                            else if arg_num == 1{
+                                pos.1 += item.parse::<f32>()?;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'M'{
+                            if arg_num == 0{
+                                pos.0 = item.parse::<f32>()?;
+                            }
+                            else if arg_num == 1{
+                                pos.1 = item.parse::<f32>()?;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'h' || op == 'H'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'h'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                                let d = (pos.0-last_stable_pos.0).abs();
+                                
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'v' || op == 'V'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'v'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+                                let d = (pos.1-last_stable_pos.1).abs();
+                                
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'l' || op == 'L'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                if op == 'l'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                            }
+                            else if arg_num == 1{
+                                let val = item.parse::<f32>()?;
+                                if op == 'l'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+                                let d = ((last_stable_pos.0-pos.0)*(last_stable_pos.0-pos.0) + (last_stable_pos.1-pos.1)*(last_stable_pos.1-pos.1)).sqrt();
+                                
+
+                                cummulative_distance += d;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        } else if op == 'a' || op == 'A'{
+                            if arg_num == 0{
+                                let val = item.parse::<f32>()?;
+                                r = val;
+                            }
+                            else if arg_num == 1{
+                                let val = item.parse::<f32>()?;
+                                if r != val{
+                                    return Err(SvgdxError::ParseError("path length not supported for non circle elipse".to_string()));
+                                }
+                            }
+                            else if arg_num == 2{
+                                // unused as not mean anything for circle
+                            }
+                            else if arg_num == 3{
+                                let val = item.parse::<u32>()?;
+                                large_arc_flag = val != 0;
+                            }
+                            else if arg_num == 4{
+                                let val = item.parse::<u32>()?;
+                                sweeping_flag = val != 0;
+                            }
+                            else if arg_num == 5{
+                                let val = item.parse::<f32>()?;
+                                if op == 'a'{
+                                    pos.0 += val;
+                                }
+                                else{
+                                    pos.0 = val;
+                                }
+                            }
+                            else if arg_num == 6{
+                                let val = item.parse::<f32>()?;
+                                if op == 'a'{
+                                    pos.1 += val;
+                                }
+                                else{
+                                    pos.1 = val;
+                                }
+
+
+                                let d2 = (last_stable_pos.0-pos.0)*(last_stable_pos.0-pos.0) + (last_stable_pos.1-pos.1)*(last_stable_pos.1-pos.1);
+                                let d = d2.sqrt();
+                                
+                                let desc = r*r - d2/4.0;
+                                let mid_point = ((last_stable_pos.0 + pos.0)*0.5,(last_stable_pos.1 + pos.1)*0.5);
+                                let centre;
+                                if desc <= 0.0{
+                                    centre = mid_point;
+                                }
+                                else{
+                                    let inv_d = 1.0/d;
+                                    let perp = ((last_stable_pos.1-pos.1)*inv_d,(pos.0-last_stable_pos.0)*inv_d);
+                                    let sign = large_arc_flag ^ sweeping_flag;// which circle to use
+                                    let len = if sign {desc.sqrt()} else {-desc.sqrt()};
+                                    centre = (mid_point.0 + perp.0*len,mid_point.1 + perp.1*len);
+                                }
+                                let ang_1 = (last_stable_pos.1-centre.1).atan2(last_stable_pos.0-centre.0);
+                                let ang_2 = (pos.1-centre.1).atan2(pos.0-centre.0);
+                                
+                                let mut shortest_arc_angle = ang_2-ang_1;
+                                if shortest_arc_angle < -std::f32::consts::PI{
+                                    shortest_arc_angle += std::f32::consts::PI*2.0;
+                                }
+                                else if shortest_arc_angle > std::f32::consts::PI{
+                                    shortest_arc_angle -= std::f32::consts::PI*2.0;
+                                }
+                                let arc_angle = if large_arc_flag {(std::f32::consts::PI*2.0-shortest_arc_angle.abs())*shortest_arc_angle.signum()} else {shortest_arc_angle};
+                                let arc_length = arc_angle.abs()*r;
+
+                                
+
+                                cummulative_distance += arc_length;
+                                last_stable_pos = pos;
+                            }
+                            else{
+                                return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                            }
+                        }
+
+                        arg_num += 1;
+                    }
+                }
+                sum += cummulative_distance;
+            }
+        }
+
+        return Ok(sum);
+    }
+
+    fn get_coord_element_loc(
+        elem_map: &impl ElementMap,
+        el: &SvgElement,
+        loc: LocSpec,
+    ) -> Result<(f32,f32)>{
+
+        if let LocSpec::PureLength(l) = loc {
+            if let Length::Ratio(r) = l{
+                let ll = Self::get_line_length(el)?;
+                return Self::get_point_along_line(el, ll*r);
+            }
+            if let Length::Absolute(a) = l{
+                return Self::get_point_along_line(el, a);
+            }
+        }
+
+        let coord = elem_map
+            .get_element_bbox(el)?
+            .ok_or_else(|| SvgdxError::MissingBoundingBox(el.to_string()))?
+            .locspec(loc);
+
+        return Ok(coord);
+    }
+
     pub fn from_element(
         element: &SvgElement,
         elem_map: &impl ElementMap,
@@ -267,10 +803,7 @@ impl Connector {
                     end_loc = Some(eloc);
                     end_dir = Self::loc_to_dir(eloc);
                 }
-                let end_coord = elem_map
-                    .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                    .locspec(end_loc.expect("Set from closest_loc"));
+                let end_coord = Self::get_coord_element_loc(elem_map, end_el, end_loc.expect("Set from closest_loc"))?;
                 (
                     Endpoint::new(start_point, start_dir),
                     Endpoint::new(end_coord, end_dir),
@@ -284,10 +817,7 @@ impl Connector {
                     start_loc = Some(sloc);
                     start_dir = Self::loc_to_dir(sloc);
                 }
-                let start_coord = elem_map
-                    .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                    .locspec(start_loc.expect("Set from closest_loc"));
+                let start_coord = Self::get_coord_element_loc(elem_map, start_el, start_loc.expect("Set from closest_loc"))?;
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_point, end_dir),
@@ -306,30 +836,18 @@ impl Connector {
                     start_dir = Self::loc_to_dir(sloc);
                     end_dir = Self::loc_to_dir(eloc);
                 } else if start_loc.is_none() {
-                    let end_coord = elem_map
-                        .get_element_bbox(end_el)?
-                        .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                        .locspec(end_loc.expect("Not both None"));
+                    let end_coord = Self::get_coord_element_loc(elem_map, end_el, end_loc.expect("Not both None"))?;
                     let sloc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
                     start_loc = Some(sloc);
                     start_dir = Self::loc_to_dir(sloc);
                 } else if end_loc.is_none() {
-                    let start_coord = elem_map
-                        .get_element_bbox(start_el)?
-                        .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                        .locspec(start_loc.expect("Not both None"));
+                    let start_coord = Self::get_coord_element_loc(elem_map, start_el, start_loc.expect("Not both None"))?;
                     let eloc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
                     end_loc = Some(eloc);
                     end_dir = Self::loc_to_dir(eloc);
                 }
-                let start_coord = elem_map
-                    .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                    .locspec(start_loc.expect("Set above"));
-                let end_coord = elem_map
-                    .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                    .locspec(end_loc.expect("Set above"));
+                let start_coord = Self::get_coord_element_loc(elem_map, start_el, start_loc.expect("Set above"))?;
+                let end_coord = Self::get_coord_element_loc(elem_map, end_el, end_loc.expect("Set above"))?;
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_coord, end_dir),
