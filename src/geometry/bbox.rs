@@ -65,7 +65,7 @@ impl BoundingBox {
             RightEdge(len) => (self.x2, len.calc_offset(self.y1, self.y2)),
             BottomEdge(len) => (len.calc_offset(self.x1, self.x2), self.y2),
             LeftEdge(len) => (self.x1, len.calc_offset(self.y1, self.y2)),
-            PureLength(len) => panic!(),
+            PureLength(_) => panic!(),
         }
     }
 
