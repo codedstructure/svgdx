@@ -82,7 +82,7 @@ fn md_parse_escapes_and_delimiters(text_value: &str) -> (Vec<char>, Vec<Delimite
                 escaped = true;
             }
             ('\\', true) => {
-                escaped = true;
+                escaped = false;
             }
             // the delimiters
             ('`', false) | ('_', false) | ('*', false) => {
