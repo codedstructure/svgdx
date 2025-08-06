@@ -22,8 +22,8 @@ fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<u32>) {
 
     for s in sections {
         let bit = s.code_bold_italic;
-        for i in s.start_ind..s.end_ind {
-            state_per_char[i] |= 1 << bit;
+        for i in state_per_char.iter_mut().take(s.end_ind).skip(s.start_ind) {
+            *i |= 1 << bit;
         }
     }
 
@@ -40,7 +40,7 @@ fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<u32>) {
             .push(parsed_string[i]);
     }
 
-    return (strings, states);
+    (strings, states)
 }
 
 #[derive(Debug)]
@@ -122,10 +122,10 @@ fn md_parse_escapes_and_delimiters(text_value: &str) -> (Vec<char>, Vec<Delimite
         }
     }
 
-    return (result, delimiters);
+    (result, delimiters)
 }
 
-fn md_parse_set_delimiter_open_close(result: &Vec<char>, delimiters: &mut Vec<DelimiterData>) {
+fn md_parse_set_delimiter_open_close(result: &[char], delimiters: &mut [DelimiterData]) {
     // set could open/close
     for i in 0..delimiters.len() {
         let prev_char;
@@ -178,7 +178,7 @@ fn md_parse_set_delimiter_open_close(result: &Vec<char>, delimiters: &mut Vec<De
     }
 }
 
-fn md_parse_eval_sections(delimiters: &mut Vec<DelimiterData>) -> Vec<SectionData> {
+fn md_parse_eval_sections(delimiters: &mut [DelimiterData]) -> Vec<SectionData> {
     let mut sections = vec![];
     let stack_bottom = 0; // because I have a null element in it
     let mut current_position = stack_bottom + 1;
@@ -261,7 +261,7 @@ fn md_parse_eval_sections(delimiters: &mut Vec<DelimiterData>) -> Vec<SectionDat
             }
         }
     }
-    return sections;
+    sections
 }
 
 fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
@@ -282,18 +282,18 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
         for s in sections.iter_mut() {
             // if start needs to be after or equal
             if s.start_ind >= d.ind {
-                s.start_ind += d.num_delimiters as usize;
+                s.start_ind += d.num_delimiters;
             }
             if s.end_ind > d.ind {
                 // if end needs to be after
-                s.end_ind += d.num_delimiters as usize;
+                s.end_ind += d.num_delimiters;
             }
         }
         let mut temp = vec![d.char_type; d.num_delimiters];
         final_result.append(&mut temp);
     }
 
-    return (final_result.into_iter().rev().collect(), sections);
+    (final_result.into_iter().rev().collect(), sections)
 }
 
 /// Convert unescaped r"\n" into newline characters for multi-line text
@@ -453,7 +453,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         return Err(SvgdxError::ParseError(
             "has both attributes of text and md".to_owned(),
         ));
-    } else if let Some(_) = orig_elem.get_attr("text") {
+    } else if orig_elem.get_attr("text").is_some() {
         text_values = vec![get_text_value(&mut orig_elem)];
         state_values = vec![0];
     } else {
@@ -462,7 +462,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
     let mut full_text_parsed_string = "".to_string();
     for t in text_values.iter() {
-        full_text_parsed_string.push_str(&t);
+        full_text_parsed_string.push_str(t);
     }
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
@@ -476,7 +476,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         let mut segments = text_values[i].lines();
 
         if let Some(first) = segments.next() {
-            if first != "" {
+            if !first.is_empty() {
                 lines
                     .last_mut()
                     .expect("added item not removed")
@@ -505,7 +505,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
 
     for i in 0..lines.len() {
-        if lines[i].len() == 0 {
+        if lines[i].is_empty() {
             lines[i].push("");
             line_types[i].push(0);
         }
