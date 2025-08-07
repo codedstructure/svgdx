@@ -48,43 +48,13 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
                 if value.starts_with(ELREF_ID_PREFIX) {
                     idx += 1; // account for ignoring # in word break search
                 } else {
-                    // account for ignoring ^/+/^^^/^n^ in word break search
+                    // account for ignoring ^/+/^^^ in word break search
                     let mut chars = value.chars();
-                    let mut last_safe_id = idx;
                     let t = chars.next().expect("must be ELREF_PREVIOUS or _NEXT");
                     idx += 1;
-                    let mut is_num = false;
-                    if let Some(x) = chars.next() {
-                        if x == t {
-                            is_num = false;
-                            idx += 1;
-                        } else if x.is_numeric() {
-                            is_num = true;
-                            last_safe_id = idx + 1;
-                        }
+                    while chars.next() == Some(t) {
+                        idx += 1;
                     }
-                    for x in chars {
-                        if x != t && !x.is_numeric() {
-                            break;
-                        }
-                        if is_num {
-                            if x.is_numeric() {
-                                idx += 1;
-                            } else {
-                                if x == t {
-                                    idx += 1;
-                                    last_safe_id = idx;
-                                }
-                                break;
-                            }
-                        } else {
-                            if x != t {
-                                break;
-                            }
-                            last_safe_id += 1;
-                        }
-                    }
-                    idx = last_safe_id;
                 }
                 result.push_str(&expand_single_relspec(&value[..idx], ctx));
                 value = &value[idx..];

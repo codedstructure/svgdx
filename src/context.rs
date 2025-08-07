@@ -177,8 +177,8 @@ impl ElementMap for TransformerContext {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.elem_map.get(id),
-            ElRef::Prev(num) => self.get_element_offset(-(*num as isize)),
-            ElRef::Next(num) => self.get_element_offset(*num as isize),
+            ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
+            ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
     }
 
@@ -323,8 +323,8 @@ impl TransformerContext {
     pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
-            ElRef::Prev(num) => self.get_element_offset(-(*num as isize)),
-            ElRef::Next(num) => self.get_element_offset(*num as isize),
+            ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
+            ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
     }
 
