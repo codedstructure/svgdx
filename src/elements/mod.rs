@@ -4,6 +4,7 @@ mod containers;
 mod element;
 mod layout;
 mod loops;
+mod markdown;
 mod path;
 mod reuse;
 mod special;
