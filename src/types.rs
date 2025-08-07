@@ -2,6 +2,7 @@ use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
 use itertools::Itertools;
 use std::fmt::{self, Display};
+use std::num::NonZeroU8;
 use std::str::FromStr;
 
 /// Return a 'minimal' representation of the given number
@@ -425,8 +426,9 @@ impl<'s> IntoIterator for &'s ClassList {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElRef {
     Id(String),
-    Prev,
-    Next,
+    // If zero then selfref which causes circular reference
+    Prev(NonZeroU8),
+    Next(NonZeroU8),
 }
 
 impl FromStr for ElRef {
@@ -447,8 +449,12 @@ impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{id}"),
-            ElRef::Prev => write!(f, "{ELREF_PREVIOUS}"),
-            ElRef::Next => write!(f, "{ELREF_NEXT}"),
+            ElRef::Prev(num) => write!(
+                f,
+                "{}",
+                ELREF_PREVIOUS.to_string().repeat(num.get() as usize)
+            ),
+            ElRef::Next(num) => write!(f, "{}", ELREF_NEXT.to_string().repeat(num.get() as usize)),
         }
     }
 }
@@ -467,10 +473,24 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
                 return Ok((ElRef::Id(s.to_owned()), ""));
             }
         }
-    } else if let Some(s) = s.strip_prefix(ELREF_PREVIOUS) {
-        return Ok((ElRef::Prev, s));
-    } else if let Some(s) = s.strip_prefix(ELREF_NEXT) {
-        return Ok((ElRef::Next, s));
+    } else if s.starts_with([ELREF_PREVIOUS, ELREF_NEXT]) {
+        let elref_char = if s.starts_with(ELREF_PREVIOUS) {
+            ELREF_PREVIOUS
+        } else {
+            ELREF_NEXT
+        };
+
+        let new_s = s.trim_start_matches(elref_char);
+        let num = (s.len() - new_s.len()) as u8; // asummes elref_char is 1 byte
+
+        let non_zero_num = NonZeroU8::new(num).expect("cannot be 0 due to starts_with");
+
+        let elref = if elref_char == ELREF_PREVIOUS {
+            ElRef::Prev(non_zero_num)
+        } else {
+            ElRef::Next(non_zero_num)
+        };
+        return Ok((elref, new_s));
     }
 
     Err(SvgdxError::ParseError(format!(
@@ -710,9 +730,20 @@ mod test {
             extract_elref("#id_a@xyz 2 3").unwrap(),
             (ElRef::Id("id_a".to_string()), "@xyz 2 3")
         );
-        assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev, "@bl"));
-        assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev, ""));
-        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next, ""));
+
+        fn nz(num: u8) -> NonZeroU8 {
+            NonZeroU8::new(num).expect("not 0")
+        }
+
+        assert_eq!(extract_elref("^@bl").unwrap(), (ElRef::Prev(nz(1)), "@bl"));
+        assert_eq!(extract_elref("^").unwrap(), (ElRef::Prev(nz(1)), ""));
+        assert_eq!(extract_elref("^^^^").unwrap(), (ElRef::Prev(nz(4)), ""));
+        assert_eq!(extract_elref("^+").unwrap(), (ElRef::Prev(nz(1)), "+"));
+        assert_eq!(extract_elref("^3^^").unwrap(), (ElRef::Prev(nz(1)), "3^^"));
+        assert_eq!(extract_elref("^^3^").unwrap(), (ElRef::Prev(nz(2)), "3^"));
+        assert_eq!(extract_elref("+").unwrap(), (ElRef::Next(nz(1)), ""));
+        assert_eq!(extract_elref("++++").unwrap(), (ElRef::Next(nz(4)), ""));
+        assert_eq!(extract_elref("++3+").unwrap(), (ElRef::Next(nz(2)), "3+"));
         assert!(extract_elref("id").is_err());
     }
 }

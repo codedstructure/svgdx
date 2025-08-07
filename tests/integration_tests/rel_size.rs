@@ -151,6 +151,16 @@ fn test_rel_size_dxy_pct() {
     let expected_rect = r#"<rect id="z" x="1" y="2" width="8" height="90"/>"#;
     let output = transform_str_default(rel_input).unwrap();
     assert_contains!(output, expected_rect);
+
+    let rel_input = r##"
+<rect xy="10 20" wh="20 60"/>
+<rect xy="98 99" wh="123 321" />
+<rect xy="22 23" wh="234 654" />
+<rect xy="1 2" wh="^^^ 40% 150%" id="z"/>
+"##;
+    let expected_rect = r#"<rect id="z" x="1" y="2" width="8" height="90"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
 }
 
 #[test]
@@ -167,6 +177,29 @@ fn test_rel_size_recursive() {
 <rect xy="1 1" wh="2"/>
 <rect xy="1 1" wh="2"/>
 <rect xy="1 1" wh="#y" id="z"/>
+"##;
+    let expected_rect = r#"<rect id="x" x="12" y="34" width="23" height="30"/>"#;
+    let output = transform_str_default(rel_recur_input).unwrap();
+    assert_contains!(output, expected_rect);
+    let expected_rect = r#"<rect id="y" x="2" y="2" width="46" height="27"/>"#;
+    let output = transform_str_default(rel_recur_input).unwrap();
+    assert_contains!(output, expected_rect);
+    let expected_rect = r#"<rect id="z" x="1" y="1" width="46" height="27"/>"#;
+    let output = transform_str_default(rel_recur_input).unwrap();
+    assert_contains!(output, expected_rect);
+
+    // Ensure a relative size can be derived from a referenced
+    // (not just previous) element which is also relatively sized
+    let rel_recur_input = r##"
+<rect xy="10 20" wh="+++" id="abc"/>
+<rect xy="12 34" wh="^ 3 50%" id="x"/>
+<rect xy="23 45" wh="2"/>
+<rect xy="10 20" wh="20 60" id="abc"/>
+<rect xy="1 1" wh="2"/>
+<rect xy="1 1" wh="#y" id="z"/>
+<rect xy="1 1" wh="2"/>
+<rect xy="1 1" wh="2"/>
+<rect xy="2 2" wh="#x 200% -3" id="y"/>
 "##;
     let expected_rect = r#"<rect id="x" x="12" y="34" width="23" height="30"/>"#;
     let output = transform_str_default(rel_recur_input).unwrap();

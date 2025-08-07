@@ -45,7 +45,18 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
             result.push_str(&value[..idx]);
             value = &value[idx..];
             if let Some(mut idx) = value[1..].find(word_break) {
-                idx += 1; // account for ignoring #/^ in word break search
+                if value.starts_with(ELREF_ID_PREFIX) {
+                    idx += 1; // account for ignoring # in word break search
+                } else {
+                    // account for ignoring ^/+/^^^ in word break search
+                    let elref_char = if value.starts_with(ELREF_PREVIOUS) {
+                        ELREF_PREVIOUS
+                    } else {
+                        ELREF_NEXT
+                    };
+                    let new_s = value.trim_start_matches(elref_char);
+                    idx = value.len() - new_s.len(); // asummes elref_char is 1 byte
+                }
                 result.push_str(&expand_single_relspec(&value[..idx], ctx));
                 value = &value[idx..];
             } else {
