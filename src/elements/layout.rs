@@ -78,11 +78,11 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
     };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name() == "point" {
-            if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
+            if let Ok(Some(Some(point))) = elem_loc(elem, LocSpec::Center) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(loc) = rest.strip_prefix(LOCSPEC_SEP).and_then(|s| s.parse().ok()) {
-            if let Ok(Some(point)) = elem_loc(elem, loc) {
+            if let Ok(Some(Some(point))) = elem_loc(elem, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest
@@ -645,7 +645,9 @@ impl SvgElement {
             } else {
                 0.
             };
-            let (x, y) = bbox.locspec(rel.to_locspec());
+            let (x, y) = bbox
+                .locspec(rel.to_locspec())
+                .expect("rel is not lineoffset and using non lineoffset garenteed not to be none");
             let (dx, dy) = match rel {
                 DirSpec::Above => (-this_width / 2., -(this_height + gap)),
                 DirSpec::Below => (-this_width / 2., gap),
@@ -658,7 +660,9 @@ impl SvgElement {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
                 if let Some(bbox) = ctx.get_target_element(self)?.bbox()? {
-                    let (tx, ty) = bbox.locspec(LocSpec::TopLeft);
+                    let (tx, ty) = bbox
+                        .locspec(LocSpec::TopLeft)
+                        .expect("using non lineoffset garenteed not to be none");
                     pos.xmin = Some(x + dx - tx);
                     pos.ymin = Some(y + dy - ty);
                 }
@@ -679,7 +683,9 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
     let width = bb.width();
     let height = bb.height();
     let (cx, cy) = bb.center();
-    let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+    let (x1, y1) = bb
+        .locspec(LocSpec::TopLeft)
+        .expect("using non lineoffset garenteed not to be none");
     match element.name() {
         "rect" | "box" => {
             element.set_attr("x", &fstr(x1));
@@ -824,14 +830,19 @@ fn pos_attr_helper(
                 "Could not parse '{loc_str}' in this context",
             )));
         }
-        let (x, y) = bbox.locspec(loc);
-        let (dx, dy) = extract_dx_dy(dxy)?;
-        use ScalarSpec::*;
-        v = match attr_ss {
-            Minx | Maxx | Cx => x + dx,
-            Miny | Maxy | Cy => y + dy,
-            _ => v,
-        };
+        if let Some((x, y)) = bbox.locspec(loc) {
+            let (dx, dy) = extract_dx_dy(dxy)?;
+            use ScalarSpec::*;
+            v = match attr_ss {
+                Minx | Maxx | Cx => x + dx,
+                Miny | Maxy | Cy => y + dy,
+                _ => v,
+            };
+        } else {
+            return Err(SvgdxError::InvalidData(
+                "general use of lineoffset not yet supported".to_string(),
+            ));
+        }
     }
     Ok(fstr(v).to_string())
 }
@@ -893,7 +904,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                     LocSpec::BottomEdge(_) => element.set_default_attr("text-loc", "b"),
                     LocSpec::LeftEdge(_) => element.set_default_attr("text-loc", "l"),
                     LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
-                    LocSpec::PureLength(_) => element.set_default_attr("text-loc", "c"), // not sure
+                    LocSpec::LineOffset(_) => element.set_default_attr("text-loc", "c"),
                 }
             } else {
                 return Err(SvgdxError::InvalidData(format!(

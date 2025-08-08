@@ -3,6 +3,7 @@ mod connector;
 mod containers;
 mod element;
 mod layout;
+mod line_offset;
 mod loops;
 mod path;
 mod reuse;

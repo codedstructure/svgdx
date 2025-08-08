@@ -246,7 +246,9 @@ impl Transformer {
             }
 
             if !orig_svg_attrs.contains_key("viewBox") {
-                let (x1, y1) = bb.locspec(LocSpec::TopLeft);
+                let (x1, y1) = bb
+                    .locspec(LocSpec::TopLeft)
+                    .expect("using non lineoffset garenteed not to be none");
                 new_svg_attrs.insert(
                     "viewBox",
                     format!("{} {} {} {}", fstr(x1), fstr(y1), view_width, view_height).as_str(),
