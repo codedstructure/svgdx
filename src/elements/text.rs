@@ -2,7 +2,7 @@ use super::SvgElement;
 use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
-use crate::elements::markdown::{get_md_value, TextClass};
+use crate::elements::markdown::{get_md_value, SpanStyle};
 use crate::errors::{Result, SvgdxError};
 
 fn get_text_value(element: &mut SvgElement) -> String {
@@ -175,7 +175,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
             (text_values, state_values) = get_md_value(&mut orig_elem);
         } else {
             text_values = vec![get_text_value(&mut orig_elem)];
-            state_values = vec![TextClass {
+            state_values = vec![SpanStyle {
                 code: false,
                 bold: false,
                 italic: false,
@@ -199,7 +199,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     let mut line_types = vec![vec![]];
     for i in 0..text_values.len() {
         let mut segments = text_values[i].lines();
-
         if let Some(first) = segments.next() {
             if !first.is_empty() {
                 lines
@@ -210,9 +209,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                     .last_mut()
                     .expect("added item not removed")
                     .push(state_values[i]);
-            } else if i != 0 {
-                lines.push(vec![]);
-                line_types.push(vec![]);
             }
         }
 
@@ -232,7 +228,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     for i in 0..lines.len() {
         if lines[i].is_empty() {
             lines[i].push("");
-            line_types[i].push(TextClass {
+            line_types[i].push(SpanStyle {
                 code: false,
                 bold: false,
                 italic: false,
@@ -382,10 +378,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {
             lines = lines.into_iter().rev().collect();
+            line_types = line_types.into_iter().rev().collect();
         }
 
         for (idx, line) in lines.into_iter().enumerate() {
-            //let mut dist_along = 0.0;
             for (idn, text_fragment) in line.into_iter().enumerate() {
                 let mut text_fragment = text_fragment.to_string();
                 let mut tspan = tspan_elem.clone();
@@ -420,15 +416,13 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                     text_fragment = text_fragment.replace(' ', NBSP);
                 }
 
-                tspan.set_attr(
-                    if vertical { "dx" } else { "dy" },
-                    &format!("{}em", fstr(line_offset)),
-                );
+                if idn == 0 {
+                    tspan.set_attr(
+                        if vertical { "dx" } else { "dy" },
+                        &format!("{}em", fstr(line_offset)),
+                    );
+                }
 
-                //tspan.set_attr(
-                //    if vertical { "dy" } else { "dx" },
-                //    &format!("{}em", fstr(dist_along)),
-                //);
                 tspan.text_content = Some(if text_fragment.is_empty() {
                     // Empty tspans don't take up vertical space, so use a zero-width space.
                     // Without this "a\n\nb" would render three tspans, but it would appear
@@ -438,8 +432,6 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                     text_fragment.to_string()
                 });
                 text_elements.push(tspan);
-
-                //dist_along += get_text_len(line_types[idx][idn] & (1 << 0) != 0, text_fragment);
             }
         }
     }
