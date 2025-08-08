@@ -1,18 +1,18 @@
 use super::SvgElement;
 
-pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<TextClass>) {
+pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<SpanStyle>) {
     let text_value = if let Some(tv) = element.pop_attr("md") {
         tv
+    } else if let Some(tv) = element.pop_attr("text") {
+        tv
     } else {
-        element
-            .pop_attr("text")
-            .expect("no text attr in process_text_attr")
+        return (vec![], vec![]);
     };
 
-    let (parsed_string, sections) = md_parse(&text_value);
+    let (parsed_string, spans) = md_parse(&text_value);
 
     let mut state_per_char = vec![
-        TextClass {
+        SpanStyle {
             code: false,
             bold: false,
             italic: false
@@ -20,13 +20,13 @@ pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<TextClass>) {
         parsed_string.len()
     ];
 
-    for s in sections {
+    for s in spans {
         let class = s.code_bold_italic;
-        for i in state_per_char.iter_mut().take(s.end_ind).skip(s.start_ind) {
+        for i in state_per_char.iter_mut().take(s.end_idx).skip(s.start_idx) {
             match class {
-                TextClassEnum::Code => i.code = true,
-                TextClassEnum::Bold => i.bold = true,
-                TextClassEnum::Italic => i.italic = true,
+                SpanStyleEnum::Code => i.code = true,
+                SpanStyleEnum::Bold => i.bold = true,
+                SpanStyleEnum::Italic => i.italic = true,
             }
         }
     }
@@ -48,24 +48,24 @@ pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<TextClass>) {
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
-pub struct TextClass {
+pub struct SpanStyle {
     pub code: bool,
     pub bold: bool,
     pub italic: bool,
 }
 
-#[derive(Debug)]
-enum TextClassEnum {
+#[derive(Debug, PartialEq)]
+enum SpanStyleEnum {
     Code,
     Bold,
     Italic,
 }
 
-#[derive(Debug)]
-struct SectionData {
-    start_ind: usize,
-    end_ind: usize,
-    code_bold_italic: TextClassEnum,
+#[derive(Debug, PartialEq)]
+struct SpanData {
+    start_idx: usize,
+    end_idx: usize,
+    code_bold_italic: SpanStyleEnum,
 }
 
 // based on the commonmark implementation https://spec.commonmark.org/0.31.2/
@@ -96,7 +96,7 @@ fn md_parse_delimiters(text_value: &str) -> (Vec<char>, Vec<DelimiterData>) {
         match c {
             // the delimiters and escape
             '`' | '_' | '*' | '\\' => {
-                let last = delimiters.last_mut().expect("garenteed not to be empty");
+                let last = delimiters.last_mut().expect("guarenteed not to be empty");
                 if c == last.char_type && last.ind == result.len() {
                     // is a continuation
                     last.num_delimiters += 1;
@@ -126,20 +126,20 @@ fn md_parse_delimiters(text_value: &str) -> (Vec<char>, Vec<DelimiterData>) {
 fn md_parse_code_blocks(
     result: &[char],
     delimiters: &mut Vec<DelimiterData>,
-) -> (Vec<char>, Vec<SectionData>) {
+) -> (Vec<char>, Vec<SpanData>) {
     let mut new_result = vec![];
-    let mut sections = vec![];
+    let mut spans = vec![];
     let mut res_ind = 0;
     let mut del_ind = 0;
-    let mut readded_letters = 0;
+    let mut re_added_letters = 0;
     while res_ind <= result.len() {
         while del_ind < delimiters.len() && delimiters[del_ind].ind <= res_ind {
             if delimiters[del_ind].char_type == '`' {
                 // if previous delimiter is \ and is right before and is odd number of \
-                // then reduce by 1 and readd it if it does make a pair
-                // need to acount for all previous delimiters have been moved by readded letters
+                // then reduce by 1 and re_add it if it does make a pair
+                // need to acount for all previous delimiters have been moved by re_added letters
                 let escaped = del_ind != 0
-                    && delimiters[del_ind - 1].ind - readded_letters == delimiters[del_ind].ind
+                    && delimiters[del_ind - 1].ind - re_added_letters == delimiters[del_ind].ind
                     && delimiters[del_ind - 1].char_type == '\\'
                     && delimiters[del_ind - 1].num_delimiters % 2 != 0;
                 let needed_len = match escaped {
@@ -151,7 +151,7 @@ fn md_parse_code_blocks(
                     if delimiters[del_ind].char_type == delimiters[closer_ind].char_type
                         && delimiters[closer_ind].num_delimiters == needed_len
                     {
-                        // it is a section
+                        // it is a span
                         delimiters[del_ind].is_active = false;
                         delimiters[closer_ind].is_active = false;
                         delimiters[del_ind].num_delimiters = 0;
@@ -160,9 +160,13 @@ fn md_parse_code_blocks(
                         if escaped {
                             delimiters[del_ind - 1].num_delimiters -= 1;
                             new_result.push('`');
-                            readded_letters += 1;
+                            re_added_letters += 1;
                         }
                         let start_ind = new_result.len();
+
+                        // to make easy to remove edge spaces if any
+                        let mut has_none_space = false;
+                        let mut span_str = vec![];
 
                         del_ind += 1;
                         while res_ind <= delimiters[closer_ind].ind {
@@ -171,31 +175,46 @@ fn md_parse_code_blocks(
                                     delimiters[del_ind].char_type;
                                     delimiters[del_ind].num_delimiters
                                 ];
-                                new_result.append(&mut temp);
-                                readded_letters += delimiters[del_ind].num_delimiters;
+                                has_none_space |= delimiters[del_ind].num_delimiters != 0; // char type will not be ' '
+                                span_str.append(&mut temp);
+                                re_added_letters += delimiters[del_ind].num_delimiters;
                                 delimiters[del_ind].num_delimiters = 0;
                                 del_ind += 1;
                             }
                             if res_ind != delimiters[closer_ind].ind {
-                                new_result.push(result[res_ind]);
+                                has_none_space |= result[res_ind] != ' ';
+                                span_str.push(result[res_ind]);
                                 res_ind += 1;
                             } else {
                                 break;
                             }
                         }
+                        if has_none_space
+                            && span_str.len() > 1
+                            && span_str[0] == ' '
+                            && span_str[span_str.len() - 1] == ' '
+                        {
+                            span_str.pop();
+                            let mut itr = span_str.iter();
+                            itr.next().expect("size bigger than 1"); // pop front
+                            new_result.extend(itr);
+                        } else {
+                            new_result.append(&mut span_str);
+                        }
+
                         let end_ind = new_result.len();
 
-                        sections.push(SectionData {
-                            start_ind,
-                            end_ind,
-                            code_bold_italic: TextClassEnum::Code,
+                        spans.push(SpanData {
+                            start_idx: start_ind,
+                            end_idx: end_ind,
+                            code_bold_italic: SpanStyleEnum::Code,
                         });
 
                         break;
                     }
                 }
             }
-            delimiters[del_ind].ind += readded_letters;
+            delimiters[del_ind].ind += re_added_letters;
 
             del_ind += 1;
         }
@@ -211,16 +230,18 @@ fn md_parse_code_blocks(
     delimiters.retain(|d| d.num_delimiters != 0);
     delimiters[0].num_delimiters = 0; // set the null delimiter to 0
 
-    (new_result, sections)
+    (new_result, spans)
 }
 
+// assumes no zero length delimiters except for null delim
+// assumes delimiters are ordered
 fn md_parse_escapes(
     result: &[char],
     delimiters: &mut [DelimiterData],
 ) -> (Vec<char>, Vec<DelimiterData>) {
     let mut new_result = vec![];
     let mut new_delimiters = vec![];
-    let mut readded_letters = 0;
+    let mut re_added_letters = 0;
     let mut del_ind = 0;
     let mut res_ind = 0;
     while res_ind <= result.len() {
@@ -230,7 +251,7 @@ fn md_parse_escapes(
                     let mut temp =
                         vec![delimiters[del_ind].char_type; delimiters[del_ind].num_delimiters / 2];
                     new_result.append(&mut temp);
-                    readded_letters += delimiters[del_ind].num_delimiters / 2;
+                    re_added_letters += delimiters[del_ind].num_delimiters / 2;
 
                     if delimiters[del_ind].num_delimiters % 2 != 0 {
                         if del_ind != delimiters.len() - 1
@@ -239,7 +260,7 @@ fn md_parse_escapes(
                             match delimiters[del_ind + 1].char_type {
                                 '`' | '*' | '_' => {
                                     new_result.push(delimiters[del_ind + 1].char_type);
-                                    readded_letters += 1;
+                                    re_added_letters += 1;
                                     delimiters[del_ind + 1].num_delimiters -= 1;
                                 }
                                 _ => panic!("\\ => should merge"),
@@ -252,7 +273,7 @@ fn md_parse_escapes(
                                 }
                                 _ => {
                                     new_result.push(delimiters[del_ind].char_type);
-                                    readded_letters += 1;
+                                    re_added_letters += 1;
                                     delimiters[del_ind].num_delimiters -= 1;
                                 }
                             }
@@ -263,12 +284,17 @@ fn md_parse_escapes(
                     let mut temp =
                         vec![delimiters[del_ind].char_type; delimiters[del_ind].num_delimiters];
                     new_result.append(&mut temp);
-                    readded_letters += delimiters[del_ind].num_delimiters;
+                    re_added_letters += delimiters[del_ind].num_delimiters;
                 }
                 ' ' | '*' | '_' => {
-                    new_delimiters.push(delimiters[del_ind].clone());
-                    let last_ind = new_delimiters.len() - 1;
-                    new_delimiters[last_ind].ind += readded_letters;
+                    // future stages assume no 0 len delimiters
+                    if delimiters[del_ind].char_type == ' '
+                        || delimiters[del_ind].num_delimiters != 0
+                    {
+                        new_delimiters.push(delimiters[del_ind].clone());
+                        let last_ind = new_delimiters.len() - 1;
+                        new_delimiters[last_ind].ind += re_added_letters;
+                    }
                 }
                 _ => panic!("no other type of delimiter char"),
             }
@@ -285,6 +311,7 @@ fn md_parse_escapes(
     (new_result, new_delimiters)
 }
 
+// assumes delimiters are ordered and nonzero
 fn md_parse_set_delimiter_open_close(result: &[char], delimiters: &mut [DelimiterData]) {
     // set could open/close
     for i in 0..delimiters.len() {
@@ -338,8 +365,8 @@ fn md_parse_set_delimiter_open_close(result: &[char], delimiters: &mut [Delimite
     }
 }
 
-fn md_parse_eval_sections(delimiters: &mut [DelimiterData]) -> Vec<SectionData> {
-    let mut sections = vec![];
+fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
+    let mut spans = vec![];
     let stack_bottom = 0; // because I have a null element in it
     let mut current_position = stack_bottom + 1;
     let mut opener_a = [stack_bottom; 3];
@@ -391,13 +418,13 @@ fn md_parse_eval_sections(delimiters: &mut [DelimiterData]) -> Vec<SectionData> 
             let strong = !code
                 && delimiters[opener_ind].num_delimiters >= 2
                 && delimiters[current_position].num_delimiters >= 2;
-            sections.push(SectionData {
-                start_ind: delimiters[opener_ind].ind,
-                end_ind: delimiters[current_position].ind,
+            spans.push(SpanData {
+                start_idx: delimiters[opener_ind].ind,
+                end_idx: delimiters[current_position].ind,
                 code_bold_italic: match (code, strong) {
-                    (true, _) => TextClassEnum::Code,
-                    (_, true) => TextClassEnum::Bold,
-                    (_, _) => TextClassEnum::Italic,
+                    (true, _) => SpanStyleEnum::Code,
+                    (_, true) => SpanStyleEnum::Bold,
+                    (_, _) => SpanStyleEnum::Italic,
                 },
             });
 
@@ -417,15 +444,15 @@ fn md_parse_eval_sections(delimiters: &mut [DelimiterData]) -> Vec<SectionData> 
             }
         }
     }
-    sections
+    spans
 }
 
-fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
+fn md_parse(text_value: &str) -> (Vec<char>, Vec<SpanData>) {
     let (result, mut delimiters) = md_parse_delimiters(text_value);
-    let (result, mut sections) = md_parse_code_blocks(&result, &mut delimiters);
+    let (result, mut spans) = md_parse_code_blocks(&result, &mut delimiters);
     let (mut result, mut delimiters) = md_parse_escapes(&result, &mut delimiters);
     md_parse_set_delimiter_open_close(&result, &mut delimiters);
-    sections.append(&mut md_parse_eval_sections(&mut delimiters));
+    spans.append(&mut md_parse_eval_spans(&mut delimiters));
 
     let mut final_result = vec![];
 
@@ -437,14 +464,14 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
             }
         }
 
-        for s in sections.iter_mut() {
+        for s in spans.iter_mut() {
             // if start needs to be after or equal
-            if s.start_ind >= d.ind {
-                s.start_ind += d.num_delimiters;
+            if s.start_idx >= d.ind {
+                s.start_idx += d.num_delimiters;
             }
-            if s.end_ind > d.ind {
+            if s.end_idx > d.ind {
                 // if end needs to be after
-                s.end_ind += d.num_delimiters;
+                s.end_idx += d.num_delimiters;
             }
         }
         if d.char_type != ' ' {
@@ -453,7 +480,7 @@ fn md_parse(text_value: &str) -> (Vec<char>, Vec<SectionData>) {
         }
     }
 
-    (final_result.into_iter().rev().collect(), sections)
+    (final_result.into_iter().rev().collect(), spans)
 }
 
 #[cfg(test)]
@@ -466,154 +493,146 @@ mod tests {
 
         let text = r"Hello, \nworld!";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['H', 'e', 'l', 'l', 'o', ',', ' ', '\\n', 'w', 'o', 'r', 'l', 'd', '!'], [])"
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', ',', ' ', '\n', 'w', 'o', 'r', 'l', 'd', '!']
         );
+        assert_eq!(md_parse(text).1, []);
 
         // when not part of a '\n', '\' is not special
         let text = r"Hello, world! \1";
-        assert_eq!(format!("{:?}",md_parse(text)), "(['H', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '!', ' ', '\\\\', '1'], [])");
+        assert_eq!(
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', ',', ' ', 'w', 'o', 'r', 'l', 'd', '!', ' ', '\\', '1']
+        );
+        assert_eq!(md_parse(text).1, []);
 
         // when precedes '\n', '\' escapes it.
         let text = r"Hello, \\nworld!";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['H', 'e', 'l', 'l', 'o', ',', ' ', '\\\\', 'n', 'w', 'o', 'r', 'l', 'd', '!'], [])"
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', ',', ' ', '\\', 'n', 'w', 'o', 'r', 'l', 'd', '!']
         );
+        assert_eq!(md_parse(text).1, []);
 
-        fn sd(s: i32, e: i32, i: i32) -> String {
-            "SectionData { start_ind: ".to_owned()
-                + &s.to_string()
-                + ", end_ind: "
-                + &e.to_string()
-                + ", code_bold_italic: "
-                + match i {
-                    0 => "Code",
-                    1 => "Bold",
-                    2 => "Italic",
-                    _ => "Err",
-                }
-                + " }"
+        fn sd(s: usize, e: usize, i: u8) -> SpanData {
+            SpanData {
+                start_idx: s,
+                end_idx: e,
+                code_bold_italic: match i {
+                    0 => SpanStyleEnum::Code,
+                    1 => SpanStyleEnum::Bold,
+                    2 => SpanStyleEnum::Italic,
+                    _ => panic!(),
+                },
+            }
         }
 
         // using the md
         let text = r"He*ll*o, \nworld!";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['H', 'e', 'l', 'l', 'o', ',', ' ', '\\n', 'w', 'o', 'r', 'l', 'd', '!'], ["
-                .to_owned()
-                + &sd(2, 4, 2)
-                + "])"
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', ',', ' ', '\n', 'w', 'o', 'r', 'l', 'd', '!']
         );
+        assert_eq!(md_parse(text).1, [sd(2, 4, 2)]);
 
         // mismatched
         let text = r"*Hello** , \nworld!";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['H', 'e', 'l', 'l', 'o', '*', ' ', ',', ' ', '\\n', 'w', 'o', 'r', 'l', 'd', '!'], ["
-                .to_owned()
-                + &sd(0, 5, 2) + "])"
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', '*', ' ', ',', ' ', '\n', 'w', 'o', 'r', 'l', 'd', '!']
         );
+        assert_eq!(md_parse(text).1, [sd(0, 5, 2)]);
 
         // diff type
         let text = r"He*llo_, \nworld!";
-        assert_eq!(format!("{:?}",md_parse(text)), "(['H', 'e', '*', 'l', 'l', 'o', '_', ',', ' ', '\\n', 'w', 'o', 'r', 'l', 'd', '!'], [])");
+        assert_eq!(
+            md_parse(text).0,
+            ['H', 'e', '*', 'l', 'l', 'o', '_', ',', ' ', '\n', 'w', 'o', 'r', 'l', 'd', '!']
+        );
+        assert_eq!(md_parse(text).1, []);
 
         // multiple diff type
         let text = r"_hello*";
-        assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['_', 'h', 'e', 'l', 'l', 'o', '*'], [])"
-        );
+        assert_eq!(md_parse(text).0, ['_', 'h', 'e', 'l', 'l', 'o', '*']);
+        assert_eq!(md_parse(text).1, []);
 
         // multiple same type
         let text = r"He*ll*o, \nw*or*ld!";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['H', 'e', 'l', 'l', 'o', ',', ' ', '\\n', 'w', 'o', 'r', 'l', 'd', '!'], ["
-                .to_owned()
-                + &sd(2, 4, 2)
-                + ", "
-                + &sd(9, 11, 2)
-                + "])"
+            md_parse(text).0,
+            ['H', 'e', 'l', 'l', 'o', ',', ' ', '\n', 'w', 'o', 'r', 'l', 'd', '!']
         );
+        assert_eq!(md_parse(text).1, [sd(2, 4, 2), sd(9, 11, 2)]);
 
         // space before
         let text = r"**foo bar **";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['*', '*', 'f', 'o', 'o', ' ', 'b', 'a', 'r', ' ', '*', '*'], [])"
+            md_parse(text).0,
+            ['*', '*', 'f', 'o', 'o', ' ', 'b', 'a', 'r', ' ', '*', '*']
         );
+        assert_eq!(md_parse(text).1, []);
 
         // punctuation before alphnum after
         let text = r"**(**foo)";
         assert_eq!(
-            format!("{:?}", md_parse(text)),
-            "(['*', '*', '(', '*', '*', 'f', 'o', 'o', ')'], [])"
+            md_parse(text).0,
+            ['*', '*', '(', '*', '*', 'f', 'o', 'o', ')']
         );
+        assert_eq!(md_parse(text).1, []);
     }
 
     #[test]
     fn test_get_md_value() {
-        fn tc(i: u32) -> String {
-            "TextClass { code: ".to_owned()
-                + match i & (1 << 0) != 0 {
-                    false => "false",
-                    true => "true",
-                }
-                + ", bold: "
-                + match i & (1 << 1) != 0 {
-                    false => "false",
-                    true => "true",
-                }
-                + ", italic: "
-                + match i & (1 << 2) != 0 {
-                    false => "false",
-                    true => "true",
-                }
-                + " }"
+        fn tc(i: u32) -> SpanStyle {
+            SpanStyle {
+                code: i & (1 << 0) != 0,
+                bold: i & (1 << 1) != 0,
+                italic: i & (1 << 2) != 0,
+            }
         }
 
         let mut el = SvgElement::new("text", &[]);
         let text = r"foo";
         el.set_attr("md", text);
-        assert_eq!(
-            format!("{:?}", get_md_value(&mut el)),
-            "([\"foo\"], [".to_owned() + &tc(0) + "])"
-        );
+        assert_eq!(get_md_value(&mut el).0, ["foo"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(0)]);
 
         let text = r"**(**foo)";
         el.set_attr("md", text);
-        assert_eq!(
-            format!("{:?}", get_md_value(&mut el)),
-            "([\"**(**foo)\"], [".to_owned() + &tc(0) + "])"
-        );
+        assert_eq!(get_md_value(&mut el).0, ["**(**foo)"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(0)]);
 
         let text = r"*foo *bar**";
         el.set_attr("md", text);
-        assert_eq!(
-            format!("{:?}", get_md_value(&mut el)),
-            "([\"foo bar\"], [".to_owned() + &tc(4) + "])"
-        );
+        assert_eq!(get_md_value(&mut el).0, ["foo bar"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(4)]);
 
         let text = r"*foo**bar**baz*";
         el.set_attr("md", text);
-        assert_eq!(
-            format!("{:?}", get_md_value(&mut el)),
-            "([\"foo\", \"bar\", \"baz\"], [".to_owned()
-                + &tc(4)
-                + ", "
-                + &tc(6)
-                + ", "
-                + &tc(4)
-                + "])"
-        );
+        assert_eq!(get_md_value(&mut el).0, ["foo", "bar", "baz"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(4), tc(6), tc(4)]);
 
         let text = r"`foo*`";
         el.set_attr("md", text);
-        assert_eq!(
-            format!("{:?}", get_md_value(&mut el)),
-            "([\"foo*\"], [".to_owned() + &tc(1) + "])"
-        );
+        assert_eq!(get_md_value(&mut el).0, ["foo*"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
+
+        // if first and last chars in code block are space remove them unless all empty
+        let text = r"` `` `";
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).0, ["``"]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
+
+        let text = r"`  `";
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).0, ["  "]);
+        el.set_attr("md", text);
+        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
     }
 }
