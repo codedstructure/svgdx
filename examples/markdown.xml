@@ -1,0 +1,4 @@
+<svg>
+  <rect wh="50 10" md="**Hello** _Markdown_ `world`!"/>
+  <rect xy="^|h" wh="10 50" text="***Hi* vertical** _Mark\ndown_ `\ ***literal*** \`!" class="d-markdown d-text-vertical"/>
+</svg>
