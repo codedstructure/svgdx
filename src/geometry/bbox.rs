@@ -44,7 +44,7 @@ impl BoundingBox {
         Self { x1, y1, x2, y2 }
     }
 
-    pub fn locspec(&self, ls: LocSpec) -> (f32, f32) {
+    pub fn locspec(&self, ls: LocSpec) -> Option<(f32, f32)> {
         let tl = (self.x1, self.y1);
         let tr = (self.x2, self.y1);
         let br = (self.x2, self.y2);
@@ -52,20 +52,20 @@ impl BoundingBox {
         let c = ((self.x1 + self.x2) / 2., (self.y1 + self.y2) / 2.);
         use LocSpec::*;
         match ls {
-            TopLeft => tl,
-            Top => ((self.x1 + self.x2) / 2., self.y1),
-            TopRight => tr,
-            Right => (self.x2, (self.y1 + self.y2) / 2.),
-            BottomRight => br,
-            Bottom => ((self.x1 + self.x2) / 2., self.y2),
-            BottomLeft => bl,
-            Left => (self.x1, (self.y1 + self.y2) / 2.),
-            Center => c,
-            TopEdge(len) => (len.calc_offset(self.x1, self.x2), self.y1),
-            RightEdge(len) => (self.x2, len.calc_offset(self.y1, self.y2)),
-            BottomEdge(len) => (len.calc_offset(self.x1, self.x2), self.y2),
-            LeftEdge(len) => (self.x1, len.calc_offset(self.y1, self.y2)),
-            PureLength(_) => panic!(),
+            TopLeft => Some(tl),
+            Top => Some(((self.x1 + self.x2) / 2., self.y1)),
+            TopRight => Some(tr),
+            Right => Some((self.x2, (self.y1 + self.y2) / 2.)),
+            BottomRight => Some(br),
+            Bottom => Some(((self.x1 + self.x2) / 2., self.y2)),
+            BottomLeft => Some(bl),
+            Left => Some((self.x1, (self.y1 + self.y2) / 2.)),
+            Center => Some(c),
+            TopEdge(len) => Some((len.calc_offset(self.x1, self.x2), self.y1)),
+            RightEdge(len) => Some((self.x2, len.calc_offset(self.y1, self.y2))),
+            BottomEdge(len) => Some((len.calc_offset(self.x1, self.x2), self.y2)),
+            LeftEdge(len) => Some((self.x1, len.calc_offset(self.y1, self.y2))),
+            LineOffset(_) => None,
         }
     }
 

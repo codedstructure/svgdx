@@ -139,7 +139,7 @@ pub enum LocSpec {
     RightEdge(Length),
     BottomEdge(Length),
     LeftEdge(Length),
-    PureLength(Length),
+    LineOffset(Length),
 }
 
 impl LocSpec {
@@ -194,7 +194,7 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
-                        "" => Ok(Self::PureLength(len)),
+                        "" => Ok(Self::LineOffset(len)),
                         _ => Err(SvgdxError::InvalidData(format!(
                             "Invalid LocSpec format {value}"
                         ))),
@@ -512,18 +512,24 @@ mod test {
     #[test]
     fn test_get_point() {
         let bb = BoundingBox::new(10., 10., 20., 20.);
-        assert_eq!(bb.locspec("t:2".parse().expect("test")), (12., 10.));
-        assert_eq!(bb.locspec("r:25%".parse().expect("test")), (20., 12.5));
-        assert_eq!(bb.locspec("b:6".parse().expect("test")), (16., 20.));
-        assert_eq!(bb.locspec("l:150%".parse().expect("test")), (10., 25.));
-        assert_eq!(bb.locspec("tl".parse().expect("test")), (10., 10.));
-        assert_eq!(bb.locspec("t".parse().expect("test")), (15., 10.));
-        assert_eq!(bb.locspec("tr".parse().expect("test")), (20., 10.));
-        assert_eq!(bb.locspec("r".parse().expect("test")), (20., 15.));
-        assert_eq!(bb.locspec("br".parse().expect("test")), (20., 20.));
-        assert_eq!(bb.locspec("b".parse().expect("test")), (15., 20.));
-        assert_eq!(bb.locspec("bl".parse().expect("test")), (10., 20.));
-        assert_eq!(bb.locspec("l".parse().expect("test")), (10., 15.));
-        assert_eq!(bb.locspec("c".parse().expect("test")), (15., 15.));
+        assert_eq!(bb.locspec("t:2".parse().expect("test")), Some((12., 10.)));
+        assert_eq!(
+            bb.locspec("r:25%".parse().expect("test")),
+            Some((20., 12.5))
+        );
+        assert_eq!(bb.locspec("b:6".parse().expect("test")), Some((16., 20.)));
+        assert_eq!(
+            bb.locspec("l:150%".parse().expect("test")),
+            Some((10., 25.))
+        );
+        assert_eq!(bb.locspec("tl".parse().expect("test")), Some((10., 10.)));
+        assert_eq!(bb.locspec("t".parse().expect("test")), Some((15., 10.)));
+        assert_eq!(bb.locspec("tr".parse().expect("test")), Some((20., 10.)));
+        assert_eq!(bb.locspec("r".parse().expect("test")), Some((20., 15.)));
+        assert_eq!(bb.locspec("br".parse().expect("test")), Some((20., 20.)));
+        assert_eq!(bb.locspec("b".parse().expect("test")), Some((15., 20.)));
+        assert_eq!(bb.locspec("bl".parse().expect("test")), Some((10., 20.)));
+        assert_eq!(bb.locspec("l".parse().expect("test")), Some((10., 15.)));
+        assert_eq!(bb.locspec("c".parse().expect("test")), Some((15., 15.)));
     }
 }

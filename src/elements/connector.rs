@@ -3,6 +3,7 @@ use std::collections::BinaryHeap;
 
 use super::SvgElement;
 use crate::context::ElementMap;
+use crate::elements::line_offset::get_point_along_linelike_type_el;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::{parse_el_loc, strp_length, BoundingBox, Length, LocSpec, ScalarSpec};
 use crate::types::{attr_split, fstr, strp};
@@ -95,7 +96,9 @@ fn closest_loc(
         .ok_or_else(|| SvgdxError::MissingBoundingBox(this.to_string()))?;
 
     for loc in edge_locations(conn_type) {
-        let this_coord = this_bb.locspec(loc);
+        let this_coord = this_bb
+            .locspec(loc)
+            .expect("always some as LineOffset not in edge_locations");
         let ((x1, y1), (x2, y2)) = (this_coord, point);
         let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
         if dist_sq < min_dist_sq {
@@ -125,8 +128,13 @@ fn shortest_link(
 
     for this_loc in edge_locations(conn_type) {
         for that_loc in edge_locations(conn_type) {
-            let this_coord = this_bb.locspec(this_loc);
-            let that_coord = that_bb.locspec(that_loc);
+            let this_coord = this_bb
+                .locspec(this_loc)
+                .expect("always some as LineOffset not in edge_locations");
+            let that_coord = that_bb
+                .locspec(that_loc)
+                .expect("always some as LineOffset not in edge_locations");
+            // always some as edge_locations does not include LineOffset
             let ((x1, y1), (x2, y2)) = (this_coord, that_coord);
             let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
             if dist_sq < min_dist_sq {
@@ -139,14 +147,14 @@ fn shortest_link(
     Ok((this_min_loc, that_min_loc))
 }
 
+// from the exaple heap docs https://doc.rust-lang.org/std/collections/binary_heap/index.html
 #[derive(PartialEq, Eq)]
-struct HeapData {
+struct PathCost {
     cost: u32,
-    ind: usize,
+    idx: usize,
 }
 
-impl Ord for HeapData {
-    // from the exaple heap docs
+impl Ord for PathCost {
     fn cmp(&self, other: &Self) -> Ordering {
         // Notice that we flip the ordering on costs.
         // In case of a tie we compare positions - this step is necessary
@@ -154,11 +162,11 @@ impl Ord for HeapData {
         other
             .cost
             .cmp(&self.cost)
-            .then_with(|| self.ind.cmp(&other.ind))
+            .then_with(|| self.idx.cmp(&other.idx))
     }
 }
 
-impl PartialOrd for HeapData {
+impl PartialOrd for PathCost {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
@@ -184,12 +192,11 @@ impl Connector {
     fn parse_element<'a>(
         element: &mut SvgElement,
         elem_map: &'a impl ElementMap,
-        start: bool,
+        attr_name: &str,
     ) -> Result<ElementParseData<'a>> {
-        let attrib_name = if start { "start" } else { "end" };
         let this_ref = element
-            .pop_attr(attrib_name)
-            .ok_or_else(|| SvgdxError::MissingAttribute(attrib_name.to_string()))?;
+            .pop_attr(attr_name)
+            .ok_or_else(|| SvgdxError::MissingAttribute(attr_name.to_string()))?;
 
         let mut ret = ElementParseData {
             el: None,
@@ -210,12 +217,12 @@ impl Connector {
             ret.point = Some((
                 parts.next().ok_or_else(|| {
                     SvgdxError::InvalidData(
-                        (attrib_name.to_owned() + "_ref x should be numeric").to_owned(),
+                        (attr_name.to_owned() + "_ref x should be numeric").to_owned(),
                     )
                 })?,
                 parts.next().ok_or_else(|| {
                     SvgdxError::InvalidData(
-                        (attrib_name.to_owned() + "_ref y should be numeric").to_owned(),
+                        (attr_name.to_owned() + "_ref y should be numeric").to_owned(),
                     )
                 })?,
             ));
@@ -224,399 +231,20 @@ impl Connector {
         Ok(ret)
     }
 
-    fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-        let is_percent;
-        let dist;
-        match length {
-            Length::Absolute(abs) => {
-                dist = abs;
-                is_percent = false;
-            }
-            Length::Ratio(rat) => {
-                dist = rat;
-                is_percent = true;
-            }
-        }
-
-        if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
-            el.get_attr("x1"),
-            el.get_attr("y1"),
-            el.get_attr("x2"),
-            el.get_attr("y2"),
-        ) {
-            let x1: f32 = x1.parse()?;
-            let y1: f32 = y1.parse()?;
-            let x2: f32 = x2.parse()?;
-            let y2: f32 = y2.parse()?;
-            if x1 == x2 && y1 == y2 {
-                return Ok((x1, y1));
-            }
-
-            let rat = if is_percent {
-                dist
-            } else {
-                let len = ((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)).sqrt();
-                dist / len
-            };
-            return Ok((x1 + rat * (x2 - x1), y1 + rat * (y2 - y1)));
-        }
-
-        Err(SvgdxError::MissingAttribute(
-            "in line either x1, y1, x2 or y2".to_string(),
-        ))
-    }
-
-    fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-        let mut is_percent;
-        let mut dist;
-        match length {
-            Length::Absolute(abs) => {
-                dist = abs;
-                is_percent = false;
-            }
-            Length::Ratio(rat) => {
-                dist = rat;
-                is_percent = true;
-            }
-        }
-
-        if let Some(points) = el.get_attr("points") {
-            let points = points.split(", ");
-            let mut lastx;
-            let mut lasty;
-
-            // loop to allow repeat to find total length if a percentage
-            loop {
-                let mut cummulative_dist = 0.0;
-                lastx = 0.0;
-                lasty = 0.0;
-                let mut first_point = true;
-                for p in points.clone() {
-                    let mut this_point = p.split_whitespace();
-                    if let (Some(x), Some(y)) = (this_point.next(), this_point.next()) {
-                        let x: f32 = x.parse()?;
-                        let y: f32 = y.parse()?;
-
-                        if !first_point {
-                            let len =
-                                ((lastx - x) * (lastx - x) + (lasty - y) * (lasty - y)).sqrt();
-                            if !is_percent && cummulative_dist + len > dist {
-                                let rat = (dist - cummulative_dist) / len;
-                                return Ok((
-                                    lastx * (1.0 - rat) + rat * x,
-                                    lasty * (1.0 - rat) + rat * y,
-                                ));
-                            }
-                            cummulative_dist += len;
-                        } else if dist < 0.0 {
-                            // clamp to start
-                            return Ok((x, y));
-                        }
-                        lastx = x;
-                        lasty = y;
-                    }
-
-                    first_point = false;
-                }
-                if !is_percent {
-                    break;
-                } else {
-                    is_percent = false;
-                    dist *= cummulative_dist;
-                }
-            }
-            return Ok((lastx, lasty));
-        }
-
-        Err(SvgdxError::MissingAttribute(
-            "points in polyline".to_string(),
-        ))
-    }
-
-    fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-        let mut is_percent;
-        let mut dist;
-        match length {
-            Length::Absolute(abs) => {
-                dist = abs;
-                is_percent = false;
-            }
-            Length::Ratio(rat) => {
-                dist = rat;
-                is_percent = true;
-            }
-        }
-
-        if let Some(d) = el.get_attr("d") {
-            let replaced_commas = d.replace([','], " ");
-            let items = replaced_commas.split_whitespace();
-
-            let mut pos;
-            // loop to allow repeat to find total length if a percentage
-            loop {
-                let mut cummulative_dist = 0.0;
-                pos = (0.0, 0.0);
-                let mut last_stable_pos = pos;
-                let mut r = 0.0;
-                let mut large_arc_flag = false;
-                let mut sweeping_flag = false;
-
-                let mut op = ' ';
-                let mut arg_num = 0;
-                for item in items.clone() {
-                    if item.starts_with([
-                        'a', 'A', 'c', 'C', 'h', 'H', 'l', 'L', 'm', 'M', 'q', 'Q', 's', 'S', 't',
-                        'T', 'v', 'V', 'z', 'Z',
-                    ]) {
-                        if let Some(c) = item.chars().next() {
-                            op = c;
-                            arg_num = 0;
-                            if dist < 0.0 && !['m', 'M'].contains(&c) {
-                                // clamping the start
-                                return Ok(last_stable_pos);
-                            }
-                        }
-                    } else {
-                        if ['c', 'C', 'q', 'Q', 's', 'S', 't', 'T', 'z', 'Z'].contains(&op) {
-                            todo!("not yet impl path parsing");
-                        } else if op == 'm' {
-                            if arg_num == 0 {
-                                pos.0 += item.parse::<f32>()?;
-                            } else if arg_num == 1 {
-                                pos.1 += item.parse::<f32>()?;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        } else if op == 'M' {
-                            if arg_num == 0 {
-                                pos.0 = item.parse::<f32>()?;
-                            } else if arg_num == 1 {
-                                pos.1 = item.parse::<f32>()?;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        } else if op == 'h' || op == 'H' {
-                            if arg_num == 0 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'h' {
-                                    pos.0 += val;
-                                } else {
-                                    pos.0 = val;
-                                }
-                                let d = (pos.0 - last_stable_pos.0).abs();
-                                if !is_percent && cummulative_dist + d > dist {
-                                    let r = (dist - cummulative_dist) / d;
-                                    return Ok((last_stable_pos.0 * (1.0 - r) + pos.0 * r, pos.1));
-                                }
-
-                                cummulative_dist += d;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        } else if op == 'v' || op == 'V' {
-                            if arg_num == 0 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'v' {
-                                    pos.1 += val;
-                                } else {
-                                    pos.1 = val;
-                                }
-                                let d = (pos.1 - last_stable_pos.1).abs();
-                                if !is_percent && cummulative_dist + d > dist {
-                                    let r = (dist - cummulative_dist) / d;
-                                    return Ok((pos.0, last_stable_pos.1 * (1.0 - r) + pos.1 * r));
-                                }
-
-                                cummulative_dist += d;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        } else if op == 'l' || op == 'L' {
-                            if arg_num == 0 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'l' {
-                                    pos.0 += val;
-                                } else {
-                                    pos.0 = val;
-                                }
-                            } else if arg_num == 1 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'l' {
-                                    pos.1 += val;
-                                } else {
-                                    pos.1 = val;
-                                }
-                                let d = ((last_stable_pos.0 - pos.0) * (last_stable_pos.0 - pos.0)
-                                    + (last_stable_pos.1 - pos.1) * (last_stable_pos.1 - pos.1))
-                                    .sqrt();
-                                if !is_percent && cummulative_dist + d > dist {
-                                    let r = (dist - cummulative_dist) / d;
-                                    return Ok((
-                                        last_stable_pos.0 * (1.0 - r) + pos.0 * r,
-                                        last_stable_pos.1 * (1.0 - r) + pos.1 * r,
-                                    ));
-                                }
-
-                                cummulative_dist += d;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        } else if op == 'a' || op == 'A' {
-                            if arg_num == 0 {
-                                let val = item.parse::<f32>()?;
-                                r = val;
-                            } else if arg_num == 1 {
-                                let val = item.parse::<f32>()?;
-                                if r != val {
-                                    return Err(SvgdxError::ParseError(
-                                        "path length not supported for non circle elipse"
-                                            .to_string(),
-                                    ));
-                                }
-                            } else if arg_num == 2 {
-                                // unused as not mean anything for circle
-                            } else if arg_num == 3 {
-                                let val = item.parse::<u32>()?;
-                                large_arc_flag = val != 0;
-                            } else if arg_num == 4 {
-                                let val = item.parse::<u32>()?;
-                                sweeping_flag = val != 0;
-                            } else if arg_num == 5 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'a' {
-                                    pos.0 += val;
-                                } else {
-                                    pos.0 = val;
-                                }
-                            } else if arg_num == 6 {
-                                let val = item.parse::<f32>()?;
-                                if op == 'a' {
-                                    pos.1 += val;
-                                } else {
-                                    pos.1 = val;
-                                }
-
-                                let d2 = (last_stable_pos.0 - pos.0) * (last_stable_pos.0 - pos.0)
-                                    + (last_stable_pos.1 - pos.1) * (last_stable_pos.1 - pos.1);
-                                let d = d2.sqrt();
-
-                                let desc = r * r - d2 / 4.0;
-                                let mid_point = (
-                                    (last_stable_pos.0 + pos.0) * 0.5,
-                                    (last_stable_pos.1 + pos.1) * 0.5,
-                                );
-                                let centre = if desc <= 0.0 {
-                                    mid_point
-                                } else {
-                                    let inv_d = 1.0 / d;
-                                    let perp = (
-                                        (last_stable_pos.1 - pos.1) * inv_d,
-                                        (pos.0 - last_stable_pos.0) * inv_d,
-                                    );
-                                    let sign = large_arc_flag ^ sweeping_flag; // which circle to use
-                                    let len = if sign { desc.sqrt() } else { -desc.sqrt() };
-
-                                    (mid_point.0 + perp.0 * len, mid_point.1 + perp.1 * len)
-                                };
-                                let ang_1 = (last_stable_pos.1 - centre.1)
-                                    .atan2(last_stable_pos.0 - centre.0);
-                                let ang_2 = (pos.1 - centre.1).atan2(pos.0 - centre.0);
-
-                                let mut shortest_arc_angle = ang_2 - ang_1;
-                                if shortest_arc_angle < -std::f32::consts::PI {
-                                    shortest_arc_angle += std::f32::consts::PI * 2.0;
-                                } else if shortest_arc_angle > std::f32::consts::PI {
-                                    shortest_arc_angle -= std::f32::consts::PI * 2.0;
-                                }
-                                let arc_angle = if large_arc_flag {
-                                    (std::f32::consts::PI * 2.0 - shortest_arc_angle.abs())
-                                        * shortest_arc_angle.signum()
-                                } else {
-                                    shortest_arc_angle
-                                };
-                                let arc_length = arc_angle.abs() * r;
-
-                                if !is_percent && cummulative_dist + arc_length > dist {
-                                    let ratio = (dist - cummulative_dist) / arc_length;
-                                    let final_angle = ang_1 + arc_angle * ratio;
-
-                                    return Ok((
-                                        centre.0 + r * (final_angle).cos(),
-                                        centre.1 + r * (final_angle).sin(),
-                                    ));
-                                }
-
-                                cummulative_dist += arc_length;
-                                last_stable_pos = pos;
-                            } else {
-                                return Err(SvgdxError::ParseError(
-                                    "path has too many vars".to_string(),
-                                ));
-                            }
-                        }
-
-                        arg_num += 1;
-                    }
-                }
-                if !is_percent {
-                    break;
-                } else {
-                    is_percent = false;
-                    dist *= cummulative_dist;
-                }
-            }
-            return Ok(pos);
-        }
-
-        Err(SvgdxError::MissingAttribute("d in path".to_string()))
-    }
-
-    fn get_point_along_linish_type_el(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-        let name = el.name();
-
-        if name == "line" {
-            return Self::get_point_along_line(el, length);
-        }
-        if name == "polyline" {
-            return Self::get_point_along_polyline(el, length);
-        }
-        if name == "path" {
-            return Self::get_point_along_path(el, length);
-        }
-
-        Err(SvgdxError::MissingAttribute(
-            "looking for point on line in a non line element".to_string(),
-        ))
-    }
-
     fn get_coord_element_loc(
         elem_map: &impl ElementMap,
         el: &SvgElement,
         loc: LocSpec,
     ) -> Result<(f32, f32)> {
-        if let LocSpec::PureLength(l) = loc {
-            return Self::get_point_along_linish_type_el(el, l);
+        if let LocSpec::LineOffset(l) = loc {
+            return get_point_along_linelike_type_el(el, l);
         }
 
         let coord = elem_map
             .get_element_bbox(el)?
             .ok_or_else(|| SvgdxError::MissingBoundingBox(el.to_string()))?
-            .locspec(loc);
+            .locspec(loc)
+            .expect("only None if LineOffset and know is not");
 
         Ok(coord)
     }
@@ -628,8 +256,8 @@ impl Connector {
     ) -> Result<Self> {
         let mut element = element.clone();
 
-        let start_ret = Self::parse_element(&mut element, elem_map, true)?;
-        let end_ret = Self::parse_element(&mut element, elem_map, false)?;
+        let start_ret = Self::parse_element(&mut element, elem_map, "start")?;
+        let end_ret = Self::parse_element(&mut element, elem_map, "end")?;
         let (start_el, mut start_loc, start_point, mut start_dir) =
             (start_ret.el, start_ret.loc, start_ret.point, start_ret.dir);
         let (end_el, mut end_loc, end_point, mut end_dir) =
@@ -750,6 +378,8 @@ impl Connector {
         })
     }
 
+    // checks if there a axis aligned line segment is intersected by a bounding box
+    // this allows the aals to be entirely inside
     fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f32) -> bool {
         if x_axis {
             if axis_val < bb.y1 || axis_val > bb.y2 {
@@ -780,45 +410,42 @@ impl Connector {
     ) -> (Vec<f32>, Vec<f32>, usize, usize) {
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
-        let sel_bb = bbs.0;
-        let eel_bb = bbs.1;
-        let start_abs_offset = abs_offsets.0;
-        let end_abs_offset = abs_offsets.1;
-        let start_dir = dirs.0;
-        let end_dir = dirs.1;
+        let (start_el_bb, end_el_bb) = bbs;
+        let (start_abs_offset, end_abs_offset) = abs_offsets;
+        let (start_dir, end_dir) = dirs;
 
         let mut x_lines = vec![];
         let mut y_lines = vec![];
         let mut mid_x = usize::MAX;
         let mut mid_y = usize::MAX;
 
-        x_lines.push(sel_bb.x1 - start_abs_offset);
-        x_lines.push(sel_bb.x2 + start_abs_offset);
-        x_lines.push(eel_bb.x1 - end_abs_offset);
-        x_lines.push(eel_bb.x2 + end_abs_offset);
+        x_lines.push(start_el_bb.x1 - start_abs_offset);
+        x_lines.push(start_el_bb.x2 + start_abs_offset);
+        x_lines.push(end_el_bb.x1 - end_abs_offset);
+        x_lines.push(end_el_bb.x2 + end_abs_offset);
 
-        if sel_bb.x1 > eel_bb.x2 {
+        if start_el_bb.x1 > end_el_bb.x2 {
             // there is a gap
-            x_lines.push((sel_bb.x1 + eel_bb.x2) * 0.5);
+            x_lines.push((start_el_bb.x1 + end_el_bb.x2) * 0.5);
             mid_x = x_lines.len() - 1;
-        } else if sel_bb.x2 < eel_bb.x1 {
+        } else if start_el_bb.x2 < end_el_bb.x1 {
             // there is a gap
-            x_lines.push((sel_bb.x2 + eel_bb.x1) * 0.5);
+            x_lines.push((start_el_bb.x2 + end_el_bb.x1) * 0.5);
             mid_x = x_lines.len() - 1;
         }
 
-        y_lines.push(sel_bb.y1 - start_abs_offset);
-        y_lines.push(sel_bb.y2 + start_abs_offset);
-        y_lines.push(eel_bb.y1 - end_abs_offset);
-        y_lines.push(eel_bb.y2 + end_abs_offset);
+        y_lines.push(start_el_bb.y1 - start_abs_offset);
+        y_lines.push(start_el_bb.y2 + start_abs_offset);
+        y_lines.push(end_el_bb.y1 - end_abs_offset);
+        y_lines.push(end_el_bb.y2 + end_abs_offset);
 
-        if sel_bb.y1 > eel_bb.y2 {
+        if start_el_bb.y1 > end_el_bb.y2 {
             // there is a gap
-            y_lines.push(sel_bb.y1 * (1.0 - ratio_offset) + eel_bb.y2 * ratio_offset);
+            y_lines.push(start_el_bb.y1 * (1.0 - ratio_offset) + end_el_bb.y2 * ratio_offset);
             mid_y = y_lines.len() - 1;
-        } else if sel_bb.y2 < eel_bb.y1 {
+        } else if start_el_bb.y2 < end_el_bb.y1 {
             // there is a gap
-            y_lines.push(sel_bb.y2 * (1.0 - ratio_offset) + eel_bb.y1 * ratio_offset);
+            y_lines.push(start_el_bb.y2 * (1.0 - ratio_offset) + end_el_bb.y1 * ratio_offset);
             mid_y = y_lines.len() - 1;
         }
 
@@ -842,10 +469,10 @@ impl Connector {
 
         if abs_offset_set {
             match start_dir {
-                Direction::Down => mid_y = 1,  // positive x
-                Direction::Left => mid_x = 0,  // negative y
-                Direction::Right => mid_x = 1, // positive y
-                Direction::Up => mid_y = 0,    // positive x
+                Direction::Down => mid_y = 1,  // positive y
+                Direction::Left => mid_x = 0,  // negative x
+                Direction::Right => mid_x = 1, // positive x
+                Direction::Up => mid_y = 0,    // negative y
             }
         }
 
@@ -854,8 +481,8 @@ impl Connector {
 
     fn render_match_corner_get_edges(
         point_set: &[(f32, f32)],
-        sel_bb: BoundingBox,
-        eel_bb: BoundingBox,
+        start_el_bb: BoundingBox,
+        end_el_bb: BoundingBox,
     ) -> Vec<Vec<usize>> {
         let mut edge_set = vec![vec![]; point_set.len()];
 
@@ -869,14 +496,14 @@ impl Connector {
                 // check if not blocked by a wall
                 if point_set[i].0 == point_set[j].0
                     && !Self::aals_blocked_by_bb(
-                        sel_bb,
+                        start_el_bb,
                         point_set[i].1,
                         point_set[j].1,
                         false,
                         point_set[i].0,
                     )
                     && !Self::aals_blocked_by_bb(
-                        eel_bb,
+                        end_el_bb,
                         point_set[i].1,
                         point_set[j].1,
                         false,
@@ -887,14 +514,14 @@ impl Connector {
                 }
                 if point_set[i].1 == point_set[j].1
                     && !Self::aals_blocked_by_bb(
-                        sel_bb,
+                        start_el_bb,
                         point_set[i].0,
                         point_set[j].0,
                         true,
                         point_set[i].1,
                     )
                     && !Self::aals_blocked_by_bb(
-                        eel_bb,
+                        end_el_bb,
                         point_set[i].0,
                         point_set[j].0,
                         true,
@@ -917,8 +544,8 @@ impl Connector {
         &self,
         point_set: &mut Vec<(f32, f32)>,
         edge_set: &mut Vec<Vec<usize>>,
-        sel_bb: BoundingBox,
-        eel_bb: BoundingBox,
+        start_el_bb: BoundingBox,
+        end_el_bb: BoundingBox,
         start_dir: Direction,
         end_dir: Direction,
     ) -> (usize, usize) {
@@ -936,7 +563,7 @@ impl Connector {
             if point_set[i].0 == x1
                 && ((point_set[i].1 < y1 && start_dir == Direction::Up)
                     || (point_set[i].1 > y1 && start_dir == Direction::Down))
-                && !Self::aals_blocked_by_bb(eel_bb, point_set[i].1, y1, false, x1)
+                && !Self::aals_blocked_by_bb(end_el_bb, point_set[i].1, y1, false, x1)
             {
                 edge_set[i].push(start_ind);
                 edge_set[start_ind].push(i);
@@ -944,7 +571,7 @@ impl Connector {
             if point_set[i].1 == y1
                 && ((point_set[i].0 > x1 && start_dir == Direction::Right)
                     || (point_set[i].0 < x1 && start_dir == Direction::Left))
-                && !Self::aals_blocked_by_bb(eel_bb, point_set[i].0, x1, true, y1)
+                && !Self::aals_blocked_by_bb(end_el_bb, point_set[i].0, x1, true, y1)
             {
                 edge_set[i].push(start_ind);
                 edge_set[start_ind].push(i);
@@ -953,7 +580,7 @@ impl Connector {
             if point_set[i].0 == x2
                 && ((point_set[i].1 < y2 && end_dir == Direction::Up)
                     || (point_set[i].1 > y2 && end_dir == Direction::Down))
-                && !Self::aals_blocked_by_bb(sel_bb, point_set[i].1, y2, false, x2)
+                && !Self::aals_blocked_by_bb(start_el_bb, point_set[i].1, y2, false, x2)
             {
                 edge_set[i].push(end_ind);
                 edge_set[end_ind].push(i);
@@ -961,7 +588,7 @@ impl Connector {
             if point_set[i].1 == y2
                 && ((point_set[i].0 > x2 && end_dir == Direction::Right)
                     || (point_set[i].0 < x2 && end_dir == Direction::Left))
-                && !Self::aals_blocked_by_bb(sel_bb, point_set[i].0, x2, true, y2)
+                && !Self::aals_blocked_by_bb(start_el_bb, point_set[i].0, x2, true, y2)
             {
                 edge_set[i].push(end_ind);
                 edge_set[end_ind].push(i);
@@ -978,10 +605,12 @@ impl Connector {
         y_lines: Vec<f32>,
         mid_x: usize,
         mid_y: usize,
+        total_bb_size: u32,
     ) -> Vec<Vec<u32>> {
         // edge cost function
 
-        let corner_cost = 1000;
+        // needs to be comparable to or larger than total_bb_size
+        let corner_cost = 1000 + total_bb_size;
         let mut edge_costs = vec![vec![]; edge_set.len()];
         for i in 0..edge_set.len() {
             for j in 0..edge_set[i].len() {
@@ -1019,37 +648,37 @@ impl Connector {
         edge_costs: &[Vec<u32>],
         start_ind: usize,
         end_ind: usize,
+        total_bb_size: u32,
     ) -> Vec<u32> {
         // just needs to be bigger than 5* (corner cost  +  total bounding box size)
-        let inf = 1000000;
+        let inf = 1000000 + 10 * total_bb_size;
         let mut dist = vec![inf; point_set.len()];
 
-        let mut queue: BinaryHeap<HeapData> = BinaryHeap::new();
+        let mut queue: BinaryHeap<PathCost> = BinaryHeap::new();
         dist[start_ind] = 0;
-        queue.push(HeapData {
+        queue.push(PathCost {
             cost: 0,
-            ind: start_ind,
+            idx: start_ind,
         });
 
         // cant get stuck in a loop as cost for a distance either decreases or queue shrinks
-        while !queue.is_empty() {
-            let next = queue.pop().expect("would not be in while loop");
-            if next.ind == end_ind {
+        while let Some(next) = queue.pop() {
+            if next.idx == end_ind {
                 break;
             }
 
             // the node is reached by faster means so already popped
-            if next.cost > dist[next.ind] {
+            if next.cost > dist[next.idx] {
                 continue;
             }
 
-            for i in 0..edge_set[next.ind].len() {
-                let edge_cost = edge_costs[next.ind][i];
-                if dist[next.ind] + edge_cost < dist[edge_set[next.ind][i]] {
-                    dist[edge_set[next.ind][i]] = dist[next.ind] + edge_cost;
-                    queue.push(HeapData {
-                        cost: dist[edge_set[next.ind][i]],
-                        ind: edge_set[next.ind][i],
+            for i in 0..edge_set[next.idx].len() {
+                let edge_cost = edge_costs[next.idx][i];
+                if dist[next.idx] + edge_cost < dist[edge_set[next.idx][i]] {
+                    dist[edge_set[next.idx][i]] = dist[next.idx] + edge_cost;
+                    queue.push(PathCost {
+                        cost: dist[edge_set[next.idx][i]],
+                        idx: edge_set[next.idx][i],
                     });
                 }
             }
@@ -1096,8 +725,8 @@ impl Connector {
         ratio_offset: f32,
         start_abs_offset: f32,
         end_abs_offset: f32,
-        sel_bb: BoundingBox,
-        eel_bb: BoundingBox,
+        start_el_bb: BoundingBox,
+        end_el_bb: BoundingBox,
         abs_offset_set: bool,
     ) -> Result<Vec<(f32, f32)>> {
         let (x1, y1) = self.start.origin;
@@ -1111,7 +740,7 @@ impl Connector {
             let (x_lines, y_lines, mid_x, mid_y) = self.render_match_corner_get_lines(
                 ratio_offset,
                 (start_abs_offset, end_abs_offset),
-                (sel_bb, eel_bb),
+                (start_el_bb, end_el_bb),
                 abs_offset_set,
                 (start_dir_some, end_dir_some),
             );
@@ -1123,18 +752,28 @@ impl Connector {
                 }
             }
 
-            let mut edge_set = Self::render_match_corner_get_edges(&point_set, sel_bb, eel_bb);
+            let mut edge_set =
+                Self::render_match_corner_get_edges(&point_set, start_el_bb, end_el_bb);
             let (start_ind, end_ind) = self.render_match_corner_add_start_and_end(
                 &mut point_set,
                 &mut edge_set,
-                sel_bb,
-                eel_bb,
+                start_el_bb,
+                end_el_bb,
                 start_dir_some,
                 end_dir_some,
             );
 
+            let total_bb = start_el_bb.combine(&end_el_bb);
+            let total_bb_size = (total_bb.width() + total_bb.height()) as u32;
+
             let edge_costs = Self::render_match_corner_cost_function(
-                &point_set, &edge_set, x_lines, y_lines, mid_x, mid_y,
+                &point_set,
+                &edge_set,
+                x_lines,
+                y_lines,
+                mid_x,
+                mid_y,
+                total_bb_size,
             );
 
             let dist = Self::render_match_corner_dijkstra_get_dists(
@@ -1143,6 +782,7 @@ impl Connector {
                 &edge_costs,
                 start_ind,
                 end_ind,
+                total_bb_size,
             );
 
             points = Self::render_match_corner_dijkstra_get_points(
@@ -1246,9 +886,13 @@ impl Connector {
             .with_attrs_from(&self.source_element),
             ConnectionType::Corner => {
                 let mut abs_offset_set = false;
-                let mut start_abs_offset = default_abs_offset.absolute().ok_or("blarg 13872199")?;
+                let mut start_abs_offset = default_abs_offset
+                    .absolute()
+                    .expect("set to absolute 3 above");
                 let mut end_abs_offset = start_abs_offset;
-                let mut ratio_offset = default_ratio_offset.ratio().ok_or("blarg 13872198")?;
+                let mut ratio_offset = default_ratio_offset
+                    .ratio()
+                    .expect("set to ratio 0.5 above");
                 if let Some(offset) = &self.offset {
                     if let Some(o) = offset.absolute() {
                         start_abs_offset = o;
@@ -1260,24 +904,24 @@ impl Connector {
                     }
                 }
 
-                let mut sel_bb = BoundingBox::new(x1, y1, x1, y1);
-                let mut eel_bb = BoundingBox::new(x2, y2, x2, y2);
+                let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
+                let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
                 if let Some(el) = &self.start_el {
                     if let Ok(Some(el_bb)) = el.bbox() {
-                        sel_bb = el_bb;
+                        start_el_bb = el_bb;
                     }
                 }
                 if let Some(el) = &self.end_el {
                     if let Ok(Some(el_bb)) = el.bbox() {
-                        eel_bb = el_bb;
+                        end_el_bb = el_bb;
                     }
                 }
                 let points = self.render_match_corner(
                     ratio_offset,
                     start_abs_offset,
                     end_abs_offset,
-                    sel_bb,
-                    eel_bb,
+                    start_el_bb,
+                    end_el_bb,
                     abs_offset_set,
                 )?;
 
@@ -1322,7 +966,7 @@ impl Connector {
     }
 
     fn points_to_path(points: Vec<(f32, f32)>, max_radius: f32) -> String {
-        let mut result = String::new();
+        let mut result = vec![];
         let mut radii = vec![];
         for i in 1..(points.len() - 1) {
             let mut d1 =
@@ -1340,7 +984,7 @@ impl Connector {
         }
 
         let mut pos = points[0];
-        result += &("M ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+        result.push(format!("M {} {}", pos.0, pos.1));
 
         for i in 1..(points.len() - 1) {
             let dx1 = points[i].0 - pos.0;
@@ -1351,7 +995,7 @@ impl Connector {
             pos.0 += dx1 - dx1 * radii[i - 1] / (dx1 * dx1 + dy1 * dy1).sqrt();
             pos.1 += dy1 - dy1 * radii[i - 1] / (dx1 * dx1 + dy1 * dy1).sqrt();
 
-            result += &("L ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+            result.push(format!("L {} {}", pos.0, pos.1));
 
             let mut new_pos = points[i];
 
@@ -1361,23 +1005,20 @@ impl Connector {
             let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
             let cl_str = if cl { "1" } else { "0" };
 
-            result += &("a ".to_owned()
-                + &radii[i - 1].to_string()
-                + ","
-                + &radii[i - 1].to_string()
-                + " 0 0 "
-                + cl_str
-                + " "
-                + &(new_pos.0 - pos.0).to_string()
-                + ","
-                + &(new_pos.1 - pos.1).to_string()
-                + "\n");
+            result.push(format!(
+                "a {} {} 0 0 {} {} {}",
+                radii[i - 1],
+                radii[i - 1],
+                cl_str,
+                (new_pos.0 - pos.0),
+                (new_pos.1 - pos.1)
+            ));
 
             pos = new_pos;
         }
         pos = points[points.len() - 1];
-        result += &("L ".to_owned() + &pos.0.to_string() + "," + &pos.1.to_string() + "\n");
+        result.push(format!("L {} {}", pos.0, pos.1));
 
-        result
+        result.as_slice().join(" ")
     }
 }
