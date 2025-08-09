@@ -1,62 +1,58 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="117mm" height="113mm" viewBox="-7 -6 117 113">
   <style>
     <![CDATA[
-      svg { background: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
     ]]>
   </style>
-  <circle cx="60" cy="24" r="5" style="fill: rgb(200, 241, 157)"/>
-  <circle cx="46" cy="11" r="5" style="fill: rgb(122, 116, 22)"/>
-  <circle cx="85" cy="91" r="5" style="fill: rgb(70, 38, 162)"/>
-  <circle cx="3" cy="18" r="5" style="fill: rgb(59, 148, 9)"/>
-  <circle cx="25" cy="16" r="5" style="fill: rgb(106, 51, 66)"/>
-  <circle cx="13" cy="95" r="5" style="fill: rgb(131, 224, 232)"/>
-  <circle cx="45" cy="53" r="5" style="fill: rgb(161, 198, 221)"/>
-  <circle cx="100" cy="42" r="5" style="fill: rgb(13, 41, 22)"/>
-  <circle cx="14" cy="60" r="5" style="fill: rgb(212, 114, 44)"/>
-  <circle cx="70" cy="79" r="5" style="fill: rgb(40, 232, 42)"/>
-  <circle cx="82" cy="60" r="5" style="fill: rgb(97, 61, 255)"/>
-  <circle cx="52" cy="47" r="5" style="fill: rgb(116, 249, 101)"/>
-  <circle cx="96" cy="96" r="5" style="fill: rgb(128, 68, 189)"/>
-  <circle cx="43" cy="4" r="5" style="fill: rgb(13, 27, 251)"/>
-  <circle cx="67" cy="96" r="5" style="fill: rgb(93, 162, 233)"/>
-  <circle cx="100" cy="4" r="5" style="fill: rgb(222, 167, 57)"/>
-  <circle cx="7" cy="43" r="5" style="fill: rgb(25, 89, 246)"/>
-  <circle cx="67" cy="52" r="5" style="fill: rgb(253, 114, 223)"/>
-  <circle cx="7" cy="5" r="5" style="fill: rgb(174, 192, 131)"/>
-  <circle cx="34" cy="77" r="5" style="fill: rgb(59, 162, 172)"/>
-  <circle cx="82" cy="97" r="5" style="fill: rgb(199, 0, 116)"/>
-  <circle cx="30" cy="14" r="5" style="fill: rgb(223, 253, 21)"/>
-  <circle cx="85" cy="69" r="5" style="fill: rgb(241, 79, 5)"/>
-  <circle cx="43" cy="8" r="5" style="fill: rgb(246, 109, 251)"/>
-  <circle cx="13" cy="49" r="5" style="fill: rgb(151, 199, 15)"/>
-  <circle cx="59" cy="9" r="5" style="fill: rgb(30, 56, 133)"/>
-  <circle cx="22" cy="64" r="5" style="fill: rgb(91, 147, 130)"/>
-  <circle cx="55" cy="15" r="5" style="fill: rgb(149, 177, 172)"/>
-  <circle cx="6" cy="96" r="5" style="fill: rgb(243, 117, 39)"/>
-  <circle cx="96" cy="63" r="5" style="fill: rgb(137, 72, 89)"/>
-  <circle cx="82" cy="51" r="5" style="fill: rgb(134, 36, 117)"/>
-  <circle cx="21" cy="78" r="5" style="fill: rgb(1, 103, 108)"/>
-  <circle cx="79" cy="83" r="5" style="fill: rgb(187, 180, 163)"/>
-  <circle cx="87" cy="60" r="5" style="fill: rgb(66, 201, 37)"/>
-  <circle cx="82" cy="39" r="5" style="fill: rgb(119, 114, 19)"/>
-  <circle cx="97" cy="43" r="5" style="fill: rgb(185, 149, 197)"/>
-  <circle cx="96" cy="38" r="5" style="fill: rgb(184, 219, 254)"/>
-  <circle cx="42" cy="53" r="5" style="fill: rgb(245, 150, 129)"/>
-  <circle cx="78" cy="94" r="5" style="fill: rgb(46, 2, 242)"/>
-  <circle cx="96" cy="48" r="5" style="fill: rgb(89, 233, 198)"/>
-  <circle cx="16" cy="87" r="5" style="fill: rgb(218, 74, 70)"/>
-  <circle cx="39" cy="61" r="5" style="fill: rgb(144, 104, 223)"/>
-  <circle cx="4" cy="69" r="5" style="fill: rgb(50, 89, 205)"/>
-  <circle cx="8" cy="13" r="5" style="fill: rgb(18, 53, 73)"/>
-  <circle cx="14" cy="25" r="5" style="fill: rgb(132, 17, 209)"/>
-  <circle cx="34" cy="28" r="5" style="fill: rgb(252, 240, 30)"/>
-  <circle cx="91" cy="57" r="5" style="fill: rgb(161, 107, 54)"/>
-  <circle cx="4" cy="81" r="5" style="fill: rgb(71, 78, 66)"/>
-  <circle cx="20" cy="92" r="5" style="fill: rgb(15, 47, 248)"/>
-  <circle cx="68" cy="15" r="5" style="fill: rgb(245, 1, 138)"/>
+  <circle cx="60" cy="24" r="5" style="fill: rgb(200, 241, 157);"/>
+  <circle cx="46" cy="11" r="5" style="fill: rgb(122, 116, 22);"/>
+  <circle cx="85" cy="91" r="5" style="fill: rgb(70, 38, 162);"/>
+  <circle cx="3" cy="18" r="5" style="fill: rgb(59, 148, 9);"/>
+  <circle cx="25" cy="16" r="5" style="fill: rgb(106, 51, 66);"/>
+  <circle cx="13" cy="95" r="5" style="fill: rgb(131, 224, 232);"/>
+  <circle cx="45" cy="53" r="5" style="fill: rgb(161, 198, 221);"/>
+  <circle cx="100" cy="42" r="5" style="fill: rgb(13, 41, 22);"/>
+  <circle cx="14" cy="60" r="5" style="fill: rgb(212, 114, 44);"/>
+  <circle cx="70" cy="79" r="5" style="fill: rgb(40, 232, 42);"/>
+  <circle cx="82" cy="60" r="5" style="fill: rgb(97, 61, 255);"/>
+  <circle cx="52" cy="47" r="5" style="fill: rgb(116, 249, 101);"/>
+  <circle cx="96" cy="96" r="5" style="fill: rgb(128, 68, 189);"/>
+  <circle cx="43" cy="4" r="5" style="fill: rgb(13, 27, 251);"/>
+  <circle cx="67" cy="96" r="5" style="fill: rgb(93, 162, 233);"/>
+  <circle cx="100" cy="4" r="5" style="fill: rgb(222, 167, 57);"/>
+  <circle cx="7" cy="43" r="5" style="fill: rgb(25, 89, 246);"/>
+  <circle cx="67" cy="52" r="5" style="fill: rgb(253, 114, 223);"/>
+  <circle cx="7" cy="5" r="5" style="fill: rgb(174, 192, 131);"/>
+  <circle cx="34" cy="77" r="5" style="fill: rgb(59, 162, 172);"/>
+  <circle cx="82" cy="97" r="5" style="fill: rgb(199, 0, 116);"/>
+  <circle cx="30" cy="14" r="5" style="fill: rgb(223, 253, 21);"/>
+  <circle cx="85" cy="69" r="5" style="fill: rgb(241, 79, 5);"/>
+  <circle cx="43" cy="8" r="5" style="fill: rgb(246, 109, 251);"/>
+  <circle cx="13" cy="49" r="5" style="fill: rgb(151, 199, 15);"/>
+  <circle cx="59" cy="9" r="5" style="fill: rgb(30, 56, 133);"/>
+  <circle cx="22" cy="64" r="5" style="fill: rgb(91, 147, 130);"/>
+  <circle cx="55" cy="15" r="5" style="fill: rgb(149, 177, 172);"/>
+  <circle cx="6" cy="96" r="5" style="fill: rgb(243, 117, 39);"/>
+  <circle cx="96" cy="63" r="5" style="fill: rgb(137, 72, 89);"/>
+  <circle cx="82" cy="51" r="5" style="fill: rgb(134, 36, 117);"/>
+  <circle cx="21" cy="78" r="5" style="fill: rgb(1, 103, 108);"/>
+  <circle cx="79" cy="83" r="5" style="fill: rgb(187, 180, 163);"/>
+  <circle cx="87" cy="60" r="5" style="fill: rgb(66, 201, 37);"/>
+  <circle cx="82" cy="39" r="5" style="fill: rgb(119, 114, 19);"/>
+  <circle cx="97" cy="43" r="5" style="fill: rgb(185, 149, 197);"/>
+  <circle cx="96" cy="38" r="5" style="fill: rgb(184, 219, 254);"/>
+  <circle cx="42" cy="53" r="5" style="fill: rgb(245, 150, 129);"/>
+  <circle cx="78" cy="94" r="5" style="fill: rgb(46, 2, 242);"/>
+  <circle cx="96" cy="48" r="5" style="fill: rgb(89, 233, 198);"/>
+  <circle cx="16" cy="87" r="5" style="fill: rgb(218, 74, 70);"/>
+  <circle cx="39" cy="61" r="5" style="fill: rgb(144, 104, 223);"/>
+  <circle cx="4" cy="69" r="5" style="fill: rgb(50, 89, 205);"/>
+  <circle cx="8" cy="13" r="5" style="fill: rgb(18, 53, 73);"/>
+  <circle cx="14" cy="25" r="5" style="fill: rgb(132, 17, 209);"/>
+  <circle cx="34" cy="28" r="5" style="fill: rgb(252, 240, 30);"/>
+  <circle cx="91" cy="57" r="5" style="fill: rgb(161, 107, 54);"/>
+  <circle cx="4" cy="81" r="5" style="fill: rgb(71, 78, 66);"/>
+  <circle cx="20" cy="92" r="5" style="fill: rgb(15, 47, 248);"/>
+  <circle cx="68" cy="15" r="5" style="fill: rgb(245, 1, 138);"/>
 
 </svg>

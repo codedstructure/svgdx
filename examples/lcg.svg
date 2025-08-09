@@ -1,23 +1,22 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="230mm" height="70mm" viewBox="-5 -16 115 35">
   <defs>
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
-      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke"/>
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
     </marker>
   </defs>
   <style>
     <![CDATA[
       svg { background: rgba(200, 230, 220, 0.5); }
-      rect, circle, ellipse, polygon { opacity: 0.7; }
-      .d-surround { fill: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: rgba(0, 30, 50, 0.15); stroke: black; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       text, tspan { stroke-width: 0; font-family: monospace; font-size: 3px; fill: black; paint-order: stroke; stroke: rgba(0, 30, 50, 0.15); }
-      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
-      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      .d-surround { fill: none; }
+      text, tspan { stroke-linejoin: round; }
+      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-bottom, tspan.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
       marker path { fill: inherit; }
-      .d-dot { stroke-dasharray: 0 1; }
+      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+      .d-dot { stroke-linecap: round; stroke-dasharray: 0 1; }
     ]]>
   </style>
   <rect id="seed" width="15" height="10"/>
