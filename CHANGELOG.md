@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1 - 2025-08-10]
+
+- Fixed: make `AutoStyleTheme` and `ThemeType` public.
+
 ## [0.22.0 - 2025-08-10]
 
 - Refactor: Significant rewrite of auto-style logic, de-coupling style rules
