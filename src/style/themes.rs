@@ -5,15 +5,22 @@ use std::rc::Rc;
 use crate::context::TransformerContext;
 use crate::errors::{Result, SvgdxError};
 
+/// Auto-style themes for svgdx.
 #[derive(Default, Debug, Clone)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ThemeType {
+    /// The default theme, suitable for line diagrams.
     #[default]
     Default,
+    /// The default theme with more bold lines and text.
     Bold,
+    /// The default theme with thinner lines and text.
     Fine,
+    /// A glass theme with translucent elements.
     Glass,
+    /// A theme inspired by solarized light mode.
     Light,
+    /// A dark theme inspired by solarized dark mode.
     Dark,
 }
 

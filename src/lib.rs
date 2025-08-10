@@ -55,7 +55,7 @@ mod transform;
 mod types;
 
 pub use errors::Result;
-use style::{AutoStyleMode, ThemeType};
+pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used

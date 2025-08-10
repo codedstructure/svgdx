@@ -17,11 +17,22 @@ use autostyle::StyleProvider;
 
 pub use themes::{ContextTheme, ThemeType};
 
+/// Auto-style processing mode.
+///
+/// Auto-styles translate specific element class names (all beginning with `d-`)
+/// to corresponding CSS (as part of a `<style>` element) or inline (the `style`
+/// attribute) style information.
+///
+/// Any required `<defs>` entries are also added, unless the mode is set to
+/// `None`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum AutoStyleMode {
+    /// Don't process auto-style classes.
     None,
+    /// Include auto-styles as part of element `<style>` attributes.
     Inline,
+    /// Generate CSS auto-style rules in a separate `<style>` element.
     #[default]
     Css,
 }
