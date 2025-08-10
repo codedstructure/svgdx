@@ -1,3 +1,5 @@
+use crate::types::StyleMap;
+
 use super::colours::COLOUR_LIST;
 
 pub trait Selectable {
@@ -6,7 +8,7 @@ pub trait Selectable {
 }
 
 pub trait Stylable {
-    fn add_style(&mut self, key: &str, value: &str);
+    fn apply_styles(&mut self, styles: &StyleMap);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

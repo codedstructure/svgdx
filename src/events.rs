@@ -439,6 +439,10 @@ impl OutputList {
         self.events.iter()
     }
 
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut OutputEvent> + '_ {
+        self.events.iter_mut()
+    }
+
     pub fn push(&mut self, ev: impl Into<OutputEvent>) {
         let ev = ev.into();
         self.events.push(ev.clone());

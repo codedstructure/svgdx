@@ -1,9 +1,12 @@
-/// This module supports styling and theming SVG documents, including svgdx 'auto-styles'.
+//! This module supports styling and theming SVG documents, including svgdx 'auto-styles'.
+//!
+//! The primary mechanism is taking element class names (with the 'd-' prefix) and mapping
+//! them to corresponding CSS or inline styles.
+
 mod autostyle;
 mod colours;
-mod oimap;
+mod omap;
 mod rules;
-mod styles;
 mod themes;
 mod types;
 
@@ -12,7 +15,6 @@ use crate::errors::{Result, SvgdxError};
 
 use autostyle::StyleProvider;
 
-pub use styles::apply_auto_styles;
 pub use themes::{ContextTheme, ThemeType};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -39,17 +41,20 @@ impl std::str::FromStr for AutoStyleMode {
     }
 }
 
-pub fn get_css_styles(tb: &ContextTheme, elements: &[&SvgElement]) -> (Vec<String>, Vec<String>) {
-    let mut registry = autostyle::StyleRegistry::new(tb);
+pub fn get_css_styles(
+    theme: &ContextTheme,
+    elements: &[&SvgElement],
+) -> (Vec<String>, Vec<String>) {
+    let mut registry = autostyle::StyleRegistry::new(theme);
     registry.register_all();
     registry.generate_css(elements)
 }
 
-#[allow(dead_code)]
-pub fn update_inline_styles(tb: &ContextTheme, elements: &mut [&mut SvgElement]) -> String {
-    let mut registry = autostyle::StyleRegistry::new(tb);
+pub fn update_inline_styles(
+    theme: &ContextTheme,
+    elements: &mut [&mut SvgElement],
+) -> (Vec<String>, Vec<String>) {
+    let mut registry = autostyle::StyleRegistry::new(theme);
     registry.register_all();
-    let defs = registry.update_elements(elements);
-
-    defs.join("\n")
+    registry.update_elements(elements)
 }

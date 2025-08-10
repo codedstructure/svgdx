@@ -289,18 +289,33 @@ impl Transformer {
         Ok(SvgElement::new("svg", &new_svg_attrs.to_vec()))
     }
 
-    fn build_auto_styles(&self, events: &OutputList) -> (Vec<String>, Vec<String>) {
+    fn build_auto_styles(&self, events: &mut OutputList) -> (Vec<String>, Vec<String>) {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
-        let elements: Vec<_> = events
-            .iter()
-            .filter_map(|output_ev| match output_ev {
-                OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
-                _ => None,
-            })
-            .collect();
         let theme = ContextTheme::from_context(&self.context);
-        style::get_css_styles(&theme, elements.as_slice())
+        match self.context.config.auto_style_mode {
+            AutoStyleMode::None => (vec![], vec![]),
+            AutoStyleMode::Inline => {
+                let mut elements: Vec<_> = events
+                    .iter_mut()
+                    .filter_map(|output_ev| match output_ev {
+                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
+                        _ => None,
+                    })
+                    .collect();
+                style::update_inline_styles(&theme, &mut elements)
+            }
+            AutoStyleMode::Css => {
+                let elements: Vec<_> = events
+                    .iter()
+                    .filter_map(|output_ev| match output_ev {
+                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
+                        _ => None,
+                    })
+                    .collect();
+                style::get_css_styles(&theme, &elements)
+            }
+        }
     }
 
     fn autostyle_defs_events(&self, auto_defs: Vec<String>) -> Result<OutputList> {
@@ -403,22 +418,25 @@ impl Transformer {
             )
         }
 
-        let mut test = output_events.clone();
-        test.extend(events.clone());
+        output_events.push(OutputEvent::Empty(SvgElement::new("style_sentinel", &[])));
+        output_events.extend(events);
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
+        let mut style_events = OutputList::new();
         if has_svg_element {
-            let (styles, defs) = self.build_auto_styles(&test);
-            output_events.extend(self.autostyle_defs_events(defs)?);
-            if self.context.config.auto_style_mode == AutoStyleMode::Css {
-                output_events.extend(self.autostyle_css_events(styles)?);
-            }
+            let (styles, defs) = self.build_auto_styles(&mut output_events);
+            style_events.extend(self.autostyle_defs_events(defs)?);
+            style_events.extend(self.autostyle_css_events(styles)?);
         }
 
-        output_events.extend(events);
+        let (pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");
 
-        output_events.write_to(writer)
+        pre_style.write_to(writer)?;
+        style_events.write_to(writer)?;
+        post_style.write_to(writer)?;
+
+        Ok(())
     }
 }
 

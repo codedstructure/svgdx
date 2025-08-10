@@ -1,11 +1,12 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 use crate::elements::SvgElement;
 use crate::types::StyleMap;
 
 use super::rules;
 use super::types::{Rule, Selectable, Selected, Stylable};
-use super::{oimap::InsertOrderMap, ContextTheme};
+use super::{omap::InsertOrderMap, ContextTheme};
 
 impl Selectable for SvgElement {
     fn name(&self) -> &str {
@@ -18,8 +19,8 @@ impl Selectable for SvgElement {
 }
 
 impl Stylable for SvgElement {
-    fn add_style(&mut self, key: &str, value: &str) {
-        self.add_auto_style(key, value);
+    fn apply_styles(&mut self, styles: &StyleMap) {
+        self.apply_auto_styles(styles);
     }
 }
 
@@ -130,35 +131,44 @@ impl StyleRegistry {
         (style, defs)
     }
 
-    fn update_element<E: Selectable + Stylable>(&mut self, element: &mut E) -> Vec<String> {
+    pub fn update_elements<E: Selectable + Stylable>(
+        &mut self,
+        elements: &mut [&mut E],
+    ) -> (Vec<String>, Vec<String>) {
         let mut defs = Vec::new();
+        let mut style = Vec::new();
+        // NOTE: want provider on the outside to deal with group_styles/group_defs,
+        // but also ideally have element on the outside to deal with having per-element
+        // accumulated styles. Resolve by having enumerating the elements list and
+        // using index into a mapping. Probably scope for tidying this up.
+        let mut el_style_mapping = HashMap::with_capacity(elements.len());
         for provider in &mut self.rules {
             let rules = provider.get_rules();
-            for rule in &rules {
-                if let Some(selected) = rule.selector.matches(element) {
-                    if !provider.on_match(rule, &selected) {
-                        continue; // Skip if on_match vetoes the match
-                    }
-                    for style_item in &rule.styles {
-                        let value = provider.eval_value(&style_item.value, &selected);
-                        element.add_style(&style_item.key, &value);
+            for (el_idx, element) in elements.iter_mut().enumerate() {
+                // get el_style_mapping entry for this element
+                let el_styles = el_style_mapping.entry(el_idx).or_insert_with(StyleMap::new);
+                for rule in &rules {
+                    if let Some(selected) = rule.selector.matches(*element) {
+                        if !provider.on_match(rule, &selected) {
+                            continue; // Skip if on_match vetoes the match
+                        }
+                        for style_item in &rule.styles {
+                            let value = provider.eval_value(&style_item.value, &selected);
+                            // element.add_style(&style_item.key, &value);
+                            el_styles.insert(style_item.key.clone(), value.to_string());
+                        }
                     }
                 }
             }
             defs.extend(provider.group_defs());
+            style.extend(provider.group_styles());
         }
-        defs
-    }
-
-    pub fn update_elements<E: Selectable + Stylable>(
-        &mut self,
-        elements: &mut [&mut E],
-    ) -> Vec<String> {
-        let mut defs = Vec::new();
-        for element in elements {
-            defs.extend(self.update_element(*element));
+        for (el_idx, element) in elements.iter_mut().enumerate() {
+            if let Some(el_styles) = el_style_mapping.get(&el_idx) {
+                element.apply_styles(el_styles);
+            }
         }
-        defs
+        (style, defs)
     }
 }
 
@@ -194,8 +204,10 @@ mod tests {
     }
 
     impl Stylable for MockElement {
-        fn add_style(&mut self, key: &str, value: &str) {
-            self.style.insert(key.to_string(), value.to_string());
+        fn apply_styles(&mut self, styles: &StyleMap) {
+            for (key, value) in styles {
+                self.style.insert(key.to_string(), value.to_string());
+            }
         }
     }
 
