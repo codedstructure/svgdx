@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0 - 2025-08-10]
+
 - Refactor: Significant rewrite of auto-style logic, de-coupling style rules
   from how they are applied to the document. The generated styles for most
   documents will change, though the visual result should be the same, though
@@ -23,6 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   auto-style mode should cover most use-cases.
 
 - Added: integer division with `//`.
+
+- Added: reference 'previous-N' or 'next-N' elements using multiple '^' or
+  '+' characters as the reference, e.g. `xy="^^^|v"` for under the previous-
+  but-two element.
 
 - Added: support for text style and colour classes in `<tspan>` elements.
 
