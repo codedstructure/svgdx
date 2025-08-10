@@ -252,7 +252,7 @@ fn test_defaults_style() {
 </defaults>
 <rect style="fill: green" />
 "##;
-    let expected = r#"<rect style="fill: blue; stroke: red; stroke-width: 0.2; fill: green"/>"#;
+    let expected = r#"<rect style="fill: green; stroke: red; stroke-width: 0.2;"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -266,7 +266,7 @@ fn test_defaults_text_style() {
 </defaults>
 <rect text-style="fill: green" text="hi"/>
 "##;
-    let expected = r#"<text x="10" y="10" style="fill: blue; stroke: red; stroke-width: 0.2; fill: green" class="d-text">hi</text>"#;
+    let expected = r#"<text x="10" y="10" style="fill: green; stroke: red; stroke-width: 0.2;" class="d-text">hi</text>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }

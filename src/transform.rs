@@ -3,11 +3,11 @@ use crate::elements::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
-use crate::style::ThemeBuilder;
+use crate::style::{self, ContextTheme};
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
-use crate::TransformConfig;
+use crate::{AutoStyleMode, TransformConfig};
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, Write};
 use std::mem;
 use std::str::FromStr;
@@ -191,7 +191,7 @@ pub fn process_events_with_index(
     let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb, oi_base)?;
 
     for (_idx, events) in idx_output {
-        output.extend(&events);
+        output.extend(events);
     }
 
     Ok((output, bbox))
@@ -215,12 +215,11 @@ impl Transformer {
         self.postprocess(output, writer)
     }
 
-    fn write_root_svg(
+    fn make_root_svg(
         &self,
         first_svg: OutputEvent,
         bbox: Option<BoundingBox>,
-        writer: &mut dyn Write,
-    ) -> Result<()> {
+    ) -> Result<SvgElement> {
         let mut new_svg_attrs = AttrMap::new();
         let mut orig_svg_attrs = HashMap::new();
         if let OutputEvent::Start(orig_svg) = first_svg {
@@ -287,38 +286,42 @@ impl Transformer {
             }
         }
 
-        OutputList::from(
-            [OutputEvent::Start(SvgElement::new(
-                "svg",
-                &new_svg_attrs.to_vec(),
-            ))]
-            .as_slice(),
-        )
-        .write_to(writer)
+        Ok(SvgElement::new("svg", &new_svg_attrs.to_vec()))
     }
 
-    fn write_auto_styles(&self, events: &mut OutputList, writer: &mut dyn Write) -> Result<()> {
+    fn build_auto_styles(&self, events: &mut OutputList) -> (Vec<String>, Vec<String>) {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
-        let mut element_set = HashSet::new();
-        let mut class_set = HashSet::new();
-        for output_ev in events.iter() {
-            match output_ev {
-                OutputEvent::Start(e) | OutputEvent::Empty(e) => {
-                    element_set.insert(e.name().to_owned());
-                    class_set.extend(e.get_classes());
-                }
-                _ => {}
+        let theme = ContextTheme::from_context(&self.context);
+        match self.context.config.auto_style_mode {
+            AutoStyleMode::None => (vec![], vec![]),
+            AutoStyleMode::Inline => {
+                let mut elements: Vec<_> = events
+                    .iter_mut()
+                    .filter_map(|output_ev| match output_ev {
+                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
+                        _ => None,
+                    })
+                    .collect();
+                style::update_inline_styles(&theme, &mut elements)
+            }
+            AutoStyleMode::Css => {
+                let elements: Vec<_> = events
+                    .iter()
+                    .filter_map(|output_ev| match output_ev {
+                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
+                        _ => None,
+                    })
+                    .collect();
+                style::get_css_styles(&theme, &elements)
             }
         }
+    }
 
+    fn autostyle_defs_events(&self, auto_defs: Vec<String>) -> Result<OutputList> {
         let indent = 2;
-        let mut tb = ThemeBuilder::new(&self.context, &element_set, &class_set);
-        tb.build();
-        let auto_defs = tb.get_defs();
-        let auto_styles = tb.get_styles();
-
         let indent_line = |n| format!("\n{}", " ".repeat(n));
+
         if !auto_defs.is_empty() {
             let mut defs_events = vec![
                 OutputEvent::Text(indent_line(indent)),
@@ -337,8 +340,16 @@ impl Transformer {
                 OutputEvent::Text(indent_line(indent)),
                 OutputEvent::End("defs".to_owned()),
             ]);
-            OutputList::from(defs_events).write_to(writer)?;
+            Ok(OutputList::from(defs_events))
+        } else {
+            Ok(OutputList::new())
         }
+    }
+
+    fn autostyle_css_events(&self, auto_styles: Vec<String>) -> Result<OutputList> {
+        let indent = 2;
+        let indent_line = |n| format!("\n{}", " ".repeat(n));
+
         if !auto_styles.is_empty() {
             let mut style_events = vec![
                 OutputEvent::Text(indent_line(indent)),
@@ -360,9 +371,10 @@ impl Transformer {
                 OutputEvent::Text(indent_line(indent)),
                 OutputEvent::End("style".to_owned()),
             ]);
-            OutputList::from(style_events).write_to(writer)?;
+            Ok(OutputList::from(style_events))
+        } else {
+            Ok(OutputList::new())
         }
-        Ok(())
     }
 
     fn postprocess(
@@ -377,10 +389,13 @@ impl Transformer {
             return events.write_to(writer);
         }
 
+        let mut output_events = OutputList::new();
+
         let mut has_svg_element = false;
         if let (pre_svg, Some(first_svg), remain) = events.partition("svg") {
-            pre_svg.write_to(writer)?;
-            self.write_root_svg(first_svg, bbox, writer)?;
+            output_events.extend(pre_svg);
+            let root_svg = self.make_root_svg(first_svg, bbox)?;
+            output_events.push(OutputEvent::Start(root_svg));
             events = remain;
             has_svg_element = true;
         }
@@ -388,26 +403,40 @@ impl Transformer {
         if self.context.config.debug {
             let indent = "\n  ".to_owned();
 
-            OutputList::from(vec![
-                OutputEvent::Text(indent.clone()),
-                OutputEvent::Comment(format!(
-                    " Generated by {} v{} ",
-                    env!("CARGO_PKG_NAME"),
-                    env!("CARGO_PKG_VERSION")
-                )),
-                OutputEvent::Text(indent),
-                OutputEvent::Comment(format!(" Config: {:?} ", self.context.config)),
-            ])
-            .write_to(writer)?;
+            output_events.extend(
+                vec![
+                    OutputEvent::Text(indent.clone()),
+                    OutputEvent::Comment(format!(
+                        " Generated by {} v{} ",
+                        env!("CARGO_PKG_NAME"),
+                        env!("CARGO_PKG_VERSION")
+                    )),
+                    OutputEvent::Text(indent),
+                    OutputEvent::Comment(format!(" Config: {:?} ", self.context.config)),
+                ]
+                .as_slice(),
+            )
         }
+
+        output_events.push(OutputEvent::Empty(SvgElement::new("style_sentinel", &[])));
+        output_events.extend(events);
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,
         // i.e. this is a full SVG document rather than a fragment.
-        if has_svg_element && self.context.config.add_auto_styles {
-            self.write_auto_styles(&mut events, writer)?;
+        let mut style_events = OutputList::new();
+        if has_svg_element {
+            let (styles, defs) = self.build_auto_styles(&mut output_events);
+            style_events.extend(self.autostyle_defs_events(defs)?);
+            style_events.extend(self.autostyle_css_events(styles)?);
         }
 
-        events.write_to(writer)
+        let (pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");
+
+        pre_style.write_to(writer)?;
+        style_events.write_to(writer)?;
+        post_style.write_to(writer)?;
+
+        Ok(())
     }
 }
 

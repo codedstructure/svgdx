@@ -105,7 +105,7 @@ impl EventGen for LoopElement {
                 let iter_oi = event_element.order_index.with_index(iteration as usize);
                 let (ev_list, ev_bbox) =
                     process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
-                gen_events.extend(&ev_list);
+                gen_events.extend(ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
                 }
@@ -183,7 +183,7 @@ impl EventGen for ForElement {
                 let iter_oi = event_element.order_index.with_index(idx as usize);
                 let (ev_list, ev_bbox) =
                     process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
-                gen_events.extend(&ev_list);
+                gen_events.extend(ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
                 }

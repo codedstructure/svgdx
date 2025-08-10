@@ -3,40 +3,31 @@
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
       <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
     </marker>
-    <filter id="d-hardshadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="0.2"/>
-      <feOffset dx="1" dy="1"/>
-      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.6" k3="1" k4="0"/>
-    </filter>
   </defs>
   <style>
     <![CDATA[
-      svg { background: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-      .d-fill-darkmagenta { fill: darkmagenta; }
-      text.d-fill-darkmagenta, text.d-fill-darkmagenta * { fill: white; stroke: black; }
-      .d-fill-grey { fill: grey; }
-      text.d-fill-grey, text.d-fill-grey * { fill: white; stroke: black; }
-      .d-fill-green { fill: green; }
-      text.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
-      .d-fill-lightgrey { fill: lightgrey; }
-      text.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
-      .d-fill-red { fill: red; }
-      text.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       .d-fill-whitesmoke { fill: whitesmoke; }
-      text.d-fill-whitesmoke, text.d-fill-whitesmoke * { fill: black; stroke: white; }
+      .d-fill-green { fill: green; }
+      text.d-fill-green, tspan.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+      .d-fill-lightgrey { fill: lightgrey; }
+      text.d-fill-lightgrey, tspan.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
+      .d-fill-grey { fill: grey; }
+      text.d-fill-grey, tspan.d-fill-grey, text.d-fill-grey * { fill: white; stroke: black; }
+      .d-fill-red { fill: red; }
+      text.d-fill-red, tspan.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
+      .d-fill-darkmagenta { fill: darkmagenta; }
+      text.d-fill-darkmagenta, tspan.d-fill-darkmagenta, text.d-fill-darkmagenta * { fill: white; stroke: black; }
       .d-blue { stroke: blue; }
-      text.d-blue, tspan.d-blue, text.d-blue * { fill: blue; stroke: white; }
       .d-thin { stroke-width: 0.25; }
-      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+      text, tspan { stroke-linejoin: round; }
+      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       marker path { fill: inherit; }
+      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
       .d-dash { stroke-dasharray: 1 1.5; }
-      .d-dot { stroke-dasharray: 0 1; }
-      .d-hardshadow { filter: url(#d-hardshadow); }
+      .d-dot { stroke-linecap: round; stroke-dasharray: 0 1; }
     ]]>
   </style>
   <rect id="base" width="40" height="20" class="d-fill-whitesmoke"/>

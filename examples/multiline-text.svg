@@ -1,16 +1,15 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="65mm" height="65mm" viewBox="-5 -5 65 65">
   <style>
     <![CDATA[
-      svg { background: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
       text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
-      text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
-      text.d-text-left, text.d-text-left * { text-anchor: start; }
-      text.d-text-right, text.d-text-right * { text-anchor: end; }
+      text, tspan { stroke-linejoin: round; }
+      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-top, tspan.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
+      text.d-text-left, tspan.d-text-left, text.d-text-left * { text-anchor: start; }
+      text.d-text-right, tspan.d-text-right, text.d-text-right * { text-anchor: end; }
+      text.d-text-bottom, tspan.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
     ]]>
   </style>
   <defs>

@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Refactor: Significant rewrite of auto-style logic, de-coupling style rules
+  from how they are applied to the document. The generated styles for most
+  documents will change, though the visual result should be the same, though
+  minor variations may occur.
+
+- Added: `auto-style-mode` config option, supporting values 'css' (the current
+  behaviour), 'inline' (applying styles directly to each element through the
+  style attribute) and 'none', where auto-styles are disabled.
+
+- Deprecated: `--no-auto-styles` CLI option and `add-auto-styles` config option
+  have been removed in favour of `--auto-style-mode none` / `auto-style-mode="none"`.
+  'use-local-styles' has also been deprecated, though without a direct
+  replacement at this point; it may be reinstated, but use of `inline`
+  auto-style mode should cover most use-cases.
+
 - Added: integer division with `//`.
 
 - Added: support for text style and colour classes in `<tspan>` elements.

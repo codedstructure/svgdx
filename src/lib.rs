@@ -55,7 +55,7 @@ mod transform;
 mod types;
 
 pub use errors::Result;
-use style::ThemeType;
+use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used
@@ -75,7 +75,7 @@ pub struct TransformConfig {
     /// Border width (user-units, default 5)
     pub border: u16,
     /// Add style & defs entries based on class usage
-    pub add_auto_styles: bool,
+    pub auto_style_mode: AutoStyleMode,
     /// Background colour (default "default" - use theme default or none)
     pub background: String, // TODO: sanitize this with a `Colour: FromStr + Display` type
     /// Random seed
@@ -106,7 +106,7 @@ impl Default for TransformConfig {
             debug: false,
             scale: 1.0,
             border: 5,
-            add_auto_styles: true,
+            auto_style_mode: AutoStyleMode::default(),
             background: "default".to_owned(),
             seed: 0,
             loop_limit: 1000,

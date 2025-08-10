@@ -402,7 +402,7 @@ fn test_text_style() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" style="font-size: 2em;" class="d-text">
-<tspan x="5" style="font-size: 2em;" dy="-0.525em">two</tspan><tspan x="5" style="font-size: 2em;" dy="1.05em">lines</tspan>
+<tspan x="5" dy="-0.525em" style="font-size: 2em;">two</tspan><tspan x="5" dy="1.05em" style="font-size: 2em;">lines</tspan>
 </text>
 "#;
 

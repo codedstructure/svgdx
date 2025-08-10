@@ -203,7 +203,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     // on a rect with `text` present would cause red-on-red invisible text).
     let text_style = orig_elem.pop_attr("text-style");
     if let Some(ref style) = text_style {
-        text_elem.set_attr("style", style);
+        text_elem.set_style_from(style);
     }
 
     // The following should *not* be inherited by the text element.
@@ -296,7 +296,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
         let mut tspan_elem = SvgElement::new("tspan", &[]);
         if let Some(ref style) = text_style {
-            tspan_elem.set_attr("style", style);
+            tspan_elem.set_style_from(style);
         }
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {

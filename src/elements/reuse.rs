@@ -104,9 +104,7 @@ impl EventGen for ReuseElement {
         // `reuse` element, as well as inherit `style` and `class` values.
         instance_element.set_indent(reuse_element.indent);
         instance_element.set_src_line(reuse_element.src_line);
-        if let Some(inst_style) = reuse_element.get_attr("style") {
-            instance_element.set_attr("style", inst_style);
-        }
+        instance_element.add_styles_from(&reuse_element);
         instance_element.add_classes_from(&reuse_element);
         if let Some(ref_id) = ref_id {
             instance_element.add_class(&ref_id);

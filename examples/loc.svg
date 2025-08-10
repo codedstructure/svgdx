@@ -1,15 +1,11 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="40mm" height="30mm" viewBox="-5 -5 40 30">
   <style>
     <![CDATA[
-      svg { background: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
     ]]>
   </style>
     <rect id="base" x="10" y="10" width="10" height="10" margin="3 1"/>
-    <rect x="0" y="10" width="10" height="10" style="fill:blue"/>
-    <rect x="20" y="10" width="10" height="10" style="fill:green"/>
-    <rect x="20" y="0" width="10" height="10" style="fill:red"/>
+    <rect x="0" y="10" width="10" height="10" style="fill: blue;"/>
+    <rect x="20" y="10" width="10" height="10" style="fill: green;"/>
+    <rect x="20" y="0" width="10" height="10" style="fill: red;"/>
 </svg>

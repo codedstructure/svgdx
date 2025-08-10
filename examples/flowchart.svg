@@ -6,16 +6,15 @@
   </defs>
   <style>
     <![CDATA[
-      svg { background: none; }
-      svg * { stroke-linecap: round; stroke-linejoin: round; }
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
-      text.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      text, tspan { stroke-linejoin: round; }
+      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
       text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
-      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+      text.d-text-bottom, tspan.d-text-bottom, text.d-text-bottom * { dominant-baseline: text-after-edge; }
       marker path { fill: inherit; }
+      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
     ]]>
   </style>
   <!-- you probably want something other than svgdx for flowcharts... -->
