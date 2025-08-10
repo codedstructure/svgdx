@@ -4,9 +4,8 @@ use std::collections::HashMap;
 use crate::elements::SvgElement;
 use crate::types::StyleMap;
 
-use super::rules;
-use super::types::{Rule, Selectable, Selected, Stylable};
-use super::{omap::InsertOrderMap, ContextTheme};
+use super::types::{InsertOrderMap, Rule, Selectable, Selected, Stylable};
+use super::{rules, ContextTheme};
 
 impl Selectable for SvgElement {
     fn name(&self) -> &str {
@@ -174,9 +173,11 @@ impl StyleRegistry {
 
 #[cfg(test)]
 mod tests {
+    use assertables::assert_contains;
+
     use super::*;
 
-    #[derive(Debug, Clone)] //, PartialEq, Eq)]
+    #[derive(Debug, Clone)]
     struct MockElement {
         name: String,
         classes: Vec<String>,
@@ -244,7 +245,7 @@ mod tests {
         let mut registry = StyleRegistry::default();
         let (css, defs) = registry.generate_css(&[&element]);
 
-        println!("CSS: {}", css.join("\n"));
-        println!("Defs: {}", defs.join("\n"));
+        assert_contains!(css.join("\n"), "url(#d-hardshadow)");
+        assert_contains!(defs.join("\n"), "<filter id=\"d-hardshadow\"");
     }
 }

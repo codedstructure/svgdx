@@ -2,6 +2,8 @@ use crate::types::StyleMap;
 
 use super::colours::COLOUR_LIST;
 
+pub use super::omap::InsertOrderMap;
+
 pub trait Selectable {
     fn name(&self) -> &str;
     fn get_classes(&self) -> Vec<String>;

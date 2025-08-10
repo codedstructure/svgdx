@@ -53,37 +53,6 @@ pub(super) trait Theme {
     }
 }
 
-// fn build_theme(theme: &dyn Theme, tb: &mut ThemeBuilder) {
-//     let mut outer_svg = String::from("svg");
-//     if let Some(id) = &tb.local_style_id {
-//         outer_svg = format!("svg#{id}");
-//     }
-//     // Any background style needs to be prior to potential CSS nesting from local_id
-//     // - it isn't a descendant of the local_id element, but that element itself.
-//     if tb.background != "default" {
-//         tb.add_style(&format!(
-//             "{} {{ background: {}; }}",
-//             outer_svg, tb.background
-//         ));
-//     } else {
-//         tb.add_style(&format!(
-//             "{} {{ background: {}; }}",
-//             outer_svg,
-//             theme.default_background()
-//         ));
-//     }
-//     if let Some(id) = &tb.local_style_id {
-//         // Start a nested CSS block for styles to ensure they don't leak
-//         // to surrounding document.
-//         tb.add_style(&format!("#{id} {{"));
-//     }
-//  ...
-//     // Close the nested CSS block if we opened one.
-//     if tb.local_style_id.is_some() {
-//         tb.add_style("}");
-//     }
-// }
-
 #[derive(Clone)]
 pub struct ContextTheme {
     // local_style_id: Option<String>,
@@ -117,6 +86,7 @@ impl ContextTheme {
             ThemeType::Dark => Box::new(DarkTheme {}) as Box<dyn Theme>,
         });
         Self {
+            // TODO: style refactor doesn't support local_style_id anymore
             // local_style_id: context.local_style_id.clone(),
             font_size: context.config.font_size,
             font_family: context.config.font_family.clone(),
