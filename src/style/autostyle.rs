@@ -1,27 +1,10 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crate::elements::SvgElement;
 use crate::types::StyleMap;
 
 use super::types::{InsertOrderMap, Rule, Selectable, Selected, Stylable};
 use super::{rules, ContextTheme};
-
-impl Selectable for SvgElement {
-    fn name(&self) -> &str {
-        self.name()
-    }
-
-    fn get_classes(&self) -> Vec<String> {
-        self.get_classes()
-    }
-}
-
-impl Stylable for SvgElement {
-    fn apply_styles(&mut self, styles: &StyleMap) {
-        self.apply_auto_styles(styles);
-    }
-}
 
 pub(super) trait StyleProvider {
     fn new(theme: &ContextTheme) -> Self

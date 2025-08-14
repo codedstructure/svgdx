@@ -10,8 +10,8 @@ mod rules;
 mod themes;
 mod types;
 
-use crate::elements::SvgElement;
 use crate::errors::{Result, SvgdxError};
+pub use crate::style::types::{Selectable, Stylable};
 
 use autostyle::StyleProvider;
 
@@ -52,18 +52,18 @@ impl std::str::FromStr for AutoStyleMode {
     }
 }
 
-pub fn get_css_styles(
+pub fn get_css_styles<E: Selectable>(
     theme: &ContextTheme,
-    elements: &[&SvgElement],
+    elements: &[&E],
 ) -> (Vec<String>, Vec<String>) {
     let mut registry = autostyle::StyleRegistry::new(theme);
     registry.register_all();
     registry.generate_css(elements)
 }
 
-pub fn update_inline_styles(
+pub fn update_inline_styles<E: Selectable + Stylable>(
     theme: &ContextTheme,
-    elements: &mut [&mut SvgElement],
+    elements: &mut [&mut E],
 ) -> (Vec<String>, Vec<String>) {
     let mut registry = autostyle::StyleRegistry::new(theme);
     registry.register_all();

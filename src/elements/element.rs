@@ -8,6 +8,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
+use crate::style::{Selectable, Stylable};
 use crate::transform::EventGen;
 use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex, StyleMap};
 
@@ -160,6 +161,22 @@ impl Display for SvgElement {
         }
         write!(f, ">")?;
         Ok(())
+    }
+}
+
+impl Selectable for SvgElement {
+    fn name(&self) -> &str {
+        self.name()
+    }
+
+    fn get_classes(&self) -> Vec<String> {
+        self.get_classes()
+    }
+}
+
+impl Stylable for SvgElement {
+    fn apply_styles(&mut self, styles: &StyleMap) {
+        self.apply_auto_styles(styles);
     }
 }
 
