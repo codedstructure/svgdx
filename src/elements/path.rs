@@ -277,6 +277,119 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     }
 }
 
+pub fn points_to_path(mut points: Vec<(f32, f32)>, max_radius: f32, polygon: bool) -> String {
+    if points.is_empty() {
+        return String::new();
+    }
+
+    let mut points_no_dupe = vec![];
+    let first_item = points[0];
+    for p in 0..points.len() {
+        if points[p] != points[(p + 1) % points.len()] || (!polygon && p == points.len() - 1) {
+            points_no_dupe.push(points[p]);
+        }
+    }
+    points = points_no_dupe;
+
+    if points.len() <= 1 {
+        return format!("M {} {}", first_item.0, first_item.1);
+    }
+
+    let mut result = vec![];
+    let mut radii = vec![];
+    for i in 1..(points.len() - 1) {
+        let mut d1 = (points[i].0 - points[i - 1].0).hypot(points[i].1 - points[i - 1].1);
+        let mut d2 = (points[i + 1].0 - points[i].0).hypot(points[i + 1].1 - points[i].1);
+        if i != 1 || polygon {
+            d1 /= 2.0;
+        }
+        if i != points.len() - 2 || polygon {
+            d2 /= 2.0;
+        }
+        let radius = d1.min(d2).min(max_radius);
+        radii.push(radius);
+    }
+
+    let mut pos = points[0];
+
+    if polygon {
+        let last = points.len() - 1;
+        let d1 =
+            (points[last].0 - points[last - 1].0).hypot(points[last].1 - points[last - 1].1) / 2.0;
+        let d2 = (points[0].0 - points[last].0).hypot(points[0].1 - points[last].1) / 2.0;
+        let d3 = (points[1].0 - points[0].0).hypot(points[1].1 - points[0].1) / 2.0;
+        let radius = d1.min(d2).min(max_radius);
+        radii.push(radius);
+        let radius = d2.min(d3).min(max_radius);
+        radii.push(radius);
+
+        let dx = points[1].0 - pos.0;
+        let dy = points[1].1 - pos.1;
+
+        let l = dx.hypot(dy);
+
+        pos.0 += dx * radii[radii.len() - 1] / l;
+        pos.1 += dy * radii[radii.len() - 1] / l;
+    }
+
+    result.push(format!("M {} {}", pos.0, pos.1));
+
+    for i in 0..radii.len() {
+        let p1 = points[(i + 1) % points.len()];
+        let p2 = points[(i + 2) % points.len()];
+
+        let dx1 = p1.0 - pos.0;
+        let dy1 = p1.1 - pos.1;
+        let dx2 = p2.0 - p1.0;
+        let dy2 = p2.1 - p1.1;
+
+        let l1 = dx1.hypot(dy1);
+        let l2 = dx2.hypot(dy2);
+
+        pos.0 += dx1 - dx1 * radii[i] / l1;
+        pos.1 += dy1 - dy1 * radii[i] / l1;
+
+        result.push(format!("L {} {}", pos.0, pos.1));
+
+        let mut new_pos = p1;
+
+        new_pos.0 += dx2 * radii[i] / l2;
+        new_pos.1 += dy2 * radii[i] / l2;
+
+        let cos = -(dx1 * dx2 + dy1 * dy2) as f64 / (l1 * l2) as f64;
+        if (cos + 1.0).abs() <= 0.0001 || cos >= 1.0 {
+            // straight lines
+            if pos != new_pos {
+                result.push(format!("L {} {}", new_pos.0, new_pos.1));
+            }
+        } else {
+            let t_div_2 = ((1.0 - cos) / (1.0 + cos)).sqrt();
+
+            let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
+            let cl_str = if cl { "1" } else { "0" };
+
+            result.push(format!(
+                "a {} {} 0 0 {} {} {}",
+                radii[i] * t_div_2 as f32,
+                radii[i] * t_div_2 as f32,
+                cl_str,
+                (new_pos.0 - pos.0),
+                (new_pos.1 - pos.1)
+            ));
+        }
+
+        pos = new_pos;
+    }
+    if !polygon {
+        pos = points[points.len() - 1];
+        result.push(format!("L {} {}", pos.0, pos.1));
+    } else {
+        result.push("Z".to_string());
+    }
+
+    result.as_slice().join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
