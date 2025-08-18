@@ -50,7 +50,7 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
         // loop to allow repeat to find total length if a percentage
         loop {
             let mut points = replaced_commas.split_whitespace();
-            let mut cummulative_dist = 0.0;
+            let mut cumulative_dist = 0.0;
             lastx = 0.0;
             lasty = 0.0;
             let mut first_point = true;
@@ -60,14 +60,14 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
 
                 if !first_point {
                     let len = ((lastx - x) * (lastx - x) + (lasty - y) * (lasty - y)).sqrt();
-                    if !is_percent && cummulative_dist + len > dist {
-                        let ratio = (dist - cummulative_dist) / len;
+                    if !is_percent && cumulative_dist + len > dist {
+                        let ratio = (dist - cumulative_dist) / len;
                         return Ok((
                             lastx * (1.0 - ratio) + ratio * x,
                             lasty * (1.0 - ratio) + ratio * y,
                         ));
                     }
-                    cummulative_dist += len;
+                    cumulative_dist += len;
                 } else if dist < 0.0 {
                     // clamp to start
                     return Ok((x, y));
@@ -81,7 +81,7 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
                 break;
             } else {
                 is_percent = false;
-                dist *= cummulative_dist;
+                dist *= cumulative_dist;
             }
         }
         return Ok((lastx, lasty));
@@ -105,7 +105,7 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         let mut pos;
         // loop to allow repeat to find total length if a percentage
         loop {
-            let mut cummulative_dist = 0.0;
+            let mut cumulative_dist = 0.0;
             pos = (0.0, 0.0);
             let mut last_stable_pos = pos;
             let mut r = 0.0;
@@ -162,12 +162,12 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                                 pos.0 = val;
                             }
                             let d = (pos.0 - last_stable_pos.0).abs();
-                            if !is_percent && cummulative_dist + d > dist {
-                                let r = (dist - cummulative_dist) / d;
+                            if !is_percent && cumulative_dist + d > dist {
+                                let r = (dist - cumulative_dist) / d;
                                 return Ok((last_stable_pos.0 * (1.0 - r) + pos.0 * r, pos.1));
                             }
 
-                            cummulative_dist += d;
+                            cumulative_dist += d;
                             last_stable_pos = pos;
                         } else {
                             return Err(SvgdxError::ParseError(
@@ -183,12 +183,12 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                                 pos.1 = val;
                             }
                             let d = (pos.1 - last_stable_pos.1).abs();
-                            if !is_percent && cummulative_dist + d > dist {
-                                let r = (dist - cummulative_dist) / d;
+                            if !is_percent && cumulative_dist + d > dist {
+                                let r = (dist - cumulative_dist) / d;
                                 return Ok((pos.0, last_stable_pos.1 * (1.0 - r) + pos.1 * r));
                             }
 
-                            cummulative_dist += d;
+                            cumulative_dist += d;
                             last_stable_pos = pos;
                         } else {
                             return Err(SvgdxError::ParseError(
@@ -213,15 +213,15 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                             let d = ((last_stable_pos.0 - pos.0) * (last_stable_pos.0 - pos.0)
                                 + (last_stable_pos.1 - pos.1) * (last_stable_pos.1 - pos.1))
                                 .sqrt();
-                            if !is_percent && cummulative_dist + d > dist {
-                                let r = (dist - cummulative_dist) / d;
+                            if !is_percent && cumulative_dist + d > dist {
+                                let r = (dist - cumulative_dist) / d;
                                 return Ok((
                                     last_stable_pos.0 * (1.0 - r) + pos.0 * r,
                                     last_stable_pos.1 * (1.0 - r) + pos.1 * r,
                                 ));
                             }
 
-                            cummulative_dist += d;
+                            cumulative_dist += d;
                             last_stable_pos = pos;
                         } else {
                             return Err(SvgdxError::ParseError(
@@ -310,8 +310,8 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                             };
                             let arc_length = arc_angle.abs() * r;
 
-                            if !is_percent && cummulative_dist + arc_length > dist {
-                                let ratio = (dist - cummulative_dist) / arc_length;
+                            if !is_percent && cumulative_dist + arc_length > dist {
+                                let ratio = (dist - cumulative_dist) / arc_length;
                                 let final_angle = ang_1 + arc_angle * ratio;
 
                                 return Ok((
@@ -320,7 +320,7 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                                 ));
                             }
 
-                            cummulative_dist += arc_length;
+                            cumulative_dist += arc_length;
                             last_stable_pos = pos;
                         } else {
                             return Err(SvgdxError::ParseError(
@@ -336,7 +336,7 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                 break;
             } else {
                 is_percent = false;
-                dist *= cummulative_dist;
+                dist *= cumulative_dist;
             }
         }
         return Ok(pos);
