@@ -1,6 +1,7 @@
 use super::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::Length;
+use crate::types::{attr_split, strp};
 
 fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
     let (is_percent, dist) = match length {
@@ -14,10 +15,10 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         el.get_attr("x2"),
         el.get_attr("y2"),
     ) {
-        let x1: f32 = x1.parse()?;
-        let y1: f32 = y1.parse()?;
-        let x2: f32 = x2.parse()?;
-        let y2: f32 = y2.parse()?;
+        let x1: f32 = strp(x1)?;
+        let y1: f32 = strp(y1)?;
+        let x2: f32 = strp(x2)?;
+        let y2: f32 = strp(y2)?;
         if x1 == x2 && y1 == y2 {
             return Ok((x1, y1));
         }
@@ -25,7 +26,7 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         let ratio = if is_percent {
             dist
         } else {
-            let len = ((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2)).sqrt();
+            let len = (x1 - x2).hypot(y1 - y2);
             dist / len
         };
         return Ok((x1 + ratio * (x2 - x1), y1 + ratio * (y2 - y1)));
@@ -37,52 +38,43 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
 }
 
 fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-    let (mut is_percent, mut dist) = match length {
+    let (is_percent, dist) = match length {
         Length::Absolute(abs) => (false, abs),
         Length::Ratio(ratio) => (true, ratio),
     };
 
     if let Some(points) = el.get_attr("points") {
-        let replaced_commas = points.replace([','], " ");
-        let mut lastx;
-        let mut lasty;
+        let mut lastx = 0.0;
+        let mut lasty = 0.0;
 
-        // loop to allow repeat to find total length if a percentage
-        loop {
-            let mut points = replaced_commas.split_whitespace();
-            let mut cumulative_dist = 0.0;
-            lastx = 0.0;
-            lasty = 0.0;
-            let mut first_point = true;
-            while let (Some(x), Some(y)) = (points.next(), points.next()) {
-                let x: f32 = x.parse()?;
-                let y: f32 = y.parse()?;
+        let mut points = attr_split(points);
+        let mut cumulative_dist = 0.0;
+        let mut first_point = true;
+        while let (Some(x), Some(y)) = (points.next(), points.next()) {
+            let x: f32 = strp(&x)?;
+            let y: f32 = strp(&y)?;
 
-                if !first_point {
-                    let len = ((lastx - x) * (lastx - x) + (lasty - y) * (lasty - y)).sqrt();
-                    if !is_percent && cumulative_dist + len > dist {
-                        let ratio = (dist - cumulative_dist) / len;
-                        return Ok((
-                            lastx * (1.0 - ratio) + ratio * x,
-                            lasty * (1.0 - ratio) + ratio * y,
-                        ));
-                    }
-                    cumulative_dist += len;
-                } else if dist < 0.0 {
-                    // clamp to start
-                    return Ok((x, y));
+            if !first_point {
+                let len = (lastx - x).hypot(lasty - y);
+                if !is_percent && cumulative_dist + len > dist {
+                    let ratio = (dist - cumulative_dist) / len;
+                    return Ok((
+                        lastx * (1.0 - ratio) + ratio * x,
+                        lasty * (1.0 - ratio) + ratio * y,
+                    ));
                 }
-                lastx = x;
-                lasty = y;
+                cumulative_dist += len;
+            } else if dist < 0.0 {
+                // clamp to start
+                return Ok((x, y));
+            }
+            lastx = x;
+            lasty = y;
 
-                first_point = false;
-            }
-            if !is_percent {
-                break;
-            } else {
-                is_percent = false;
-                dist *= cumulative_dist;
-            }
+            first_point = false;
+        }
+        if is_percent {
+            return get_point_along_polyline(el, Length::Absolute(dist * cumulative_dist));
         }
         return Ok((lastx, lasty));
     }
@@ -93,126 +85,99 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
 }
 
 fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-    let (mut is_percent, mut dist) = match length {
+    let (is_percent, dist) = match length {
         Length::Absolute(abs) => (false, abs),
         Length::Ratio(ratio) => (true, ratio),
     };
 
     if let Some(d) = el.get_attr("d") {
-        let replaced_commas = d.replace([','], " ");
-        let items = replaced_commas.split_whitespace();
+        let mut pos = (0.0, 0.0);
 
-        let mut pos;
-        // loop to allow repeat to find total length if a percentage
-        loop {
-            let mut cumulative_dist = 0.0;
-            pos = (0.0, 0.0);
-            let mut last_stable_pos = pos;
-            let mut r = 0.0;
-            let mut large_arc_flag = false;
-            let mut sweeping_flag = false;
+        let mut cumulative_dist = 0.0;
+        let mut last_stable_pos = pos;
+        let mut r = 0.0;
+        let mut large_arc_flag = false;
+        let mut sweeping_flag = false;
 
-            let mut op = ' ';
-            let mut arg_num = 0;
-            for item in items.clone() {
-                if item.starts_with([
-                    'a', 'A', 'b', 'B', 'c', 'C', 'h', 'H', 'l', 'L', 'm', 'M', 'q', 'Q', 's', 'S',
-                    't', 'T', 'v', 'V', 'z', 'Z',
-                ]) {
-                    if let Some(c) = item.chars().next() {
-                        op = c;
-                        arg_num = 0;
-                        if dist < 0.0 && !['m', 'M'].contains(&c) {
-                            // clamping the start
-                            return Ok(last_stable_pos);
-                        }
+        let mut op = ' ';
+        let mut arg_num = 0;
+        for item in attr_split(d) {
+            if item.starts_with([
+                'a', 'A', 'b', 'B', 'c', 'C', 'h', 'H', 'l', 'L', 'm', 'M', 'q', 'Q', 's', 'S',
+                't', 'T', 'v', 'V', 'z', 'Z',
+            ]) {
+                if let Some(c) = item.chars().next() {
+                    op = c;
+                    arg_num = 0;
+                    if dist < 0.0 && !['m', 'M'].contains(&c) {
+                        // clamping the start
+                        return Ok(last_stable_pos);
                     }
-                } else {
-                    if ['b', 'B', 'c', 'C', 'q', 'Q', 's', 'S', 't', 'T', 'z', 'Z'].contains(&op) {
+                }
+            } else {
+                let num_args = match op {
+                    'm' | 'M' | 'l' | 'L' => 2,
+                    'h' | 'H' | 'v' | 'V' => 1,
+                    'a' | 'A' => 7,
+                    _ => {
                         return Err(SvgdxError::InvalidData(format!(
                             "not yet impl path parsing line offset for {op}"
                         )));
-                    } else if op == 'm' || op == 'M' {
-                        if arg_num == 0 {
-                            let val = item.parse::<f32>()?;
-                            if op == 'm' {
-                                pos.0 += val;
-                            } else {
-                                pos.0 = val;
-                            }
-                        } else if arg_num == 1 {
-                            let val = item.parse::<f32>()?;
-                            if op == 'm' {
-                                pos.1 += val;
-                            } else {
-                                pos.1 = val;
-                            }
-                            last_stable_pos = pos;
-                        } else {
-                            return Err(SvgdxError::ParseError(
-                                "path has too many vars".to_string(),
-                            ));
-                        }
-                    } else if op == 'h' || op == 'H' {
-                        if arg_num == 0 {
-                            let val = item.parse::<f32>()?;
-                            if op == 'h' {
-                                pos.0 += val;
-                            } else {
-                                pos.0 = val;
-                            }
-                            let d = (pos.0 - last_stable_pos.0).abs();
-                            if !is_percent && cumulative_dist + d > dist {
-                                let r = (dist - cumulative_dist) / d;
-                                return Ok((last_stable_pos.0 * (1.0 - r) + pos.0 * r, pos.1));
-                            }
+                    }
+                };
+                if arg_num == num_args {
+                    return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                }
 
-                            cumulative_dist += d;
-                            last_stable_pos = pos;
+                match op {
+                    'm' | 'M' => {
+                        let val = strp(&item)?;
+                        let pos_ref = if arg_num == 0 { &mut pos.0 } else { &mut pos.1 };
+                        if op == 'm' {
+                            *pos_ref += val;
                         } else {
-                            return Err(SvgdxError::ParseError(
-                                "path has too many vars".to_string(),
+                            *pos_ref = val;
+                        }
+                    }
+                    'h' | 'H' | 'v' | 'V' => {
+                        let val = strp(&item)?;
+                        let pos_ref = if op == 'h' || op == 'H' {
+                            &mut pos.0
+                        } else {
+                            &mut pos.1
+                        };
+                        if op == 'h' || op == 'v' {
+                            *pos_ref += val;
+                        } else {
+                            *pos_ref = val;
+                        }
+                        let d =
+                            (pos.0 - last_stable_pos.0).abs() + (pos.1 - last_stable_pos.1).abs();
+                        if !is_percent && cumulative_dist + d > dist {
+                            let r = (dist - cumulative_dist) / d;
+                            return Ok((
+                                last_stable_pos.0 * (1.0 - r) + pos.0 * r,
+                                last_stable_pos.1 * (1.0 - r) + pos.1 * r,
                             ));
                         }
-                    } else if op == 'v' || op == 'V' {
-                        if arg_num == 0 {
-                            let val = item.parse::<f32>()?;
-                            if op == 'v' {
-                                pos.1 += val;
-                            } else {
-                                pos.1 = val;
-                            }
-                            let d = (pos.1 - last_stable_pos.1).abs();
-                            if !is_percent && cumulative_dist + d > dist {
-                                let r = (dist - cumulative_dist) / d;
-                                return Ok((pos.0, last_stable_pos.1 * (1.0 - r) + pos.1 * r));
-                            }
 
-                            cumulative_dist += d;
-                            last_stable_pos = pos;
-                        } else {
-                            return Err(SvgdxError::ParseError(
-                                "path has too many vars".to_string(),
-                            ));
-                        }
-                    } else if op == 'l' || op == 'L' {
+                        cumulative_dist += d;
+                    }
+                    'l' | 'L' => {
+                        let val = strp(&item)?;
                         if arg_num == 0 {
-                            let val = item.parse::<f32>()?;
                             if op == 'l' {
                                 pos.0 += val;
                             } else {
                                 pos.0 = val;
                             }
-                        } else if arg_num == 1 {
-                            let val = item.parse::<f32>()?;
+                        } else {
                             if op == 'l' {
                                 pos.1 += val;
                             } else {
                                 pos.1 = val;
                             }
-                            let d = ((last_stable_pos.0 - pos.0) * (last_stable_pos.0 - pos.0)
-                                + (last_stable_pos.1 - pos.1) * (last_stable_pos.1 - pos.1))
-                                .sqrt();
+                            let d = (last_stable_pos.0 - pos.0).hypot(last_stable_pos.1 - pos.1);
                             if !is_percent && cumulative_dist + d > dist {
                                 let r = (dist - cumulative_dist) / d;
                                 return Ok((
@@ -222,18 +187,14 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                             }
 
                             cumulative_dist += d;
-                            last_stable_pos = pos;
-                        } else {
-                            return Err(SvgdxError::ParseError(
-                                "path has too many vars".to_string(),
-                            ));
                         }
-                    } else if op == 'a' || op == 'A' {
+                    }
+                    'a' | 'A' => {
                         if arg_num == 0 {
-                            let val = item.parse::<f32>()?;
+                            let val = strp(&item)?;
                             r = val;
                         } else if arg_num == 1 {
-                            let val = item.parse::<f32>()?;
+                            let val = strp(&item)?;
                             if r != val {
                                 return Err(SvgdxError::ParseError(
                                     "path length not supported for non circle elipse".to_string(),
@@ -248,14 +209,14 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                             let val = item.parse::<u32>()?;
                             sweeping_flag = val != 0;
                         } else if arg_num == 5 {
-                            let val = item.parse::<f32>()?;
+                            let val = strp(&item)?;
                             if op == 'a' {
                                 pos.0 += val;
                             } else {
                                 pos.0 = val;
                             }
-                        } else if arg_num == 6 {
-                            let val = item.parse::<f32>()?;
+                        } else {
+                            let val = strp(&item)?;
                             if op == 'a' {
                                 pos.1 += val;
                             } else {
@@ -321,23 +282,24 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                             }
 
                             cumulative_dist += arc_length;
-                            last_stable_pos = pos;
-                        } else {
-                            return Err(SvgdxError::ParseError(
-                                "path has too many vars".to_string(),
-                            ));
                         }
                     }
+                    _ => {
+                        return Err(SvgdxError::InvalidData(format!(
+                            "not yet impl path parsing line offset for {op}"
+                        )));
+                    }
+                }
 
-                    arg_num += 1;
+                arg_num += 1;
+
+                if arg_num == num_args {
+                    last_stable_pos = pos;
                 }
             }
-            if !is_percent {
-                break;
-            } else {
-                is_percent = false;
-                dist *= cumulative_dist;
-            }
+        }
+        if is_percent {
+            return get_point_along_path(el, Length::Absolute(dist * cumulative_dist));
         }
         return Ok(pos);
     }
@@ -346,21 +308,14 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
 }
 
 pub fn get_point_along_linelike_type_el(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-    let name = el.name();
-
-    if name == "line" {
-        return get_point_along_line(el, length);
+    match el.name() {
+        "line" => get_point_along_line(el, length),
+        "polyline" => get_point_along_polyline(el, length),
+        "path" => get_point_along_path(el, length),
+        _ => Err(SvgdxError::InternalLogicError(
+            "looking for point on line in a non line element".to_string(),
+        )),
     }
-    if name == "polyline" {
-        return get_point_along_polyline(el, length);
-    }
-    if name == "path" {
-        return get_point_along_path(el, length);
-    }
-
-    Err(SvgdxError::MissingAttribute(
-        "looking for point on line in a non line element".to_string(),
-    ))
 }
 
 #[cfg(test)]
