@@ -293,8 +293,9 @@ impl Transformer {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
         let theme = ContextTheme::from_context(&self.context);
+        let mut registry = style::StyleRegistry::new(&theme);
         match self.context.config.auto_style_mode {
-            AutoStyleMode::None => (vec![], vec![]),
+            AutoStyleMode::None => {}
             AutoStyleMode::Inline => {
                 let mut elements: Vec<_> = events
                     .iter_mut()
@@ -303,7 +304,7 @@ impl Transformer {
                         _ => None,
                     })
                     .collect();
-                style::update_inline_styles(&theme, &mut elements)
+                registry.process_inline(&mut elements);
             }
             AutoStyleMode::Css => {
                 let elements: Vec<_> = events
@@ -313,9 +314,10 @@ impl Transformer {
                         _ => None,
                     })
                     .collect();
-                style::get_css_styles(&theme, &elements)
+                registry.process_css(&elements);
             }
         }
+        registry.get_state()
     }
 
     fn autostyle_defs_events(&self, auto_defs: Vec<String>) -> Result<OutputList> {

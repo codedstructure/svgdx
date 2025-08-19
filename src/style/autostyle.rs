@@ -33,9 +33,43 @@ pub(super) trait StyleProvider {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+struct StyleState {
+    // store accumulated styles.
+    styles: InsertOrderMap<String, ()>,
+    defs: InsertOrderMap<String, ()>,
+}
+impl StyleState {
+    pub fn add_styles(&mut self, styles: &[String]) {
+        for style in styles {
+            self.styles.insert(style.clone(), ());
+        }
+    }
+
+    pub fn add_defs(&mut self, defs: &[String]) {
+        for def in defs {
+            self.defs.insert(def.clone(), ());
+        }
+    }
+
+    pub fn get_defs(&self) -> Vec<String> {
+        self.defs.iter().map(|(k, _)| k.clone()).collect::<Vec<_>>()
+    }
+
+    pub fn get_styles(&self) -> Vec<String> {
+        self.styles
+            .iter()
+            .map(|(k, _)| k.clone())
+            .collect::<Vec<_>>()
+    }
+}
+
 pub struct StyleRegistry {
     tb: ContextTheme,
     rules: Vec<Box<dyn StyleProvider>>,
+
+    // stores style & defs state for incremental updates
+    state: StyleState,
 }
 
 impl Default for StyleRegistry {
@@ -43,6 +77,7 @@ impl Default for StyleRegistry {
         let mut r = StyleRegistry {
             tb: ContextTheme::default(),
             rules: Vec::new(),
+            state: StyleState::default(),
         };
         r.register_all();
         r
@@ -51,13 +86,16 @@ impl Default for StyleRegistry {
 
 impl StyleRegistry {
     pub fn new(tb: &ContextTheme) -> Self {
-        StyleRegistry {
+        let mut reg = StyleRegistry {
             tb: tb.clone(),
             rules: Vec::new(),
-        }
+            state: StyleState::default(),
+        };
+        reg.register_all();
+        reg
     }
 
-    pub fn register_all(&mut self) {
+    fn register_all(&mut self) {
         self.register(rules::DefaultStyles::new(&self.tb));
         self.register(rules::ColourStyles::new(&self.tb));
         self.register(rules::StrokeWidthStyles::new(&self.tb));
@@ -73,10 +111,11 @@ impl StyleRegistry {
             .push(Box::new(provider) as Box<dyn StyleProvider>);
     }
 
-    pub fn generate_css<E: Selectable>(&mut self, elements: &[&E]) -> (Vec<String>, Vec<String>) {
-        let mut style = Vec::new();
-        let mut defs = Vec::new();
+    pub fn get_state(&self) -> (Vec<String>, Vec<String>) {
+        (self.state.get_styles(), self.state.get_defs())
+    }
 
+    pub fn process_css<E: Selectable>(&mut self, elements: &[&E]) {
         for provider in &mut self.rules {
             let mut selector_style_map = InsertOrderMap::new();
             let rules = provider.get_rules();
@@ -103,22 +142,16 @@ impl StyleRegistry {
                 }
             }
 
-            defs.extend(provider.group_defs());
-            style.extend(provider.group_styles());
+            self.state.add_defs(&provider.group_defs());
+            self.state.add_styles(&provider.group_styles());
             for (selector, styles) in selector_style_map {
-                style.push(format!("{selector} {{ {styles} }}"));
+                self.state
+                    .add_styles(&[format!("{selector} {{ {styles} }}")]);
             }
         }
-
-        (style, defs)
     }
 
-    pub fn update_elements<E: Selectable + Stylable>(
-        &mut self,
-        elements: &mut [&mut E],
-    ) -> (Vec<String>, Vec<String>) {
-        let mut defs = Vec::new();
-        let mut style = Vec::new();
+    pub fn process_inline<E: Selectable + Stylable>(&mut self, elements: &mut [&mut E]) {
         // NOTE: want provider on the outside to deal with group_styles/group_defs,
         // but also ideally have element on the outside to deal with having per-element
         // accumulated styles. Resolve by having enumerating the elements list and
@@ -136,21 +169,20 @@ impl StyleRegistry {
                         }
                         for style_item in &rule.styles {
                             let value = provider.eval_value(&style_item.value, &selected);
-                            // element.add_style(&style_item.key, &value);
                             el_styles.insert(style_item.key.clone(), value.to_string());
                         }
                     }
                 }
             }
-            defs.extend(provider.group_defs());
-            style.extend(provider.group_styles());
+
+            self.state.add_defs(&provider.group_defs());
+            self.state.add_styles(&provider.group_styles());
         }
         for (el_idx, element) in elements.iter_mut().enumerate() {
             if let Some(el_styles) = el_style_mapping.get(&el_idx) {
                 element.apply_styles(el_styles);
             }
         }
-        (style, defs)
     }
 }
 
@@ -198,6 +230,7 @@ mod tests {
     #[test]
     fn test_registry() {
         let mut registry = StyleRegistry::default();
+        // TODO: these are already registered by `default`; need to test an 'empty' registry
         registry.register(rules::TextStyles::new(&ContextTheme::default()));
         registry.register(rules::StrokeWidthStyles::new(&ContextTheme::default()));
         registry.register(rules::ArrowStyles::new(&ContextTheme::default()));
@@ -205,7 +238,8 @@ mod tests {
         let a = MockElement::new("text", &["d-text", "d-text-bold"]);
         let b = MockElement::new("text", &["d-text", "d-text-italic"]);
         let c = MockElement::new("text", &["d-text", "d-text-bold"]);
-        let (styles, _defs) = registry.generate_css(&[&a, &b, &c]);
+        registry.process_css(&[&a, &b, &c]);
+        let (styles, _defs) = registry.get_state();
         let styles = styles.join("\n");
         assert!(styles.contains(&"font-weight: bold".to_string()));
     }
@@ -216,7 +250,7 @@ mod tests {
 
         let mut registry = StyleRegistry::default();
         registry.register(rules::ColourStyles::new(&ContextTheme::default()));
-        registry.update_elements(&mut [&mut element]);
+        registry.process_inline(&mut [&mut element]);
 
         assert_eq!(element.style.get("fill"), Some("red"));
     }
@@ -226,7 +260,8 @@ mod tests {
         let element = MockElement::new("rect", &["d-hardshadow"]);
 
         let mut registry = StyleRegistry::default();
-        let (css, defs) = registry.generate_css(&[&element]);
+        registry.process_css(&[&element]);
+        let (css, defs) = registry.get_state();
 
         assert_contains!(css.join("\n"), "url(#d-hardshadow)");
         assert_contains!(defs.join("\n"), "<filter id=\"d-hardshadow\"");
