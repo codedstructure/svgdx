@@ -1,8 +1,10 @@
+use itertools::Itertools;
+
 use super::SvgElement;
 use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
-use crate::elements::markdown::{get_md_value, SpanStyle};
+use crate::elements::markdown::{get_md_value, MdSpan};
 use crate::errors::{Result, SvgdxError};
 
 fn get_text_value(element: &mut SvgElement) -> String {
@@ -163,8 +165,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let mut orig_elem = element.clone();
 
-    let text_values;
-    let state_values;
+    let spans;
     if let (Some(_), Some(_)) = (orig_elem.get_attr("text"), orig_elem.get_attr("md")) {
         return Err(SvgdxError::ParseError(
             "has both attributes of text and md".to_owned(),
@@ -172,72 +173,84 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     } else if orig_elem.get_attr("text").is_some() {
         if orig_elem.has_class("d-markdown") {
             // as to call must have one of them
-            (text_values, state_values) = get_md_value(&mut orig_elem);
+            spans = get_md_value(&mut orig_elem);
         } else {
-            text_values = vec![get_text_value(&mut orig_elem)];
-            state_values = vec![SpanStyle {
+            spans = vec![MdSpan {
                 code: false,
                 bold: false,
                 italic: false,
+                text: get_text_value(&mut orig_elem),
             }];
         }
     } else {
         // as to call must have one of them
-        (text_values, state_values) = get_md_value(&mut orig_elem);
+        spans = get_md_value(&mut orig_elem);
     }
-    let mut full_text_parsed_string = "".to_string();
-    for t in text_values.iter() {
-        full_text_parsed_string.push_str(t);
-    }
+    let full_text_parsed_string = spans.iter().map(|s| s.text.clone()).join("");
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);
     let mut text_elements = Vec::new();
+    // lines is a vec of (line)s
+    // a line is a vec of spans
+    // it starts with a single empty line
     let mut lines = vec![vec![]];
-    let mut line_types = vec![vec![]];
-    for i in 0..text_values.len() {
-        let mut segments = text_values[i].lines();
+    for span in spans.iter() {
+        let mut segments = span.text.lines();
         if let Some(first) = segments.next() {
             if !first.is_empty() {
                 lines
                     .last_mut()
                     .expect("added item not removed")
-                    .push(first);
-                line_types
-                    .last_mut()
-                    .expect("added item not removed")
-                    .push(state_values[i]);
+                    .push(MdSpan {
+                        code: span.code,
+                        bold: span.bold,
+                        italic: span.italic,
+                        text: first.to_string(),
+                    });
             }
         }
 
         for s in segments {
-            lines.push(vec![s]);
-            line_types.push(vec![state_values[i]]);
+            lines.push(vec![MdSpan {
+                code: span.code,
+                bold: span.bold,
+                italic: span.italic,
+                text: s.to_string(),
+            }]);
         }
 
-        if let Some(last_char) = text_values[i].chars().last() {
-            if last_char == '\n' && i != text_values.len() - 1 {
+        if let Some(last_char) = span.text.chars().last() {
+            if last_char == '\n' {
                 lines.push(vec![]);
-                line_types.push(vec![]);
+            }
+        }
+    }
+    // if last char is newline dont do the new line
+    if let Some(last_span) = spans.last() {
+        if let Some(last_char) = last_span.text.chars().last() {
+            if last_char == '\n' {
+                lines.pop();
             }
         }
     }
 
-    for i in 0..lines.len() {
-        if lines[i].is_empty() {
-            lines[i].push("");
-            line_types[i].push(SpanStyle {
+    // fill empty lines with empty strings
+    for l in &mut lines {
+        if l.is_empty() {
+            l.push(MdSpan {
                 code: false,
                 bold: false,
                 italic: false,
+                text: String::new(),
             });
         }
     }
     let line_count = lines.len();
 
-    let multielement = line_count > 1 || text_values.len() > 1;
+    let multielement = line_count > 1 || spans.len() > 1;
     let vertical = orig_elem.has_class("d-text-vertical");
     // Whether text is pre-formatted (i.e. spaces are not collapsed)
     let text_pre = orig_elem.has_class("d-text-pre");
@@ -311,13 +324,13 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
 
     if !multielement {
-        if line_types[0][0].code {
+        if lines[0][0].code {
             text_classes.push("d-text-monospace".to_string());
         }
-        if line_types[0][0].bold {
+        if lines[0][0].bold {
             text_classes.push("d-text-bold".to_string());
         }
-        if line_types[0][0].italic {
+        if lines[0][0].italic {
             text_classes.push("d-text-italic".to_string());
         }
     }
@@ -378,12 +391,11 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {
             lines = lines.into_iter().rev().collect();
-            line_types = line_types.into_iter().rev().collect();
         }
 
         for (idx, line) in lines.into_iter().enumerate() {
-            for (idn, text_fragment) in line.into_iter().enumerate() {
-                let mut text_fragment = text_fragment.to_string();
+            for (idn, md_span) in line.into_iter().enumerate() {
+                let mut text_fragment = md_span.text;
                 let mut tspan = tspan_elem.clone();
                 if idn == 0 {
                     if vertical {
@@ -393,13 +405,13 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
                     }
                 }
 
-                if line_types[idx][idn].code {
+                if md_span.code {
                     tspan.add_class("d-text-monospace");
                 }
-                if line_types[idx][idn].bold {
+                if md_span.bold {
                     tspan.add_class("d-text-bold");
                 }
-                if line_types[idx][idn].italic {
+                if md_span.italic {
                     tspan.add_class("d-text-italic");
                 }
 

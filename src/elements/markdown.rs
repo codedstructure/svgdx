@@ -1,28 +1,30 @@
 use super::SvgElement;
 
-pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<SpanStyle>) {
+pub fn get_md_value(element: &mut SvgElement) -> Vec<MdSpan> {
     let text_value = if let Some(tv) = element.pop_attr("md") {
         tv
     } else if let Some(tv) = element.pop_attr("text") {
         tv
     } else {
-        return (vec![], vec![]);
+        return vec![];
     };
 
+    // parse into spans and data about style
     let (spans, span_data) = md_parse(&text_value);
 
-    let mut state_per_span = vec![
-        SpanStyle {
+    let mut md_spans: Vec<MdSpan> = spans
+        .iter()
+        .map(|s| MdSpan {
             code: false,
             bold: false,
-            italic: false
-        };
-        spans.len()
-    ];
+            italic: false,
+            text: s.to_string(),
+        })
+        .collect();
 
     for s in span_data {
         let class = s.code_bold_italic;
-        for i in state_per_span.iter_mut().take(s.end_idx).skip(s.start_idx) {
+        for i in md_spans.iter_mut().take(s.end_idx).skip(s.start_idx) {
             match class {
                 SpanStyleEnum::Code => i.code = true,
                 SpanStyleEnum::Bold => i.bold = true,
@@ -31,25 +33,37 @@ pub fn get_md_value(element: &mut SvgElement) -> (Vec<String>, Vec<SpanStyle>) {
         }
     }
 
-    let mut strings = vec![];
-    let mut states = vec![];
-    for i in 0..spans.len() {
-        if i == 0 || states[states.len() - 1] != state_per_span[i] {
-            strings.push(String::new());
-            states.push(state_per_span[i])
+    // merge equal style spans together
+    let mut result = vec![];
+    let mut md_span_iter = md_spans.iter();
+    if let Some(first) = md_span_iter.next() {
+        result.push(first.clone());
+    }
+    for span in md_span_iter {
+        if result[result.len() - 1].bold != span.bold
+            || result[result.len() - 1].code != span.code
+            || result[result.len() - 1].italic != span.italic
+        {
+            result.push(MdSpan {
+                code: span.code,
+                bold: span.bold,
+                italic: span.italic,
+                text: String::new(),
+            });
         }
-        let last_ind = strings.len() - 1;
-        strings[last_ind] += &spans[i];
+        let last_ind = result.len() - 1;
+        result[last_ind].text += &span.text;
     }
 
-    (strings, states)
+    result
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub struct SpanStyle {
+#[derive(Debug, Clone, PartialEq)]
+pub struct MdSpan {
     pub code: bool,
     pub bold: bool,
     pub italic: bool,
+    pub text: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -66,11 +80,41 @@ struct SpanData {
     code_bold_italic: SpanStyleEnum,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum DelimiterType {
+    Null,
+    Asterisk,
+    Escape,
+    UnderScore,
+    Tick,
+}
+
+impl DelimiterType {
+    fn to_char(&self) -> char {
+        match self {
+            DelimiterType::Null => ' ',
+            DelimiterType::Asterisk => '*',
+            DelimiterType::Escape => '\\',
+            DelimiterType::UnderScore => '_',
+            DelimiterType::Tick => '`',
+        }
+    }
+    fn from_char(c: char) -> Self {
+        match c {
+            '*' => DelimiterType::Asterisk,
+            '\\' => DelimiterType::Escape,
+            '_' => DelimiterType::UnderScore,
+            '`' => DelimiterType::Tick,
+            _ => DelimiterType::Null,
+        }
+    }
+}
+
 // based on the commonmark implementation https://spec.commonmark.org/0.31.2/
 #[derive(Debug, Clone)]
 struct DelimiterData {
     ind: usize, // goes just before this char
-    char_type: char,
+    char_type: DelimiterType,
     num_delimiters: usize,
     is_active: bool,
     could_open: bool,
@@ -81,7 +125,7 @@ fn md_parse_delimiters(text_value: &str) -> (Vec<String>, Vec<DelimiterData>) {
     let mut result = vec![];
     let mut delimiters = vec![DelimiterData {
         ind: 0,
-        char_type: ' ',
+        char_type: DelimiterType::Null,
         num_delimiters: 0,
         is_active: false,
         could_open: false,
@@ -92,34 +136,29 @@ fn md_parse_delimiters(text_value: &str) -> (Vec<String>, Vec<DelimiterData>) {
 
     // first pass find delimiters
     for c in text_value.chars() {
-        let mut add = true;
-        match c {
+        match DelimiterType::from_char(c) {
+            DelimiterType::Null => current_span.push(c),
             // the delimiters and escape
-            '`' | '_' | '*' | '\\' => {
+            _ => {
                 if !current_span.is_empty() {
                     result.push(current_span);
                     current_span = String::new();
                 }
-                let last = delimiters.last_mut().expect("guarenteed not to be empty");
-                if c == last.char_type && last.ind == result.len() {
+                let last = delimiters.last_mut().expect("guaranteed not to be empty");
+                if DelimiterType::from_char(c) == last.char_type && last.ind == result.len() {
                     // is a continuation
                     last.num_delimiters += 1;
                 } else {
                     delimiters.push(DelimiterData {
                         ind: result.len(),
-                        char_type: c,
+                        char_type: DelimiterType::from_char(c),
                         num_delimiters: 1,
                         is_active: true,
                         could_open: true,
                         could_close: true,
                     });
                 }
-                add = false;
             }
-            _ => {}
-        }
-        if add {
-            current_span.push(c);
         }
     }
     if !current_span.is_empty() {
@@ -129,7 +168,6 @@ fn md_parse_delimiters(text_value: &str) -> (Vec<String>, Vec<DelimiterData>) {
     (result, delimiters)
 }
 
-// assumes delimiters are ordered
 fn md_parse_code_blocks(
     result: Vec<String>,
     delimiters: &mut Vec<DelimiterData>,
@@ -143,13 +181,13 @@ fn md_parse_code_blocks(
     let mut current_span = String::new();
     while res_ind <= result.len() {
         while del_ind < delimiters.len() && delimiters[del_ind].ind <= res_ind {
-            if delimiters[del_ind].char_type == '`' {
+            if delimiters[del_ind].char_type == DelimiterType::Tick {
                 // if previous delimiter is \ and is right before and is odd number of \
                 // then reduce by 1 and re_add it if it does make a pair
                 // need to acount for all previous delimiters have been moved by re_added letters
                 let escaped = del_ind != 0
                     && delimiters[del_ind - 1].ind + removed_spans == delimiters[del_ind].ind
-                    && delimiters[del_ind - 1].char_type == '\\'
+                    && delimiters[del_ind - 1].char_type == DelimiterType::Escape
                     && delimiters[del_ind - 1].num_delimiters % 2 != 0;
                 let needed_len = match escaped {
                     false => delimiters[del_ind].num_delimiters,
@@ -161,14 +199,17 @@ fn md_parse_code_blocks(
                         && delimiters[closer_ind].num_delimiters == needed_len
                     {
                         // it is a span
+
+                        // disable both
                         delimiters[del_ind].is_active = false;
                         delimiters[closer_ind].is_active = false;
                         delimiters[del_ind].num_delimiters = 0;
                         delimiters[closer_ind].num_delimiters = 0;
 
+                        // readd escaped tick
                         if escaped {
                             delimiters[del_ind - 1].num_delimiters -= 1;
-                            current_span.push('`');
+                            current_span.push(delimiters[del_ind].char_type.to_char());
                         }
 
                         if !current_span.is_empty() {
@@ -184,23 +225,34 @@ fn md_parse_code_blocks(
                         del_ind += 1;
                         while res_ind <= delimiters[closer_ind].ind {
                             while del_ind < closer_ind && delimiters[del_ind].ind <= res_ind {
-                                has_none_space |= delimiters[del_ind].num_delimiters != 0; // char type will not be ' '
+                                // if there is a delimiter it will not be a space
+                                has_none_space |= delimiters[del_ind].num_delimiters != 0;
+
+                                // readd delimiter literal
                                 current_span += &delimiters[del_ind]
                                     .char_type
+                                    .to_char()
                                     .to_string()
                                     .repeat(delimiters[del_ind].num_delimiters);
+                                // mark for removal
                                 delimiters[del_ind].num_delimiters = 0;
                                 del_ind += 1;
                             }
                             if res_ind != delimiters[closer_ind].ind {
+                                // one fewer span
                                 removed_spans += 1;
+                                // check if has non space
                                 has_none_space |= result[res_ind].contains(|c| c != ' ');
+                                // merge
                                 current_span += &result[res_ind];
                                 res_ind += 1;
                             } else {
                                 break;
                             }
                         }
+
+                        // if the span starts and ends with a space
+                        // and is not all space then remove first and last space
                         if has_none_space
                             && current_span.len() > 1
                             && current_span.starts_with(' ')
@@ -209,6 +261,7 @@ fn md_parse_code_blocks(
                             current_span = current_span[1..current_span.len() - 1].to_string();
                             // chop off each end
                         }
+                        // adding a new span
                         if !current_span.is_empty() {
                             removed_spans -= 1;
                             new_result.push(current_span);
@@ -217,6 +270,7 @@ fn md_parse_code_blocks(
 
                         let end_ind = new_result.len();
 
+                        // add style span data
                         spans.push(SpanData {
                             start_idx: start_ind,
                             end_idx: end_ind,
@@ -239,15 +293,14 @@ fn md_parse_code_blocks(
         res_ind += 1;
     }
 
-    delimiters[0].num_delimiters = 1; // set the null delimiter to 1
+    // remove all 0 length delimiters except for the null one
+    delimiters[0].num_delimiters = 1;
     delimiters.retain(|d| d.num_delimiters != 0);
-    delimiters[0].num_delimiters = 0; // set the null delimiter to 0
+    delimiters[0].num_delimiters = 0;
 
     (new_result, spans)
 }
 
-// assumes no zero length delimiters except for null delim
-// assumes delimiters are ordered
 fn md_parse_escapes(
     result: Vec<String>,
     delimiters: &mut [DelimiterData],
@@ -262,29 +315,37 @@ fn md_parse_escapes(
     while res_ind <= result.len() {
         while del_ind < delimiters.len() && delimiters[del_ind].ind <= res_ind {
             match delimiters[del_ind].char_type {
-                '\\' => {
+                DelimiterType::Escape => {
                     if !current_span.is_empty() && delimiters[del_ind].num_delimiters != 0 {
                         new_result.push(current_span);
                         current_span = String::new();
                     }
+
+                    // readd 1 '\' for every 2 rounded down
                     current_span += &delimiters[del_ind]
                         .char_type
+                        .to_char()
                         .to_string()
                         .repeat(delimiters[del_ind].num_delimiters / 2);
 
+                    // if escapes dont all cancel out
                     if delimiters[del_ind].num_delimiters % 2 != 0 {
                         if del_ind != delimiters.len() - 1
                             && delimiters[del_ind + 1].ind == delimiters[del_ind].ind
                         {
                             match delimiters[del_ind + 1].char_type {
-                                '`' | '*' | '_' => {
+                                DelimiterType::Tick
+                                | DelimiterType::Asterisk
+                                | DelimiterType::UnderScore => {
                                     added_spans += 1;
-                                    current_span.push(delimiters[del_ind + 1].char_type);
+                                    current_span.push(delimiters[del_ind + 1].char_type.to_char());
                                     delimiters[del_ind + 1].num_delimiters -= 1;
                                 }
+                                // escapes if adjacent should merge and null is only first
                                 _ => panic!("\\ => should merge"),
                             }
                         } else {
+                            // letter specific values
                             match result[delimiters[del_ind].ind].chars().next() {
                                 Some('n') => {
                                     current_span.push('\n');
@@ -292,8 +353,9 @@ fn md_parse_escapes(
                                     res_ind += 1;
                                     delimiters[del_ind].num_delimiters -= 1;
                                 }
+                                // not escapable so put \ back
                                 _ => {
-                                    current_span.push(delimiters[del_ind].char_type);
+                                    current_span.push(delimiters[del_ind].char_type.to_char());
                                     current_span += &result[delimiters[del_ind].ind];
                                     res_ind += 1;
                                     delimiters[del_ind].num_delimiters -= 1;
@@ -302,15 +364,17 @@ fn md_parse_escapes(
                         }
                     }
                 }
-                '`' => {
+                DelimiterType::Tick => {
+                    // unused from previous stage readd to string
                     current_span += &delimiters[del_ind]
                         .char_type
+                        .to_char()
                         .to_string()
                         .repeat(delimiters[del_ind].num_delimiters);
                 }
-                ' ' | '*' | '_' => {
+                DelimiterType::Null | DelimiterType::Asterisk | DelimiterType::UnderScore => {
                     // future stages assume no 0 len delimiters
-                    if delimiters[del_ind].char_type == ' '
+                    if delimiters[del_ind].char_type == DelimiterType::Null
                         || delimiters[del_ind].num_delimiters != 0
                     {
                         new_delimiters.push(delimiters[del_ind].clone());
@@ -318,7 +382,6 @@ fn md_parse_escapes(
                         new_delimiters[last_ind].ind += added_spans;
                     }
                 }
-                _ => panic!("no other type of delimiter char"),
             }
 
             del_ind += 1;
@@ -341,14 +404,14 @@ fn md_parse_escapes(
     (new_result, new_delimiters)
 }
 
-// assumes delimiters are ordered and nonzero
 fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [DelimiterData]) {
     // set could open/close
     for i in 0..delimiters.len() {
+        // find which char was before and after it
         let prev_char;
         let next_char;
         if i != 0 && delimiters[i - 1].ind == delimiters[i].ind {
-            prev_char = delimiters[i - 1].char_type;
+            prev_char = delimiters[i - 1].char_type.to_char();
         } else if delimiters[i].ind == 0 {
             prev_char = ' ';
         } else {
@@ -359,7 +422,7 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
         }
 
         if i != delimiters.len() - 1 && delimiters[i + 1].ind == delimiters[i].ind {
-            next_char = delimiters[i + 1].char_type;
+            next_char = delimiters[i + 1].char_type.to_char();
         } else if delimiters[i].ind == result.len() {
             next_char = ' ';
         } else {
@@ -369,9 +432,12 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
                 .expect("no 0 len spans");
         }
 
+        // if prev is whitespace cant end
+        // if next is whitespace cant start
+        // if neither whitespace but is underscore then cant either
         match (prev_char.is_whitespace(), next_char.is_whitespace()) {
             (false, false) => {
-                if delimiters[i].char_type == '_' {
+                if delimiters[i].char_type == DelimiterType::UnderScore {
                     delimiters[i].could_open = false;
                     delimiters[i].could_close = false;
                 }
@@ -388,6 +454,8 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
             }
         }
 
+        // if next is punctuation and prev is alphanumeric then cant start
+        // oposite for end
         if next_char.is_ascii_punctuation()
             && (!prev_char.is_whitespace() || !prev_char.is_ascii_punctuation())
         {
@@ -409,6 +477,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
     let mut opener_d = [stack_bottom; 3];
 
     loop {
+        // find something which can close
         while current_position != delimiters.len()
             && !delimiters[current_position].could_close
             && delimiters[current_position].is_active
@@ -418,19 +487,25 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
         if current_position == delimiters.len() {
             break;
         }
+        // check which type it is
         let opener_min = match delimiters[current_position].char_type {
-            '*' => &mut opener_a,
-            '_' => &mut opener_d,
-            _ => panic!("this cant happen as current_position starts at 0 and all other delimiters are of above types"),
+            DelimiterType::Asterisk => &mut opener_a,
+            DelimiterType::UnderScore => &mut opener_d,
+            _ => panic!("this cant happen as current_position starts at 0 and all remaining delimiters are of above types"),
         };
 
+        // min is the value upto which has already been checked for this type
         let min = opener_min[delimiters[current_position].num_delimiters % 3].max(stack_bottom);
+
+        // go down from the previous until at min
         let mut opener_ind = current_position - 1;
         while opener_ind > min {
             // found opener
             if delimiters[opener_ind].is_active
                 && delimiters[opener_ind].could_open
                 && delimiters[opener_ind].char_type == delimiters[current_position].char_type
+                // see spec
+                // if one of them could open and close then sum cant be multiple of 3 unless both are
                 && !((delimiters[opener_ind].could_close
                     || delimiters[current_position].could_open)
                     && delimiters[opener_ind].num_delimiters % 3
@@ -442,31 +517,34 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
             opener_ind -= 1;
         }
 
+        // if hit min then there was no valid one
         if opener_ind == min {
-            // not found a opener
+            // update checked upto point
             opener_min[delimiters[current_position].num_delimiters % 3] = current_position - 1;
             current_position += 1;
         } else {
+            // a delimiter cant both open and close
             delimiters[current_position].could_open = false;
             delimiters[opener_ind].could_close = false;
-            // did
-            let code = delimiters[current_position].char_type == '`';
-            let strong = !code
-                && delimiters[opener_ind].num_delimiters >= 2
+
+            // it is strong emphasis if both have more than 2 delimiters
+            let strong = delimiters[opener_ind].num_delimiters >= 2
                 && delimiters[current_position].num_delimiters >= 2;
+            // create style data for this
             spans.push(SpanData {
                 start_idx: delimiters[opener_ind].ind,
                 end_idx: delimiters[current_position].ind,
-                code_bold_italic: match (code, strong) {
-                    (true, _) => SpanStyleEnum::Code,
-                    (_, true) => SpanStyleEnum::Bold,
-                    (_, _) => SpanStyleEnum::Italic,
+                code_bold_italic: match strong {
+                    true => SpanStyleEnum::Bold,
+                    false => SpanStyleEnum::Italic,
                 },
             });
 
+            // decrease remaining delimiters
             delimiters[opener_ind].num_delimiters -= 1 + (strong as usize);
             delimiters[current_position].num_delimiters -= 1 + (strong as usize);
 
+            // if go to 0 deactivate
             if delimiters[opener_ind].num_delimiters == 0 {
                 delimiters[opener_ind].is_active = false;
             }
@@ -475,6 +553,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
                 current_position += 1;
             }
 
+            // deactiveate all delimiters inside the new style span
             for d in &mut delimiters[(opener_ind + 1)..current_position] {
                 d.is_active = false;
             }
@@ -484,14 +563,32 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
 }
 
 fn md_parse(text_value: &str) -> (Vec<String>, Vec<SpanData>) {
+    // parse the string into a vec of strings which are seperated by delimiters
+    // delimiters starts with a null delimiter and is always sorted by ind
+    // there are no 0 length delimiters except for the first null one
     let (result, mut delimiters) = md_parse_delimiters(text_value);
+
+    // parse code blocks and any escapes directly effecting it
+    // code blocks have the highest precedence
     let (result, mut span_data) = md_parse_code_blocks(result, &mut delimiters);
+
+    // other escapes are parsed and remaining ticks are reinserted
+    // after this point there should be no ticks or escapes in delimiters
     let (mut result, mut delimiters) = md_parse_escapes(result, &mut delimiters);
+
+    // for each remaining delimiter it is checked whether
+    // it could start or end the style
     md_parse_set_delimiter_open_close(&result, &mut delimiters);
+
+    // the delimiters are parsed and evaluated which ones form
+    // pairs and create style regions
+    // this does not remove delimiters which are fully used
+    // so after this 0 length delimiters can exist
     span_data.append(&mut md_parse_eval_spans(&mut delimiters));
 
     let mut final_result = vec![];
 
+    // all remaining delimiters are reinserted into the string as seperate spans
     for d in delimiters.into_iter().rev() {
         while d.ind < result.len() {
             if let Some(thing) = result.pop() {
@@ -499,7 +596,8 @@ fn md_parse(text_value: &str) -> (Vec<String>, Vec<SpanData>) {
             }
         }
 
-        if d.char_type != ' ' && d.num_delimiters != 0 {
+        // update style regions
+        if d.char_type != DelimiterType::Null && d.num_delimiters != 0 {
             for s in span_data.iter_mut() {
                 // if start needs to be after or equal
                 if s.start_idx >= d.ind {
@@ -511,7 +609,7 @@ fn md_parse(text_value: &str) -> (Vec<String>, Vec<SpanData>) {
                 }
             }
 
-            final_result.push(d.char_type.to_string().repeat(d.num_delimiters));
+            final_result.push(d.char_type.to_char().to_string().repeat(d.num_delimiters));
         }
     }
 
@@ -548,7 +646,7 @@ mod tests {
                     0 => SpanStyleEnum::Code,
                     1 => SpanStyleEnum::Bold,
                     2 => SpanStyleEnum::Italic,
-                    _ => panic!(),
+                    _ => unreachable!("set by tests to only be 0 1 or 2"),
                 },
             }
         }
@@ -591,56 +689,46 @@ mod tests {
 
     #[test]
     fn test_get_md_value() {
-        fn tc(i: u32) -> SpanStyle {
-            SpanStyle {
+        fn tc(i: u32, t: &str) -> MdSpan {
+            MdSpan {
                 code: i & (1 << 0) != 0,
                 bold: i & (1 << 1) != 0,
                 italic: i & (1 << 2) != 0,
+                text: t.to_string(),
             }
         }
 
         let mut el = SvgElement::new("text", &[]);
         let text = r"foo";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["foo"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(0)]);
+        assert_eq!(get_md_value(&mut el), [tc(0, "foo")]);
 
         let text = r"**(**foo)";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["**(**foo)"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(0)]);
+        assert_eq!(get_md_value(&mut el), [tc(0, "**(**foo)")]);
 
         let text = r"*foo *bar**";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["foo bar"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(4)]);
+        assert_eq!(get_md_value(&mut el), [tc(4, "foo bar")]);
 
         let text = r"*foo**bar**baz*";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["foo", "bar", "baz"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(4), tc(6), tc(4)]);
+        assert_eq!(
+            get_md_value(&mut el),
+            [tc(4, "foo"), tc(6, "bar"), tc(4, "baz")]
+        );
 
         let text = r"`foo*`";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["foo*"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
+        assert_eq!(get_md_value(&mut el), [tc(1, "foo*")]);
 
         // if first and last chars in code block are space remove them unless all empty
         let text = r"` `` `";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["``"]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
+        assert_eq!(get_md_value(&mut el), [tc(1, "``")]);
 
         let text = r"`  `";
         el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).0, ["  "]);
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el).1, [tc(1)]);
+        assert_eq!(get_md_value(&mut el), [tc(1, "  ")]);
     }
 }
