@@ -1,6 +1,7 @@
 use super::SvgElement;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::BoundingBox;
+use crate::types::{attr_split, strp};
 
 struct PathParser {
     tokens: SvgPathSyntax,
@@ -277,117 +278,202 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     }
 }
 
-pub fn points_to_path(mut points: Vec<(f32, f32)>, max_radius: f32, polygon: bool) -> String {
-    if points.is_empty() {
-        return String::new();
-    }
-
-    let mut points_no_dupe = vec![];
-    let first_item = points[0];
-    for p in 0..points.len() {
-        if points[p] != points[(p + 1) % points.len()] || (!polygon && p == points.len() - 1) {
-            points_no_dupe.push(points[p]);
-        }
-    }
-    points = points_no_dupe;
-
-    if points.len() <= 1 {
-        return format!("M {} {}", first_item.0, first_item.1);
-    }
-
-    let mut result = vec![];
-    let mut radii = vec![];
-    for i in 1..(points.len() - 1) {
-        let mut d1 = (points[i].0 - points[i - 1].0).hypot(points[i].1 - points[i - 1].1);
-        let mut d2 = (points[i + 1].0 - points[i].0).hypot(points[i + 1].1 - points[i].1);
-        if i != 1 || polygon {
-            d1 /= 2.0;
-        }
-        if i != points.len() - 2 || polygon {
-            d2 /= 2.0;
-        }
-        let radius = d1.min(d2).min(max_radius);
-        radii.push(radius);
-    }
-
-    let mut pos = points[0];
-
-    if polygon {
-        let last = points.len() - 1;
-        let d1 =
-            (points[last].0 - points[last - 1].0).hypot(points[last].1 - points[last - 1].1) / 2.0;
-        let d2 = (points[0].0 - points[last].0).hypot(points[0].1 - points[last].1) / 2.0;
-        let d3 = (points[1].0 - points[0].0).hypot(points[1].1 - points[0].1) / 2.0;
-        let radius = d1.min(d2).min(max_radius);
-        radii.push(radius);
-        let radius = d2.min(d3).min(max_radius);
-        radii.push(radius);
-
-        let dx = points[1].0 - pos.0;
-        let dy = points[1].1 - pos.1;
-
-        let l = dx.hypot(dy);
-
-        pos.0 += dx * radii[radii.len() - 1] / l;
-        pos.1 += dy * radii[radii.len() - 1] / l;
-    }
-
-    result.push(format!("M {} {}", pos.0, pos.1));
-
-    for i in 0..radii.len() {
-        let p1 = points[(i + 1) % points.len()];
-        let p2 = points[(i + 2) % points.len()];
-
-        let dx1 = p1.0 - pos.0;
-        let dy1 = p1.1 - pos.1;
-        let dx2 = p2.0 - p1.0;
-        let dy2 = p2.1 - p1.1;
-
-        let l1 = dx1.hypot(dy1);
-        let l2 = dx2.hypot(dy2);
-
-        pos.0 += dx1 - dx1 * radii[i] / l1;
-        pos.1 += dy1 - dy1 * radii[i] / l1;
-
-        result.push(format!("L {} {}", pos.0, pos.1));
-
-        let mut new_pos = p1;
-
-        new_pos.0 += dx2 * radii[i] / l2;
-        new_pos.1 += dy2 * radii[i] / l2;
-
-        let cos = -(dx1 * dx2 + dy1 * dy2) as f64 / (l1 * l2) as f64;
-        if (cos + 1.0).abs() <= 0.0001 || cos >= 1.0 {
-            // straight lines
-            if pos != new_pos {
-                result.push(format!("L {} {}", new_pos.0, new_pos.1));
+pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
+    let mut points: Vec<(f32, f32)>;
+    let max_radius;
+    if let (Some(r), Some(p)) = (
+        element.get_attr("corner-radius"),
+        element.get_attr("points"),
+    ) {
+        if let Ok(r) = strp(r) {
+            max_radius = r;
+            let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
+            if floats.len() % 2 == 0 {
+                points = floats.chunks(2).map(|a| (a[0], a[1])).collect();
+            } else {
+                return Err(SvgdxError::ParseError(
+                    "odd number of values in points".to_string(),
+                ));
             }
         } else {
-            let t_div_2 = ((1.0 - cos) / (1.0 + cos)).sqrt();
-
-            let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
-            let cl_str = if cl { "1" } else { "0" };
-
-            result.push(format!(
-                "a {} {} 0 0 {} {} {}",
-                radii[i] * t_div_2 as f32,
-                radii[i] * t_div_2 as f32,
-                cl_str,
-                (new_pos.0 - pos.0),
-                (new_pos.1 - pos.1)
+            return Err(SvgdxError::ParseError(
+                "corner radius is not a float".to_string(),
             ));
         }
-
-        pos = new_pos;
-    }
-    if !polygon {
-        pos = points[points.len() - 1];
-        result.push(format!("L {} {}", pos.0, pos.1));
     } else {
-        result.push("Z".to_string());
+        return Err(SvgdxError::InternalLogicError(
+            "calling points to path without checking if has points and corner-radius".to_string(),
+        ));
     }
 
-    result.as_slice().join(" ")
+    let polygon = element.name() == "polygon";
+
+    let mut result = vec![];
+    if points.is_empty() {
+        result.push(String::new());
+    } else {
+        let mut points_no_dupe = vec![];
+        let first_item = points[0];
+        for p in 0..points.len() {
+            if points[p] != points[(p + 1) % points.len()] || (!polygon && p == points.len() - 1) {
+                points_no_dupe.push(points[p]);
+            }
+        }
+        points = points_no_dupe;
+
+        if points.len() <= 1 {
+            result.push(format!("M {} {} l 0 0", first_item.0, first_item.1));
+        } else {
+            // radii coresponding to each corner
+            // may be smaller than max as if 2 adjacent points are too close
+            // then their curves would overlap resulting in obvious error
+            // decided to limit to half distance to closest neighbour as simple and often good enough
+            let mut radii = vec![];
+            for i in 1..(points.len() - 1) {
+                //           v current point considering
+                // x---------x------x
+                //  <--d1---> <-d2->
+                let mut d1 = (points[i].0 - points[i - 1].0).hypot(points[i].1 - points[i - 1].1);
+                let mut d2 = (points[i + 1].0 - points[i].0).hypot(points[i + 1].1 - points[i].1);
+
+                // if it is not a polygon then end points have no radius so dont need to share
+                // so dont half
+                if i != 1 || polygon {
+                    d1 /= 2.0;
+                }
+                if i != points.len() - 2 || polygon {
+                    d2 /= 2.0;
+                }
+                let radius = d1.min(d2).min(max_radius);
+                radii.push(radius);
+            }
+
+            // inited now because may be changed by polygon condition
+            let mut pos = points[0];
+
+            // if polygon need to add 2 more corners for each end point and join them up
+            if polygon {
+                let last = points.len() - 1;
+                // v penultimate v last  v first    v second
+                // x-------------x-------x----------x
+                //  <-----d1----> <--d2-> <---d3--->
+
+                // d1 d2 and d3 are all halved instantly as this is a polygon so nothing special about any point
+                let d1 = (points[last].0 - points[last - 1].0)
+                    .hypot(points[last].1 - points[last - 1].1)
+                    / 2.0;
+                let d2 = (points[0].0 - points[last].0).hypot(points[0].1 - points[last].1) / 2.0;
+                let d3 = (points[1].0 - points[0].0).hypot(points[1].1 - points[0].1) / 2.0;
+                let radius = d1.min(d2).min(max_radius);
+                radii.push(radius);
+                let radius = d2.min(d3).min(max_radius);
+                radii.push(radius);
+
+                // move by distance of the radius corresponding to first point along d3
+                let dx = points[1].0 - pos.0;
+                let dy = points[1].1 - pos.1;
+
+                let len = dx.hypot(dy);
+
+                pos.0 += dx * radii[radii.len() - 1] / len;
+                pos.1 += dy * radii[radii.len() - 1] / len;
+            }
+
+            // move to start
+            result.push(format!("M {} {}", pos.0, pos.1));
+
+            for i in 0..radii.len() {
+                let p1 = points[(i + 1) % points.len()];
+                let p2 = points[(i + 2) % points.len()];
+
+                // 1 is from pos to this point
+                // 2 is from this point to next point
+                let dx1 = p1.0 - pos.0;
+                let dy1 = p1.1 - pos.1;
+                let dx2 = p2.0 - p1.0;
+                let dy2 = p2.1 - p1.1;
+
+                let l1 = dx1.hypot(dy1);
+                let l2 = dx2.hypot(dy2);
+
+                // calculate where curve starts
+                pos.0 += dx1 - dx1 * radii[i] / l1;
+                pos.1 += dy1 - dy1 * radii[i] / l1;
+
+                // move there
+                result.push(format!("L {} {}", pos.0, pos.1));
+
+                let mut new_pos = p1;
+
+                // calculate where curve ends
+                new_pos.0 += dx2 * radii[i] / l2;
+                new_pos.1 += dy2 * radii[i] / l2;
+
+                // using the dot product normalised
+                // negated as one line goes into point
+                // and one line goes out
+                let cos = -(dx1 * dx2 + dy1 * dy2) as f64 / (l1 * l2) as f64;
+                // if cos ~~ -1.0 then it is a straight line the corresponding radius is inf or very large
+                // to avoid fp errors if corresponding t value > 2000 it is unlikly to work
+                // also need to check for greater than 1 due to more fp errors as that does not make sense
+                // greater than 1 still semanticly means straight line so same logic is used
+                if (cos + 1.0).abs() <= 0.0001 || cos >= 1.0 {
+                    // for tidyness
+                    if pos != new_pos {
+                        result.push(format!("L {} {}", new_pos.0, new_pos.1));
+                    }
+                } else {
+                    // this is using a t formulae
+                    // t = tan(theta/2)
+                    // cos(theta) = (1-t^2)/(1+t^2)
+                    // rearange to get t (valid for 0<=theta<pi)
+                    let t = ((1.0 - cos) / (1.0 + cos)).sqrt();
+                    // t scales the radius to get used radius
+                    // draw a kite with 2 corners being right-angles
+                    // 2 sides are equal to this radius = r
+                    // the 2 other sides are used radius = a
+                    // split the kite along diagonal so 2 right-angled triangles
+                    // it can be seen a = r*t if theta = angle between the 2 rs
+
+                    // whether it is going clockwise
+                    // calculated by taking dotproduct of d1 and (d2 rotated 90deg)
+                    // equivalent to '2d' cross product
+                    // the sign of the answer is which way it goes
+                    let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
+
+                    // the first 0 is rotation and could be any float parsable value
+                    // the second 0 is whether to do a large arc but for this we never do
+                    result.push(format!(
+                        "a {} {} 0 0 {} {} {}",
+                        radii[i] * t as f32, // radius x
+                        radii[i] * t as f32, // radius y
+                        cl as u32,           // clockwise
+                        (new_pos.0 - pos.0), // dx
+                        (new_pos.1 - pos.1), // dy
+                    ));
+                }
+
+                pos = new_pos;
+            }
+            if !polygon {
+                // move to the last point
+                pos = points[points.len() - 1];
+                result.push(format!("L {} {}", pos.0, pos.1));
+            } else {
+                // close polygon as even if in same place may look different
+                result.push("z".to_string());
+            }
+        }
+    }
+
+    // create new element and copy attrs and replace points with path attr
+    let mut new_element = SvgElement::new("path", &[]);
+    new_element = new_element.with_attrs_from(element);
+
+    new_element.pop_attr("points");
+    new_element.set_attr("d", &result.join(" "));
+
+    Ok(new_element)
 }
 
 #[cfg(test)]

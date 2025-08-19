@@ -11,7 +11,7 @@ use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
 use crate::transform::EventGen;
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ClassList, OrderIndex, StyleMap};
+use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex, StyleMap};
 
 use core::fmt::Display;
 
@@ -549,17 +549,10 @@ impl SvgElement {
             }
         }
 
-        if let (Some(r), Some(points)) = (self.pop_attr("corner-radius"), self.get_attr("points")) {
-            let floats: Vec<f32> = attr_split(points)
-                .filter_map(|a| a.parse::<f32>().ok())
-                .collect();
-            let rad = r.parse::<f32>();
-            if let (Ok(r), true) = (rad, floats.len() % 2 == 0) {
-                let points: Vec<(f32, f32)> = floats.chunks(2).map(|a| (a[0], a[1])).collect();
-
-                self.pop_attr("points");
-                self.set_attr("d", &points_to_path(points, r, self.name == "polygon"));
-                self.name = "path".to_string();
+        if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {
+            let res = points_to_path(self);
+            if let Ok(res) = res {
+                *self = res;
             }
         }
 
