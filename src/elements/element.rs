@@ -4,6 +4,7 @@ use super::{
     ReuseElement, SpecsElement, VarElement,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::elements::path::points_to_path;
 use crate::errors::{Result, SvgdxError};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
@@ -545,6 +546,13 @@ impl SvgElement {
                 return Err(SvgdxError::InvalidData(
                     "Cannot create connector".to_owned(),
                 ));
+            }
+        }
+
+        if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {
+            let res = points_to_path(self);
+            if let Ok(res) = res {
+                *self = res;
             }
         }
 
