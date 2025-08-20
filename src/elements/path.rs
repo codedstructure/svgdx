@@ -278,93 +278,68 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     }
 }
 
-fn points_to_path_draw_loop(
-    pos: &mut (f32, f32),
-    points: &[(f32, f32)],
-    radii: Vec<f32>,
-) -> Vec<String> {
-    let mut result = vec![];
-
-    // move to start
-    result.push(format!("M {} {}", fstr(pos.0), fstr(pos.1)));
-
-    for i in 0..radii.len() {
-        let p1 = points[(i + 1) % points.len()];
-        let p2 = points[(i + 2) % points.len()];
-
-        // 1 is from pos to this point
-        // 2 is from this point to next point
-        let dx1 = p1.0 - pos.0;
-        let dy1 = p1.1 - pos.1;
-        let dx2 = p2.0 - p1.0;
-        let dy2 = p2.1 - p1.1;
-
-        let l1 = dx1.hypot(dy1);
-        let l2 = dx2.hypot(dy2);
-
-        // calculate where curve starts
-        pos.0 += dx1 - dx1 * radii[i] / l1;
-        pos.1 += dy1 - dy1 * radii[i] / l1;
-
-        // move there
-        result.push(format!("L {} {}", fstr(pos.0), fstr(pos.1)));
-
-        let mut new_pos = p1;
-
-        // calculate where curve ends
-        new_pos.0 += dx2 * radii[i] / l2;
-        new_pos.1 += dy2 * radii[i] / l2;
-
-        // using the dot product normalised
-        // negated as one line goes into point
-        // and one line goes out
-        let cos = -(dx1 * dx2 + dy1 * dy2) as f64 / (l1 * l2) as f64;
-        // if cos ~~ -1.0 then it is a straight line the corresponding radius is inf or very large
-        // to avoid fp errors if corresponding t value > 2000 it is unlikly to work
-        // also need to check for greater than 1 due to more fp errors as that does not make sense
-        // greater than 1 still semanticly means straight line so same logic is used
-        if (cos + 1.0).abs() <= 0.0001 || cos >= 1.0 {
-            // for tidyness
-            if *pos != new_pos {
-                result.push(format!("L {} {}", fstr(new_pos.0), fstr(new_pos.1)));
-            }
-        } else {
-            // this is using a t formulae
-            // t = tan(theta/2)
-            // cos(theta) = (1-t^2)/(1+t^2)
-            // rearange to get t (valid for 0<=theta<pi)
-            let t = ((1.0 - cos) / (1.0 + cos)).sqrt();
-            // t scales the radius to get used radius
-            // draw a kite with 2 corners being right-angles
-            // 2 sides are equal to this radius = r
-            // the 2 other sides are used radius = a
-            // split the kite along diagonal so 2 right-angled triangles
-            // it can be seen a = r*t if theta = angle between the 2 rs
-
-            // whether it is going clockwise
-            // calculated by taking dotproduct of d1 and (d2 rotated 90deg)
-            // equivalent to '2d' cross product
-            // the sign of the answer is which way it goes
-            let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
-
-            // the first 0 is rotation and could be any float parsable value
-            // the second 0 is whether to do a large arc but for this we never do
-            if radii[i] != 0.0 {
-                result.push(format!(
-                    "a {} {} 0 0 {} {} {}",
-                    fstr(radii[i] * t as f32), // radius x
-                    fstr(radii[i] * t as f32), // radius y
-                    cl as u32,                 // clockwise
-                    fstr(new_pos.0 - pos.0),   // dx
-                    fstr(new_pos.1 - pos.1),   // dy
+pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
+    let mut points: Vec<(f32, f32)>;
+    let max_radius;
+    if let (Some(r), Some(p)) = (
+        element.get_attr("corner-radius"),
+        element.get_attr("points"),
+    ) {
+        if let Ok(r) = strp(r) {
+            max_radius = r;
+            let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
+            if floats.len() % 2 == 0 {
+                points = floats.chunks(2).map(|a| (a[0], a[1])).collect();
+            } else {
+                return Err(SvgdxError::ParseError(
+                    "odd number of values in points".to_string(),
                 ));
             }
+        } else {
+            return Err(SvgdxError::ParseError(
+                "corner radius is not a float".to_string(),
+            ));
         }
-
-        *pos = new_pos;
+    } else {
+        return Err(SvgdxError::InternalLogicError(
+            "calling points to path without checking if has points and corner-radius".to_string(),
+        ));
     }
 
-    result
+    let polygon = element.name() == "polygon";
+
+    let mut result = vec![];
+    if points.is_empty() {
+        result.push(String::new());
+    } else {
+        let mut points_no_dupe = vec![];
+        let first_item = points[0];
+        for p in 0..points.len() {
+            if points[p] != points[(p + 1) % points.len()] || (!polygon && p == points.len() - 1) {
+                points_no_dupe.push(points[p]);
+            }
+        }
+        points = points_no_dupe;
+
+        if points.len() <= 1 {
+            result.push(format!(
+                "M {} {} l 0 0",
+                fstr(first_item.0),
+                fstr(first_item.1)
+            ));
+        } else {
+            result = points_to_path_render(&points, polygon, max_radius);
+        }
+    }
+
+    // create new element and copy attrs and replace points with path attr
+    let mut new_element = SvgElement::new("path", &[]);
+    new_element = new_element.with_attrs_from(element);
+
+    new_element.pop_attr("points");
+    new_element.set_attr("d", &result.join(" "));
+
+    Ok(new_element)
 }
 
 fn points_to_path_render(points: &[(f32, f32)], polygon: bool, max_radius: f32) -> Vec<String> {
@@ -435,68 +410,93 @@ fn points_to_path_render(points: &[(f32, f32)], polygon: bool, max_radius: f32) 
     result
 }
 
-pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
-    let mut points: Vec<(f32, f32)>;
-    let max_radius;
-    if let (Some(r), Some(p)) = (
-        element.get_attr("corner-radius"),
-        element.get_attr("points"),
-    ) {
-        if let Ok(r) = strp(r) {
-            max_radius = r;
-            let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
-            if floats.len() % 2 == 0 {
-                points = floats.chunks(2).map(|a| (a[0], a[1])).collect();
-            } else {
-                return Err(SvgdxError::ParseError(
-                    "odd number of values in points".to_string(),
+fn points_to_path_draw_loop(
+    pos: &mut (f32, f32),
+    points: &[(f32, f32)],
+    radii: Vec<f32>,
+) -> Vec<String> {
+    let mut result = vec![];
+
+    // move to start
+    result.push(format!("M {} {}", fstr(pos.0), fstr(pos.1)));
+
+    for i in 0..radii.len() {
+        let p1 = points[(i + 1) % points.len()];
+        let p2 = points[(i + 2) % points.len()];
+
+        // 1 is from pos to this point
+        // 2 is from this point to next point
+        let dx1 = p1.0 - pos.0;
+        let dy1 = p1.1 - pos.1;
+        let dx2 = p2.0 - p1.0;
+        let dy2 = p2.1 - p1.1;
+
+        let len1 = dx1.hypot(dy1);
+        let len2 = dx2.hypot(dy2);
+
+        // calculate where curve starts
+        pos.0 += dx1 - dx1 * radii[i] / len1;
+        pos.1 += dy1 - dy1 * radii[i] / len1;
+
+        // move there
+        result.push(format!("L {} {}", fstr(pos.0), fstr(pos.1)));
+
+        let mut new_pos = p1;
+
+        // calculate where curve ends
+        new_pos.0 += dx2 * radii[i] / len2;
+        new_pos.1 += dy2 * radii[i] / len2;
+
+        // using the dot product normalised
+        // negated as one line goes into point
+        // and one line goes out
+        let cos = -(dx1 * dx2 + dy1 * dy2) as f64 / (len1 * len2) as f64;
+        // if cos ~~ -1.0 then it is a straight line the corresponding radius is inf or very large
+        // to avoid fp errors if corresponding t value > 2000 it is unlikly to work
+        // also need to check for greater than 1 due to more fp errors as that does not make sense
+        // greater than 1 still semanticly means straight line so same logic is used
+        if (cos + 1.0).abs() <= 0.0001 || cos >= 1.0 {
+            // for tidyness
+            if *pos != new_pos {
+                result.push(format!("L {} {}", fstr(new_pos.0), fstr(new_pos.1)));
+            }
+        } else {
+            // this is using a t formulae
+            // t = tan(theta/2)
+            // cos(theta) = (1-t^2)/(1+t^2)
+            // rearange to get t (valid for 0<=theta<pi)
+            let t = ((1.0 - cos) / (1.0 + cos)).sqrt();
+            // t scales the radius to get used radius
+            // draw a kite with 2 corners being right-angles
+            // 2 sides are equal to this radius = r
+            // the 2 other sides are used radius = a
+            // split the kite along diagonal so 2 right-angled triangles
+            // it can be seen a = r*t if theta = angle between the 2 rs
+
+            // whether it is going clockwise
+            // calculated by taking dotproduct of d1 and (d2 rotated 90deg)
+            // equivalent to '2d' cross product
+            // the sign of the answer is which way it goes
+            let cl = (dx1 * dy2 - dy1 * dx2) > 0.0;
+
+            // the first 0 is rotation and could be any float parsable value
+            // the second 0 is whether to do a large arc but for this we never do
+            if radii[i] != 0.0 {
+                result.push(format!(
+                    "a {} {} 0 0 {} {} {}",
+                    fstr(radii[i] * t as f32), // radius x
+                    fstr(radii[i] * t as f32), // radius y
+                    cl as u32,                 // clockwise
+                    fstr(new_pos.0 - pos.0),   // dx
+                    fstr(new_pos.1 - pos.1),   // dy
                 ));
             }
-        } else {
-            return Err(SvgdxError::ParseError(
-                "corner radius is not a float".to_string(),
-            ));
         }
-    } else {
-        return Err(SvgdxError::InternalLogicError(
-            "calling points to path without checking if has points and corner-radius".to_string(),
-        ));
+
+        *pos = new_pos;
     }
 
-    let polygon = element.name() == "polygon";
-
-    let mut result = vec![];
-    if points.is_empty() {
-        result.push(String::new());
-    } else {
-        let mut points_no_dupe = vec![];
-        let first_item = points[0];
-        for p in 0..points.len() {
-            if points[p] != points[(p + 1) % points.len()] || (!polygon && p == points.len() - 1) {
-                points_no_dupe.push(points[p]);
-            }
-        }
-        points = points_no_dupe;
-
-        if points.len() <= 1 {
-            result.push(format!(
-                "M {} {} l 0 0",
-                fstr(first_item.0),
-                fstr(first_item.1)
-            ));
-        } else {
-            result = points_to_path_render(&points, polygon, max_radius);
-        }
-    }
-
-    // create new element and copy attrs and replace points with path attr
-    let mut new_element = SvgElement::new("path", &[]);
-    new_element = new_element.with_attrs_from(element);
-
-    new_element.pop_attr("points");
-    new_element.set_attr("d", &result.join(" "));
-
-    Ok(new_element)
+    result
 }
 
 #[cfg(test)]
