@@ -212,3 +212,49 @@ fn test_style_vars() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_style);
 }
+
+#[test]
+fn test_inline_styles() {
+    let input = r#"
+<svg><config auto-style-mode="inline"/>
+<rect wh="10" class="d-fill-blue"/>
+</svg>
+"#;
+    let expected_style = r#"fill: blue;"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_style);
+}
+
+#[test]
+fn test_inline_style_priority() {
+    let input = r#"
+<svg><config auto-style-mode="inline"/>
+<rect wh="10" class="d-fill-blue d-fill-red"/>
+</svg>
+"#;
+    // last class wins
+    let expected_style = r#"fill: red;"#;
+    let unexpected_style = r#"fill: blue;"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_style);
+    assert_not_contains!(output, unexpected_style);
+}
+
+#[test]
+fn test_inline_style_reuse() {
+    let input = r##"
+<svg><config auto-style-mode="inline"/>
+<specs><rect id="a" wh="10" class="d-fill-blue"/></specs>
+<reuse id="b" href="#a"/>
+<reuse id="c" href="#a" class="d-fill-red"/>
+</svg>
+"##;
+    // local style & class should override any template style
+    let output = transform_str_default(input).unwrap();
+    let lines = output.lines().collect::<Vec<&str>>();
+    let line_b = lines.iter().find(|l| l.contains(r#"<rect id="b""#)).unwrap();
+    let line_c = lines.iter().find(|l| l.contains(r#"<rect id="c""#)).unwrap();
+    assert_contains!(line_b, "fill: blue;");
+    assert_contains!(line_c, "fill: red;");
+    assert_not_contains!(line_c, "fill: blue;");
+}

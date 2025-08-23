@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: last class has priority in conflicting styles (e.g. multiple
+  d-fill-COLOUR classes). This is useful in letting `<reuse>` element local
+  classes override the source element.
+
 ## [0.22.1 - 2025-08-10]
 
 - Fixed: make `AutoStyleTheme` and `ThemeType` public.

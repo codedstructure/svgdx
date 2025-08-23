@@ -99,8 +99,10 @@ impl Selector {
                 None
             }
             Selector::Class(mt) => {
-                for class in classes {
-                    if let Some(mr) = mt.matches_class(&class) {
+                // Reverse order so later classes override earlier ones,
+                // useful in `<reuse>` elements.
+                for class in classes.iter().rev() {
+                    if let Some(mr) = mt.matches_class(class) {
                         return Some(Selected::Class(mr));
                     }
                 }
