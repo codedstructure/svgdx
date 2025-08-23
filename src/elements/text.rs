@@ -140,14 +140,19 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = element
+    if let Some((mut tdx, mut tdy)) = element
         .bbox()?
         .ok_or_else(|| SvgdxError::MissingBoundingBox(element.to_string()))?
-        .locspec(text_anchor);
-    tdx += t_dx;
-    tdy += t_dy;
-
-    Ok((tdx, tdy, outside, text_anchor, text_classes))
+        .locspec(text_anchor)
+    {
+        tdx += t_dx;
+        tdy += t_dy;
+        Ok((tdx, tdy, outside, text_anchor, text_classes))
+    } else {
+        Err(SvgdxError::InvalidData(
+            "trying to use lineoffset on text element not supported yet".to_string(),
+        ))
+    }
 }
 
 pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
