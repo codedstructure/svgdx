@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: reuse positioning much improved when used with relative (previous /
+  next) elrefs. Various code simplifications result from this change, which
+  makes heavier use of order-index values throughout the code.
+
+- Added: basic support for positioning `<g>` elements through `x`, `y` and `xy`
+  attributes, similar to `<use>` elements. `<g>` elements are positioned with a
+  `transform="translate(...)"` attribute.
+
 - Fixed: last class has priority in conflicting styles (e.g. multiple
   d-fill-COLOUR classes). This is useful in letting `<reuse>` element local
   classes override the source element.
