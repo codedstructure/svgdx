@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.2 - 2025-08-29]
+
 - Fixed: reuse positioning much improved when used with relative (previous /
   next) elrefs. Various code simplifications result from this change, which
   makes heavier use of order-index values throughout the code.
