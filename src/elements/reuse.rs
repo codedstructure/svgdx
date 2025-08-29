@@ -39,15 +39,8 @@ impl EventGen for ReuseElement {
             .inspect_err(|_| {
                 context.pop_element();
             })?;
-        // TODO: this replicates some of the logic from OtherElement::generate_events()
-        // but maybe should just generate the inner events first rather than later in
-        // this function? The current approach assumes that we can't generate events
-        // until we know position, which is true for 'simple' elements, but not for
-        // containers, where we use transform on the outer element. Potentially we could
-        // wrap *every* rendered reuse instance in a <g> element with a transform...
-        // (not keen...)
+
         instance_element.set_order_index(&reuse_element.order_index);
-        context.set_current_element(&instance_element);
         instance_element
             .resolve_position(context)
             .inspect_err(|_| {
@@ -56,6 +49,7 @@ impl EventGen for ReuseElement {
         instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
+
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {
             match attr.as_str() {
@@ -93,7 +87,7 @@ impl EventGen for ReuseElement {
             }
         }
 
-        // if referenced by an ElRef::Id (rather than Prev), will have an `id`
+        // if referenced by an ElRef::Id (rather than Prev/Next), will have an `id`
         // attribute (which it was referenced by) but the new instance should
         // not have this to avoid multiple elements with the same id.
         // We remove it here and re-add as a class.
@@ -118,8 +112,6 @@ impl EventGen for ReuseElement {
         if instance_element.name() == "symbol" {
             instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
         }
-
-        context.update_element(&instance_element);
 
         let res = if let (false, Some((start, end))) = (
             instance_element.is_empty_element(),

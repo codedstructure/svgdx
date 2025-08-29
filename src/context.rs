@@ -158,6 +158,8 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
+    #[allow(unused_variables)]
+    fn set_current_element(&mut self, el: &SvgElement) {}
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
@@ -174,6 +176,14 @@ pub trait VariableMap {
 pub trait ContextView: ElementMap + VariableMap {}
 
 impl ElementMap for TransformerContext {
+    /// mark the current element as being processed.
+    ///
+    /// used when determining relative ElRef offsets.
+    fn set_current_element(&mut self, el: &SvgElement) {
+        self.current_index = el.order_index.clone();
+        self.index_map.insert(el.order_index.clone(), el.clone());
+    }
+
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.elem_map.get(id),
@@ -196,10 +206,6 @@ impl ElementMap for TransformerContext {
         // of a hack. In particular using `id` or `href` is insufficient, as doesn't
         // cope with '^' where the target might not even have an id. Would be better
         // to assign a dedicated internal ID to every element and use that.
-        // TODO: in addition to the above, '^' is already broken since it doesn't get
-        // captured in the 'remain' thing for deferred elements, and is always the same
-        // element as evaluated here. Probably need to store a 'prev' (and later, 'next')
-        // internal ID with each element so can follow a chain of these.
         let mut seen: Vec<OrderIndex> = vec![];
         let mut element = el;
 
@@ -485,14 +491,6 @@ impl TransformerContext {
             }
         }
         self.set_current_element(el);
-    }
-
-    /// mark the current element as being processed.
-    ///
-    /// used when determining relative ElRef offsets.
-    pub fn set_current_element(&mut self, el: &SvgElement) {
-        self.current_index = el.order_index.clone();
-        self.index_map.insert(el.order_index.clone(), el.clone());
     }
 
     fn get_element_offset(&self, offset: isize) -> Option<&SvgElement> {

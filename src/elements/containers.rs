@@ -53,10 +53,8 @@ impl EventGen for Container {
                     // TODO: this duplicates part of the `OtherElement::generate_events`
                     // logic; should really be based on graphics vs container element
                     // rather than whether the XML element is empty or not.
-                    context.set_current_element(&new_el);
                     new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
                     new_el.transmute(context)?;
-                    context.update_element(&new_el);
                     bbox = new_el.bbox()?;
                 }
 
@@ -134,11 +132,7 @@ impl EventGen for GroupElement {
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
-
-        // need to ensure '^' etc are relative to this element...
-        context.set_current_element(&new_el);
         new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
-
         new_el.handle_rotation()?;
 
         let mut events = OutputList::new();

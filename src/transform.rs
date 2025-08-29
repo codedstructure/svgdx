@@ -101,11 +101,6 @@ fn process_tags(
     while !tags.is_empty() && remain.len() != tags.len() {
         for t in &mut tags.iter_mut() {
             let el = t.get_element_mut().cloned();
-            // update early so reuse targets are available even if the element
-            // is not ready (e.g. within a specs block)
-            if let Some(ref el) = el {
-                context.update_element(el);
-            }
             let gen_result = t.generate_events(context);
             if !context.in_specs {
                 let idx = t.get_order_index();

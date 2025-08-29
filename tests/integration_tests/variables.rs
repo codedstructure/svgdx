@@ -104,10 +104,11 @@ fn test_var_indirect() {
 
 #[test]
 fn test_var_reuse() {
+    // NOTE: use of `rr` because `r` is a layout attribute.
     let input = r##"
 <var p="4"/>
-<g id="group1" q="8" r="9">
-<rect wh="10" text="$p-$q-$r"/>
+<g id="group1" q="8" rr="9">
+<rect wh="10" text="$p-$q-$rr"/>
 </g>
 <reuse href="#group1" p="3"/>
 "##;
