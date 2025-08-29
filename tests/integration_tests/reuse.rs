@@ -130,13 +130,13 @@ fn test_reuse_positioning() {
         ),
         (
             // Reuse of group element inside <specs> block
-            r##"<specs><g id="a7"><rect wh="10 5"/></g></specs><reuse href="#a7" x="1" y="2"/>"##,
-            r##"<g transform="translate(1, 2)" class="a7"><rect width="10" height="5"/></g>"##,
+            r##"<specs><g id="a8"><rect wh="10 5"/></g></specs><reuse href="#a8" x="1" y="2"/>"##,
+            r##"<g transform="translate(1, 2)" class="a8"><rect width="10" height="5"/></g>"##,
         ),
         (
             // Relspec (#id|h) in <reuse> element
-            r##"<specs><rect id="a6" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a6" xy="#b|h"/>"##,
-            r##"<rect x="3" y="1" width="1" height="1" class="a6"/>"##,
+            r##"<specs><rect id="a9" wh="1"/></specs><rect id="b" wh="3"/><reuse href="#a9" xy="#b|h"/>"##,
+            r##"<rect x="3" y="1" width="1" height="1" class="a9"/>"##,
         ),
     ] {
         let output = transform_str_default(input).unwrap();
@@ -671,6 +671,96 @@ fn test_reuse_path_refvar() {
 "##;
     let expected1 = r#"<path d="M0 0 l1.414 -1.414l1.414 1.414l-1.414 1.414z" class="diamond"/>"#;
     let expected2 = r#"<text x="1.414" y="0" class="d-text diamond">ok?</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_reuse_orderindex_1() {
+    let input = r##"
+<defs>
+<symbol id="a">
+</symbol>
+</defs>
+<reuse id="z" href="#a"/>
+"##;
+    let expected = r#"<g id="z" class="a">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_reuse_orderindex_2() {
+    let input = r##"
+<defs>
+<symbol id="a">
+<rect wh="1"/><rect xy="^|h" wh="1"/>
+</symbol>
+</defs>
+<reuse id="z" href="#a"/>
+<rect id="z1" surround="^"/>
+"##;
+    let expected = r#"<rect id="z1" x="0" y="0" width="2" height="1""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_reuse_orderindex_3() {
+    let input = r##"
+<specs>
+<symbol id="a">
+<rect wh="1"/><rect xy="^|h" wh="1"/>
+</symbol>
+<symbol id="b">
+<rect wh="1"/><rect xy="^|h" wh="1"/>
+</symbol>
+</specs>
+<reuse id="z" href="#a"/>
+<reuse id="z1" href="#b" xy="#z|v"/>
+<rect id="z2" surround="#z1"/>
+"##;
+    let expected1 = r#"<g id="z1" transform="translate(0, 1)""#;
+    let expected2 = r#"<rect id="z2" x="0" y="1" width="2" height="1""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_reuse_orderindex_4() {
+    let input = r##"
+<specs>
+<symbol id="a">
+<rect wh="1"/><rect xy="^|h" wh="1"/>
+</symbol>
+</specs>
+<reuse id="z" href="#a"/>
+<reuse id="z1" href="#a" xy="#z|v"/>
+<rect id="z2" surround="#z1"/>
+"##;
+    let expected1 = r#"<g id="z1" transform="translate(0, 1)""#;
+    let expected2 = r#"<rect id="z2" x="0" y="1" width="2" height="1""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_reuse_orderindex_5() {
+    let input = r##"
+<specs>
+<symbol id="a">
+<rect wh="1"/><rect xy="^|h" wh="1"/>
+</symbol>
+</specs>
+<reuse id="z" href="#a"/>
+<reuse id="z1" href="#a" xy="^|v"/>
+<rect id="z2" surround="^"/>
+"##;
+    let expected1 = r#"<g id="z1" transform="translate(0, 1)""#;
+    let expected2 = r#"<rect id="z2" x="0" y="1" width="2" height="1""#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);

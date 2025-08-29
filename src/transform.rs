@@ -72,16 +72,16 @@ impl EventGen for Tag {
                     events.push(OutputEvent::Text(tail.to_owned()));
                 }
             }
-            Tag::Comment(c, tail) => {
+            Tag::Comment(_, c, tail) => {
                 events.push(OutputEvent::Comment(c.clone()));
                 if let Some(tail) = tail {
                     events.push(OutputEvent::Text(tail.to_owned()));
                 }
             }
-            Tag::Text(t) => {
+            Tag::Text(_, t) => {
                 events.push(OutputEvent::Text(t.clone()));
             }
-            Tag::CData(c) => {
+            Tag::CData(_, c) => {
                 events.push(OutputEvent::CData(c.clone()));
             }
         }
@@ -90,40 +90,25 @@ impl EventGen for Tag {
 }
 
 fn process_tags(
-    tags: &mut Vec<(OrderIndex, Tag)>,
+    tags: &mut Vec<Tag>,
     context: &mut TransformerContext,
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
     bbb: &mut BoundingBoxBuilder,
-    oi_base: Option<OrderIndex>,
 ) -> Result<Option<BoundingBox>> {
     let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
     let remain = &mut Vec::new();
 
-    let tag_oi = |idx: &OrderIndex| {
-        oi_base
-            .as_ref()
-            .map(|base| base.with_sub_index(idx))
-            .unwrap_or_else(|| idx.clone())
-    };
-
-    for (idx, t) in tags.iter_mut() {
-        if let Some(el) = t.get_element_mut() {
+    while !tags.is_empty() && remain.len() != tags.len() {
+        for t in &mut tags.iter_mut() {
+            let el = t.get_element_mut().cloned();
             // update early so reuse targets are available even if the element
             // is not ready (e.g. within a specs block)
-            el.set_order_index(&tag_oi(idx));
-            context.update_element(el);
-        }
-    }
-
-    while !tags.is_empty() && remain.len() != tags.len() {
-        for (idx, t) in &mut tags.iter_mut() {
-            let (el, idx) = if let Some(el) = t.get_element_mut() {
-                (Some(el.clone()), el.order_index.clone())
-            } else {
-                (None, tag_oi(idx))
-            };
+            if let Some(ref el) = el {
+                context.update_element(el);
+            }
             let gen_result = t.generate_events(context);
             if !context.in_specs {
+                let idx = t.get_order_index();
                 // if we *are* in a specs block, we don't care if there were errors;
                 // a specs entry may have insufficient context until reuse time.
                 // We do still call generate_events for side-effects including registering
@@ -145,7 +130,7 @@ fn process_tags(
                             element_errors.insert(idx.clone(), (el, err));
                         }
                     }
-                    remain.push((idx, t.clone()));
+                    remain.push(t.clone());
                 }
             }
         }
@@ -163,14 +148,6 @@ pub fn process_events(
     input: impl Into<InputList>,
     context: &mut TransformerContext,
 ) -> Result<(OutputList, Option<BoundingBox>)> {
-    process_events_with_index(input, context, None)
-}
-
-pub fn process_events_with_index(
-    input: impl Into<InputList>,
-    context: &mut TransformerContext,
-    oi_base: Option<OrderIndex>,
-) -> Result<(OutputList, Option<BoundingBox>)> {
     let input = input.into();
     if is_real_svg(&input) {
         if context.get_top_element().is_none() {
@@ -183,12 +160,8 @@ pub fn process_events_with_index(
     let mut idx_output = BTreeMap::<OrderIndex, OutputList>::new();
 
     let mut bbb = BoundingBoxBuilder::new();
-    let mut tags = tagify_events(input)?
-        .iter()
-        .enumerate()
-        .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
-        .collect::<Vec<_>>();
-    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb, oi_base)?;
+    let mut tags = tagify_events(input)?;
+    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb)?;
 
     for (_idx, events) in idx_output {
         output.extend(events);
@@ -510,45 +483,6 @@ mod tests {
         let seq = InputList::new();
 
         process_events(seq, &mut transformer.context).unwrap();
-    }
-
-    #[test]
-    fn test_process_tags_multiple_elements() {
-        let mut transformer = Transformer::from_config(&TransformConfig::default());
-        let mut idx_output = BTreeMap::new();
-
-        let seq = InputList::from_str(
-            r##"<svg>
-          <rect xy="#a|h" wh="10"/>
-          <circle id="a" cx="50" cy="50" r="40"/>
-        </svg>"##,
-        )
-        .unwrap();
-
-        transformer.context.set_events(seq.events.clone());
-        let mut tags = tagify_events(seq)
-            .unwrap()
-            .iter()
-            .enumerate()
-            .map(|(idx, el)| (OrderIndex::new(idx), el.clone()))
-            .collect::<Vec<_>>();
-        let bbb = &mut BoundingBoxBuilder::new();
-
-        let result = process_tags(
-            &mut tags,
-            &mut transformer.context,
-            &mut idx_output,
-            bbb,
-            None,
-        );
-        assert!(result.is_ok());
-
-        // let ok_ev_count = idx_output
-        //     .iter()
-        //     .map(|entry| entry.1.events.len())
-        //     .reduce(|a, b| a + b)
-        //     .unwrap();
-        // assert_eq!(ok_ev_count, 7);
     }
 
     #[test]

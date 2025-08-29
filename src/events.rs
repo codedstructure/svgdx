@@ -204,6 +204,7 @@ impl InputList {
                         indent,
                         alt_idx: start_idx,
                     });
+                    order.step();
                 }
                 e => {
                     events.push(InputEvent {
@@ -223,6 +224,12 @@ impl InputList {
             buf.clear();
         }
 
+        // println!("event list:");
+        // for ev in &events {
+        //     println!(" {}: {:?}", ev.order.to_string(), ev.event);
+        // }
+        // println!("");
+
         Ok(Self { events })
     }
 
@@ -231,17 +238,48 @@ impl InputList {
             events: self.events[start..end].to_vec(),
         }
     }
+
+    pub fn rebase_index(&mut self, oi_base: OrderIndex) {
+        // replace all order indices of events such that the first event is `oi_base`
+        let mut oi = oi_base.clone();
+        for ev in &mut self.events {
+            match &ev.event {
+                Event::Start(_) => {
+                    ev.order = oi.clone();
+                    oi.down();
+                }
+                // end events will have the same order index as the start event,
+                // but should never have their order index used...
+                Event::End(_) => {
+                    oi.up();
+                    ev.order = oi.clone();
+                    oi.step();
+                }
+                _ => {
+                    ev.order = oi.clone();
+                    oi.step();
+                }
+            }
+        }
+    }
+
+    pub fn rebase_under(&mut self, oi_base: OrderIndex) {
+        // replace all order indices of events to be under `oi_base`
+        let mut oi = oi_base.clone();
+        oi.down();
+        self.rebase_index(oi);
+    }
 }
 
 #[derive(Debug, Clone)]
 pub enum Tag {
     /// Represents a Start..End block and all events in between
-    Compound(SvgElement, Option<String>),
+    Compound(SvgElement, Option<String>), // element, tail
     /// Represents a single Empty element
-    Leaf(SvgElement, Option<String>),
-    Comment(String, Option<String>),
-    Text(String),
-    CData(String),
+    Leaf(SvgElement, Option<String>), // element, tail
+    Comment(OrderIndex, String, Option<String>), // comment, tail
+    Text(OrderIndex, String),
+    CData(OrderIndex, String),
 }
 
 impl Tag {
@@ -249,8 +287,18 @@ impl Tag {
         match self {
             Tag::Compound(_, tail) => *tail = Some(text),
             Tag::Leaf(_, tail) => *tail = Some(text),
-            Tag::Comment(_, tail) => *tail = Some(text),
+            Tag::Comment(_, _, tail) => *tail = Some(text),
             _ => {}
+        }
+    }
+
+    pub fn get_order_index(&self) -> OrderIndex {
+        match self {
+            Tag::Compound(el, _) => el.order_index.clone(),
+            Tag::Leaf(el, _) => el.order_index.clone(),
+            Tag::Comment(oi, _, _) => oi.clone(),
+            Tag::Text(oi, _) => oi.clone(),
+            Tag::CData(oi, _) => oi.clone(),
         }
     }
 
@@ -308,14 +356,14 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
             }
             Event::Comment(c) => {
                 let text = String::from_utf8(c.to_vec())?;
-                tags.push(Tag::Comment(text, None));
+                tags.push(Tag::Comment(input_ev.order.clone(), text, None));
             }
             Event::Text(t) => {
                 let text = String::from_utf8(t.to_vec())?;
                 if let Some(t) = tags.last_mut() {
                     t.set_text(text)
                 } else {
-                    tags.push(Tag::Text(text));
+                    tags.push(Tag::Text(input_ev.order.clone(), text));
                 }
             }
             Event::CData(c) => {
@@ -323,7 +371,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 if let Some(t) = tags.last_mut() {
                     t.set_text(text)
                 } else {
-                    tags.push(Tag::CData(text));
+                    tags.push(Tag::CData(input_ev.order.clone(), text));
                 }
             }
             _ => {

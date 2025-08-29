@@ -252,8 +252,14 @@ fn test_inline_style_reuse() {
     // local style & class should override any template style
     let output = transform_str_default(input).unwrap();
     let lines = output.lines().collect::<Vec<&str>>();
-    let line_b = lines.iter().find(|l| l.contains(r#"<rect id="b""#)).unwrap();
-    let line_c = lines.iter().find(|l| l.contains(r#"<rect id="c""#)).unwrap();
+    let line_b = lines
+        .iter()
+        .find(|l| l.contains(r#"<rect id="b""#))
+        .unwrap();
+    let line_c = lines
+        .iter()
+        .find(|l| l.contains(r#"<rect id="c""#))
+        .unwrap();
     assert_contains!(line_b, "fill: blue;");
     assert_contains!(line_c, "fill: red;");
     assert_not_contains!(line_c, "fill: blue;");

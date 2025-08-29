@@ -484,6 +484,13 @@ impl TransformerContext {
                 self.original_map.insert(id, el.clone());
             }
         }
+        self.set_current_element(el);
+    }
+
+    /// mark the current element as being processed.
+    ///
+    /// used when determining relative ElRef offsets.
+    pub fn set_current_element(&mut self, el: &SvgElement) {
         self.current_index = el.order_index.clone();
         self.index_map.insert(el.order_index.clone(), el.clone());
     }
