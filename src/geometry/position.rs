@@ -312,11 +312,14 @@ impl Position {
                 xy_xfrm = format!("{exist_xfrm} {xy_xfrm}");
             }
             element.set_attr("transform", &xy_xfrm);
-            element.remove_attrs(&[
-                "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "rx", "ry",
-                "r", "width", "height",
-            ]);
         }
+        // assumes element is g/path/polyline/polygon etc where these attrs
+        // have no meaning.
+        // NOTE: don't try and use variables with these names!
+        element.remove_attrs(&[
+            "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "cx", "cy", "rx", "ry", "r",
+            "width", "height",
+        ]);
     }
 }
 

@@ -227,3 +227,24 @@ fn test_next_el_group() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_group_position() {
+    let input = r#"
+<g xy="1"><rect wh="1"/></g>
+"#;
+    let expected1 = r#"<g transform="translate(1, 1)">"#;
+    let expected2 = r#"<rect width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r#"
+<g xy="1 3"><rect xy="10" wh="1"/></g>
+"#;
+    let expected1 = r#"<g transform="translate(1, 3)">"#;
+    let expected2 = r#"<rect x="10" y="10" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

@@ -160,7 +160,10 @@ impl SvgElement {
         None
     }
 
-    pub fn resolve_position(&mut self, ctx: &impl ContextView) -> Result<()> {
+    pub fn resolve_position(&mut self, ctx: &mut impl ContextView) -> Result<()> {
+        // Ensure relative ElRef offsets are resolved wrt this element
+        ctx.set_current_element(self);
+
         // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
         // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
         // moved out of this function and called once per element (or this function
@@ -197,15 +200,6 @@ impl SvgElement {
         // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
         expand_compound_pos(self);
         eval_rel_attributes(self, ctx)?;
-
-        // if let ("polyline" | "polygon", Some(points)) =
-        //     (self.name.as_str(), self.get_attr("points"))
-        // {
-        //     self.set_attr("points", &expand_relspec(&points, ctx));
-        // }
-        // if let ("path", Some(d)) = (self.name.as_str(), self.get_attr("d")) {
-        //     self.set_attr("d", &expand_relspec(&d, ctx));
-        // }
 
         let mut p = Position::try_from(self as &SvgElement)?;
         if self.name() == "use" {

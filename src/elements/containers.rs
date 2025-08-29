@@ -3,7 +3,7 @@ use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::events::{OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events_with_index, EventGen};
+use crate::transform::{process_events, EventGen};
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
@@ -55,7 +55,6 @@ impl EventGen for Container {
                     // rather than whether the XML element is empty or not.
                     new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
                     new_el.transmute(context)?;
-                    context.update_element(&new_el);
                     bbox = new_el.bbox()?;
                 }
 
@@ -74,8 +73,9 @@ impl EventGen for Container {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
-                    let oi_base = Some(new_el.order_index.clone());
-                    process_events_with_index(inner_events, context, oi_base)?
+                    let mut inner_events = inner_events.clone();
+                    inner_events.rebase_under(new_el.order_index.clone());
+                    process_events(inner_events, context)?
                 };
                 events.extend(evlist);
                 events.push(OutputEvent::End(self.0.name().to_owned()));
@@ -118,8 +118,9 @@ impl EventGen for GroupElement {
         let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
             // get the inner events / bbox first, as some outer element attrs
             // (e.g. `transform` via rotate) may depend on the bbox.
-            let oi_base = Some(new_el.order_index.clone());
-            process_events_with_index(inner_events, context, oi_base).inspect_err(|_| {
+            let mut inner_events = inner_events.clone();
+            inner_events.rebase_under(new_el.order_index.clone());
+            process_events(inner_events, context).inspect_err(|_| {
                 context.pop_element();
             })?
         } else {
@@ -131,6 +132,7 @@ impl EventGen for GroupElement {
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
+        new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
         new_el.handle_rotation()?;
 
         let mut events = OutputList::new();

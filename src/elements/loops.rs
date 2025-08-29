@@ -4,7 +4,7 @@ use crate::errors::{Result, SvgdxError};
 use crate::events::OutputList;
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
-use crate::transform::{process_events_with_index, EventGen};
+use crate::transform::{process_events, EventGen};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -103,8 +103,9 @@ impl EventGen for LoopElement {
                 // Each iteration needs different order indices on elements, so e.g.
                 // ElRef::Prev isn't identical for each iteration.
                 let iter_oi = event_element.order_index.with_index(iteration as usize);
-                let (ev_list, ev_bbox) =
-                    process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
+                let mut inner_events = inner_events.clone();
+                inner_events.rebase_under(iter_oi);
+                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
                 gen_events.extend(ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
@@ -181,8 +182,9 @@ impl EventGen for ForElement {
                     context.set_var(idx_name, &idx.to_string());
                 }
                 let iter_oi = event_element.order_index.with_index(idx as usize);
-                let (ev_list, ev_bbox) =
-                    process_events_with_index(inner_events.clone(), context, Some(iter_oi))?;
+                let mut inner_events = inner_events.clone();
+                inner_events.rebase_under(iter_oi);
+                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
                 gen_events.extend(ev_list);
                 if let Some(bb) = ev_bbox {
                     bbox.extend(bb);
