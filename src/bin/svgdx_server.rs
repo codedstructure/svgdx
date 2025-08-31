@@ -40,9 +40,7 @@ async fn main() {
         tokio::spawn(async move {
             // Wait for server to start listening
             if rx.recv().await.is_some() {
-                // webbrowser is quite heavyweight, but avoids needing to deal with
-                // a bunch of command-injection issues when using e.g. `xdg-open`.
-                webbrowser::open(&format!("http://{address}"))
+                open::that(format!("http://{address}"))
                     .unwrap_or_else(|e| eprintln!("Failed to open browser: {e}"));
             }
         });

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- svgdx-server: replace `webbrowser` crate with the lighter `open` crate.
+
 ## [0.22.2 - 2025-08-29]
 
 - Fixed: reuse positioning much improved when used with relative (previous /

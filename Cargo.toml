@@ -13,7 +13,7 @@ exclude = ["/examples", "/docs"]
 [features]
 default = ["cli", "server"]
 cli = ["shlex", "notify", "notify-debouncer-mini", "clap", "tempfile"]
-server = ["axum", "clap", "hyper", "serde", "serde_derive", "tokio", "webbrowser"]
+server = ["axum", "clap", "hyper", "serde", "serde_derive", "tokio", "open"]
 
 [dependencies]
 quick-xml = "0.38.0"
@@ -32,7 +32,7 @@ hyper = { version = "1.3", optional = true }
 serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 tokio = { version = "1.44", features = ["macros", "rt-multi-thread", "fs"], optional = true }
-webbrowser = { version = "1.0.3", features = ["hardened", "disable-wsl"], optional = true }
+open = { version = "5.3.2", optional = true }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
