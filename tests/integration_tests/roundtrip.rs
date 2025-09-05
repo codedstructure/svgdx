@@ -1,3 +1,4 @@
+use assertables::{assert_contains, assert_not_contains};
 use svgdx::transform_str_default;
 
 #[test]
@@ -130,4 +131,62 @@ fn test_roundtrip_svg_percent() {
 "##;
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, input);
+}
+
+#[test]
+fn test_roundtrip_style() {
+    // tests the partial-escaping used in text events;
+    // quotes should not be escaped, but > should be.
+    // CSS styles are just one use of this.
+    let inner = r##"<style>
+    text { font-family: "Times New Roman", serif; font-size: 12px; }
+    text tspan { fill: #0000ff; }
+    .red { fill: #ff0000; }
+  </style>"##;
+    let input = format!(
+        r##"
+<svg>
+  {inner}
+</svg>
+"##
+    );
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, inner);
+    assert_not_contains!(output, "&gt;");
+
+    // if using '>' in CSS, it will be escaped - should really
+    // use CDATA for this.
+    let inner = r##"<style>
+    text { font-family: "Times New Roman", serif; font-size: 12px; }
+    text > tspan { fill: #0000ff; }
+    .red { fill: #ff0000; }
+  </style>"##;
+    let input = format!(
+        r##"
+<svg>
+  {inner}
+</svg>
+"##
+    );
+    let output = transform_str_default(input).unwrap();
+    assert_not_contains!(output, inner);
+    assert_contains!(output, "text &gt; tspan");
+
+    // check CDATA does preserve the '>'
+    let inner = r##"<style>
+    <![CDATA[
+    text { font-family: "Times New Roman", serif; font-size: 12px; }
+    text > tspan { fill: #0000ff; }
+    .red { fill: #ff0000; }
+    ]]>
+  </style>"##;
+    let input = format!(
+        r##"
+<svg>
+  {inner}
+</svg>
+"##
+    );
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, inner);
 }

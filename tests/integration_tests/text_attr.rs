@@ -269,7 +269,7 @@ fn test_text_cdata() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text">
-<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print(&quot;Hello World!&quot;)</tspan>
+<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print("Hello World!")</tspan>
 </text>
 "#;
     let expected = expected.replace('Z', "\u{200b}");
@@ -298,7 +298,7 @@ fn test_text_cdata_pre() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text d-text-pre">
-<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint(&quot;HelloNWorld!&quot;)</tspan>
+<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint("HelloNWorld!")</tspan>
 </text>
 "#;
     let expected = expected.replace('N', "\u{a0}").replace('Z', "\u{200b}");

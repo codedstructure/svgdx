@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Minor change: preserve quotes unescaped in XML text nodes; use-case is to
+  avoid mangling quoted font names in CSS `<style>` elements.
+
 - svgdx-server: replace `webbrowser` crate with the lighter `open` crate.
 
 ## [0.22.2 - 2025-08-29]

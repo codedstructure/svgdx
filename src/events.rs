@@ -5,6 +5,7 @@ use crate::types::OrderIndex;
 use std::io::{BufRead, BufReader, Cursor, Write};
 use std::str::FromStr;
 
+use quick_xml::escape::partial_escape;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::{Reader, Writer};
@@ -530,7 +531,7 @@ impl OutputList {
                 continue;
             } else if !text_buf.is_empty() {
                 let content = Self::blank_line_remover(&text_buf);
-                let text_event = Event::Text(BytesText::new(&content).into_owned());
+                let text_event = OutputEvent::Text(content);
                 text_buf.clear();
                 writer
                     .write_event(text_event)
@@ -541,7 +542,7 @@ impl OutputList {
         // re-add any trailing text
         if !text_buf.is_empty() {
             let content = Self::blank_line_remover(&text_buf);
-            let text_event = Event::Text(BytesText::new(&content).into_owned());
+            let text_event = OutputEvent::Text(content);
             writer
                 .write_event(text_event)
                 .map_err(SvgdxError::from_err)?;
@@ -589,8 +590,8 @@ impl<'a> From<OutputEvent> for Event<'a> {
         match svg_ev {
             OutputEvent::Empty(e) => Event::Empty(e.into_bytesstart()),
             OutputEvent::Start(e) => Event::Start(e.into_bytesstart()),
-            OutputEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
-            OutputEvent::Text(t) => Event::Text(BytesText::from_escaped(t)),
+            OutputEvent::Comment(t) => Event::Comment(BytesText::from_escaped(partial_escape(t))),
+            OutputEvent::Text(t) => Event::Text(BytesText::from_escaped(partial_escape(t))),
             OutputEvent::CData(t) => Event::CData(BytesCData::new(t)),
             OutputEvent::End(name) => Event::End(BytesEnd::new(name)),
             OutputEvent::Other(e) => e,
