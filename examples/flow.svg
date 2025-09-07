@@ -7,23 +7,23 @@
   <style>
     <![CDATA[
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       .d-fill-whitesmoke { fill: whitesmoke; }
       .d-fill-green { fill: green; }
-      text.d-fill-green, tspan.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+      text.d-fill-green, tspan.d-fill-green { fill: white; stroke: black; }
       .d-fill-lightgrey { fill: lightgrey; }
-      text.d-fill-lightgrey, tspan.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
+      text.d-fill-lightgrey, tspan.d-fill-lightgrey { fill: black; stroke: white; }
       .d-fill-grey { fill: grey; }
-      text.d-fill-grey, tspan.d-fill-grey, text.d-fill-grey * { fill: white; stroke: black; }
+      text.d-fill-grey, tspan.d-fill-grey { fill: white; stroke: black; }
       .d-fill-red { fill: red; }
-      text.d-fill-red, tspan.d-fill-red, text.d-fill-red * { fill: white; stroke: black; }
+      text.d-fill-red, tspan.d-fill-red { fill: white; stroke: black; }
       .d-fill-darkmagenta { fill: darkmagenta; }
-      text.d-fill-darkmagenta, tspan.d-fill-darkmagenta, text.d-fill-darkmagenta * { fill: white; stroke: black; }
+      text.d-fill-darkmagenta, tspan.d-fill-darkmagenta { fill: white; stroke: black; }
       .d-blue { stroke: blue; }
       .d-thin { stroke-width: 0.25; }
-      text, tspan { stroke-linejoin: round; }
-      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
+      text { stroke-linejoin: round; paint-order: stroke; }
+      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
       marker path { fill: inherit; }
       line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
       .d-dash { stroke-dasharray: 1 1.5; }

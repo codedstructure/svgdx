@@ -2,21 +2,21 @@
   <style>
     <![CDATA[
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
       .d-fill-gold { fill: gold; }
-      text.d-fill-gold, tspan.d-fill-gold, text.d-fill-gold * { fill: black; stroke: white; }
+      text.d-fill-gold, tspan.d-fill-gold { fill: black; stroke: white; }
       .d-fill-green { fill: green; }
-      text.d-fill-green, tspan.d-fill-green, text.d-fill-green * { fill: white; stroke: black; }
+      text.d-fill-green, tspan.d-fill-green { fill: white; stroke: black; }
       .d-fill-lightgrey { fill: lightgrey; }
-      text.d-fill-lightgrey, tspan.d-fill-lightgrey, text.d-fill-lightgrey * { fill: black; stroke: white; }
+      text.d-fill-lightgrey, tspan.d-fill-lightgrey { fill: black; stroke: white; }
       .d-thin { stroke-width: 0.25; }
-      text, tspan { stroke-linejoin: round; }
-      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-top, tspan.d-text-top, text.d-text-top * { dominant-baseline: text-before-edge; }
-      text.d-text-right, tspan.d-text-right, text.d-text-right * { text-anchor: end; }
-      text.d-text-monospace, tspan.d-text-monospace, text.d-text-monospace * { font-family: monospace; }
-      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
+      text { stroke-linejoin: round; paint-order: stroke; }
+      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
+      text.d-text-right, tspan.d-text-right { text-anchor: end; }
+      text.d-text-monospace, tspan.d-text-monospace { font-family: monospace; }
+      text.d-text-small, tspan.d-text-small { font-size: 2px; }
       .d-dash { stroke-dasharray: 1 1.5; }
     ]]>
   </style>

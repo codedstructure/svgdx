@@ -10,18 +10,18 @@
     <![CDATA[
       svg { background: #eee8d5; }
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: #fdf6e3; stroke: #657b83; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: #657b83; paint-order: stroke; stroke: #fdf6e3; }
+      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: #657b83; stroke: #fdf6e3; }
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: #657b83; }
       .d-fill-grey { fill: grey; }
-      text.d-fill-grey, tspan.d-fill-grey, text.d-fill-grey * { fill: #fdf6e3; stroke: #657b83; }
-      text.d-text-silver, tspan.d-text-silver, text.d-text-silver * { fill: silver; stroke: #657b83; }
-      text.d-text-ol-black, tspan.d-text-ol-black, text.d-text-ol-black * { stroke: black; stroke-width: 0.5; }
+      text.d-fill-grey, tspan.d-fill-grey { fill: #fdf6e3; stroke: #657b83; }
+      text.d-text-silver, tspan.d-text-silver { fill: silver; stroke: #657b83; }
+      text.d-text-ol-black, tspan.d-text-ol-black { stroke: black; stroke-width: 0.5; }
       .d-darkred { stroke: darkred; }
-      text, tspan { stroke-linejoin: round; }
-      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
-      text.d-text-italic, tspan.d-text-italic, text.d-text-italic * { font-style: italic; }
-      text.d-text-small, tspan.d-text-small, text.d-text-small * { font-size: 2px; }
+      text { stroke-linejoin: round; paint-order: stroke; }
+      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-bold, tspan.d-text-bold { font-weight: bold; }
+      text.d-text-italic, tspan.d-text-italic { font-style: italic; }
+      text.d-text-small, tspan.d-text-small { font-size: 2px; }
       @keyframes d-flow-animation { from { stroke-dashoffset: 5; } to { stroke-dashoffset: 0; } }
       .d-flow-slow { animation: 2s linear 0s infinite running d-flow-animation; stroke-dasharray: 1 1.5; }
       rect.d-hardshadow, circle.d-hardshadow, ellipse.d-hardshadow, polygon.d-hardshadow { filter: url(#d-hardshadow); }

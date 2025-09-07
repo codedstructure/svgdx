@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minor change: preserve quotes unescaped in XML text nodes; use-case is to
   avoid mangling quoted font names in CSS `<style>` elements.
 
+- Fixed: auto-style `<tspan>` elements use inherited styles (with workaround
+  for the non-inherited dominant-baseline) to ensure consistency between css
+  and inline style modes.
+
 - svgdx-server: replace `webbrowser` crate with the lighter `open` crate.
 
 ## [0.22.2 - 2025-08-29]

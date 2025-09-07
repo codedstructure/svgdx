@@ -141,7 +141,7 @@ impl Selector {
         if let Some(class) = mr.as_class() {
             match self {
                 Selector::Element(_) => unreachable!("Element::as_class() will return None"),
-                Selector::TextLike(_) => format!("text.{class}, tspan.{class}, text.{class} *"),
+                Selector::TextLike(_) => format!("text.{class}, tspan.{class}"),
                 Selector::Class(_) => format!(".{class}"),
                 Selector::LineLike(_) => format!("line.{class}, polyline.{class}, path.{class}"),
                 Selector::BasicShape(_) => {

@@ -29,7 +29,6 @@ impl StyleProvider for DefaultStyles {
             Style::new("font-family", self.theme.font_family.clone()),
             Style::new("font-size", "3px"),
             Style::new("fill", &stroke), // NOTE: text uses stroke as fill
-            Style::new("paint-order", "stroke"),
             Style::new("stroke", &fill),
         ];
         if let Some(weight) = font_weight {
@@ -62,7 +61,7 @@ impl StyleProvider for DefaultStyles {
                 ],
             },
             Rule {
-                selector: Selector::TextLike(MatchType::Any),
+                selector: Selector::Element(MatchType::Element("text".to_string())),
                 styles: text_styles,
             },
             Rule {
@@ -193,8 +192,11 @@ impl StyleProvider for TextStyles {
 
         // Prevent spiky outlines on text with d-text-ol classes
         rules.push(Rule {
-            selector: Selector::TextLike(MatchType::Any),
-            styles: vec![Style::new("stroke-linejoin", "round")],
+            selector: Selector::Element(MatchType::Element("text".to_string())),
+            styles: vec![
+                Style::new("stroke-linejoin", "round"),
+                Style::new("paint-order", "stroke"),
+            ],
         });
 
         for (class, (key, value)) in [
@@ -221,6 +223,23 @@ impl StyleProvider for TextStyles {
             });
         }
 
+        // In SVG1.1, dominant-baseline isn't inherited. SVG2 'corrects' this:
+        // https://www.w3.org/TR/SVG11/text.html#DominantBaselineProperty
+        // https://www.w3.org/TR/css-inline-3/#propdef-dominant-baseline
+        //
+        // Firefox / Chrome / Edge all behave with inherited dominant-baseline.
+        // For Safari (as of 18.6, 2025-09), it is not inherited, which means
+        // either the various text alignment classes need copying to the tspan -
+        // bad enough but very noisy in `inline` style mode - or we force it to
+        // be inherited, as here. If / when Safari handles dominant-baseline as
+        // inherited, this rule can be removed.
+        rules.push(Rule {
+            selector: Selector::Element(MatchType::Element("tspan".to_string())),
+            styles: vec![Style::new("dominant-baseline", "inherit")],
+        });
+
+        // The following style rules apply to tspan as well as top-level text elements
+
         for (class, (key, value)) in [
             // Default is sans-serif 'normal' text.
             ("d-text-bold", ("font-weight", "bold")),
@@ -230,6 +249,9 @@ impl StyleProvider for TextStyles {
             ("d-text-italic", ("font-style", "italic")),
             ("d-text-monospace", ("font-family", "monospace")),
             ("d-text-pre", ("font-family", "monospace")),
+            // experimental!! - should d-text-pre avoid splitting into tspans
+            // and NBSP replacement?
+            ("d-text-pre", ("white-space", "pre")),
         ] {
             rules.push(Rule {
                 selector: Selector::TextLike(MatchType::Class(class.to_string())),

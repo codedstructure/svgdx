@@ -2,61 +2,61 @@
   <style>
     <![CDATA[
       rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text, tspan { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; paint-order: stroke; stroke: white; }
+      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
       .d-fill-aliceblue { fill: aliceblue; }
-      text.d-fill-aliceblue, tspan.d-fill-aliceblue, text.d-fill-aliceblue * { fill: black; stroke: white; }
+      text.d-fill-aliceblue, tspan.d-fill-aliceblue { fill: black; stroke: white; }
       .d-fill-antiquewhite { fill: antiquewhite; }
-      text.d-fill-antiquewhite, tspan.d-fill-antiquewhite, text.d-fill-antiquewhite * { fill: black; stroke: white; }
+      text.d-fill-antiquewhite, tspan.d-fill-antiquewhite { fill: black; stroke: white; }
       .d-fill-aqua { fill: aqua; }
-      text.d-fill-aqua, tspan.d-fill-aqua, text.d-fill-aqua * { fill: black; stroke: white; }
+      text.d-fill-aqua, tspan.d-fill-aqua { fill: black; stroke: white; }
       .d-fill-aquamarine { fill: aquamarine; }
-      text.d-fill-aquamarine, tspan.d-fill-aquamarine, text.d-fill-aquamarine * { fill: black; stroke: white; }
+      text.d-fill-aquamarine, tspan.d-fill-aquamarine { fill: black; stroke: white; }
       .d-fill-azure { fill: azure; }
-      text.d-fill-azure, tspan.d-fill-azure, text.d-fill-azure * { fill: black; stroke: white; }
+      text.d-fill-azure, tspan.d-fill-azure { fill: black; stroke: white; }
       .d-fill-beige { fill: beige; }
-      text.d-fill-beige, tspan.d-fill-beige, text.d-fill-beige * { fill: black; stroke: white; }
+      text.d-fill-beige, tspan.d-fill-beige { fill: black; stroke: white; }
       .d-fill-bisque { fill: bisque; }
-      text.d-fill-bisque, tspan.d-fill-bisque, text.d-fill-bisque * { fill: black; stroke: white; }
+      text.d-fill-bisque, tspan.d-fill-bisque { fill: black; stroke: white; }
       .d-fill-black { fill: black; }
-      text.d-fill-black, tspan.d-fill-black, text.d-fill-black * { fill: white; stroke: black; }
+      text.d-fill-black, tspan.d-fill-black { fill: white; stroke: black; }
       .d-fill-blanchedalmond { fill: blanchedalmond; }
-      text.d-fill-blanchedalmond, tspan.d-fill-blanchedalmond, text.d-fill-blanchedalmond * { fill: black; stroke: white; }
+      text.d-fill-blanchedalmond, tspan.d-fill-blanchedalmond { fill: black; stroke: white; }
       .d-fill-blue { fill: blue; }
-      text.d-fill-blue, tspan.d-fill-blue, text.d-fill-blue * { fill: white; stroke: black; }
+      text.d-fill-blue, tspan.d-fill-blue { fill: white; stroke: black; }
       .d-fill-blueviolet { fill: blueviolet; }
-      text.d-fill-blueviolet, tspan.d-fill-blueviolet, text.d-fill-blueviolet * { fill: white; stroke: black; }
+      text.d-fill-blueviolet, tspan.d-fill-blueviolet { fill: white; stroke: black; }
       .d-fill-brown { fill: brown; }
-      text.d-fill-brown, tspan.d-fill-brown, text.d-fill-brown * { fill: white; stroke: black; }
+      text.d-fill-brown, tspan.d-fill-brown { fill: white; stroke: black; }
       .d-fill-burlywood { fill: burlywood; }
-      text.d-fill-burlywood, tspan.d-fill-burlywood, text.d-fill-burlywood * { fill: black; stroke: white; }
+      text.d-fill-burlywood, tspan.d-fill-burlywood { fill: black; stroke: white; }
       .d-fill-cadetblue { fill: cadetblue; }
-      text.d-fill-cadetblue, tspan.d-fill-cadetblue, text.d-fill-cadetblue * { fill: white; stroke: black; }
+      text.d-fill-cadetblue, tspan.d-fill-cadetblue { fill: white; stroke: black; }
       .d-fill-chartreuse { fill: chartreuse; }
-      text.d-fill-chartreuse, tspan.d-fill-chartreuse, text.d-fill-chartreuse * { fill: black; stroke: white; }
+      text.d-fill-chartreuse, tspan.d-fill-chartreuse { fill: black; stroke: white; }
       .d-fill-chocolate { fill: chocolate; }
-      text.d-fill-chocolate, tspan.d-fill-chocolate, text.d-fill-chocolate * { fill: white; stroke: black; }
+      text.d-fill-chocolate, tspan.d-fill-chocolate { fill: white; stroke: black; }
       .d-fill-coral { fill: coral; }
-      text.d-fill-coral, tspan.d-fill-coral, text.d-fill-coral * { fill: white; stroke: black; }
+      text.d-fill-coral, tspan.d-fill-coral { fill: white; stroke: black; }
       .d-fill-cornflowerblue { fill: cornflowerblue; }
-      text.d-fill-cornflowerblue, tspan.d-fill-cornflowerblue, text.d-fill-cornflowerblue * { fill: white; stroke: black; }
+      text.d-fill-cornflowerblue, tspan.d-fill-cornflowerblue { fill: white; stroke: black; }
       .d-fill-cornsilk { fill: cornsilk; }
-      text.d-fill-cornsilk, tspan.d-fill-cornsilk, text.d-fill-cornsilk * { fill: black; stroke: white; }
+      text.d-fill-cornsilk, tspan.d-fill-cornsilk { fill: black; stroke: white; }
       .d-fill-crimson { fill: crimson; }
-      text.d-fill-crimson, tspan.d-fill-crimson, text.d-fill-crimson * { fill: white; stroke: black; }
+      text.d-fill-crimson, tspan.d-fill-crimson { fill: white; stroke: black; }
       .d-fill-cyan { fill: cyan; }
-      text.d-fill-cyan, tspan.d-fill-cyan, text.d-fill-cyan * { fill: black; stroke: white; }
+      text.d-fill-cyan, tspan.d-fill-cyan { fill: black; stroke: white; }
       .d-fill-darkblue { fill: darkblue; }
-      text.d-fill-darkblue, tspan.d-fill-darkblue, text.d-fill-darkblue * { fill: white; stroke: black; }
+      text.d-fill-darkblue, tspan.d-fill-darkblue { fill: white; stroke: black; }
       .d-fill-darkcyan { fill: darkcyan; }
-      text.d-fill-darkcyan, tspan.d-fill-darkcyan, text.d-fill-darkcyan * { fill: white; stroke: black; }
+      text.d-fill-darkcyan, tspan.d-fill-darkcyan { fill: white; stroke: black; }
       .d-fill-darkgoldenrod { fill: darkgoldenrod; }
-      text.d-fill-darkgoldenrod, tspan.d-fill-darkgoldenrod, text.d-fill-darkgoldenrod * { fill: white; stroke: black; }
+      text.d-fill-darkgoldenrod, tspan.d-fill-darkgoldenrod { fill: white; stroke: black; }
       .d-fill-darkgray { fill: darkgray; }
-      text.d-fill-darkgray, tspan.d-fill-darkgray, text.d-fill-darkgray * { fill: white; stroke: black; }
-      text, tspan { stroke-linejoin: round; }
-      text.d-text, tspan.d-text, text.d-text * { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-bold, tspan.d-text-bold, text.d-text-bold * { font-weight: bold; }
-      text.d-text-ol, tspan.d-text-ol, text.d-text-ol * { stroke-width: 0.5; }
+      text.d-fill-darkgray, tspan.d-fill-darkgray { fill: white; stroke: black; }
+      text { stroke-linejoin: round; paint-order: stroke; }
+      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+      text.d-text-bold, tspan.d-text-bold { font-weight: bold; }
+      text.d-text-ol, tspan.d-text-ol { stroke-width: 0.5; }
     ]]>
   </style>
   <title>The first few named SVG colours</title>
