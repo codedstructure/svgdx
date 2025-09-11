@@ -242,9 +242,42 @@ fn test_group_position() {
     let input = r#"
 <g xy="1 3"><rect xy="10" wh="1"/></g>
 "#;
-    let expected1 = r#"<g transform="translate(1, 3)">"#;
+    let expected1 = r#"<g transform="translate(-9, -7)">"#;
     let expected2 = r#"<rect x="10" y="10" width="1" height="1"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_group_universal_layout() {
+    let input = r##"
+<svg>
+  <g id="z1" x2="100" cy="50">
+    <rect xy="10" wh="50"/>
+    <rect xy="^|h" wh="50"/>
+  </g>
+</svg>
+"##;
+    let expected1 = r#"<g id="z1" transform="translate(-10, 15)">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+}
+
+#[test]
+fn test_group_nested_position() {
+    let input = r##"
+<svg>
+  <rect id="a1" surround="+" margin="2"/>
+  <rect id="a2" wh="5"/>
+
+  <rect id="a3" surround="+" margin="2"/>
+  <g id="a4" xy="#a1|h 4">
+    <rect id="a5" wh="5"/>
+  </g>
+</svg>
+"##;
+    let expected1 = r#"<rect id="a3" x="9" y="-2" width="9" height="9""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
 }
