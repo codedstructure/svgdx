@@ -20,7 +20,7 @@
       <rect text="something" width="20"/>
       <rect text="more..." class="next"/>
     </g>
-    
+
     <rect id="b1" class="bg"/>
     <g xy="#a2|v 4">
       <rect text="under"/>
@@ -38,7 +38,7 @@
       <rect text="top"/>
       <rect text="right" class="next"/>
     </g>
-    
+
     <box surround="#a3 #a4"/>
     <rect id="b2" class="bg"/>
     <g y="#a3~y2 4" x2="#a4~x2 -2">

@@ -435,11 +435,16 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         }, 200);
     }
 
+    function cleanText(text) {
+        // remove trailing whitespace on each line and end with a single newline
+        return text.split("\n").map(line => line.trimEnd()).join("\n").trimEnd() + "\n";
+    }
+
     // save input button
     document.getElementById('save-input').addEventListener('click', () => {
         hidePopup();
         // trigger download
-        const blob = new Blob([editor.getValue()], { type: 'application/xml' });
+        const blob = new Blob([cleanText(editor.getValue())], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -451,7 +456,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
     // copy input button
     document.getElementById('copy-input').addEventListener('click', async () => {
         hidePopup();
-        copyToClipboard("text/plain", Promise.resolve(editor.getValue()));
+        copyToClipboard("text/plain", Promise.resolve(cleanText(editor.getValue())));
     });
 
     // save output button
@@ -468,7 +473,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
             return;
         }
         // trigger download
-        const blob = new Blob([svg_output], { type: 'image/svg+xml' });
+        const blob = new Blob([cleanText(svg_output)], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -487,7 +492,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         // Returns a Promise that resolves SVG output without metadata
         const [ok, svg_output] = await get_transform(editor.getValue(), false);
         if (ok) {
-            return svg_output;
+            return cleanText(svg_output);
         } else {
             statusbar.style.color = "darkred";
             statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
