@@ -13,7 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which would infer a width, for example).
 
 - Minor change: preserve quotes unescaped in XML text nodes; use-case is to
-  avoid mangling quoted font names in CSS `<style>` elements.
+  avoid mangling quoted font names in CSS `<style>` elements. The content of
+  XML comments is also left unescaped, for clearer output when commenting out
+  blocks of the input document.
 
 - Fixed: auto-style `<tspan>` elements use inherited styles (with workaround
   for the non-inherited dominant-baseline) to ensure consistency between css

@@ -41,3 +41,23 @@ fn test_var_comment() {
     let expected = r#"<rect x="0" y="0" width="5" height="5"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
 }
+
+#[test]
+fn test_commented_xml() {
+    // Documents can contain commented-out XML elements, ensure these don't get
+    // escaped or transformed.
+    let input = r##"
+<rect xy="0" wh="5"/>
+<!--
+<rect xy="10" wh="5"/>
+-->
+"##;
+    let expected = r##"
+<rect x="0" y="0" width="5" height="5"/>
+<!--
+<rect xy="10" wh="5"/>
+-->
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output.trim(), expected.trim());
+}

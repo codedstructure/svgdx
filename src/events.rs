@@ -590,7 +590,7 @@ impl<'a> From<OutputEvent> for Event<'a> {
         match svg_ev {
             OutputEvent::Empty(e) => Event::Empty(e.into_bytesstart()),
             OutputEvent::Start(e) => Event::Start(e.into_bytesstart()),
-            OutputEvent::Comment(t) => Event::Comment(BytesText::from_escaped(partial_escape(t))),
+            OutputEvent::Comment(t) => Event::Comment(BytesText::from_escaped(t)),
             OutputEvent::Text(t) => Event::Text(BytesText::from_escaped(partial_escape(t))),
             OutputEvent::CData(t) => Event::CData(BytesCData::new(t)),
             OutputEvent::End(name) => Event::End(BytesEnd::new(name)),
