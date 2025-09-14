@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: support for `<g>` element universal layout. Group elements can now
+  be positioned similar to other elements, subject to their inherent (content)
+  size (so `width` cannot be provided, nor more than one of `x`/`x1`/`cx`/`x2`
+  which would infer a width, for example).
+
 - Minor change: preserve quotes unescaped in XML text nodes; use-case is to
   avoid mangling quoted font names in CSS `<style>` elements.
 

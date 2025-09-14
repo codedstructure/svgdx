@@ -228,7 +228,7 @@ fn test_reuse_symbol() {
 </defs>
 <reuse y="2" href="#sym"/>
   "##;
-    let expected = r#"<g transform="translate(0, 2)" class="sym"><circle r="1"/></g>"#;
+    let expected = r#"<g transform="translate(0, 3)" class="sym"><circle r="1"/></g>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -386,11 +386,11 @@ fn test_reuse_group_rel() {
 <svg>
 <config border="0" add-auto-styles="false"/>
 <g id="tt"><rect xy="5" wh="10"/></g>
-<reuse id="a" href="#tt" x="10" y="15"/>
+<reuse id="a" href="#tt" xy="5 10"/>
 </svg>
 "##;
-    let expected1 = r##"<g id="a" transform="translate(10, 15)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
-    let expected2 = r##"viewBox="5 5 20 25"##;
+    let expected1 = r##"<g id="a" transform="translate(0, 5)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
+    let expected2 = r##"viewBox="5 5 10 15"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
@@ -404,8 +404,8 @@ fn test_reuse_group_rel() {
 <reuse id="a" href="#tt" x="10" y="15"/>
 </svg>
 "##;
-    let expected1 = r##"<g id="a" transform="translate(10, 15)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
-    let expected2 = r##"viewBox="15 20 10 10"##;
+    let expected1 = r##"<g id="a" transform="translate(5, 10)" class="tt"><rect x="5" y="5" width="10" height="10"/></g>"##;
+    let expected2 = r##"viewBox="10 15 10 10"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);

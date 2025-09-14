@@ -193,7 +193,10 @@ impl SvgElement {
         // which would be resolved by expand_relspec, though that requires
         // eval_rel_attributes to be called first...
         if let Some(relpos) = self.extract_relpos() {
-            if let Some(pos) = self.pos_from_dirspec(&relpos, ctx)? {
+            if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
+                if let Some(bb) = self.content_bbox {
+                    pos.translate(-bb.x1, -bb.y1);
+                }
                 pos.set_position_attrs(self);
             }
         }
@@ -202,7 +205,12 @@ impl SvgElement {
         eval_rel_attributes(self, ctx)?;
 
         let mut p = Position::try_from(self as &SvgElement)?;
-        if self.name() == "use" {
+        if self.name() == "g" {
+            if let Some(bb) = self.content_bbox {
+                p.update_size(&Size::new(bb.width(), bb.height()));
+                p.translate(-bb.x1, -bb.y1);
+            }
+        } else if self.name() == "use" {
             let el = ctx.get_target_element(self)?;
             if let Some(sz) = el.size(ctx)? {
                 p.update_size(&sz);
@@ -400,6 +408,29 @@ impl SvgElement {
     }
 
     pub fn bbox(&self) -> Result<Option<BoundingBox>> {
+        // TODO: this is a hack; forward references (i.e. '+') may cause bounding box
+        // evaluation of an element which hasn't had attributes expanded yet, and if
+        // there is otherwise sufficient info (e.g. with x/y etc assumed zero) for a bbox.
+        // Should probably pre-expand attributes first...
+        // Also, elements with clip-path overload content_bbox to be the clip region,
+        // in which case we may still validly have these other attributes...
+        // TODO: avoid overloading different content_bbox uses.
+        if !self.has_attr("clip-path") {
+            for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
+                if self.has_attr(key) {
+                    return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                }
+            }
+            if self.name() == "g" {
+                // for group elements, *any* positional attributes imply positioning
+                // hasn't yet been resolved.
+                for key in ["x", "y", "cx", "cy", "x1", "y1", "x2", "y2"] {
+                    if self.has_attr(key) {
+                        return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                    }
+                }
+            }
+        }
         let mut el_bbox = if self.content_bbox.is_some() {
             // container elements (`g`, `symbol`, `clipPath` etc) set this
             // to the bbox of their contents
@@ -416,15 +447,6 @@ impl SvgElement {
     }
 
     fn bbox_raw(&self) -> Result<Option<BoundingBox>> {
-        // TODO: this is a hack; forward references (i.e. '+') may cause bounding box
-        // evaluation of an element which hasn't had attributes expanded yet, and if
-        // there is otherwise sufficient info (e.g. with x/y etc assumed zero) for a bbox.
-        // Should probably pre-expand attributes first...
-        for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
-            if self.has_attr(key) {
-                return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
-            }
-        }
         // For SVG 'Basic shapes' (e.g. rect, circle, ellipse, etc) for x/y and similar:
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
