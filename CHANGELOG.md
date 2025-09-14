@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - svgdx-server: replace `webbrowser` crate with the lighter `open` crate.
 
+- Editor: copy & download UX changes: makes input and output copy / download
+  UI consistent; removes not-very-usable 'copy as SVG image' function added
+  in 0.19.0.
+
 ## [0.22.2 - 2025-08-29]
 
 - Fixed: reuse positioning much improved when used with relative (previous /

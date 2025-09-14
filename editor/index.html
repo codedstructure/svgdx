@@ -44,13 +44,18 @@
 
             <button id="auto-viewbox" data-info="When active, auto-resize and center the SVG on update">Auto Fit</button>
             <button id="reset-view" data-info="Resize and center the SVG">Reset View</button>
-            <button id="save-input" data-info="Download the input">Save Input</button>
-            <button id="save-output" data-info="Download the SVG">Save SVG</button>
-            <div id="copy-svg-popup" class="popup-container">
-              <button id="copy-svg" data-info="Copy SVG to clipboard">Copy SVG</button>
+            <div id="input-popup" class="popup-container">
+              <button id="input-copy-save" data-info="Save or copy input document">Input...</button>
               <div class="popup-buttons">
-                <button class="popup-button" id="copy-svg-img" data-info="Clipboard SVG not supported by all browsers/applications">SVG image</button>
-                <button class="popup-button" id="copy-svg-text" data-info="Copy the raw SVG XML as text">SVG text</button>
+                <button class="popup-button" id="save-input" data-info="Download the input">Download</button>
+                <button class="popup-button" id="copy-input" data-info="Copy input to clipboard">Copy</button>
+              </div>
+            </div>
+            <div id="output-popup" class="popup-container">
+              <button id="output-copy-save" data-info="Save or copy SVG output">Output...</button>
+              <div class="popup-buttons">
+                <button class="popup-button" id="save-output" data-info="Download SVG output">Download</button>
+                <button class="popup-button" id="copy-output" data-info="Copy SVG output to clipboard">Copy</button>
               </div>
             </div>
             <div id="copy-popup" class="popup-container">

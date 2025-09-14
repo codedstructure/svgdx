@@ -312,6 +312,7 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 editorContainer.classList.add('error');
                 error_output.innerText = responseText;
                 error_output.style.display = "";
+                statusbar.style.color = null;
                 statusbar.innerText = "svgdx editor";
             }
         } catch (e) {
@@ -396,8 +397,47 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}-${pad2(date.getHours())}${pad2(date.getMinutes())}${pad2(date.getSeconds())}`;
     }
 
+    // Note: Safari on MacOS requires clipboard actions happen in an event
+    // handler triggered by a user action; resolving a promise using await prior
+    // to clipboard.write[Text]() defeats that, so always use .write() (which
+    // takes a ClipboadItem, which *can* resolve a Promise) even for text.
+    function copyToClipboard(mimeType, dataPromise) {
+        try {
+            navigator.clipboard.write([
+                new ClipboardItem({
+                    [mimeType]: dataPromise
+                })
+            ]);
+            if (statusbar) {
+                statusbar.style.color = null;
+                statusbar.innerText = "Copied to clipboard";
+            }
+        } catch (e) {
+            console.error('Error copying to clipboard', e);
+            if (statusbar) {
+                statusbar.style.color = "darkred";
+                statusbar.innerText = "Failed to copy to clipboard";
+            }
+        }
+    }
+
+    function hidePopup() {
+        // Hide the popup buttons again after action. This is quite hacky (including
+        // the timeout values), due to pure-CSS popup not having a way to close.
+        // We make all the inner elements invisible, which will (should!) cause
+        // the popup to no longer be :hover, at which point it will be hidden,
+        // but then we need to remove the display:none to allow it to be used again...
+        setTimeout(() => {
+            document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
+            setTimeout(() => {
+                document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
+            }, 200);
+        }, 200);
+    }
+
     // save input button
     document.getElementById('save-input').addEventListener('click', () => {
+        hidePopup();
         // trigger download
         const blob = new Blob([editor.getValue()], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
@@ -408,8 +448,15 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         URL.revokeObjectURL(url);
     });
 
+    // copy input button
+    document.getElementById('copy-input').addEventListener('click', async () => {
+        hidePopup();
+        copyToClipboard("text/plain", Promise.resolve(editor.getValue()));
+    });
+
     // save output button
     document.getElementById('save-output').addEventListener('click', async () => {
+        hidePopup();
         // download svg as file
         // start by getting a fresh output without metadata
         const svgdx_input = editor.getValue();
@@ -430,72 +477,27 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
         URL.revokeObjectURL(url);
     });
 
-    // copy SVG output
-    document.querySelectorAll('#copy-svg-popup .popup-button').forEach(
-        el => el.addEventListener('click', async (e) => {
-            // start by getting a fresh output without metadata
-            const svgdx_input = editor.getValue();
-            let [ok, svg_output] = await get_transform(svgdx_input, false);
-            if (!ok) {
-                // update status bar with error message
-                statusbar.style.color = "darkred";
-                statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
-                return;
-            }
-            // Hide the buttons again after copying. This is quite hacky (including
-            // the timeout values), due to pure-CSS popup not having a way to close.
-            // We make all the inner elements invisible, which will (should!) cause
-            // the popup to no longer be :hover, at which point it will be hidden,
-            // but then we need to remove the display:none to allow it to be used again...
-            setTimeout(() => {
-                document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
-                setTimeout(() => {
-                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
-                }, 200);
-            }, 200);
+    // copy output button
+    document.getElementById('copy-output').addEventListener('click', async () => {
+        hidePopup();
+        copyToClipboard("text/plain", cleanSvgPromise());
+    })
 
-            let id = e.target.id;
-            if (id === "copy-svg-text") {
-                // copy to clipboard
-                try {
-                    await navigator.clipboard.writeText(svg_output);
-                } catch (e) {
-                    console.error('Error copying SVG to clipboard', e);
-                    statusbar.style.color = "darkred";
-                    statusbar.innerText = "Error copying SVG to clipboard";
-                    return;
-                }
-            } else if (id === "copy-svg-img") {
-                try {
-                    // Perhaps this should use ClipboardItem.supports("image/svg+xml") but
-                    // that isn't supported on browsers which don't support image/svg+xml
-                    // anyway, so just give it a go in a try/catch block.
-                    let blob = new Blob([svg_output], { type: "image/svg+xml" });
-                    navigator.clipboard.write([
-                        new ClipboardItem({
-                            ["image/svg+xml"]: blob,
-                        }),
-                    ]);
-                    console.log("SVG image copied to clipboard");
-                } catch (error) {
-                    console.error("Error copying SVG image to clipboard:", error);
-                    statusbar.style.color = "darkred";
-                    statusbar.innerText = "Error copying SVG to clipboard";
-                    return;
-                }
-            } else {
-                console.error(`Unknown copy output button: ${id}`);
-                return;
-            }
-
-            statusbar.style.color = null;
-            statusbar.innerText = "SVG output copied to clipboard";
-        })
-    );
+    async function cleanSvgPromise() {
+        // Returns a Promise that resolves SVG output without metadata
+        const [ok, svg_output] = await get_transform(editor.getValue(), false);
+        if (ok) {
+            return svg_output;
+        } else {
+            statusbar.style.color = "darkred";
+            statusbar.innerText = `Error retrieving SVG: ${svg_output}`;
+        }
+    }
 
     // copy PNG buttons
     document.querySelectorAll('#copy-popup .popup-button').forEach(
         el => el.addEventListener('click', async (e) => {
+            hidePopup();
             let id = e.target.id;
             const resolution = {"copy-png-big": 2048, "copy-png-medium": 1024, "copy-png-small": 512, "copy-png-tiny": 128};
             const res = resolution[id];
@@ -504,26 +506,8 @@ const textViewer = CodeMirror(document.getElementById('text-output'), {
                 return;
             }
             try {
-                navigator.clipboard.write([
-                    new ClipboardItem({
-                        // Note for Safari on MacOS requires clipboard actions to happen in
-                        // an event handler triggered by a user action; having `await` in here
-                        // seems to defeat that, so resolve things directly here.
-                        ["image/png"]: Promise.resolve(generatePng(res)),
-                    }),
-                ]);
+                copyToClipboard("image/png", generatePng(res));
                 console.log(`PNG image copied to clipboard (${res}px)`);
-                // Hide the buttons again after copying. This is quite hacky (including
-                // the timeout values), due to pure-CSS popup not having a way to close.
-                // We make all the inner elements invisible, which will (should!) cause
-                // the popup to no longer be :hover, at which point it will be hidden,
-                // but then we need to remove the display:none to allow it to be used again...
-                setTimeout(() => {
-                    document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = "none";});
-                    setTimeout(() => {
-                        document.querySelectorAll(".popup-buttons").forEach((e) => {e.style.display = null;});
-                    }, 200);
-                }, 200);
             } catch (error) {
                 console.error("Error copying PNG image to clipboard:", error);
             }
