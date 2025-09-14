@@ -1,0 +1,50 @@
+<svg>
+  <defaults>
+    <rect wh="15 7" style="fill:silver" class="d-softshadow"/>
+    <rect match=".bg" surround="+" margin="2" style="fill:lime"/>
+    <rect match=".next" xy="^|v 2"/>
+  </defaults>
+
+  <rect surround="+" margin="3" style="fill:lightblue"/>
+  <g>
+    <rect id="a1" class="bg"/>
+    <g>
+      <rect text="a"/>
+      <rect text="nice" class="next"/>
+      <rect text="simple" class="next"/>
+      <rect text="list" class="next"/>
+    </g>
+
+    <rect id="a2" class="bg"/>
+    <g xy="#a1@tr 4 2">
+      <rect text="something" width="20"/>
+      <rect text="more..." class="next"/>
+    </g>
+    
+    <rect id="b1" class="bg"/>
+    <g xy="#a2|v 4">
+      <rect text="under"/>
+      <rect text="neath" class="next"/>
+    </g>
+
+    <rect id="a3" class="bg"/>
+    <g xy="#a2@tr 4 2">
+      <rect text="this\none" height="12"/>
+      <rect text="ok?" class="next"/>
+    </g>
+
+    <rect id="a4" class="bg"/>
+    <g xy="#a3@tr 4 2">
+      <rect text="top"/>
+      <rect text="right" class="next"/>
+    </g>
+    
+    <box surround="#a3 #a4"/>
+    <rect id="b2" class="bg"/>
+    <g y="#a3~y2 4" x2="#a4~x2 -2">
+      <rect text="big" wh="20 15" class="d-text-bold d-text-larger"/>
+      <rect text="small" wh="8" xy="^|h 2" class="d-text-small"/>
+      <rect text="stuff" y="^^~y2 2" x1="^^" x2="^"/>
+    </g>
+  </g>
+</svg>

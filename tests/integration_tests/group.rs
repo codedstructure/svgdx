@@ -262,20 +262,28 @@ fn test_group_universal_layout() {
     let expected1 = r#"<g id="z1" transform="translate(-10, 15)">"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
+
+    let input = r##"
+<rect id="a1" xy="10" wh="10"/>
+<rect id="a2" xy="^|h 2" wh="10"/>
+<g id="z1" x2="#a2~x1" y="#a1~y2">
+    <rect xy="30" wh="5"/>
+</g>"##;
+    let expected1 = r#"<g id="z1" transform="translate(-13, -10)">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
 }
 
 #[test]
 fn test_group_nested_position() {
     let input = r##"
-<svg>
-  <rect id="a1" surround="+" margin="2"/>
-  <rect id="a2" wh="5"/>
+<rect id="a1" surround="+" margin="2"/>
+<rect id="a2" wh="5"/>
 
-  <rect id="a3" surround="+" margin="2"/>
-  <g id="a4" xy="#a1|h 4">
-    <rect id="a5" wh="5"/>
-  </g>
-</svg>
+<rect id="a3" surround="+" margin="2"/>
+<g id="a4" xy="#a1|h 4">
+  <rect id="a5" wh="5"/>
+</g>
 "##;
     let expected1 = r#"<rect id="a3" x="9" y="-2" width="9" height="9""#;
     let output = transform_str_default(input).unwrap();

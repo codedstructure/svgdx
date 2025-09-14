@@ -421,6 +421,15 @@ impl SvgElement {
                     return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
                 }
             }
+            if self.name() == "g" {
+                // for group elements, *any* positional attributes imply positioning
+                // hasn't yet been resolved.
+                for key in ["x", "y", "cx", "cy", "x1", "y1", "x2", "y2"] {
+                    if self.has_attr(key) {
+                        return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                    }
+                }
+            }
         }
         let mut el_bbox = if self.content_bbox.is_some() {
             // container elements (`g`, `symbol`, `clipPath` etc) set this
