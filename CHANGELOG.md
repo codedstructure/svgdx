@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   size (so `width` cannot be provided, nor more than one of `x`/`x1`/`cx`/`x2`
   which would infer a width, for example).
 
+- Added: `rotate-loc` to specify the center of rotation for `rotate` values,
+  defaulting to `"c"` for the center of the element. Takes locspec format.
+
 - Minor change: preserve quotes unescaped in XML text nodes; use-case is to
   avoid mangling quoted font names in CSS `<style>` elements. The content of
   XML comments is also left unescaped, for clearer output when commenting out

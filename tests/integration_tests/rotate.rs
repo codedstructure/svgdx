@@ -76,3 +76,32 @@ fn test_rotate_reuse() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
 }
+
+#[test]
+fn test_rotate_loc() {
+    // standard locspec on an element
+    let input = r##"
+<rect xy="3 7" wh="10 5" rotate="270" rotate-loc="br"/>
+"##;
+    let expected1 = r#"<rect x="3" y="7" width="10" height="5" transform="rotate(270, 13, 12)"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+
+    // locspec on a group
+    let input = r##"
+<g rotate="90" rotate-loc="t">
+  <rect wh="10 5"/>
+</g>
+"##;
+    let expected1 = r#"<g transform="rotate(90, 5, 0)">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+
+    // edgespec
+    let input = r##"
+<rect xy="3 7" wh="10 5" rotate="-10" rotate-loc="b:40%"/>
+"##;
+    let expected1 = r#"<rect x="3" y="7" width="10" height="5" transform="rotate(-10, 7, 12)"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+}

@@ -594,12 +594,17 @@ impl SvgElement {
 
     pub fn handle_rotation(&mut self) -> Result<()> {
         let angle = self.pop_attr("rotate");
+        // determine center of rotation; default center of bbox
+        let rot_loc = self
+            .pop_attr("rotate-loc")
+            .unwrap_or("c".to_string())
+            .parse()?;
         if angle.is_none() {
             return Ok(());
         }
         let angle = angle.unwrap();
         let angle = strp(&angle)?;
-        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.center()) {
+        if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.locspec(rot_loc)) {
             let mut rot_xfrm = TransformAttr::new();
             rot_xfrm.rotate_around(angle, cx, cy);
             if let Some(xfrm) = self.pop_attr("transform") {
