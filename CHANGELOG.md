@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0 - 2025-09-21]
+
 - Improved: support for `<g>` element universal layout. Group elements can now
   be positioned similar to other elements, subject to their inherent (content)
   size (so `width` cannot be provided, nor more than one of `x`/`x1`/`cx`/`x2`
