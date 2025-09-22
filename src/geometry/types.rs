@@ -139,6 +139,12 @@ pub enum LocSpec {
     RightEdge(Length),
     BottomEdge(Length),
     LeftEdge(Length),
+}
+
+/// `LocSpec` defines a location on a `SvgElement`
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ElementLoc {
+    LocSpec(LocSpec),
     LineOffset(Length),
 }
 
@@ -172,6 +178,28 @@ impl LocSpec {
     }
 }
 
+impl FromStr for ElementLoc {
+    type Err = SvgdxError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        if let Ok(ls) = LocSpec::from_str(value) {
+            Ok(ElementLoc::LocSpec(ls))
+        } else if let Some((edge, len)) = value.split_once(EDGESPEC_SEP) {
+            let len = len.parse::<Length>()?;
+            match edge {
+                "" => Ok(ElementLoc::LineOffset(len)),
+                _ => Err(SvgdxError::InvalidData(format!(
+                    "Invalid LocSpec format {value}"
+                ))),
+            }
+        } else {
+            Err(SvgdxError::InvalidData(format!(
+                "Invalid LocSpec format {value}"
+            )))
+        }
+    }
+}
+
 impl FromStr for LocSpec {
     type Err = SvgdxError;
 
@@ -194,7 +222,6 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
-                        "" => Ok(Self::LineOffset(len)),
                         _ => Err(SvgdxError::InvalidData(format!(
                             "Invalid LocSpec format {value}"
                         ))),
@@ -342,8 +369,8 @@ impl FromStr for DirSpec {
     }
 }
 
-/// Parse a elref + optional locspec, e.g. `#id@tl:10%` or `#id`
-pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
+/// Parse a elref + optional ElementLoc, e.g. `#id@tl:10%` or `#id`
+pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     let (elref, remain) = extract_elref(s)?;
     if remain.is_empty() {
         return Ok((elref, None));
@@ -394,17 +421,23 @@ mod test {
     fn test_parse_loc() {
         assert_eq!(
             parse_el_loc("#a@b").unwrap(),
-            (ElRef::Id("a".to_string()), Some(LocSpec::Bottom))
+            (
+                ElRef::Id("a".to_string()),
+                Some(ElementLoc::LocSpec(LocSpec::Bottom))
+            )
         );
         assert_eq!(
             parse_el_loc("#id@tl").unwrap(),
-            (ElRef::Id("id".to_string()), Some(LocSpec::TopLeft))
+            (
+                ElRef::Id("id".to_string()),
+                Some(ElementLoc::LocSpec(LocSpec::TopLeft))
+            )
         );
         assert_eq!(
             parse_el_loc("#id@t:25%").unwrap(),
             (
                 ElRef::Id("id".to_string()),
-                Some(LocSpec::TopEdge(Length::Ratio(0.25)))
+                Some(ElementLoc::LocSpec(LocSpec::TopEdge(Length::Ratio(0.25))))
             )
         );
         assert_eq!(
@@ -512,24 +545,18 @@ mod test {
     #[test]
     fn test_get_point() {
         let bb = BoundingBox::new(10., 10., 20., 20.);
-        assert_eq!(bb.locspec("t:2".parse().expect("test")), Some((12., 10.)));
-        assert_eq!(
-            bb.locspec("r:25%".parse().expect("test")),
-            Some((20., 12.5))
-        );
-        assert_eq!(bb.locspec("b:6".parse().expect("test")), Some((16., 20.)));
-        assert_eq!(
-            bb.locspec("l:150%".parse().expect("test")),
-            Some((10., 25.))
-        );
-        assert_eq!(bb.locspec("tl".parse().expect("test")), Some((10., 10.)));
-        assert_eq!(bb.locspec("t".parse().expect("test")), Some((15., 10.)));
-        assert_eq!(bb.locspec("tr".parse().expect("test")), Some((20., 10.)));
-        assert_eq!(bb.locspec("r".parse().expect("test")), Some((20., 15.)));
-        assert_eq!(bb.locspec("br".parse().expect("test")), Some((20., 20.)));
-        assert_eq!(bb.locspec("b".parse().expect("test")), Some((15., 20.)));
-        assert_eq!(bb.locspec("bl".parse().expect("test")), Some((10., 20.)));
-        assert_eq!(bb.locspec("l".parse().expect("test")), Some((10., 15.)));
-        assert_eq!(bb.locspec("c".parse().expect("test")), Some((15., 15.)));
+        assert_eq!(bb.locspec("t:2".parse().expect("test")), (12., 10.));
+        assert_eq!(bb.locspec("r:25%".parse().expect("test")), (20., 12.5));
+        assert_eq!(bb.locspec("b:6".parse().expect("test")), (16., 20.));
+        assert_eq!(bb.locspec("l:150%".parse().expect("test")), (10., 25.));
+        assert_eq!(bb.locspec("tl".parse().expect("test")), (10., 10.));
+        assert_eq!(bb.locspec("t".parse().expect("test")), (15., 10.));
+        assert_eq!(bb.locspec("tr".parse().expect("test")), (20., 10.));
+        assert_eq!(bb.locspec("r".parse().expect("test")), (20., 15.));
+        assert_eq!(bb.locspec("br".parse().expect("test")), (20., 20.));
+        assert_eq!(bb.locspec("b".parse().expect("test")), (15., 20.));
+        assert_eq!(bb.locspec("bl".parse().expect("test")), (10., 20.));
+        assert_eq!(bb.locspec("l".parse().expect("test")), (10., 15.));
+        assert_eq!(bb.locspec("c".parse().expect("test")), (15., 15.));
     }
 }

@@ -272,3 +272,18 @@ fn test_connector_previous() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_connector_corners() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="20" wh="10"/>
+<polyline id="c1" start="#a@t" end="#b@r"/>
+<polyline id="c2" start="#a@l" end="#b@r:40%" corner-offset="1"/>
+"##;
+    let expected1 = r##"id="c1" points="5 0, 5 -3, 33 -3, 33 25, 30 25""##;
+    let expected2 = r##"id="c2" points="0 5, -1 5, -1 15, 31 15, 31 24, 30 24""##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
