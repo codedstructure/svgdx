@@ -144,9 +144,9 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         .bbox()?
         .ok_or_else(|| SvgdxError::MissingBoundingBox(element.to_string()))?
         .locspec(text_anchor);
+
     tdx += t_dx;
     tdy += t_dy;
-
     Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 

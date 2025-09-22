@@ -1,15 +1,18 @@
 use super::SvgElement;
 use crate::context::ElementMap;
+use crate::elements::corner_route::render_match_corner;
 use crate::errors::{Result, SvgdxError};
-use crate::geometry::{parse_el_loc, strp_length, Length, LocSpec, ScalarSpec};
+use crate::geometry::{
+    parse_el_loc, strp_length, BoundingBox, ElementLoc, Length, LocSpec, ScalarSpec,
+};
 use crate::types::{attr_split, fstr, strp};
 
 pub fn is_connector(el: &SvgElement) -> bool {
     el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
 }
 
-#[derive(Clone, Copy, Debug)]
-enum Direction {
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Direction {
     Up,
     Right,
     Down,
@@ -17,9 +20,9 @@ enum Direction {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct Endpoint {
-    origin: (f32, f32),
-    dir: Option<Direction>,
+pub struct Endpoint {
+    pub origin: (f32, f32),
+    pub dir: Option<Direction>,
 }
 
 impl Endpoint {
@@ -71,8 +74,8 @@ pub struct Connector {
     source_element: SvgElement,
     start_el: Option<SvgElement>,
     end_el: Option<SvgElement>,
-    start: Endpoint,
-    end: Endpoint,
+    pub start: Endpoint,
+    pub end: Endpoint,
     conn_type: ConnectionType,
     offset: Option<Length>,
 }
@@ -123,6 +126,7 @@ fn shortest_link(
         for that_loc in edge_locations(conn_type) {
             let this_coord = this_bb.locspec(this_loc);
             let that_coord = that_bb.locspec(that_loc);
+            // always some as edge_locations does not include LineOffset
             let ((x1, y1), (x2, y2)) = (this_coord, that_coord);
             let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
             if dist_sq < min_dist_sq {
@@ -133,6 +137,12 @@ fn shortest_link(
         }
     }
     Ok((this_min_loc, that_min_loc))
+}
+
+#[allow(clippy::large_enum_variant)]
+enum ElementParseData {
+    El(SvgElement, Option<ElementLoc>, Option<Direction>),
+    Point(f32, f32),
 }
 
 impl Connector {
@@ -146,18 +156,69 @@ impl Connector {
         }
     }
 
+    fn parse_element(
+        element: &mut SvgElement,
+        elem_map: &impl ElementMap,
+        attr_name: &str,
+    ) -> Result<ElementParseData> {
+        let this_ref = element
+            .pop_attr(attr_name)
+            .ok_or_else(|| SvgdxError::MissingAttribute(attr_name.to_string()))?;
+
+        // Example: "#thing@tl" => top left coordinate of element id="thing"
+        if let Ok((elref, loc)) = parse_el_loc(&this_ref) {
+            let mut retdir = None;
+            let mut retloc = None;
+            if let Some(loc) = loc {
+                if let ElementLoc::LocSpec(ls) = loc {
+                    retdir = Self::loc_to_dir(ls);
+                }
+                retloc = Some(loc);
+            }
+            Ok(ElementParseData::El(
+                elem_map
+                    .get_element(&elref)
+                    .ok_or(SvgdxError::ReferenceError(elref))?
+                    .clone(),
+                retloc,
+                retdir,
+            ))
+        } else {
+            let mut parts = attr_split(&this_ref).map_while(|v| strp(&v).ok());
+
+            Ok(ElementParseData::Point(
+                parts.next().ok_or_else(|| {
+                    SvgdxError::InvalidData(
+                        (attr_name.to_owned() + "_ref x should be numeric").to_owned(),
+                    )
+                })?,
+                parts.next().ok_or_else(|| {
+                    SvgdxError::InvalidData(
+                        (attr_name.to_owned() + "_ref y should be numeric").to_owned(),
+                    )
+                })?,
+            ))
+        }
+    }
+
     pub fn from_element(
         element: &SvgElement,
         elem_map: &impl ElementMap,
         conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
-        let start_ref = element
-            .pop_attr("start")
-            .ok_or_else(|| SvgdxError::MissingAttribute("start".to_string()))?;
-        let end_ref = element
-            .pop_attr("end")
-            .ok_or_else(|| SvgdxError::MissingAttribute("end".to_string()))?;
+
+        let start_ret = Self::parse_element(&mut element, elem_map, "start")?;
+        let end_ret = Self::parse_element(&mut element, elem_map, "end")?;
+        let (start_el, mut start_loc, mut start_dir, start_point) = match start_ret {
+            ElementParseData::El(a, b, c) => (Some(a), b, c, None),
+            ElementParseData::Point(x, y) => (None, None, None, Some((x, y))),
+        };
+        let (end_el, mut end_loc, mut end_dir, end_point) = match end_ret {
+            ElementParseData::El(a, b, c) => (Some(a), b, c, None),
+            ElementParseData::Point(x, y) => (None, None, None, Some((x, y))),
+        };
+
         let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
             Some(
                 strp_length(&o_inner)
@@ -171,50 +232,6 @@ impl Connector {
         // Needs to support explicit coordinate pairs or element references, and
         // for element references support given locations or not (in which case
         // the location is determined automatically to give the shortest distance)
-        let mut start_el: Option<&SvgElement> = None;
-        let mut end_el: Option<&SvgElement> = None;
-        let mut start_loc: Option<LocSpec> = None;
-        let mut end_loc: Option<LocSpec> = None;
-        let mut start_point: Option<(f32, f32)> = None;
-        let mut end_point: Option<(f32, f32)> = None;
-        let mut start_dir: Option<Direction> = None;
-        let mut end_dir: Option<Direction> = None;
-
-        // Example: "#thing@tl" => top left coordinate of element id="thing"
-        if let Ok((elref, loc)) = parse_el_loc(&start_ref) {
-            if let Some(loc) = loc {
-                start_dir = Self::loc_to_dir(loc);
-                start_loc = Some(loc);
-            }
-            start_el = elem_map.get_element(&elref);
-        } else {
-            let mut parts = attr_split(&start_ref).map_while(|v| strp(&v).ok());
-            start_point = Some((
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData("start_ref x should be numeric".to_owned())
-                })?,
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData("start_ref y should be numeric".to_owned())
-                })?,
-            ));
-        }
-        if let Ok((elref, loc)) = parse_el_loc(&end_ref) {
-            if let Some(loc) = loc {
-                end_dir = Self::loc_to_dir(loc);
-                end_loc = Some(loc);
-            }
-            end_el = elem_map.get_element(&elref);
-        } else {
-            let mut parts = attr_split(&end_ref).map_while(|v| strp(&v).ok());
-            end_point = Some((
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData("end_ref x should be numeric".to_owned())
-                })?,
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData("end_ref y should be numeric".to_owned())
-                })?,
-            ));
-        }
 
         let (start, end) = match (start_point, end_point) {
             (Some(start_point), Some(end_point)) => (
@@ -222,17 +239,16 @@ impl Connector {
                 Endpoint::new(end_point, end_dir),
             ),
             (Some(start_point), None) => {
-                let end_el =
-                    end_el.ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?;
+                let end_el = end_el
+                    .as_ref()
+                    .ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?;
                 if end_loc.is_none() {
                     let eloc = closest_loc(end_el, start_point, conn_type, elem_map)?;
-                    end_loc = Some(eloc);
+                    end_loc = Some(ElementLoc::LocSpec(eloc));
                     end_dir = Self::loc_to_dir(eloc);
                 }
-                let end_coord = elem_map
-                    .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                    .locspec(end_loc.expect("Set from closest_loc"));
+                let end_coord = end_el
+                    .get_element_loc_coord(elem_map, end_loc.expect("Set from closest_loc"))?;
                 (
                     Endpoint::new(start_point, start_dir),
                     Endpoint::new(end_coord, end_dir),
@@ -240,16 +256,15 @@ impl Connector {
             }
             (None, Some(end_point)) => {
                 let start_el = start_el
+                    .as_ref()
                     .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?;
                 if start_loc.is_none() {
                     let sloc = closest_loc(start_el, end_point, conn_type, elem_map)?;
-                    start_loc = Some(sloc);
+                    start_loc = Some(ElementLoc::LocSpec(sloc));
                     start_dir = Self::loc_to_dir(sloc);
                 }
-                let start_coord = elem_map
-                    .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                    .locspec(start_loc.expect("Set from closest_loc"));
+                let start_coord = start_el
+                    .get_element_loc_coord(elem_map, start_loc.expect("Set from closest_loc"))?;
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_point, end_dir),
@@ -258,40 +273,35 @@ impl Connector {
             (None, None) => {
                 let (start_el, end_el) = (
                     start_el
+                        .as_ref()
                         .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?,
-                    end_el.ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?,
+                    end_el
+                        .as_ref()
+                        .ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?,
                 );
                 if start_loc.is_none() && end_loc.is_none() {
                     let (sloc, eloc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
-                    start_loc = Some(sloc);
-                    end_loc = Some(eloc);
+                    start_loc = Some(ElementLoc::LocSpec(sloc));
+                    end_loc = Some(ElementLoc::LocSpec(eloc));
                     start_dir = Self::loc_to_dir(sloc);
                     end_dir = Self::loc_to_dir(eloc);
                 } else if start_loc.is_none() {
-                    let end_coord = elem_map
-                        .get_element_bbox(end_el)?
-                        .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                        .locspec(end_loc.expect("Not both None"));
+                    let end_coord =
+                        end_el.get_element_loc_coord(elem_map, end_loc.expect("Not both None"))?;
                     let sloc = closest_loc(start_el, end_coord, conn_type, elem_map)?;
-                    start_loc = Some(sloc);
+                    start_loc = Some(ElementLoc::LocSpec(sloc));
                     start_dir = Self::loc_to_dir(sloc);
                 } else if end_loc.is_none() {
-                    let start_coord = elem_map
-                        .get_element_bbox(start_el)?
-                        .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                        .locspec(start_loc.expect("Not both None"));
+                    let start_coord = start_el
+                        .get_element_loc_coord(elem_map, start_loc.expect("Not both None"))?;
                     let eloc = closest_loc(end_el, start_coord, conn_type, elem_map)?;
-                    end_loc = Some(eloc);
+                    end_loc = Some(ElementLoc::LocSpec(eloc));
                     end_dir = Self::loc_to_dir(eloc);
                 }
-                let start_coord = elem_map
-                    .get_element_bbox(start_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?
-                    .locspec(start_loc.expect("Set above"));
-                let end_coord = elem_map
-                    .get_element_bbox(end_el)?
-                    .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?
-                    .locspec(end_loc.expect("Set above"));
+                let start_coord =
+                    start_el.get_element_loc_coord(elem_map, start_loc.expect("Set above"))?;
+                let end_coord =
+                    end_el.get_element_loc_coord(elem_map, end_loc.expect("Set above"))?;
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new(end_coord, end_dir),
@@ -302,8 +312,8 @@ impl Connector {
             source_element: element,
             start,
             end,
-            start_el: start_el.cloned(),
-            end_el: end_el.cloned(),
+            start_el,
+            end_el,
             conn_type,
             offset,
         })
@@ -394,96 +404,47 @@ impl Connector {
             )
             .with_attrs_from(&self.source_element),
             ConnectionType::Corner => {
-                let points;
-                if let (Some(start_dir_some), Some(end_dir_some)) = (self.start.dir, self.end.dir) {
-                    points = match (start_dir_some, end_dir_some) {
-                        // L-shaped connection
-                        (Direction::Up | Direction::Down, Direction::Left | Direction::Right) => {
-                            vec![(x1, y1), (self.start.origin.0, self.end.origin.1), (x2, y2)]
-                        }
-                        (Direction::Left | Direction::Right, Direction::Up | Direction::Down) => {
-                            vec![(x1, y1), (self.end.origin.0, self.start.origin.1), (x2, y2)]
-                        }
-                        // Z-shaped connection
-                        (Direction::Left, Direction::Right)
-                        | (Direction::Right, Direction::Left) => {
-                            let mid_x = self
-                                .offset
-                                .unwrap_or(default_ratio_offset)
-                                .calc_offset(self.start.origin.0, self.end.origin.0);
-                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
-                        }
-                        (Direction::Up, Direction::Down) | (Direction::Down, Direction::Up) => {
-                            let mid_y = self
-                                .offset
-                                .unwrap_or(default_ratio_offset)
-                                .calc_offset(self.start.origin.1, self.end.origin.1);
-                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
-                        }
-                        // U-shaped connection
-                        (Direction::Left, Direction::Left) => {
-                            let min_x = self.start.origin.0.min(self.end.origin.0);
-                            let mid_x = min_x
-                                - self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .ok_or_else(|| {
-                                        SvgdxError::InvalidData(
-                                            "Corner type requires absolute offset".to_owned(),
-                                        )
-                                    })?;
-                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
-                        }
-                        (Direction::Right, Direction::Right) => {
-                            let max_x = self.start.origin.0.max(self.end.origin.0);
-                            let mid_x = max_x
-                                + self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .ok_or_else(|| {
-                                        SvgdxError::InvalidData(
-                                            "Corner type requires absolute offset".to_owned(),
-                                        )
-                                    })?;
-
-                            vec![(x1, y1), (mid_x, y1), (mid_x, y2), (x2, y2)]
-                        }
-                        (Direction::Up, Direction::Up) => {
-                            let min_y = self.start.origin.1.min(self.end.origin.1);
-                            let mid_y = min_y
-                                - self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .ok_or_else(|| {
-                                        SvgdxError::InvalidData(
-                                            "Corner type requires absolute offset".to_owned(),
-                                        )
-                                    })?;
-
-                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
-                        }
-                        (Direction::Down, Direction::Down) => {
-                            let max_y = self.start.origin.1.max(self.end.origin.1);
-                            let mid_y = max_y
-                                + self
-                                    .offset
-                                    .unwrap_or(default_abs_offset)
-                                    .absolute()
-                                    .ok_or_else(|| {
-                                        SvgdxError::InvalidData(
-                                            "Corner type requires absolute offset".to_owned(),
-                                        )
-                                    })?;
-
-                            vec![(x1, y1), (x1, mid_y), (x2, mid_y), (x2, y2)]
-                        }
-                    };
-                } else {
-                    points = vec![(x1, y1), (x2, y2)];
+                let mut abs_offset_set = false;
+                let mut start_abs_offset = default_abs_offset
+                    .absolute()
+                    .expect("set to absolute 3 above");
+                let mut end_abs_offset = start_abs_offset;
+                let mut ratio_offset = default_ratio_offset
+                    .ratio()
+                    .expect("set to ratio 0.5 above");
+                if let Some(offset) = &self.offset {
+                    if let Some(o) = offset.absolute() {
+                        start_abs_offset = o;
+                        end_abs_offset = o;
+                        abs_offset_set = true;
+                    }
+                    if let Some(r) = offset.ratio() {
+                        ratio_offset = r;
+                    }
                 }
+
+                let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
+                let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
+                if let Some(el) = &self.start_el {
+                    if let Ok(Some(el_bb)) = el.bbox() {
+                        start_el_bb = el_bb;
+                    }
+                }
+                if let Some(el) = &self.end_el {
+                    if let Ok(Some(el_bb)) = el.bbox() {
+                        end_el_bb = el_bb;
+                    }
+                }
+                let points = render_match_corner(
+                    self,
+                    ratio_offset,
+                    start_abs_offset,
+                    end_abs_offset,
+                    start_el_bb,
+                    end_el_bb,
+                    abs_offset_set,
+                )?;
+
                 // TODO: remove repeated points.
                 if points.len() == 2 {
                     SvgElement::new(

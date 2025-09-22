@@ -141,6 +141,13 @@ pub enum LocSpec {
     LeftEdge(Length),
 }
 
+/// `LocSpec` defines a location on a `SvgElement`
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ElementLoc {
+    LocSpec(LocSpec),
+    LineOffset(Length),
+}
+
 impl LocSpec {
     pub fn is_top(&self) -> bool {
         matches!(
@@ -168,6 +175,28 @@ impl LocSpec {
             self,
             Self::Left | Self::TopLeft | Self::BottomLeft | Self::LeftEdge(_)
         )
+    }
+}
+
+impl FromStr for ElementLoc {
+    type Err = SvgdxError;
+
+    fn from_str(value: &str) -> Result<Self> {
+        if let Ok(ls) = LocSpec::from_str(value) {
+            Ok(ElementLoc::LocSpec(ls))
+        } else if let Some((edge, len)) = value.split_once(EDGESPEC_SEP) {
+            let len = len.parse::<Length>()?;
+            match edge {
+                "" => Ok(ElementLoc::LineOffset(len)),
+                _ => Err(SvgdxError::InvalidData(format!(
+                    "Invalid LocSpec format {value}"
+                ))),
+            }
+        } else {
+            Err(SvgdxError::InvalidData(format!(
+                "Invalid LocSpec format {value}"
+            )))
+        }
     }
 }
 
@@ -340,8 +369,8 @@ impl FromStr for DirSpec {
     }
 }
 
-/// Parse a elref + optional locspec, e.g. `#id@tl:10%` or `#id`
-pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<LocSpec>)> {
+/// Parse a elref + optional ElementLoc, e.g. `#id@tl:10%` or `#id`
+pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     let (elref, remain) = extract_elref(s)?;
     if remain.is_empty() {
         return Ok((elref, None));
@@ -392,17 +421,23 @@ mod test {
     fn test_parse_loc() {
         assert_eq!(
             parse_el_loc("#a@b").unwrap(),
-            (ElRef::Id("a".to_string()), Some(LocSpec::Bottom))
+            (
+                ElRef::Id("a".to_string()),
+                Some(ElementLoc::LocSpec(LocSpec::Bottom))
+            )
         );
         assert_eq!(
             parse_el_loc("#id@tl").unwrap(),
-            (ElRef::Id("id".to_string()), Some(LocSpec::TopLeft))
+            (
+                ElRef::Id("id".to_string()),
+                Some(ElementLoc::LocSpec(LocSpec::TopLeft))
+            )
         );
         assert_eq!(
             parse_el_loc("#id@t:25%").unwrap(),
             (
                 ElRef::Id("id".to_string()),
-                Some(LocSpec::TopEdge(Length::Ratio(0.25)))
+                Some(ElementLoc::LocSpec(LocSpec::TopEdge(Length::Ratio(0.25))))
             )
         );
         assert_eq!(

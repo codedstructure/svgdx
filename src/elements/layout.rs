@@ -7,11 +7,12 @@ use crate::constants::{
     SCALARSPEC_SEP, VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
+use crate::elements::line_offset::get_point_along_linelike_type_el;
 use crate::elements::path::path_bbox;
 use crate::errors::{Result, SvgdxError};
 use crate::geometry::{
-    strp_length, BoundingBox, DirSpec, LocSpec, Position, ScalarSpec, Size, TransformAttr,
-    TrblLength,
+    strp_length, BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size,
+    TransformAttr, TrblLength,
 };
 use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, split_compound_attr, strp};
 
@@ -224,6 +225,20 @@ impl SvgElement {
         p.set_position_attrs(self);
 
         Ok(())
+    }
+
+    pub fn get_element_loc_coord(
+        &self,
+        elem_map: &impl ElementMap,
+        loc: ElementLoc,
+    ) -> Result<(f32, f32)> {
+        match loc {
+            ElementLoc::LineOffset(l) => get_point_along_linelike_type_el(self, l),
+            ElementLoc::LocSpec(spec) => Ok(elem_map
+                .get_element_bbox(self)?
+                .ok_or_else(|| SvgdxError::MissingBoundingBox(self.to_string()))?
+                .locspec(spec)),
+        }
     }
 
     fn handle_containment(&mut self, ctx: &dyn ContextView) -> Result<()> {
