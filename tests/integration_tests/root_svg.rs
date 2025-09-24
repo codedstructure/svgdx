@@ -152,3 +152,29 @@ fn test_root_svg_bbox_out_of_order() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_root_svg_preserve_attrs() {
+    let input = r##"
+<svg id="abc123" class="svgdx-a blob" data-attr="arbitrary" style="border: 1px solid red;">
+  <config border="0"/>
+  <rect x="10" y="10" width="50" height="25"/>
+</svg>
+"##;
+    let expected = r##"<svg id="abc123" version="1.1" xmlns="http://www.w3.org/2000/svg" width="50mm" height="25mm" data-attr="arbitrary" viewBox="10 10 50 25" style="border: 1px solid red;" class="svgdx-a blob">"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_root_svg_style_combo() {
+    let input = r##"
+<svg style="border: 1px solid red;">
+  <config border="0" svg-style="background: silver;"/>
+  <rect x="10" y="10" width="50" height="25"/>
+</svg>
+"##;
+    let expected = r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50mm" height="25mm" viewBox="10 10 50 25" style="border: 1px solid red; background: silver;">"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

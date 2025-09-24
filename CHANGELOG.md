@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: preserve `class` and `style` attributes on root SVG element.
+
 ## [0.23.0 - 2025-09-21]
 
 - Improved: support for `<g>` element universal layout. Group elements can now

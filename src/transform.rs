@@ -190,11 +190,15 @@ impl Transformer {
     ) -> Result<SvgElement> {
         let mut new_svg_attrs = AttrMap::new();
         let mut orig_svg_attrs = HashMap::new();
+        let mut orig_svg_class = None;
+        let mut orig_svg_style = None;
         if let OutputEvent::Start(orig_svg) = first_svg {
             for (k, v) in orig_svg.get_attrs() {
                 new_svg_attrs.insert(k, v);
             }
             orig_svg_attrs = orig_svg.get_attrs().into_iter().collect();
+            orig_svg_class = Some(orig_svg.get_classes());
+            orig_svg_style = Some(orig_svg.get_styles().clone());
         }
         if !orig_svg_attrs.contains_key("version") {
             new_svg_attrs.insert("version", "1.1");
@@ -207,8 +211,18 @@ impl Transformer {
                 new_svg_attrs.insert("id", local_id.as_str());
             }
         }
+        let mut root_style = orig_svg_style.map(|s| s.to_string()).unwrap_or_default();
         if let Some(svg_style) = &self.context.config.svg_style {
-            new_svg_attrs.insert("style", svg_style.as_str());
+            root_style.push(' ');
+            root_style.push_str(svg_style.as_str());
+        }
+        if !root_style.is_empty() {
+            new_svg_attrs.insert("style", root_style);
+        }
+        if let Some(class) = orig_svg_class {
+            if !class.is_empty() {
+                new_svg_attrs.insert("class", class.join(" "));
+            }
         }
         // If width or height are provided, leave width/height/viewBox alone.
         let orig_width = orig_svg_attrs.get("width");
