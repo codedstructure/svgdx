@@ -7,6 +7,7 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
     let (is_percent, dist) = match length {
         Length::Absolute(abs) => (false, abs),
         Length::Ratio(ratio) => (true, ratio),
+        Length::Rational(numer, denom) => (true, numer as f32 / denom.get() as f32),
     };
 
     if let (Some(x1), Some(y1), Some(x2), Some(y2)) = (
@@ -41,6 +42,7 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
     let (is_percent, dist) = match length {
         Length::Absolute(abs) => (false, abs),
         Length::Ratio(ratio) => (true, ratio),
+        Length::Rational(numer, denom) => (true, numer as f32 / denom.get() as f32),
     };
 
     if let Some(points) = el.get_attr("points") {
@@ -88,6 +90,7 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
     let (is_percent, dist) = match length {
         Length::Absolute(abs) => (false, abs),
         Length::Ratio(ratio) => (true, ratio),
+        Length::Rational(numer, denom) => (true, numer as f32 / denom.get() as f32),
     };
 
     if let Some(d) = el.get_attr("d") {
