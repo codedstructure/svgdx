@@ -14,7 +14,7 @@ use crate::geometry::{
     strp_length, BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size,
     TransformAttr, TrblLength,
 };
-use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, split_compound_attr, strp};
+use crate::types::{attr_split, extract_elref, fstr, split_compound_attr, strp};
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -810,6 +810,9 @@ fn pos_attr_helper(
     bbox: &BoundingBox,
     attr_ss: ScalarSpec,
 ) -> Result<String> {
+    // NOTE: at this point assumed that the delta (if any) is a single value,
+    // i.e. that split_compound_attr has already been applied.
+
     // default value - same 'type' as attr name, e.g. y2 => ymax
     let mut v = bbox.scalarspec(attr_ss);
 
@@ -831,7 +834,7 @@ fn pos_attr_helper(
             // will set x2 to the 'x2' (i.e. right edge) of #abc
             attr_ss.into()
         };
-        // "[@loc][ dx dy]"
+        // "[@loc][ delta]"
         if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
             loc = ls.parse()?;
         } else if !loc_str.is_empty() {
@@ -840,12 +843,16 @@ fn pos_attr_helper(
             )));
         }
         let (x, y) = bbox.locspec(loc);
-        let (dx, dy) = extract_dx_dy(dxy)?;
         use ScalarSpec::*;
-        v = match attr_ss {
-            Minx | Maxx | Cx => x + dx,
-            Miny | Maxy | Cy => y + dy,
-            _ => v,
+        let (base, dim) = match attr_ss {
+            Minx | Maxx | Cx => (x, bbox.width()),
+            Miny | Maxy | Cy => (y, bbox.height()),
+            _ => (v, 0.0),
+        };
+        v = if !dxy.is_empty() {
+            base + strp_length(dxy)?.evaluate(dim)
+        } else {
+            base
         };
     }
     Ok(fstr(v).to_string())
@@ -920,14 +927,6 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
 fn is_pos_attr(name: &str) -> bool {
     // Position attributes are identical for all element types
     matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
-}
-
-/// Extract dx/dy from a string such as '10 20' or '10' (in which case both are 10)
-fn extract_dx_dy(input: &str) -> Result<(f32, f32)> {
-    let mut parts = attr_split_cycle(input);
-    let dx = strp(&parts.next().unwrap_or("0".to_string()))?;
-    let dy = strp(&parts.next().unwrap_or("0".to_string()))?;
-    Ok((dx, dy))
 }
 
 fn expand_compound_size(el: &mut SvgElement) {
@@ -1101,10 +1100,10 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "37");
 
-        let result = pos_attr_helper(&element, "@l:37 3 5", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@l:37 3", &bbox, ScalarSpec::Minx);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "3");
-        let result = pos_attr_helper(&element, "@l:37 3 5", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@l:37 5", &bbox, ScalarSpec::Miny);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "42");
     }
@@ -1144,12 +1143,13 @@ mod tests {
         let result = pos_attr_helper(&element, "invalid", &bbox, ScalarSpec::Minx);
         assert!(result.is_err());
 
+        // compound deltas should have been split up already
+        let result = pos_attr_helper(&element, " 30 20", &bbox, ScalarSpec::Minx);
+        assert!(result.is_err());
+
         // Scalar-spec isn't valid for pos_attr_helper
         let result = pos_attr_helper(&element, "~w", &bbox, ScalarSpec::Minx);
         assert_eq!(result.unwrap(), "100");
-
-        let result = pos_attr_helper(&element, " 30 20", &bbox, ScalarSpec::Minx);
-        assert_eq!(result.unwrap(), "30");
     }
 
     #[derive(Default)]
