@@ -15,6 +15,9 @@ impl EventGen for DefaultsElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
+        // both the `defaults` element itself and any inner elements
+        // are used to set default attr values.
+        context.set_element_default(&self.0);
         for ev in self.0.inner_events(context).unwrap_or_default() {
             // we only care about Element-generating (i.e. start/empty) events
             if let Ok(el) = SvgElement::try_from(ev.clone()) {

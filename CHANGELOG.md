@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: default attrs can now be specified directly on a `<defaults>` element,
+  as well as any inner elements. Given attributes are equivalent to being
+  present on an additional `<_ ...>` first child of a `<defaults>` block.
+
 - Fixed: preserve `class` and `style` attributes on root SVG element.
 
 ## [0.23.0 - 2025-09-21]

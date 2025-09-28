@@ -13,6 +13,19 @@ fn test_defaults_simple() {
 }
 
 #[test]
+fn test_defaults_empty() {
+    for input in vec![
+        r##"<defaults wh="37"/><defaults xy="10"/><rect />"##,
+        r##"<defaults wh="37" xy="10"/><rect />"##,
+        r##"<defaults wh="37"><_ xy="10"/></defaults><rect />"##,
+    ] {
+        let expected = r#"<rect x="10" y="10" width="37" height="37"/>"#;
+        let output = transform_str_default(input).unwrap();
+        assert_contains!(output, expected, "input: {}", input);
+    }
+}
+
+#[test]
 fn test_defaults_accumulate() {
     // Attributes get replaced
     let input = r##"

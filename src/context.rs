@@ -55,10 +55,12 @@ impl ElementMatch {
 
 impl From<&SvgElement> for ElementMatch {
     fn from(el: &SvgElement) -> Self {
-        let element = if el.name() == "_" {
-            None
-        } else {
-            Some(el.name().to_owned())
+        // attrs on the defaults element itself or on any
+        // child element with name '_' will apply to all
+        // element types, subject to `match`.
+        let element = match el.name() {
+            "_" | "defaults" => None,
+            _ => Some(el.name().to_owned()),
         };
         let mut matches = Vec::new();
         let mut is_final = false;
