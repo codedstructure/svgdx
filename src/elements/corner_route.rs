@@ -78,11 +78,11 @@ fn get_lines(
 
     if start_el_bb.x1 > end_el_bb.x2 {
         // there is a gap
-        x_lines.push((start_el_bb.x1 + end_el_bb.x2) * 0.5);
+        x_lines.push(start_el_bb.x1 * (1.0 - ratio_offset) + end_el_bb.x2 * ratio_offset);
         mid_x = x_lines.len() - 1;
     } else if start_el_bb.x2 < end_el_bb.x1 {
         // there is a gap
-        x_lines.push((start_el_bb.x2 + end_el_bb.x1) * 0.5);
+        x_lines.push(start_el_bb.x2 * (1.0 - ratio_offset) + end_el_bb.x1 * ratio_offset);
         mid_x = x_lines.len() - 1;
     }
 

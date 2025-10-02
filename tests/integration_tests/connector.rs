@@ -287,3 +287,30 @@ fn test_connector_corners() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_elbow_connector() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" wh="10" xy="30 15"/>
+<polyline id="z1" start="#a@r:40%" end="#b@l:40%" corner-offset="55%"/>
+<polyline id="z2" start="#b@l:60%" end="#a@r:60%" corner-offset="55%"/>
+"##;
+    let expected1 = r##"<polyline id="z1" points="10 4, 21 4, 21 19, 30 19"/>"##;
+    let expected2 = r##"<polyline id="z2" points="30 21, 19 21, 19 6, 10 6"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" wh="10" xy="15 30"/>
+<polyline id="z1" start="#a@b:40%" end="#b@t:40%" corner-offset="55%"/>
+<polyline id="z2" start="#b@t:60%" end="#a@b:60%" corner-offset="55%"/>
+"##;
+        let expected1 = r##"<polyline id="z1" points="4 10, 4 21, 19 21, 19 30"/>"##;
+        let expected2 = r##"<polyline id="z2" points="21 30, 21 19, 6 19, 6 10"/>"##;
+        let output = transform_str_default(input).unwrap();
+        assert_contains!(output, expected1);
+        assert_contains!(output, expected2);
+}
