@@ -2,8 +2,6 @@
 use std::fmt::{self, Display, Formatter};
 use std::str::FromStr;
 
-use itertools::Itertools;
-
 use super::functions::{eval_function, Function};
 use crate::constants::{
     ELREF_ID_PREFIX, ELREF_PREVIOUS, EXPR_END, EXPR_START, VAR_END_BRACE, VAR_OPEN_BRACE,
@@ -80,8 +78,14 @@ impl Display for ExprValue {
             Self::Number(n) => write!(f, "{}", fstr(*n)),
             Self::String(s) => write!(f, "'{}'", escape(s)),
             Self::Text(t) => write!(f, "{t}"),
-            Self::List(_) => {
-                write!(f, "{}", self.flatten().into_iter().join(", "))
+            Self::List(list) => {
+                for (idx, v) in list.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{v}")?;
+                }
+                Ok(())
             }
         }
     }
@@ -537,7 +541,7 @@ impl<'a> EvalState<'a> {
     }
 
     fn lookup(&mut self, v: &str) -> Result<ExprValue> {
-        if self.checked_vars.iter().contains(&String::from(v)) {
+        if self.checked_vars.iter().any(|var| var == v) {
             return Err(SvgdxError::CircularRefError(v.to_owned()));
         }
         self.checked_vars.push(v.to_string());

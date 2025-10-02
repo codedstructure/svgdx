@@ -5,8 +5,6 @@ use std::num::{ParseFloatError, ParseIntError};
 use std::str::ParseBoolError;
 use std::string::FromUtf8Error;
 
-use itertools::Itertools;
-
 use crate::elements::SvgElement;
 use crate::types::{ElRef, OrderIndex};
 
@@ -57,7 +55,9 @@ impl fmt::Display for SvgdxError {
             SvgdxError::MessageError(reason) => write!(f, "{reason}"),
             SvgdxError::InternalLogicError(reason) => write!(f, "Internal logic error: {reason}"),
             SvgdxError::MultiError(errors) => {
-                for (_, (el, err)) in errors.iter().sorted_by(|a, b| a.0.cmp(b.0)) {
+                let mut errs = errors.iter().collect::<Vec<_>>();
+                errs.sort_by(|a, b| a.0.cmp(b.0));
+                for (_, (el, err)) in errs {
                     write!(f, "\n {:>4}: {}: {}", el.src_line, el.original, err)?;
                 }
                 Ok(())

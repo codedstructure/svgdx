@@ -1,6 +1,5 @@
 use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
 use crate::errors::{Result, SvgdxError};
-use itertools::Itertools;
 use std::fmt::{self, Display};
 use std::num::NonZeroU8;
 use std::ops::{Deref, DerefMut};
@@ -152,7 +151,14 @@ impl OrderIndex {
 
 impl Display for OrderIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{{}}}", self.0.iter().map(|i| i.to_string()).join("."))
+        write!(f, "{{")?;
+        for (i, v) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ".")?;
+            }
+            write!(f, "{v}")?;
+        }
+        write!(f, "}}")
     }
 }
 

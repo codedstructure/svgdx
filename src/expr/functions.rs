@@ -1,7 +1,6 @@
 use super::expression::{EvalState, ExprValue};
 use crate::errors::{Result, SvgdxError};
 
-use itertools::Itertools;
 use rand::Rng;
 use std::str::FromStr;
 
@@ -290,7 +289,7 @@ pub fn eval_function(
             }
             let value = &args[0];
             let rest = &args[1..];
-            if rest.iter().contains(&value) {
+            if rest.iter().any(|v| v == value) {
                 1.
             } else {
                 0.
@@ -497,7 +496,7 @@ pub fn eval_function(
         }
         Function::Join => {
             if let Some((sep, rest)) = args.string_list()?.split_first() {
-                let combined = rest.iter().join(sep);
+                let combined = rest.to_vec().join(sep);
                 return Ok(ExprValue::String(combined));
             } else {
                 return Err(SvgdxError::ParseError(
