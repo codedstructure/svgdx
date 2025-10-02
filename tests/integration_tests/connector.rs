@@ -308,9 +308,9 @@ fn test_elbow_connector() {
 <polyline id="z1" start="#a@b:40%" end="#b@t:40%" corner-offset="55%"/>
 <polyline id="z2" start="#b@t:60%" end="#a@b:60%" corner-offset="55%"/>
 "##;
-        let expected1 = r##"<polyline id="z1" points="4 10, 4 21, 19 21, 19 30"/>"##;
-        let expected2 = r##"<polyline id="z2" points="21 30, 21 19, 6 19, 6 10"/>"##;
-        let output = transform_str_default(input).unwrap();
-        assert_contains!(output, expected1);
-        assert_contains!(output, expected2);
+    let expected1 = r##"<polyline id="z1" points="4 10, 4 21, 19 21, 19 30"/>"##;
+    let expected2 = r##"<polyline id="z2" points="21 30, 21 19, 6 19, 6 10"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
 }
