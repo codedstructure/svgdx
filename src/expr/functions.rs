@@ -1,5 +1,5 @@
 use super::expression::{EvalState, ExprValue};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 
 use rand::Rng;
 use std::str::FromStr;
@@ -115,7 +115,7 @@ pub enum Function {
 }
 
 impl FromStr for Function {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         Ok(match value {
@@ -172,11 +172,7 @@ impl FromStr for Function {
             "trim" => Self::Trim,
             "join" => Self::Join,
             "_" => Self::Text,
-            _ => {
-                return Err(SvgdxError::ParseError(format!(
-                    "Unknown function: '{value}'"
-                )))
-            }
+            _ => return Err(Error::Parse(format!("Unknown function: '{value}'"))),
         })
     }
 }
@@ -203,7 +199,7 @@ pub fn eval_function(
         Function::Addv => {
             let args = args.number_list()?;
             if args.len() % 2 != 0 {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "addv() requires an even number of arguments".to_string(),
                 ));
             }
@@ -217,7 +213,7 @@ pub fn eval_function(
         Function::Subv => {
             let args = args.number_list()?;
             if args.len() % 2 != 0 {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "subv() requires an even number of arguments".to_string(),
                 ));
             }
@@ -231,7 +227,7 @@ pub fn eval_function(
         Function::Scalev => {
             let args = args.number_list()?;
             if args.len() < 2 {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "scalev() requires at least two arguments".to_string(),
                 ));
             }
@@ -266,7 +262,7 @@ pub fn eval_function(
         Function::Select => {
             let args = args.flatten();
             if args.len() < 2 {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "select() requires at least two arguments".to_string(),
                 ));
             }
@@ -275,7 +271,7 @@ pub fn eval_function(
             if n < rest.len() {
                 return Ok(rest[n].to_owned());
             } else {
-                return Err(SvgdxError::InvalidData(
+                return Err(Error::InvalidData(
                     "select() index out of range".to_string(),
                 ));
             }
@@ -283,7 +279,7 @@ pub fn eval_function(
         Function::In => {
             let args = args.flatten();
             if args.is_empty() {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "in() requires at least one argument".to_string(),
                 ));
             }
@@ -333,7 +329,7 @@ pub fn eval_function(
             let (min, max) = args.number_pair()?;
             let (min, max) = (min as i32, max as i32);
             if min > max {
-                return Err(SvgdxError::InvalidData(
+                return Err(Error::InvalidData(
                     "randint(min, max) - `min` must be <= `max`".to_string(),
                 ));
             }
@@ -347,21 +343,17 @@ pub fn eval_function(
             .number_list()?
             .into_iter()
             .max_by(|a, b| a.total_cmp(b))
-            .ok_or_else(|| {
-                SvgdxError::InvalidData("max() requires at least one argument".to_owned())
-            })?,
+            .ok_or_else(|| Error::InvalidData("max() requires at least one argument".to_owned()))?,
         Function::Min => args
             .number_list()?
             .into_iter()
             .min_by(|a, b| a.total_cmp(b))
-            .ok_or_else(|| {
-                SvgdxError::InvalidData("min() requires at least one argument".to_owned())
-            })?,
+            .ok_or_else(|| Error::InvalidData("min() requires at least one argument".to_owned()))?,
         Function::Sum => args.number_list()?.into_iter().sum(),
         Function::Product => args.number_list()?.into_iter().product(),
         Function::Mean => {
             if args.is_empty() {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "mean() requires at least one argument".to_string(),
                 ));
             }
@@ -371,7 +363,7 @@ pub fn eval_function(
         Function::Clamp => {
             let (x, min, max) = args.number_triple()?;
             if min > max {
-                return Err(SvgdxError::InvalidData(
+                return Err(Error::InvalidData(
                     "clamp(x, min, max) - `min` must be <= `max`".to_string(),
                 ));
             }
@@ -437,9 +429,7 @@ pub fn eval_function(
                     return Ok(b.clone());
                 }
             }
-            return Err(SvgdxError::ParseError(
-                "if() requires three arguments".to_string(),
-            ));
+            return Err(Error::Parse("if() requires three arguments".to_string()));
         }
         Function::Not => {
             if args.one_number()? == 0. {
@@ -499,7 +489,7 @@ pub fn eval_function(
                 let combined = rest.to_vec().join(sep);
                 return Ok(ExprValue::String(combined));
             } else {
-                return Err(SvgdxError::ParseError(
+                return Err(Error::Parse(
                     "join() requires at least one argument".to_string(),
                 ));
             }

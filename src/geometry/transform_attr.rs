@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
 use crate::types::{fstr, strp};
 
@@ -36,18 +36,18 @@ enum TransformType {
 }
 
 impl FromStr for TransformType {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         let mut parts = value.splitn(2, '(');
         let name = parts
             .next()
-            .ok_or_else(|| SvgdxError::ParseError("No transform name".to_owned()))?;
+            .ok_or_else(|| Error::Parse("No transform name".to_owned()))?;
         let args = parts
             .next()
-            .ok_or_else(|| SvgdxError::ParseError("No transform args".to_owned()))?
+            .ok_or_else(|| Error::Parse("No transform args".to_owned()))?
             .strip_suffix(')')
-            .ok_or_else(|| SvgdxError::ParseError("No closing bracket".to_owned()))?
+            .ok_or_else(|| Error::Parse("No closing bracket".to_owned()))?
             .split(&[',', ' ', '\t', '\n', '\r'])
             .filter(|&v| !v.is_empty())
             .map(strp)
@@ -61,7 +61,7 @@ impl FromStr for TransformType {
                 } else if args.len() == 2 {
                     TransformType::Translate(args[0], args[1])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for translate".to_string(),
                     ));
                 }
@@ -73,7 +73,7 @@ impl FromStr for TransformType {
                 } else if args.len() == 2 {
                     TransformType::Scale(args[0], args[1])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for scale".to_string(),
                     ));
                 }
@@ -85,7 +85,7 @@ impl FromStr for TransformType {
                 } else if args.len() == 3 {
                     TransformType::Rotate(args[0], args[1], args[2])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for rotate".to_string(),
                     ));
                 }
@@ -95,7 +95,7 @@ impl FromStr for TransformType {
                 if args.len() == 1 {
                     TransformType::SkewX(args[0])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for skewX".to_string(),
                     ));
                 }
@@ -105,7 +105,7 @@ impl FromStr for TransformType {
                 if args.len() == 1 {
                     TransformType::SkewY(args[0])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for skewY".to_string(),
                     ));
                 }
@@ -115,14 +115,12 @@ impl FromStr for TransformType {
                 if args.len() == 6 {
                     TransformType::Matrix(args[0], args[1], args[2], args[3], args[4], args[5])
                 } else {
-                    return Err(SvgdxError::ParseError(
+                    return Err(Error::Parse(
                         "Invalid number of arguments for matrix".to_string(),
                     ));
                 }
             }
-            _ => Err(SvgdxError::ParseError(format!(
-                "Unknown transform type: '{name}'"
-            )))?,
+            _ => Err(Error::Parse(format!("Unknown transform type: '{name}'")))?,
         })
     }
 }
@@ -133,7 +131,7 @@ pub struct TransformAttr {
 }
 
 impl FromStr for TransformAttr {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         let parts = value.split_inclusive(')').map(|v| v.trim());

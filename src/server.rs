@@ -9,7 +9,7 @@ use axum::{
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::Sender;
 
-use crate::errors::SvgdxError;
+use crate::errors::Error;
 use crate::{transform_str, TransformConfig};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
@@ -42,7 +42,7 @@ async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResp
         .and_then(|output| {
             if output.is_empty() {
                 // Can't build a valid image/svg+xml response from empty string.
-                Err(SvgdxError::from("Empty response"))
+                Err(Error::Document("Empty response".into()))
             } else {
                 Ok(output)
             }

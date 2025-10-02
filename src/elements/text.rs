@@ -2,7 +2,7 @@ use super::SvgElement;
 use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp};
 
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 
 fn get_text_value(element: &mut SvgElement) -> String {
     let text_value = element
@@ -45,12 +45,12 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = parts.next().ok_or_else(|| {
-                SvgdxError::ParseError("dx from text-dxy should be numeric".to_owned())
-            })?;
-            t_dy = parts.next().ok_or_else(|| {
-                SvgdxError::ParseError("dy from text-dxy should be numeric".to_owned())
-            })?;
+            t_dx = parts
+                .next()
+                .ok_or_else(|| Error::Parse("dx from text-dxy should be numeric".to_owned()))?;
+            t_dy = parts
+                .next()
+                .ok_or_else(|| Error::Parse("dy from text-dxy should be numeric".to_owned()))?;
         }
         if let Some(dx) = dx {
             t_dx = strp(&dx)?;
@@ -142,7 +142,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
     let (mut tdx, mut tdy) = element
         .bbox()?
-        .ok_or_else(|| SvgdxError::MissingBoundingBox(element.to_string()))?
+        .ok_or_else(|| Error::MissingBBox(element.to_string()))?
         .locspec(text_anchor);
 
     tdx += t_dx;

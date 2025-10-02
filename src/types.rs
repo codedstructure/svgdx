@@ -1,5 +1,5 @@
 use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use std::fmt::{self, Display};
 use std::num::NonZeroU8;
 use std::ops::{Deref, DerefMut};
@@ -25,7 +25,7 @@ pub fn fstr(x: f32) -> String {
 pub fn strp(s: &str) -> Result<f32> {
     s.trim()
         .parse::<f32>()
-        .map_err(|_| SvgdxError::ParseError(format!("Expected a number: '{s}'")))
+        .map_err(|_| Error::Parse(format!("Expected a number: '{s}'")))
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
@@ -36,14 +36,14 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
     for ch in s.trim().chars() {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
-                return Err(SvgdxError::ParseError(format!(
+                return Err(Error::Parse(format!(
                     "Invalid character in numeric value: '{ch}'"
                 )));
             }
             value.push(ch);
         } else {
             if value.is_empty() {
-                return Err(SvgdxError::ParseError(format!(
+                return Err(Error::Parse(format!(
                     "'{s}' does not start with numeric value"
                 )));
             }
@@ -400,7 +400,7 @@ impl Display for StyleMap {
 }
 
 impl FromStr for StyleMap {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         let mut styles = Self::new();
@@ -583,15 +583,13 @@ pub enum ElRef {
 }
 
 impl FromStr for ElRef {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         let (elref, remain) = extract_elref(s)?;
         if remain.is_empty() {
             Ok(elref)
         } else {
-            Err(SvgdxError::ParseError(format!(
-                "Invalid elref format '{s}'"
-            )))
+            Err(Error::Parse(format!("Invalid elref format '{s}'")))
         }
     }
 }
@@ -644,9 +642,7 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         return Ok((elref, new_s));
     }
 
-    Err(SvgdxError::ParseError(format!(
-        "Invalid elref format '{s}'"
-    )))
+    Err(Error::Parse(format!("Invalid elref format '{s}'")))
 }
 
 #[cfg(test)]

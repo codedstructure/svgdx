@@ -1,6 +1,6 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::OutputList;
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
@@ -20,11 +20,11 @@ struct LoopDef {
 }
 
 impl TryFrom<&SvgElement> for LoopDef {
-    type Error = SvgdxError;
+    type Error = Error;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name() != "loop" {
-            return Err(SvgdxError::InvalidData(
+            return Err(Error::InvalidData(
                 "LoopType can only be created from a loop element".to_string(),
             ));
         }
@@ -45,9 +45,7 @@ impl TryFrom<&SvgElement> for LoopDef {
         } else if let Some(until_expr) = element.get_attr("until") {
             loop_type = LoopType::Until(until_expr.to_string());
         } else {
-            return Err(SvgdxError::MissingAttribute(
-                "count | while | until".to_string(),
-            ));
+            return Err(Error::MissingAttr("count | while | until".to_string()));
         }
         Ok(Self {
             loop_type,
@@ -119,10 +117,7 @@ impl EventGen for LoopElement {
                 iteration += 1;
                 loop_var_value += loop_step;
                 if iteration > context.config.loop_limit {
-                    return Err(SvgdxError::LoopLimitError(
-                        iteration,
-                        context.config.loop_limit,
-                    ));
+                    return Err(Error::LoopLimit(iteration, context.config.loop_limit));
                 }
             }
         }
@@ -137,16 +132,16 @@ struct ForDef {
 }
 
 impl TryFrom<&SvgElement> for ForDef {
-    type Error = SvgdxError;
+    type Error = Error;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         let var_name = element
             .get_attr("var")
-            .ok_or_else(|| SvgdxError::MissingAttribute("var".to_string()))?;
+            .ok_or_else(|| Error::MissingAttr("var".to_string()))?;
         let idx_name = element.get_attr("idx-var");
         let data = element
             .get_attr("data")
-            .ok_or_else(|| SvgdxError::MissingAttribute("data".to_string()))?;
+            .ok_or_else(|| Error::MissingAttr("data".to_string()))?;
         Ok(Self {
             var_name: var_name.to_string(),
             idx_name: idx_name.map(|s| s.to_string()),
@@ -191,12 +186,12 @@ impl EventGen for ForElement {
                 }
                 idx += 1;
                 if idx > context.config.loop_limit {
-                    return Err(SvgdxError::LoopLimitError(idx, context.config.loop_limit));
+                    return Err(Error::LoopLimit(idx, context.config.loop_limit));
                 }
             }
             Ok((gen_events, bbox.build()))
         } else {
-            Err(SvgdxError::InvalidData("Invalid <for> element".to_string()))
+            Err(Error::InvalidData("Invalid <for> element".to_string()))
         }
     }
 }

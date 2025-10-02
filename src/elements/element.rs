@@ -5,7 +5,7 @@ use super::{
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::elements::path::points_to_path;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
@@ -49,7 +49,7 @@ impl EventGen for SvgElement {
         {
             let clip_el = context
                 .get_element(&clip_id)
-                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+                .ok_or(Error::Reference(clip_id))?;
             if let ("clipPath", Some(clip_bbox)) =
                 (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
             {
@@ -449,7 +449,7 @@ impl SvgElement {
                     if let Some(value) = &elem.text_content {
                         events.push(OutputEvent::Text(value.clone()));
                     } else {
-                        return Err(SvgdxError::InvalidData(
+                        return Err(Error::InvalidData(
                             "Text element should have content".to_owned(),
                         ));
                     }
@@ -468,7 +468,7 @@ impl SvgElement {
                         if let Some(value) = &elem.text_content {
                             events.push(OutputEvent::Text(value.clone()));
                         } else {
-                            return Err(SvgdxError::InvalidData(
+                            return Err(Error::InvalidData(
                                 "Text element should have content".to_owned(),
                             ));
                         }
@@ -539,9 +539,7 @@ impl SvgElement {
                 // replace with rendered connection element
                 *self = conn.render(ctx)?.without_attr("edge-type");
             } else {
-                return Err(SvgdxError::InvalidData(
-                    "Cannot create connector".to_owned(),
-                ));
+                return Err(Error::InvalidData("Cannot create connector".to_owned()));
             }
         }
 

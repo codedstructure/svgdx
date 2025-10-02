@@ -9,7 +9,7 @@ use crate::constants::{
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_type_el;
 use crate::elements::path::path_bbox;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::{
     strp_length, BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size,
     TransformAttr, TrblLength,
@@ -117,7 +117,7 @@ fn split_relspec<'a, 'b>(
             // with whitespace, that is significant.
             Ok((Some(el), remain))
         } else {
-            Err(SvgdxError::ReferenceError(elref))
+            Err(Error::Reference(elref))
         }
     } else {
         Ok((None, input))
@@ -236,7 +236,7 @@ impl SvgElement {
             ElementLoc::LineOffset(l) => get_point_along_linelike_type_el(self, l),
             ElementLoc::LocSpec(spec) => Ok(elem_map
                 .get_element_bbox(self)?
-                .ok_or_else(|| SvgdxError::MissingBoundingBox(self.to_string()))?
+                .ok_or_else(|| Error::MissingBBox(self.to_string()))?
                 .locspec(spec)),
         }
     }
@@ -245,7 +245,7 @@ impl SvgElement {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
-            return Err(SvgdxError::InvalidData(
+            return Err(Error::InvalidData(
                 "Cannot have 'surround' and 'inside' on an element".to_owned(),
             ));
         }
@@ -263,7 +263,7 @@ impl SvgElement {
             let elref = elref.parse()?;
             let el = ctx
                 .get_element(&elref)
-                .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
+                .ok_or_else(|| Error::Reference(elref.clone()))?;
             {
                 let bb = if is_surround {
                     ctx.get_element_bbox(el)
@@ -277,7 +277,7 @@ impl SvgElement {
                 if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
                 } else {
-                    return Err(SvgdxError::MissingBoundingBox(el.to_string()));
+                    return Err(Error::MissingBBox(el.to_string()));
                 }
             }
         }
@@ -433,7 +433,7 @@ impl SvgElement {
         if !self.has_attr("clip-path") {
             for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
                 if self.has_attr(key) {
-                    return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                    return Err(Error::MissingBBox(key.to_owned()));
                 }
             }
             if self.name() == "g" {
@@ -441,7 +441,7 @@ impl SvgElement {
                 // hasn't yet been resolved.
                 for key in ["x", "y", "cx", "cy", "x1", "y1", "x2", "y2"] {
                     if self.has_attr(key) {
-                        return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                        return Err(Error::MissingBBox(key.to_owned()));
                     }
                 }
             }
@@ -685,7 +685,7 @@ impl SvgElement {
             }
             Ok(Some(pos))
         } else {
-            Err(SvgdxError::MissingBoundingBox(format!("No bbox: {input}")))
+            Err(Error::MissingBBox(format!("No bbox: {input}")))
         }
     }
 }
@@ -835,7 +835,7 @@ fn pos_attr_helper(
         if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
             loc = ls.parse()?;
         } else if !loc_str.is_empty() {
-            return Err(SvgdxError::ParseError(format!(
+            return Err(Error::Parse(format!(
                 "Could not parse '{loc_str}' in this context",
             )));
         }
@@ -910,7 +910,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                     LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
                 }
             } else {
-                return Err(SvgdxError::InvalidData(format!(
+                return Err(Error::InvalidData(format!(
                     "Could not derive text anchor: '{loc}'"
                 )));
             }

@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::types::{attr_split, extract_elref, strp, ElRef};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -98,7 +98,7 @@ pub fn strp_length(s: &str) -> Result<Length> {
 }
 
 impl FromStr for Length {
-    type Err = SvgdxError;
+    type Err = Error;
 
     /// Parse a ratio (float or %age) to an f32
     /// Note this deliberately does not clamp to 0..1
@@ -179,7 +179,7 @@ impl LocSpec {
 }
 
 impl FromStr for ElementLoc {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         if let Ok(ls) = LocSpec::from_str(value) {
@@ -188,12 +188,12 @@ impl FromStr for ElementLoc {
             let len = len.parse::<Length>()?;
             match edge {
                 "" => Ok(ElementLoc::LineOffset(len)),
-                _ => Err(SvgdxError::InvalidData(format!(
+                _ => Err(Error::InvalidData(format!(
                     "Invalid LocSpec format {value}"
                 ))),
             }
         } else {
-            Err(SvgdxError::InvalidData(format!(
+            Err(Error::InvalidData(format!(
                 "Invalid LocSpec format {value}"
             )))
         }
@@ -201,7 +201,7 @@ impl FromStr for ElementLoc {
 }
 
 impl FromStr for LocSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         match value {
@@ -222,12 +222,12 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
-                        _ => Err(SvgdxError::InvalidData(format!(
+                        _ => Err(Error::InvalidData(format!(
                             "Invalid LocSpec format {value}"
                         ))),
                     }
                 } else {
-                    Err(SvgdxError::InvalidData(format!(
+                    Err(Error::InvalidData(format!(
                         "Invalid LocSpec format {value}"
                     )))
                 }
@@ -281,7 +281,7 @@ impl ScalarSpec {
 }
 
 impl FromStr for ScalarSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
@@ -299,7 +299,7 @@ impl FromStr for ScalarSpec {
             "rx" => Ok(Self::Rx),
             "h" | "height" => Ok(Self::Height),
             "ry" => Ok(Self::Ry),
-            _ => Err(SvgdxError::InvalidData(format!(
+            _ => Err(Error::InvalidData(format!(
                 "Invalid ScalarSpec format {value}"
             ))),
         }
@@ -326,7 +326,7 @@ impl TrblLength {
 }
 
 impl FromStr for TrblLength {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         // convert parts to Length, fail if any conversion fails.
         let parts: Result<Vec<_>> = attr_split(value).map(|v| strp_length(&v)).collect();
@@ -337,9 +337,7 @@ impl FromStr for TrblLength {
             2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
             3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
             4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
-            _ => Err(SvgdxError::InvalidData(
-                "Incorrect number of values".to_owned(),
-            ))?,
+            _ => Err(Error::InvalidData("Incorrect number of values".to_owned()))?,
         })
     }
 }
@@ -354,7 +352,7 @@ pub enum DirSpec {
 }
 
 impl FromStr for DirSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         match value {
@@ -362,7 +360,7 @@ impl FromStr for DirSpec {
             "H" => Ok(Self::Behind),
             "v" => Ok(Self::Below),
             "V" => Ok(Self::Above),
-            _ => Err(SvgdxError::InvalidData(format!(
+            _ => Err(Error::InvalidData(format!(
                 "Invalid DirSpec format {value}"
             ))),
         }
@@ -377,13 +375,13 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     }
     let remain = remain
         .strip_prefix(LOCSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))?;
+        .ok_or(Error::Parse(format!("Invalid locspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut loc = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))
+                return Err(Error::Parse(format!("Invalid locspec: '{s}'")))
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),
@@ -398,13 +396,13 @@ pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
     }
     let remain = remain
         .strip_prefix(SCALARSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))?;
+        .ok_or(Error::Parse(format!("Invalid scalarspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut scalar = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))
+                return Err(Error::Parse(format!("Invalid scalarspec: '{s}'")))
             }
             Some(c) => scalar.push(c),
             None => return Ok((elref, Some(scalar.parse()?))),

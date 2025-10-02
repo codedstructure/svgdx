@@ -1,5 +1,5 @@
 use crate::elements::SvgElement;
-use crate::errors::SvgdxError;
+use crate::errors::Error;
 use crate::geometry::{BoundingBox, Size};
 use crate::types::{fstr, strp};
 
@@ -324,7 +324,7 @@ impl Position {
 }
 
 impl TryFrom<&SvgElement> for Position {
-    type Error = SvgdxError;
+    type Error = Error;
 
     /// assumes SvgElement has already had compound attributes split
     fn try_from(value: &SvgElement) -> Result<Self, Self::Error> {

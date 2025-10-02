@@ -1,5 +1,5 @@
 use crate::elements::{is_layout_element, SvgElement};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
@@ -214,18 +214,16 @@ impl ElementMap for TransformerContext {
         while let "use" | "reuse" = element.name() {
             let href = element
                 .get_attr("href")
-                .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))?;
+                .ok_or_else(|| Error::MissingAttr("href".to_owned()))?;
             let elref = href.parse()?;
             if let Some(el) = self.get_element(&elref) {
                 if seen.contains(&el.order_index) {
-                    return Err(SvgdxError::CircularRefError(format!(
-                        "{elref} already seen"
-                    )));
+                    return Err(Error::CircularRef(format!("{elref} already seen")));
                 }
                 seen.push(el.order_index.clone());
                 element = el;
             } else {
-                return Err(SvgdxError::ReferenceError(elref));
+                return Err(Error::Reference(elref));
             }
         }
         Ok(element.clone())
@@ -254,12 +252,12 @@ impl ElementMap for TransformerContext {
         // it works in both '^' contexts and root SVG bbox generation context.
         // Can't just move this to SvgElement::bbox() as it needs ElementMap.
         if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
-            let clip_id = extract_urlref(clip_path).ok_or(SvgdxError::InvalidData(format!(
+            let clip_id = extract_urlref(clip_path).ok_or(Error::InvalidData(format!(
                 "Invalid clip-path attribute: {clip_path}"
             )))?;
             let clip_el = self
                 .get_element(&clip_id)
-                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+                .ok_or(Error::Reference(clip_id))?;
             if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);
@@ -464,7 +462,7 @@ impl TransformerContext {
     pub fn inc_depth(&mut self) -> Result<()> {
         self.current_depth += 1;
         if self.current_depth > self.config.depth_limit {
-            return Err(SvgdxError::DepthLimitExceeded(
+            return Err(Error::DepthLimit(
                 self.current_depth,
                 self.config.depth_limit,
             ));
@@ -476,7 +474,7 @@ impl TransformerContext {
         if self.current_depth > 0 {
             self.current_depth -= 1;
         } else {
-            return Err(SvgdxError::from("Depth must be positive"));
+            return Err(Error::InternalLogic("dec_depth underflow".into()));
         }
         Ok(())
     }

@@ -1,6 +1,6 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
@@ -24,7 +24,7 @@ impl EventGen for ReuseElement {
         context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
-            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))
+            .ok_or_else(|| Error::MissingAttr("href".to_owned()))
             .inspect_err(|_| {
                 context.pop_element();
             })?;
@@ -35,7 +35,7 @@ impl EventGen for ReuseElement {
         let mut instance_element = context
             .get_original_element(&elref)
             .cloned()
-            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))
+            .ok_or_else(|| Error::Reference(elref.clone()))
             .inspect_err(|_| {
                 context.pop_element();
             })?;
