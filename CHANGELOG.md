@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: new 'rational' length type, available as position and size deltas
+  similar to the existing 'percentage' ratio type. Rational values are given
+  as 'p/q', e.g. '3/10', where both numerator and denominator are integers
+  and the denominator is >= 1. This approach is useful for aligning to a grid
+  layout, e.g. with `<rect xy="#ref 2/10 5/10" xy2="#ref@tl 8/10 9/10"/>`.
+  Note the `@tl` on the `xy2` case, to avoid positioning from the `br` loc
+  of #ref as is default for `xy2` - this approach may change in future.
+
 - Added: default attrs can now be specified directly on a `<defaults>` element,
   as well as any inner elements. Given attributes are equivalent to being
   present on an additional `<_ ...>` first child of a `<defaults>` block.
