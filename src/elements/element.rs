@@ -49,7 +49,7 @@ impl EventGen for SvgElement {
         {
             let clip_el = context
                 .get_element(&clip_id)
-                .ok_or(Error::Reference(clip_id))?;
+                .ok_or_else(|| Error::Reference(clip_id))?;
             if let ("clipPath", Some(clip_bbox)) =
                 (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
             {
@@ -449,8 +449,8 @@ impl SvgElement {
                     if let Some(value) = &elem.text_content {
                         events.push(OutputEvent::Text(value.clone()));
                     } else {
-                        return Err(Error::InvalidData(
-                            "Text element should have content".to_owned(),
+                        return Err(Error::InternalLogic(
+                            "text element should have content".to_owned(),
                         ));
                     }
                     events.push(OutputEvent::End("text".to_string()));
@@ -468,8 +468,8 @@ impl SvgElement {
                         if let Some(value) = &elem.text_content {
                             events.push(OutputEvent::Text(value.clone()));
                         } else {
-                            return Err(Error::InvalidData(
-                                "Text element should have content".to_owned(),
+                            return Err(Error::InternalLogic(
+                                "text element should have content".to_owned(),
                             ));
                         }
                         events.push(OutputEvent::End("tspan".to_string()));
@@ -525,7 +525,7 @@ impl SvgElement {
         }
 
         if is_connector(self) {
-            if let Ok(conn) = Connector::from_element(
+            let conn = Connector::from_element(
                 self,
                 ctx,
                 if let Some(e_type) = self.get_attr("edge-type") {
@@ -535,12 +535,9 @@ impl SvgElement {
                 } else {
                     ConnectionType::Straight
                 },
-            ) {
-                // replace with rendered connection element
-                *self = conn.render(ctx)?.without_attr("edge-type");
-            } else {
-                return Err(Error::InvalidData("Cannot create connector".to_owned()));
-            }
+            )?;
+            // replace with rendered connection element
+            *self = conn.render(ctx)?.without_attr("edge-type");
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {

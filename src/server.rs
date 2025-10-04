@@ -42,7 +42,7 @@ async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResp
         .and_then(|output| {
             if output.is_empty() {
                 // Can't build a valid image/svg+xml response from empty string.
-                Err(Error::Document("Empty response".into()))
+                Err(Error::Document("empty response".into()))
             } else {
                 Ok(output)
             }

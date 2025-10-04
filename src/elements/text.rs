@@ -44,13 +44,13 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         let dy = element.pop_attr("text-dy");
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
-            let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = parts
-                .next()
-                .ok_or_else(|| Error::Parse("dx from text-dxy should be numeric".to_owned()))?;
-            t_dy = parts
-                .next()
-                .ok_or_else(|| Error::Parse("dy from text-dxy should be numeric".to_owned()))?;
+            let mut parts = attr_split_cycle(&dxy);
+            if let Some(pdx) = parts.next() {
+                t_dx = strp(&pdx)?;
+            }
+            if let Some(pdy) = parts.next() {
+                t_dy = strp(&pdy)?;
+            }
         }
         if let Some(dx) = dx {
             t_dx = strp(&dx)?;

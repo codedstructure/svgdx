@@ -157,7 +157,7 @@ impl InputList {
                 0
             };
             let ev =
-                ev.map_err(|e| Error::Parse(format!("XML error near line {src_line}: {e:?}")))?;
+                ev.map_err(|e| Error::Document(format!("XML error near line {src_line}: {e:?}")))?;
 
             match &ev {
                 Event::Eof => break, // exits the loop when reaching end of file
@@ -668,7 +668,7 @@ impl TryFrom<InputEvent> for SvgElement {
                 Ok(element)
             }
             _ => Err(Error::Document(format!(
-                "Expected Start or Empty event, got {:?}",
+                "expected Start or Empty event, got {:?}",
                 ev.event
             ))),
         }

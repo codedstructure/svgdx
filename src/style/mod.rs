@@ -46,7 +46,7 @@ impl std::str::FromStr for AutoStyleMode {
             "none" => Ok(AutoStyleMode::None),
             "inline" => Ok(AutoStyleMode::Inline),
             "css" => Ok(AutoStyleMode::Css),
-            _ => Err(Error::Parse(format!("Unknown auto-styles mode: {s}"))),
+            _ => Err(Error::InvalidValue("auto-style-mode".into(), s.into())),
         }
     }
 }

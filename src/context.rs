@@ -252,12 +252,11 @@ impl ElementMap for TransformerContext {
         // it works in both '^' contexts and root SVG bbox generation context.
         // Can't just move this to SvgElement::bbox() as it needs ElementMap.
         if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
-            let clip_id = extract_urlref(clip_path).ok_or(Error::InvalidData(format!(
-                "Invalid clip-path attribute: {clip_path}"
-            )))?;
+            let clip_id = extract_urlref(clip_path)
+                .ok_or_else(|| Error::InvalidValue("clip-path".into(), clip_path.into()))?;
             let clip_el = self
                 .get_element(&clip_id)
-                .ok_or(Error::Reference(clip_id))?;
+                .ok_or_else(|| Error::Reference(clip_id))?;
             if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);

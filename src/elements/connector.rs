@@ -5,7 +5,7 @@ use crate::errors::{Error, Result};
 use crate::geometry::{
     parse_el_loc, strp_length, BoundingBox, ElementLoc, Length, LocSpec, ScalarSpec,
 };
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp};
 
 pub fn is_connector(el: &SvgElement) -> bool {
     el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
@@ -178,26 +178,20 @@ impl Connector {
             Ok(ElementParseData::El(
                 elem_map
                     .get_element(&elref)
-                    .ok_or(Error::Reference(elref))?
+                    .ok_or_else(|| Error::Reference(elref))?
                     .clone(),
                 retloc,
                 retdir,
             ))
         } else {
-            let mut parts = attr_split(&this_ref).map_while(|v| strp(&v).ok());
-
-            Ok(ElementParseData::Point(
-                parts.next().ok_or_else(|| {
-                    Error::InvalidData(
-                        (attr_name.to_owned() + "_ref x should be numeric").to_owned(),
-                    )
-                })?,
-                parts.next().ok_or_else(|| {
-                    Error::InvalidData(
-                        (attr_name.to_owned() + "_ref y should be numeric").to_owned(),
-                    )
-                })?,
-            ))
+            let mut parts = attr_split_cycle(&this_ref);
+            let x = parts.next().ok_or_else(|| {
+                Error::InvalidValue(format!("{attr_name}.x"), this_ref.to_owned())
+            })?;
+            let y = parts.next().ok_or_else(|| {
+                Error::InvalidValue(format!("{attr_name}.y"), this_ref.to_owned())
+            })?;
+            Ok(ElementParseData::Point(strp(&x)?, strp(&y)?))
         }
     }
 
@@ -222,7 +216,7 @@ impl Connector {
         let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
             Some(
                 strp_length(&o_inner)
-                    .map_err(|_| Error::Parse("Invalid corner-offset".to_owned()))?,
+                    .map_err(|_| Error::Parse("invalid corner-offset".to_owned()))?,
             )
         } else {
             None

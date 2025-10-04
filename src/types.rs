@@ -25,7 +25,7 @@ pub fn fstr(x: f32) -> String {
 pub fn strp(s: &str) -> Result<f32> {
     s.trim()
         .parse::<f32>()
-        .map_err(|_| Error::Parse(format!("Expected a number: '{s}'")))
+        .map_err(|_| Error::Parse(format!("expected a number: '{s}'")))
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
@@ -37,7 +37,7 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
                 return Err(Error::Parse(format!(
-                    "Invalid character in numeric value: '{ch}'"
+                    "invalid character in numeric value: '{ch}'"
                 )));
             }
             value.push(ch);
@@ -589,7 +589,7 @@ impl FromStr for ElRef {
         if remain.is_empty() {
             Ok(elref)
         } else {
-            Err(Error::Parse(format!("Invalid elref format '{s}'")))
+            Err(Error::Parse(format!("invalid elref format '{s}'")))
         }
     }
 }
@@ -642,7 +642,7 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         return Ok((elref, new_s));
     }
 
-    Err(Error::Parse(format!("Invalid elref format '{s}'")))
+    Err(Error::Parse(format!("invalid elref format '{s}'")))
 }
 
 #[cfg(test)]

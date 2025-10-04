@@ -35,7 +35,9 @@ impl BearingPathSyntax {
 impl PathSyntax for BearingPathSyntax {
     fn at_command(&self) -> Result<bool> {
         self.check_not_end()?;
-        let c = self.current().ok_or(Error::Parse("No data".to_string()))?;
+        let c = self
+            .current()
+            .ok_or_else(|| Error::Parse("no data".to_string()))?;
         // Adds 'B' and 'b' to the set of SVG commands.
         Ok("MmBbLlHhVvZzCcSsQqTtAa".contains(c))
     }

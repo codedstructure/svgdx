@@ -24,7 +24,7 @@ impl TryFrom<&SvgElement> for LoopDef {
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name() != "loop" {
-            return Err(Error::InvalidData(
+            return Err(Error::InternalLogic(
                 "LoopType can only be created from a loop element".to_string(),
             ));
         }
@@ -162,10 +162,8 @@ impl EventGen for ForElement {
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         let mut idx = 0;
-        if let (Ok(for_def), Some(inner_events)) = (
-            ForDef::try_from(event_element),
-            event_element.inner_events(context),
-        ) {
+        let for_def = ForDef::try_from(event_element)?;
+        if let Some(inner_events) = event_element.inner_events(context) {
             let data_list: Vec<_> = eval_list(&for_def.data, context)?;
             let idx_name = for_def.idx_name.clone();
 
@@ -191,7 +189,8 @@ impl EventGen for ForElement {
             }
             Ok((gen_events, bbox.build()))
         } else {
-            Err(Error::InvalidData("Invalid <for> element".to_string()))
+            // empty for loop element
+            Ok((gen_events, None))
         }
     }
 }

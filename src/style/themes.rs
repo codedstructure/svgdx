@@ -35,9 +35,10 @@ impl std::str::FromStr for ThemeType {
             "glass" => Ok(Self::Glass),
             "light" => Ok(Self::Light),
             "dark" => Ok(Self::Dark),
-            _ => Err(Error::InvalidData(format!(
-                "Unknown theme '{s}' (available themes: default, bold, fine, glass, light, dark)",
-            ))),
+            _ => Err(Error::InvalidValue(
+                "theme (default, bold, fine, glass, light, dark)".into(),
+                s.into(),
+            )),
         }
     }
 }

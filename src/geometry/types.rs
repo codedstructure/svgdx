@@ -188,14 +188,10 @@ impl FromStr for ElementLoc {
             let len = len.parse::<Length>()?;
             match edge {
                 "" => Ok(ElementLoc::LineOffset(len)),
-                _ => Err(Error::InvalidData(format!(
-                    "Invalid LocSpec format {value}"
-                ))),
+                _ => Err(Error::Parse(format!("invalid LocSpec format {value}"))),
             }
         } else {
-            Err(Error::InvalidData(format!(
-                "Invalid LocSpec format {value}"
-            )))
+            Err(Error::Parse(format!("invalid LocSpec format {value}")))
         }
     }
 }
@@ -222,14 +218,10 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
-                        _ => Err(Error::InvalidData(format!(
-                            "Invalid LocSpec format {value}"
-                        ))),
+                        _ => Err(Error::Parse(format!("invalid LocSpec format {value}"))),
                     }
                 } else {
-                    Err(Error::InvalidData(format!(
-                        "Invalid LocSpec format {value}"
-                    )))
+                    Err(Error::Parse(format!("invalid LocSpec format {value}")))
                 }
             }
         }
@@ -299,9 +291,7 @@ impl FromStr for ScalarSpec {
             "rx" => Ok(Self::Rx),
             "h" | "height" => Ok(Self::Height),
             "ry" => Ok(Self::Ry),
-            _ => Err(Error::InvalidData(format!(
-                "Invalid ScalarSpec format {value}"
-            ))),
+            _ => Err(Error::Parse(format!("Invalid ScalarSpec format {value}"))),
         }
     }
 }
@@ -337,7 +327,7 @@ impl FromStr for TrblLength {
             2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
             3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
             4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
-            _ => Err(Error::InvalidData("Incorrect number of values".to_owned()))?,
+            _ => Err(Error::Arity("TrblLength requires 1-4 values".to_owned()))?,
         })
     }
 }
@@ -360,9 +350,7 @@ impl FromStr for DirSpec {
             "H" => Ok(Self::Behind),
             "v" => Ok(Self::Below),
             "V" => Ok(Self::Above),
-            _ => Err(Error::InvalidData(format!(
-                "Invalid DirSpec format {value}"
-            ))),
+            _ => Err(Error::Parse(format!("invalid DirSpec format {value}"))),
         }
     }
 }
@@ -375,13 +363,13 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     }
     let remain = remain
         .strip_prefix(LOCSPEC_SEP)
-        .ok_or(Error::Parse(format!("Invalid locspec: '{s}'")))?;
+        .ok_or_else(|| Error::Parse(format!("invalid locspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut loc = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(Error::Parse(format!("Invalid locspec: '{s}'")))
+                return Err(Error::Parse(format!("invalid locspec: '{s}'")))
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),
@@ -396,13 +384,13 @@ pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
     }
     let remain = remain
         .strip_prefix(SCALARSPEC_SEP)
-        .ok_or(Error::Parse(format!("Invalid scalarspec: '{s}'")))?;
+        .ok_or_else(|| Error::Parse(format!("invalid scalarspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut scalar = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(Error::Parse(format!("Invalid scalarspec: '{s}'")))
+                return Err(Error::Parse(format!("invalid scalarspec: '{s}'")))
             }
             Some(c) => scalar.push(c),
             None => return Ok((elref, Some(scalar.parse()?))),

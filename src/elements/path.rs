@@ -31,7 +31,9 @@ impl SvgPathSyntax {
 impl PathSyntax for SvgPathSyntax {
     fn at_command(&self) -> Result<bool> {
         self.check_not_end()?;
-        let c = self.current().ok_or(Error::Parse("No data".to_string()))?;
+        let c = self
+            .current()
+            .ok_or_else(|| Error::Parse("no data".to_string()))?;
         Ok("MmLlHhVvZzCcSsQqTtAa".contains(c))
     }
 
@@ -56,7 +58,7 @@ pub trait PathSyntax {
 
     fn check_not_end(&self) -> Result<()> {
         if self.at_end() {
-            Err(Error::Parse("Ran out of data!".to_string()))
+            Err(Error::Parse("ran out of data!".to_string()))
         } else {
             Ok(())
         }
@@ -108,7 +110,10 @@ pub trait PathSyntax {
             self.skip_wsp_comma();
             Ok(command)
         } else {
-            Err(Error::InvalidData("Invalid path command".to_string()))
+            Err(Error::InvalidValue(
+                "invalid path command".to_string(),
+                self.current().map(|c| c.to_string()).unwrap_or_default(),
+            ))
         }
     }
 }
@@ -197,9 +202,7 @@ impl PathParser {
                 self.update_position((cpx, cpy + dy));
             }
             'Z' | 'z' => {
-                self.update_position(self.start_pos.ok_or_else(|| {
-                    Error::InvalidData("Cannot 'z' without start position".to_owned())
-                })?);
+                self.update_position(self.start_pos.unwrap_or((0., 0.)));
             }
             'C' => {
                 let _cp1 = self.tokens.read_coord()?; // control point 1
@@ -250,8 +253,9 @@ impl PathParser {
                 let (cpx, cpy) = self.position.unwrap_or((0., 0.));
                 self.update_position((cpx + dx, cpy + dy));
             }
-            _ => Err(Error::InvalidData(
-                "Unknown path data instruction".to_string(),
+            _ => Err(Error::InvalidValue(
+                "path command".to_string(),
+                self.command.unwrap_or_default().to_string(),
             ))?,
         }
         Ok(())
@@ -277,28 +281,24 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
 }
 
 pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
-    let mut points: Vec<(f32, f32)>;
-    let max_radius;
-    if let (Some(r), Some(p)) = (
+    let (mut points, max_radius) = if let (Some(r), Some(p)) = (
         element.get_attr("corner-radius"),
         element.get_attr("points"),
     ) {
-        if let Ok(r) = strp(r) {
-            max_radius = r;
-            let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
-            if floats.len() % 2 == 0 {
-                points = floats.chunks(2).map(|a| (a[0], a[1])).collect();
-            } else {
-                return Err(Error::Parse("odd number of values in points".to_string()));
-            }
-        } else {
-            return Err(Error::Parse("corner radius is not a float".to_string()));
-        }
+        let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
+        // chunks_exact to ignore any unpaired final number
+        (
+            floats
+                .chunks_exact(2)
+                .map(|a| (a[0], a[1]))
+                .collect::<Vec<_>>(),
+            strp(r)?,
+        )
     } else {
         return Err(Error::InternalLogic(
-            "calling points to path without checking if has points and corner-radius".to_string(),
+            "points_to_path() needs points and corner-radius".to_string(),
         ));
-    }
+    };
 
     let polygon = element.name() == "polygon";
 

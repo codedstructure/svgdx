@@ -11,19 +11,37 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub enum Error {
+    /// IO error
     Io(std::io::Error),
+    /// A value or part of a value could not be parsed
     Parse(String),
-    InvalidData(String),
+    /// An attribute has an invalid value
+    InvalidValue(String, String), // reason, value
+    /// Wrong number of arguments or values
+    Arity(String),
+    /// Element reference does not resolve at this point
     Reference(ElRef),
+    /// A variable has exceeded the length limit
     VarLimit(String, usize, u32),
+    /// Loop iteration has exceeded the configured limit
     LoopLimit(u32, u32),
+    /// Recursion or element nesting has exceeded the configured limit
     DepthLimit(u32, u32),
+    /// Circular reference detected
     CircularRef(String),
+    /// Document structure is invalid
     Document(String),
+    /// An attribute is invalid in this context
+    InvalidAttr(String),
+    /// A required attribute is missing
     MissingAttr(String),
+    /// A required bounding box is missing
     MissingBBox(String),
+    /// Logic error detected; should not happen in normal operation
     InternalLogic(String),
+    /// Multiple errors, keyed by element OrderIndex
     Multi(HashMap<OrderIndex, (SvgElement, Error)>),
+    /// Wrapper for other error types
     Other(Box<dyn std::error::Error>),
     #[cfg(feature = "cli")]
     Cli(String),
@@ -34,7 +52,8 @@ impl std::fmt::Display for Error {
         match self {
             Error::Io(source) => write!(f, "IO error: {source}"),
             Error::Parse(reason) => write!(f, "Parse error: {reason}"),
-            Error::InvalidData(reason) => write!(f, "Invalid data: {reason}"),
+            Error::InvalidValue(reason, value) => write!(f, "'{value}' invalid ({reason})"),
+            Error::Arity(reason) => write!(f, "Arity error: {reason}"),
             Error::Reference(elref) => write!(f, "Reference error: {elref}"),
             Error::VarLimit(name, len, limit) => {
                 write!(f, "Variable '{name}' length ({len}) exceeded limit {limit}")
@@ -49,6 +68,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Circular reference error: {reason}")
             }
             Error::Document(reason) => write!(f, "Document error: {reason}"),
+            Error::InvalidAttr(reason) => write!(f, "Invalid attribute: {reason}"),
             Error::MissingAttr(attr) => write!(f, "Element missing attribute '{attr}'"),
             Error::MissingBBox(reason) => write!(f, "Missing bounding box: {reason}"),
             Error::InternalLogic(reason) => write!(f, "Internal logic error: {reason}"),
@@ -72,13 +92,15 @@ impl std::error::Error for Error {
         match self {
             Error::Io(source) => Some(source),
             Error::Parse(_) => None,
-            Error::InvalidData(_) => None,
+            Error::InvalidValue(_, _) => None,
+            Error::Arity(_) => None,
             Error::Reference(_) => None,
             Error::VarLimit(_, _, _) => None,
             Error::LoopLimit(_, _) => None,
             Error::DepthLimit(_, _) => None,
             Error::CircularRef(_) => None,
             Error::Document(_) => None,
+            Error::InvalidAttr(_) => None,
             Error::MissingAttr(_) => None,
             Error::MissingBBox(_) => None,
             Error::InternalLogic(_) => None,

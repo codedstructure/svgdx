@@ -245,8 +245,8 @@ impl SvgElement {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
-            return Err(Error::InvalidData(
-                "Cannot have 'surround' and 'inside' on an element".to_owned(),
+            return Err(Error::InvalidAttr(
+                "cannot have 'surround' and 'inside' on an element".to_owned(),
             ));
         }
         if surround.is_none() && inside.is_none() {
@@ -685,7 +685,7 @@ impl SvgElement {
             }
             Ok(Some(pos))
         } else {
-            Err(Error::MissingBBox(format!("No bbox: {input}")))
+            Err(Error::MissingBBox(format!("no bbox: {input}")))
         }
     }
 }
@@ -836,7 +836,7 @@ fn pos_attr_helper(
             loc = ls.parse()?;
         } else if !loc_str.is_empty() {
             return Err(Error::Parse(format!(
-                "Could not parse '{loc_str}' in this context",
+                "could not parse '{loc_str}' in this context",
             )));
         }
         let (x, y) = bbox.locspec(loc);
@@ -910,9 +910,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                     LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
                 }
             } else {
-                return Err(Error::InvalidData(format!(
-                    "Could not derive text anchor: '{loc}'"
-                )));
+                return Err(Error::InvalidValue("text-loc".into(), loc.into()));
             }
         }
     }

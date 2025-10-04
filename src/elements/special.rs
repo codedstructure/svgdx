@@ -62,7 +62,7 @@ impl EventGen for ConfigElement {
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
                 "svg-style" => new_config.svg_style = Some(value.clone()),
-                _ => return Err(Error::InvalidData(format!("Unknown config setting {key}"))),
+                _ => return Err(Error::InvalidAttr(key)),
             }
         }
         context.set_config(new_config);
@@ -80,7 +80,7 @@ impl EventGen for SpecsElement {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if context.in_specs {
             return Err(Error::Document(
-                "Nested <specs> elements are not allowed".to_string(),
+                "nested <specs> elements are not allowed".to_string(),
             ));
         }
         if let Some(inner_events) = self.0.inner_events(context) {
