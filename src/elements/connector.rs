@@ -1,11 +1,11 @@
 use super::SvgElement;
 use crate::context::ElementMap;
 use crate::elements::corner_route::render_match_corner;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::{
     parse_el_loc, strp_length, BoundingBox, ElementLoc, Length, LocSpec, ScalarSpec,
 };
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp};
 
 pub fn is_connector(el: &SvgElement) -> bool {
     el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
@@ -91,7 +91,7 @@ fn closest_loc(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .ok_or_else(|| SvgdxError::MissingBoundingBox(this.to_string()))?;
+        .ok_or_else(|| Error::MissingBBox(this.to_string()))?;
 
     for loc in edge_locations(conn_type) {
         let this_coord = this_bb.locspec(loc);
@@ -117,10 +117,10 @@ fn shortest_link(
 
     let this_bb = context
         .get_element_bbox(this)?
-        .ok_or_else(|| SvgdxError::MissingBoundingBox(this.to_string()))?;
+        .ok_or_else(|| Error::MissingBBox(this.to_string()))?;
     let that_bb = context
         .get_element_bbox(that)?
-        .ok_or_else(|| SvgdxError::MissingBoundingBox(that.to_string()))?;
+        .ok_or_else(|| Error::MissingBBox(that.to_string()))?;
 
     for this_loc in edge_locations(conn_type) {
         for that_loc in edge_locations(conn_type) {
@@ -163,7 +163,7 @@ impl Connector {
     ) -> Result<ElementParseData> {
         let this_ref = element
             .pop_attr(attr_name)
-            .ok_or_else(|| SvgdxError::MissingAttribute(attr_name.to_string()))?;
+            .ok_or_else(|| Error::MissingAttr(attr_name.to_string()))?;
 
         // Example: "#thing@tl" => top left coordinate of element id="thing"
         if let Ok((elref, loc)) = parse_el_loc(&this_ref) {
@@ -178,26 +178,20 @@ impl Connector {
             Ok(ElementParseData::El(
                 elem_map
                     .get_element(&elref)
-                    .ok_or(SvgdxError::ReferenceError(elref))?
+                    .ok_or_else(|| Error::Reference(elref))?
                     .clone(),
                 retloc,
                 retdir,
             ))
         } else {
-            let mut parts = attr_split(&this_ref).map_while(|v| strp(&v).ok());
-
-            Ok(ElementParseData::Point(
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData(
-                        (attr_name.to_owned() + "_ref x should be numeric").to_owned(),
-                    )
-                })?,
-                parts.next().ok_or_else(|| {
-                    SvgdxError::InvalidData(
-                        (attr_name.to_owned() + "_ref y should be numeric").to_owned(),
-                    )
-                })?,
-            ))
+            let mut parts = attr_split_cycle(&this_ref);
+            let x = parts.next().ok_or_else(|| {
+                Error::InvalidValue(format!("{attr_name}.x"), this_ref.to_owned())
+            })?;
+            let y = parts.next().ok_or_else(|| {
+                Error::InvalidValue(format!("{attr_name}.y"), this_ref.to_owned())
+            })?;
+            Ok(ElementParseData::Point(strp(&x)?, strp(&y)?))
         }
     }
 
@@ -222,7 +216,7 @@ impl Connector {
         let offset = if let Some(o_inner) = element.pop_attr("corner-offset") {
             Some(
                 strp_length(&o_inner)
-                    .map_err(|_| SvgdxError::ParseError("Invalid corner-offset".to_owned()))?,
+                    .map_err(|_| Error::Parse("invalid corner-offset".to_owned()))?,
             )
         } else {
             None
@@ -241,7 +235,7 @@ impl Connector {
             (Some(start_point), None) => {
                 let end_el = end_el
                     .as_ref()
-                    .ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?;
+                    .ok_or_else(|| Error::InternalLogic("no end_el".to_owned()))?;
                 if end_loc.is_none() {
                     let eloc = closest_loc(end_el, start_point, conn_type, elem_map)?;
                     end_loc = Some(ElementLoc::LocSpec(eloc));
@@ -257,7 +251,7 @@ impl Connector {
             (None, Some(end_point)) => {
                 let start_el = start_el
                     .as_ref()
-                    .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?;
+                    .ok_or_else(|| Error::InternalLogic("no start_el".to_owned()))?;
                 if start_loc.is_none() {
                     let sloc = closest_loc(start_el, end_point, conn_type, elem_map)?;
                     start_loc = Some(ElementLoc::LocSpec(sloc));
@@ -274,10 +268,10 @@ impl Connector {
                 let (start_el, end_el) = (
                     start_el
                         .as_ref()
-                        .ok_or_else(|| SvgdxError::InternalLogicError("no start_el".to_owned()))?,
+                        .ok_or_else(|| Error::InternalLogic("no start_el".to_owned()))?,
                     end_el
                         .as_ref()
-                        .ok_or_else(|| SvgdxError::InternalLogicError("no end_el".to_owned()))?,
+                        .ok_or_else(|| Error::InternalLogic("no end_el".to_owned()))?,
                 );
                 if start_loc.is_none() && end_loc.is_none() {
                     let (sloc, eloc) = shortest_link(start_el, end_el, conn_type, elem_map)?;
@@ -337,10 +331,10 @@ impl Connector {
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let start_bb = start_el
                             .bbox()?
-                            .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?;
+                            .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
                         let end_bb = end_el
                             .bbox()?
-                            .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?;
+                            .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
                         let overlap_top = start_bb
                             .scalarspec(ScalarSpec::Miny)
                             .max(end_bb.scalarspec(ScalarSpec::Miny));
@@ -368,10 +362,10 @@ impl Connector {
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
                         let start_bb = ctx
                             .get_element_bbox(start_el)?
-                            .ok_or_else(|| SvgdxError::MissingBoundingBox(start_el.to_string()))?;
+                            .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
                         let end_bb = ctx
                             .get_element_bbox(end_el)?
-                            .ok_or_else(|| SvgdxError::MissingBoundingBox(end_el.to_string()))?;
+                            .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
                         let overlap_left = start_bb
                             .scalarspec(ScalarSpec::Minx)
                             .max(end_bb.scalarspec(ScalarSpec::Minx));

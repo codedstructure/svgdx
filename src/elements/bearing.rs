@@ -15,7 +15,7 @@
 //! aligned with the bearing direction and the 'y' coordinate is perpendicular to it.
 
 use super::path::PathSyntax;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::types::fstr;
 
 struct BearingPathSyntax {
@@ -37,7 +37,7 @@ impl PathSyntax for BearingPathSyntax {
         self.check_not_end()?;
         let c = self
             .current()
-            .ok_or(SvgdxError::ParseError("No data".to_string()))?;
+            .ok_or_else(|| Error::Parse("no data".to_string()))?;
         // Adds 'B' and 'b' to the set of SVG commands.
         Ok("MmBbLlHhVvZzCcSsQqTtAa".contains(c))
     }

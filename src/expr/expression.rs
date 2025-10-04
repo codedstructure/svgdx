@@ -8,7 +8,7 @@ use crate::constants::{
     VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::parse_el_scalar;
 use crate::types::fstr;
 
@@ -131,9 +131,7 @@ impl ExprValue {
         if let [a, b] = &self.flatten().as_slice() {
             Ok((a.to_owned(), b.to_owned()))
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected exactly two arguments".to_owned(),
-            ))
+            Err(Error::Arity("expected exactly two arguments".to_owned()))
         }
     }
 
@@ -160,8 +158,8 @@ impl ExprValue {
     /// return list of strings, iff we are a list of string/text values
     pub fn string_list(&self) -> Result<Vec<String>> {
         match self {
-            Self::Number(_) => Err(SvgdxError::ParseError(
-                "Expected a list of strings, got a number".to_owned(),
+            Self::Number(_) => Err(Error::Parse(
+                "expected a list of strings, got a number".to_owned(),
             )),
             Self::String(s) | Self::Text(s) => Ok(vec![s.clone()]),
             Self::List(v) => {
@@ -169,11 +167,7 @@ impl ExprValue {
                 for e in v {
                     match e {
                         Self::String(s) | Self::Text(s) => out.push(s.clone()),
-                        _ => {
-                            return Err(SvgdxError::ParseError(
-                                "Expected a list of strings".to_owned(),
-                            ))
-                        }
+                        _ => return Err(Error::Parse("expected a list of strings".to_owned())),
                     }
                 }
                 Ok(out)
@@ -186,9 +180,7 @@ impl ExprValue {
         if let [nl] = &self.string_list()?.as_slice() {
             Ok(nl.clone())
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected a single string argument".to_owned(),
-            ))
+            Err(Error::Arity("expected a single string argument".to_owned()))
         }
     }
 
@@ -197,8 +189,8 @@ impl ExprValue {
         if let [a, b] = &self.string_list()?.as_slice() {
             Ok((a.clone(), b.clone()))
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected exactly two string arguments".to_owned(),
+            Err(Error::Arity(
+                "expected exactly two string arguments".to_owned(),
             ))
         }
     }
@@ -207,8 +199,8 @@ impl ExprValue {
     pub fn number_list(&self) -> Result<Vec<f32>> {
         match self {
             Self::Number(v) => Ok(vec![*v]),
-            Self::String(s) | Self::Text(s) => Err(SvgdxError::ParseError(format!(
-                "Expected a list of numbers, got '{s}'"
+            Self::String(s) | Self::Text(s) => Err(Error::Parse(format!(
+                "expected a list of numbers, got '{s}'"
             ))),
             Self::List(v) => {
                 let mut out = Vec::new();
@@ -216,9 +208,7 @@ impl ExprValue {
                     if let Self::Number(n) = e {
                         out.push(*n);
                     } else {
-                        return Err(SvgdxError::ParseError(
-                            "Expected a list of numbers".to_owned(),
-                        ));
+                        return Err(Error::Parse("expected a list of numbers".to_owned()));
                     }
                 }
                 Ok(out)
@@ -230,8 +220,8 @@ impl ExprValue {
         if let [a] = self.number_list()?.as_slice() {
             Ok(*a)
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected a single numeric argument".to_owned(),
+            Err(Error::Arity(
+                "expected a single numeric argument".to_owned(),
             ))
         }
     }
@@ -240,8 +230,8 @@ impl ExprValue {
         if let [a, b] = self.number_list()?.as_slice() {
             Ok((*a, *b))
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected exactly two numeric arguments".to_owned(),
+            Err(Error::Arity(
+                "expected exactly two numeric arguments".to_owned(),
             ))
         }
     }
@@ -250,8 +240,8 @@ impl ExprValue {
         if let [a, b, c] = self.number_list()?.as_slice() {
             Ok((*a, *b, *c))
         } else {
-            Err(SvgdxError::ParseError(
-                "Expected exactly three numeric arguments".to_owned(),
+            Err(Error::Arity(
+                "expected exactly three numeric arguments".to_owned(),
             ))
         }
     }
@@ -268,7 +258,7 @@ pub enum ComparisonOp {
 }
 
 impl FromStr for ComparisonOp {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "eq" => Ok(Self::Eq),
@@ -277,9 +267,7 @@ impl FromStr for ComparisonOp {
             "ge" => Ok(Self::Ge),
             "lt" => Ok(Self::Lt),
             "le" => Ok(Self::Le),
-            _ => Err(SvgdxError::ParseError(format!(
-                "Invalid comparison op '{s}'"
-            ))),
+            _ => Err(Error::Parse(format!("invalid comparison op '{s}'"))),
         }
     }
 }
@@ -292,13 +280,13 @@ pub enum LogicalOp {
 }
 
 impl FromStr for LogicalOp {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "and" => Ok(Self::And),
             "or" => Ok(Self::Or),
             "xor" => Ok(Self::Xor),
-            _ => Err(SvgdxError::ParseError(format!("Invalid logical op '{s}'"))),
+            _ => Err(Error::Parse(format!("invalid logical op '{s}'"))),
         }
     }
 }
@@ -343,17 +331,13 @@ enum Token {
 
 fn valid_variable_name(var: &str) -> Result<&str> {
     if !var.starts_with(|c: char| c.is_ascii_alphabetic()) {
-        return Err(SvgdxError::ParseError(format!(
-            "Invalid variable name '{var}'"
-        )));
+        return Err(Error::Parse(format!("invalid variable name '{var}'")));
     }
     if !var[1..]
         .chars()
         .all(|c| c.is_ascii_alphanumeric() || c == '_')
     {
-        return Err(SvgdxError::ParseError(format!(
-            "Invalid variable name '{var}'"
-        )));
+        return Err(Error::Parse(format!("invalid variable name '{var}'")));
     }
     Ok(var)
 }
@@ -375,9 +359,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         if let Some(var) = var_name {
             valid_variable_name(var).map(|v| Token::Var(v.to_string()))
         } else {
-            Err(SvgdxError::ParseError(format!(
-                "Missing closing brace in '{input}'"
-            )))
+            Err(Error::Parse(format!("missing closing brace in '{input}'")))
         }
     } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
         Ok(Token::ElementRef(input.to_owned()))
@@ -386,9 +368,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
     } else if valid_symbol(input) {
         Ok(Token::Symbol(input.to_owned()))
     } else {
-        Err(SvgdxError::ParseError(format!(
-            "Unexpected token '{input}'"
-        )))
+        Err(Error::Parse(format!("unexpected token '{input}'")))
     }
 }
 
@@ -470,9 +450,7 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
 
     if !buffer.is_empty() {
         if in_quote.is_some() {
-            return Err(SvgdxError::ParseError(format!(
-                "Missing closing quote in '{input}'"
-            )));
+            return Err(Error::Parse(format!("missing closing quote in '{input}'")));
         }
         let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
         buffer.clear();
@@ -533,8 +511,8 @@ impl<'a> EvalState<'a> {
             self.advance();
             Ok(())
         } else {
-            Err(SvgdxError::ParseError(format!(
-                "Expected token '{token:?}' not matched (got '{:?}')",
+            Err(Error::Parse(format!(
+                "expected token '{token:?}' (got '{:?}')",
                 self.peek()
             )))
         }
@@ -542,7 +520,7 @@ impl<'a> EvalState<'a> {
 
     fn lookup(&mut self, v: &str) -> Result<ExprValue> {
         if self.checked_vars.iter().any(|var| var == v) {
-            return Err(SvgdxError::CircularRefError(v.to_owned()));
+            return Err(Error::CircularRef(v.to_owned()));
         }
         self.checked_vars.push(v.to_string());
         let result = if let Some(inner) = self.context.get_var(v) {
@@ -555,15 +533,13 @@ impl<'a> EvalState<'a> {
                 if es.peek().is_none() {
                     Ok(e)
                 } else {
-                    return Err(SvgdxError::ParseError(format!(
-                        "Unexpected trailing tokens evaluating '{v}'"
+                    return Err(Error::Parse(format!(
+                        "unexpected trailing tokens evaluating '{v}'"
                     )));
                 }
             }
         } else {
-            return Err(SvgdxError::ParseError(format!(
-                "Could not evaluate variable '{v}'"
-            )));
+            return Err(Error::Parse(format!("could not evaluate variable '{v}'")));
         };
         // Need this to allow e.g. "$var + $var"
         self.checked_vars.pop();
@@ -590,15 +566,13 @@ impl<'a> EvalState<'a> {
                 if let Some(bb) = self.context.get_element_bbox(elem)? {
                     Ok(bb.scalarspec(scalar).into())
                 } else {
-                    Err(SvgdxError::MissingBoundingBox(elem.to_string()))
+                    Err(Error::MissingBBox(elem.to_string()))
                 }
             } else {
-                Err(SvgdxError::ReferenceError(elref))
+                Err(Error::Reference(elref))
             }
         } else {
-            Err(SvgdxError::ParseError(format!(
-                "Invalid element_ref: '{v}'"
-            )))
+            Err(Error::Parse(format!("invalid element_ref: '{v}'")))
         }
     }
 }
@@ -621,8 +595,8 @@ fn evaluate_inner(
     if eval_state.peek().is_none() {
         Ok(e)
     } else {
-        Err(SvgdxError::ParseError(format!(
-            "Unexpected trailing tokens: {tokens:?}"
+        Err(Error::Parse(format!(
+            "unexpected trailing tokens: {tokens:?}"
         )))
     }
 }
@@ -779,10 +753,8 @@ fn primary(eval_state: &mut EvalState) -> Result<ExprValue> {
             eval_state.require(Token::CloseParen)?;
             Ok(e)
         }
-        Some(tok) => Err(SvgdxError::ParseError(format!(
-            "Invalid token in primary(): {tok:?}"
-        ))),
-        None => Err(SvgdxError::ParseError("Unexpected end of input".to_owned())),
+        Some(tok) => Err(Error::Parse(format!("invalid token in primary(): {tok:?}"))),
+        None => Err(Error::Parse("unexpected end of input".to_owned())),
     }
 }
 
@@ -924,14 +896,12 @@ pub fn eval_condition(value: &str, context: &impl ContextView) -> Result<bool> {
     if let Some(inner) = value.strip_prefix(EXPR_START) {
         value = inner
             .strip_suffix(EXPR_END)
-            .ok_or(SvgdxError::ParseError(format!(
-                "Expected closing '{EXPR_END}': '{value}'"
-            )))?;
+            .ok_or_else(|| Error::Parse(format!("expected closing '{EXPR_END}': '{value}'")))?;
     }
     eval_str(value, context)?
         .parse::<f32>()
         .map(|v| v != 0.)
-        .map_err(|_| SvgdxError::ParseError(format!("Invalid condition: '{value}'")))
+        .map_err(|_| Error::Parse(format!("invalid condition: '{value}'")))
 }
 
 pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>> {
@@ -941,9 +911,7 @@ pub fn eval_list(value: &str, context: &impl ContextView) -> Result<Vec<String>>
     if let Some(inner) = value.strip_prefix(EXPR_START) {
         value = inner
             .strip_suffix(EXPR_END)
-            .ok_or(SvgdxError::ParseError(format!(
-                "Expected closing '{EXPR_END}': '{value}'"
-            )))?;
+            .ok_or_else(|| Error::Parse(format!("expected closing '{EXPR_END}': '{value}'")))?;
     }
     let tokens = tokenize(value)?;
     Ok(evaluate(tokens, context)?.to_string_vec())
@@ -1023,9 +991,7 @@ mod tests {
         if eval_state.peek().is_none() {
             Ok(e.one_number()?)
         } else {
-            Err(SvgdxError::ParseError(
-                "Unexpected trailing tokens".to_owned(),
-            ))
+            Err(Error::Parse("unexpected trailing tokens".to_owned()))
         }
     }
 

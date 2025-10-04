@@ -1,5 +1,5 @@
 use super::SvgElement;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::Length;
 use crate::types::{attr_split, strp};
 
@@ -32,8 +32,8 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         return Ok((x1 + ratio * (x2 - x1), y1 + ratio * (y2 - y1)));
     }
 
-    Err(SvgdxError::MissingAttribute(
-        "in line either x1, y1, x2 or y2".to_string(),
+    Err(Error::MissingAttr(
+        "line element requires x1, y1, x2 and y2".to_string(),
     ))
 }
 
@@ -79,8 +79,8 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
         return Ok((lastx, lasty));
     }
 
-    Err(SvgdxError::MissingAttribute(
-        "points in polyline".to_string(),
+    Err(Error::MissingAttr(
+        "polyline element requires points".to_string(),
     ))
 }
 
@@ -120,13 +120,14 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                     'h' | 'H' | 'v' | 'V' => 1,
                     'a' | 'A' => 7,
                     _ => {
-                        return Err(SvgdxError::InvalidData(format!(
-                            "not yet impl path parsing line offset for {op}"
-                        )));
+                        return Err(Error::InvalidValue(
+                            "point_along_path() unhandled command".into(),
+                            op.to_string(),
+                        ));
                     }
                 };
                 if arg_num == num_args {
-                    return Err(SvgdxError::ParseError("path has too many vars".to_string()));
+                    return Err(Error::Parse("path has too many vars".to_string()));
                 }
 
                 match op {
@@ -196,8 +197,8 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                         } else if arg_num == 1 {
                             let val = strp(&item)?;
                             if r != val {
-                                return Err(SvgdxError::ParseError(
-                                    "path length not supported for non circle elipse".to_string(),
+                                return Err(Error::Parse(
+                                    "path length not supported for non circle ellipse".to_string(),
                                 ));
                             }
                         } else if arg_num == 2 {
@@ -285,9 +286,10 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
                         }
                     }
                     _ => {
-                        return Err(SvgdxError::InvalidData(format!(
-                            "not yet impl path parsing line offset for {op}"
-                        )));
+                        return Err(Error::InvalidValue(
+                            "point_along_path() unhandled command".into(),
+                            op.to_string(),
+                        ));
                     }
                 }
 
@@ -304,7 +306,7 @@ fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         return Ok(pos);
     }
 
-    Err(SvgdxError::MissingAttribute("d in path".to_string()))
+    Err(Error::MissingAttr("path element requires d".to_string()))
 }
 
 pub fn get_point_along_linelike_type_el(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
@@ -312,8 +314,8 @@ pub fn get_point_along_linelike_type_el(el: &SvgElement, length: Length) -> Resu
         "line" => get_point_along_line(el, length),
         "polyline" => get_point_along_polyline(el, length),
         "path" => get_point_along_path(el, length),
-        _ => Err(SvgdxError::InternalLogicError(
-            "looking for point on line in a non line element".to_string(),
+        _ => Err(Error::InternalLogic(
+            "point_along_line on a non line-like element".to_string(),
         )),
     }
 }

@@ -54,7 +54,7 @@ mod style;
 mod transform;
 mod types;
 
-pub use errors::Result;
+pub use errors::{Error, Result};
 pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 
@@ -159,18 +159,18 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
             Box::new(stdin) as Box<dyn BufRead>
         }
     } else {
-        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
+        Box::new(BufReader::new(File::open(input).map_err(Error::Io)?)) as Box<dyn BufRead>
     };
 
     if output == "-" {
         transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
     } else {
-        let mut out_temp = NamedTempFile::new()?;
+        let mut out_temp = NamedTempFile::new().map_err(Error::Io)?;
         transform_stream(&mut in_reader, &mut out_temp, cfg)?;
         // Copy content rather than rename (by .persist()) since this
         // could cross filesystems; some apps (e.g. eog) also fail to
         // react to 'moved-over' files.
-        fs::copy(out_temp.path(), output)?;
+        fs::copy(out_temp.path(), output).map_err(Error::Io)?;
     }
 
     Ok(())

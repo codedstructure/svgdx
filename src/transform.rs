@@ -1,6 +1,6 @@
 use crate::context::TransformerContext;
 use crate::elements::SvgElement;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
@@ -95,7 +95,7 @@ fn process_tags(
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
     bbb: &mut BoundingBoxBuilder,
 ) -> Result<Option<BoundingBox>> {
-    let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
+    let mut element_errors: HashMap<OrderIndex, (SvgElement, Error)> = HashMap::new();
     let remain = &mut Vec::new();
 
     while !tags.is_empty() && remain.len() != tags.len() {
@@ -117,7 +117,7 @@ fn process_tags(
                     }
                 } else {
                     if let (Some(el), Err(err)) = (el, gen_result) {
-                        if let SvgdxError::MultiError(err_list) = err {
+                        if let Error::Multi(err_list) = err {
                             for (idx, (el, err)) in err_list {
                                 element_errors.insert(idx, (el, err));
                             }
@@ -130,7 +130,7 @@ fn process_tags(
             }
         }
         if tags.len() == remain.len() {
-            return Err(SvgdxError::MultiError(element_errors));
+            return Err(Error::Multi(element_errors));
         }
 
         mem::swap(tags, remain);

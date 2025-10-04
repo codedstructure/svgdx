@@ -4,7 +4,7 @@ use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
 use std::{path::Path, sync::mpsc::channel, time::Duration};
 
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::style::ThemeType;
 use crate::{transform_file, AutoStyleMode, TransformConfig};
 
@@ -122,8 +122,8 @@ impl Config {
     fn from_args(args: Arguments) -> Result<Self> {
         if args.watch && args.file == "-" {
             // Should already be enforced by clap validation
-            return Err(SvgdxError::from(
-                "A non-stdin file must be provided with -w/--watch argument",
+            return Err(Error::Cli(
+                "A non-stdin file must be provided with -w/--watch argument".into(),
             ));
         }
         if args.file != "-" && args.output != "-" {
@@ -133,11 +133,11 @@ impl Config {
             let in_path = Path::new(&args.file);
             let out_path = Path::new(&args.output);
             if out_path.exists()
-                && out_path.canonicalize().map_err(SvgdxError::from_err)?
-                    == in_path.canonicalize().map_err(SvgdxError::from_err)?
+                && out_path.canonicalize().map_err(Error::from_err)?
+                    == in_path.canonicalize().map_err(Error::from_err)?
             {
-                return Err(SvgdxError::from(
-                    "Output path must not refer to the same file as the input file.",
+                return Err(Error::Cli(
+                    "Output path must not refer to the same file as the input file.".into(),
                 ));
             }
         }
@@ -179,7 +179,7 @@ impl Config {
     /// spaces or quotes should be quoted or escaped appropriately.
     pub fn from_cmdline(args: &str) -> Result<Self> {
         let args = shlex::split(args).unwrap_or_default();
-        let args = Arguments::try_parse_from(args.iter()).map_err(SvgdxError::from_err)?;
+        let args = Arguments::try_parse_from(args.iter()).map_err(Error::from_err)?;
         Self::from_args(args)
     }
 }
@@ -203,7 +203,7 @@ pub fn run(config: Config) -> Result<()> {
         watcher
             .watcher()
             .watch(Path::new(&watch), RecursiveMode::NonRecursive)
-            .map_err(SvgdxError::from_err)?;
+            .map_err(Error::from_err)?;
         transform_file(&watch, &config.output_path, &config.transform).unwrap_or_else(|e| {
             eprintln!("transform failed: {e:?}");
         });
@@ -212,7 +212,9 @@ pub fn run(config: Config) -> Result<()> {
             match rx.recv() {
                 Ok(Ok(events)) => {
                     for event in events {
-                        if event.path.canonicalize()? == watch_path.canonicalize()? {
+                        if event.path.canonicalize().map_err(Error::Io)?
+                            == watch_path.canonicalize().map_err(Error::Io)?
+                        {
                             eprintln!("{} changed", event.path.to_string_lossy());
                             transform_file(&watch, &config.output_path, &config.transform)
                                 .unwrap_or_else(|e| {

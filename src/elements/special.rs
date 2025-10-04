@@ -1,6 +1,6 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::events::OutputList;
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
@@ -62,11 +62,7 @@ impl EventGen for ConfigElement {
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
                 "svg-style" => new_config.svg_style = Some(value.clone()),
-                _ => {
-                    return Err(SvgdxError::InvalidData(format!(
-                        "Unknown config setting {key}"
-                    )))
-                }
+                _ => return Err(Error::InvalidAttr(key)),
             }
         }
         context.set_config(new_config);
@@ -83,8 +79,8 @@ impl EventGen for SpecsElement {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if context.in_specs {
-            return Err(SvgdxError::DocumentError(
-                "Nested <specs> elements are not allowed".to_string(),
+            return Err(Error::Document(
+                "nested <specs> elements are not allowed".to_string(),
             ));
         }
         if let Some(inner_events) = self.0.inner_events(context) {
@@ -115,7 +111,7 @@ impl EventGen for VarElement {
                 let value = eval_attr(&value, context)?;
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
-                    return Err(SvgdxError::VarLimitError(
+                    return Err(Error::VarLimit(
                         key.clone(),
                         value.len(),
                         context.config.var_limit,
@@ -142,7 +138,7 @@ impl EventGen for IfElement {
         let test = self
             .0
             .get_attr("test")
-            .ok_or_else(|| SvgdxError::MissingAttribute("test".to_owned()))?;
+            .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
         if let Some(inner_events) = self.0.inner_events(context) {
             if eval_condition(test, context)? {
                 // opening if element is not included in the processed inner events to avoid

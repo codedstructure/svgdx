@@ -1,5 +1,5 @@
 use crate::elements::SvgElement;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
 
 use std::io::{BufRead, BufReader, Cursor, Write};
@@ -101,7 +101,7 @@ impl IntoIterator for InputList {
 }
 
 impl FromStr for InputList {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         Self::from_reader(&mut BufReader::new(Cursor::new(s.as_bytes())))
@@ -156,9 +156,8 @@ impl InputList {
             } else {
                 0
             };
-            let ev = ev.map_err(|e| {
-                SvgdxError::ParseError(format!("XML error near line {src_line}: {e:?}"))
-            })?;
+            let ev =
+                ev.map_err(|e| Error::Document(format!("XML error near line {src_line}: {e:?}")))?;
 
             match &ev {
                 Event::Eof => break, // exits the loop when reaching end of file
@@ -325,7 +324,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
         match ev {
             Event::Start(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
-                    SvgdxError::DocumentError(format!(
+                    Error::Document(format!(
                         "could not extract element at line {}",
                         input_ev.line
                     ))
@@ -347,7 +346,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
             }
             Event::Empty(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
-                    SvgdxError::DocumentError(format!(
+                    Error::Document(format!(
                         "could not extract element at line {}",
                         input_ev.line
                     ))
@@ -533,19 +532,15 @@ impl OutputList {
                 let content = Self::blank_line_remover(&text_buf);
                 let text_event = OutputEvent::Text(content);
                 text_buf.clear();
-                writer
-                    .write_event(text_event)
-                    .map_err(SvgdxError::from_err)?;
+                writer.write_event(text_event).map_err(Error::from_err)?;
             }
-            writer.write_event(event).map_err(SvgdxError::from_err)?;
+            writer.write_event(event).map_err(Error::from_err)?;
         }
         // re-add any trailing text
         if !text_buf.is_empty() {
             let content = Self::blank_line_remover(&text_buf);
             let text_event = OutputEvent::Text(content);
-            writer
-                .write_event(text_event)
-                .map_err(SvgdxError::from_err)?;
+            writer.write_event(text_event).map_err(Error::from_err)?;
         }
         Ok(())
     }
@@ -637,7 +632,7 @@ impl SvgElement {
 }
 
 impl TryFrom<&BytesStart<'_>> for SvgElement {
-    type Error = SvgdxError;
+    type Error = Error;
 
     /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
     /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
@@ -649,12 +644,9 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
         let attrs: Result<Vec<(String, String)>> = e
             .attributes()
             .map(move |a| {
-                let aa = a.map_err(SvgdxError::from_err)?;
+                let aa = a.map_err(Error::from_err)?;
                 let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let value = aa
-                    .unescape_value()
-                    .map_err(SvgdxError::from_err)?
-                    .into_owned();
+                let value = aa.unescape_value().map_err(Error::from_err)?.into_owned();
                 Ok((key, value))
             })
             .collect();
@@ -663,7 +655,7 @@ impl TryFrom<&BytesStart<'_>> for SvgElement {
 }
 
 impl TryFrom<InputEvent> for SvgElement {
-    type Error = SvgdxError;
+    type Error = Error;
 
     fn try_from(ev: InputEvent) -> Result<Self> {
         match ev.event {
@@ -675,8 +667,8 @@ impl TryFrom<InputEvent> for SvgElement {
                 element.set_order_index(&ev.order);
                 Ok(element)
             }
-            _ => Err(SvgdxError::DocumentError(format!(
-                "Expected Start or Empty event, got {:?}",
+            _ => Err(Error::Document(format!(
+                "expected Start or Empty event, got {:?}",
                 ev.event
             ))),
         }
