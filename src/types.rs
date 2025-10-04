@@ -74,9 +74,17 @@ pub fn split_compound_attr(value: &str) -> (String, String) {
         let prefix = parts.next().expect("nonempty");
         if let Some(remain) = parts.next() {
             let mut parts = attr_split_cycle(remain);
-            let x_suffix = parts.next().unwrap_or_default();
-            let y_suffix = parts.next().unwrap_or_default();
-            ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
+            let x = if let Some(dx) = parts.next() {
+                format!("{prefix} {dx}")
+            } else {
+                prefix.to_string()
+            };
+            let y = if let Some(dy) = parts.next() {
+                format!("{prefix} {dy}")
+            } else {
+                prefix.to_string()
+            };
+            (x, y)
         } else {
             (value.to_owned(), value.to_owned())
         }

@@ -1,0 +1,11 @@
+<svg>
+  <rect id="a" wh="100 50" class="d-grid-5"/>
+
+  <rect id="b" xy="#a 2/10 5/10" xy2="#a@tl 8/10 9/10"/>
+  <rect xy="#a 2/10 1/10" wh="#a 2/10 2/10"/>
+  <rect xy="#a 8/10 1/10" wh="^" xy-loc="tr"/>
+
+  <loop count="5" loop-var="i">
+    <circle x="#b $i/5" cy="#b" r="#b 2/10"/>
+  </loop>
+</svg>

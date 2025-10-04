@@ -1,3 +1,4 @@
+use std::num::NonZeroU32;
 use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
@@ -28,6 +29,7 @@ impl Size {
 pub enum Length {
     Absolute(f32),
     Ratio(f32),
+    Rational(i32, NonZeroU32), // numerator, denominator
 }
 
 impl Default for Length {
@@ -39,10 +41,10 @@ impl Default for Length {
 impl Length {
     #[allow(dead_code)]
     pub const fn ratio(&self) -> Option<f32> {
-        if let Self::Ratio(result) = self {
-            Some(*result)
-        } else {
-            None
+        match self {
+            Self::Ratio(result) => Some(*result),
+            Self::Rational(numer, denom) => Some(*numer as f32 / denom.get() as f32),
+            _ => None,
         }
     }
 
@@ -60,6 +62,7 @@ impl Length {
         match self {
             Self::Absolute(abs) => *abs,
             Self::Ratio(ratio) => base * ratio,
+            Self::Rational(numer, denom) => base * (*numer as f32 / denom.get() as f32),
         }
     }
 
@@ -69,6 +72,7 @@ impl Length {
         match self {
             Self::Absolute(abs) => value + abs,
             Self::Ratio(ratio) => value * ratio,
+            Self::Rational(numer, denom) => value * (*numer as f32 / denom.get() as f32),
         }
     }
 
@@ -89,6 +93,9 @@ impl Length {
                 }
             }
             Self::Ratio(ratio) => start + (end - start) * ratio,
+            Self::Rational(numer, denom) => {
+                start + (end - start) * (*numer as f32 / denom.get() as f32)
+            }
         }
     }
 }
@@ -106,6 +113,14 @@ impl FromStr for Length {
         let value = value.trim();
         if let Some(pc) = value.strip_suffix('%') {
             Ok(Length::Ratio(strp(pc)? * 0.01))
+        } else if let Some((numer, denom)) = value.split_once('/') {
+            let numer = numer
+                .parse()
+                .map_err(|_| Error::Parse(format!("expected an integer numerator: '{value}'")))?;
+            let denom = denom.parse().map_err(|_| {
+                Error::Parse(format!("expected an integer denominator >= 1: '{value}'"))
+            })?;
+            Ok(Length::Rational(numer, denom))
         } else {
             Ok(Length::Absolute(strp(value)?))
         }
@@ -441,6 +456,14 @@ mod test {
         assert_eq!(strp_length("-0.0123").ok(), Some(Length::Absolute(-0.0123)));
         assert_eq!(strp_length("0.5%").ok(), Some(Length::Ratio(0.005)));
         assert_eq!(strp_length("150%").ok(), Some(Length::Ratio(1.5)));
+        assert_eq!(
+            strp_length("1/5").ok(),
+            Some(Length::Rational(1, NonZeroU32::new(5).unwrap()))
+        );
+        assert_eq!(
+            strp_length("-2/37").ok(),
+            Some(Length::Rational(-2, NonZeroU32::new(37).unwrap()))
+        );
         assert_eq!(strp_length("1.2.3").ok(), None);
         assert_eq!(strp_length("a").ok(), None);
         assert_eq!(strp_length("a%").ok(), None);
@@ -461,6 +484,11 @@ mod test {
         assert_eq!(ratio_len.absolute(), None);
         assert_eq!(ratio_len.ratio(), Some(0.75));
         assert_eq!(ratio_len.adjust(3.125), 0.75 * 3.125);
+
+        let rat_len = Length::Rational(3, NonZeroU32::new(4).unwrap());
+        assert_eq!(rat_len.absolute(), None);
+        assert_eq!(rat_len.ratio(), Some(0.75));
+        assert_eq!(rat_len.adjust(3.125), 0.75 * 3.125);
     }
 
     #[test]

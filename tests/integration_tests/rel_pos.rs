@@ -380,3 +380,53 @@ fn test_dirspec_next() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_rational_delta() {
+    let input = r##"
+<rect id="a" wh="100 60"/>
+<rect id="l" xy="#a 1/10 1/10" wh="#a 2/10 8/10"/>
+<rect id="m" xy="#a 5/10 1/10" xy-loc="t" wh="^"/>
+<rect id="r" xy="#a 9/10 1/10" xy-loc="tr" wh="^"/>
+"##;
+    let expected1 = r#"<rect id="l" x="10" y="6" width="20" height="48"/>"#;
+    let expected2 = r#"<rect id="m" x="40" y="6" width="20" height="48"/>"#;
+    let expected3 = r#"<rect id="r" x="70" y="6" width="20" height="48"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
+
+#[test]
+fn test_rational_xy2_delta() {
+    // use implicit 'xy2 implies from bottom right of ref'
+    let input = r##"
+<rect id="a" wh="100 60"/>
+<rect id="l" xy="#a 1/10" wh="#a 4/10 8/10"/>
+<rect id="r" xy2="#a -1/10" wh="^"/>
+"##;
+    let expected1 = r#"<rect id="l" x="10" y="6" width="40" height="48"/>"#;
+    let expected2 = r#"<rect id="r" x="50" y="6" width="40" height="48"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_mixed_locspec_rational_delta() {
+    // supply locspec on ref element, use rational and absolute deltas
+    let input = r##"
+<rect id="a" wh="100 50"/>
+<rect id="b" cxy="#a@c 2/10 0" wh="#a 2/10"/>
+<rect id="c" cxy="#a@c -2/10 -1" wh="#a 2/10"/>
+<rect id="d" cxy="#a@tl 3/10 1" wh="#a 2/10"/>
+"##;
+    let expected1 = r#"<rect id="b" x="60" y="20" width="20" height="10"/>"#;
+    let expected2 = r#"<rect id="c" x="20" y="19" width="20" height="10"/>"#;
+    let expected3 = r#"<rect id="d" x="20" y="-4" width="20" height="10"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}

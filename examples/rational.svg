@@ -1,0 +1,31 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="110mm" height="60mm" viewBox="-5 -5 110 60">
+  <defs>
+    <pattern id="grid-5" x="0" y="0" width="5" height="5" patternUnits="userSpaceOnUse">
+        <rect width="100%" height="100%" style="stroke: none; fill: none;"/>
+        <line x1="0" y1="0" x2="5" y2="0" style="stroke-width: 0.224; stroke: black;"/><line x1="0" y1="0" x2="0" y2="5" style="stroke-width: 0.224; stroke: black;"/>
+        </pattern>
+  </defs>
+  <style>
+    <![CDATA[
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      rect.d-grid-5, circle.d-grid-5, ellipse.d-grid-5, polygon.d-grid-5 { fill: url(#grid-5); }
+    ]]>
+  </style>
+  <rect id="a" width="100" height="50" class="d-grid-5"/>
+
+  <rect id="b" x="20" y="25" width="60" height="20"/>
+  <rect x="20" y="5" width="20" height="10"/>
+  <rect x="60" y="5" width="20" height="10"/>
+
+
+    <circle cx="26" cy="35" r="6"/>
+
+    <circle cx="38" cy="35" r="6"/>
+
+    <circle cx="50" cy="35" r="6"/>
+
+    <circle cx="62" cy="35" r="6"/>
+
+    <circle cx="74" cy="35" r="6"/>
+
+</svg>
