@@ -80,15 +80,69 @@ pub trait PathSyntax {
         }
     }
 
+    fn read_flag(&mut self) -> Result<u32> {
+        self.check_not_end()?;
+        // per the grammar for `a`/`A`, could have '00' etc for
+        // the two adjacent flags...
+        let res = match self.current().unwrap() {
+            '0' => 0,
+            '1' => 1,
+            _ => {
+                return Err(Error::InvalidValue(
+                    "flag".to_string(),
+                    self.current().unwrap().to_string(),
+                ))
+            }
+        };
+        self.advance();
+        self.skip_wsp_comma();
+        Ok(res)
+    }
+
     fn read_number(&mut self) -> Result<f32> {
         self.check_not_end()?;
-        let mut s = String::new();
-        while let Some(ch) = self.current() {
-            if ch.is_ascii_digit() || ch == '.' || ch == '-' {
-                s.push(ch);
+        let mut mult = 1.;
+        match self.current().unwrap() {
+            '-' => {
+                mult = -1.;
                 self.advance();
-            } else {
-                break;
+            }
+            '+' => {
+                self.advance();
+            }
+            _ => {}
+        };
+        Ok(mult * self.read_non_negative()?)
+    }
+
+    fn read_non_negative(&mut self) -> Result<f32> {
+        self.check_not_end()?;
+        let mut s = String::new();
+        let mut dot_valid = true;
+        let mut exp_valid = true;
+        while let Some(ch) = self.current() {
+            match ch {
+                '0'..='9' => {
+                    s.push(ch);
+                    self.advance();
+                }
+                '.' if dot_valid => {
+                    s.push(ch);
+                    self.advance();
+                    dot_valid = false;
+                }
+                'e' | 'E' if exp_valid && s.ends_with(|c: char| c.is_ascii_digit()) => {
+                    s.push(ch);
+                    self.advance();
+                    // include sign character if present
+                    if self.current() == Some('-') || self.current() == Some('+') {
+                        s.push(self.current().unwrap());
+                        self.advance();
+                    }
+                    exp_valid = false;
+                    dot_valid = false;
+                }
+                _ => break,
             }
         }
         self.skip_wsp_comma();
@@ -236,19 +290,21 @@ impl PathParser {
             }
             'A' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let _rxy = self.tokens.read_coord()?;
+                let _rx = self.tokens.read_non_negative()?;
+                let _ry = self.tokens.read_non_negative()?;
                 let _xar = self.tokens.read_number()?;
-                let _laf = self.tokens.read_number()?;
-                let _sf = self.tokens.read_number()?;
+                let _laf = self.tokens.read_flag()?;
+                let _sf = self.tokens.read_flag()?;
                 let xy = self.tokens.read_coord()?;
                 self.update_position(xy);
             }
             'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let _rxy = self.tokens.read_coord()?;
+                let _rx = self.tokens.read_non_negative()?;
+                let _ry = self.tokens.read_non_negative()?;
                 let _xar = self.tokens.read_number()?;
-                let _laf = self.tokens.read_number()?;
-                let _sf = self.tokens.read_number()?;
+                let _laf = self.tokens.read_flag()?;
+                let _sf = self.tokens.read_flag()?;
                 let (dx, dy) = self.tokens.read_coord()?;
                 let (cpx, cpy) = self.position.unwrap_or((0., 0.));
                 self.update_position((cpx + dx, cpy + dy));
@@ -506,6 +562,49 @@ mod tests {
         assert_eq!(ps.read_number().unwrap(), 4.5);
         ps.skip_whitespace();
         assert_eq!(ps.read_number().unwrap(), -9.25);
+
+        // should read as little as needed to allow valid parsing,
+        // so numbers can be squished together providing the result
+        // is unambiguous. See https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
+        let mut ps = SvgPathSyntax::new("123-4.5.25+5");
+        assert_eq!(ps.read_number().unwrap(), 123.);
+        assert_eq!(ps.read_number().unwrap(), -4.5);
+        assert_eq!(ps.read_number().unwrap(), 0.25);
+        assert_eq!(ps.read_number().unwrap(), 5.);
+
+        // should support exponents
+        let mut ps = SvgPathSyntax::new("1e3 -2E-2 +3.5e+2");
+        assert_eq!(ps.read_number().unwrap(), 1e3);
+        assert_eq!(ps.read_number().unwrap(), -2e-2);
+        assert_eq!(ps.read_number().unwrap(), 3.5e+2);
+        // ... and without spaces; '1e3.5' is '1e3' followed by '.5'
+        let mut ps = SvgPathSyntax::new("1e3.5-2E-2+3.5e+2");
+        assert_eq!(ps.read_number().unwrap(), 1e3);
+        assert_eq!(ps.read_number().unwrap(), 0.5);
+        assert_eq!(ps.read_number().unwrap(), -2e-2);
+        assert_eq!(ps.read_number().unwrap(), 3.5e+2);
+    }
+
+    #[test]
+    fn test_ps_flag() {
+        let mut ps = SvgPathSyntax::new("0 1,1 0");
+        assert_eq!(ps.read_flag().unwrap(), 0);
+        assert_eq!(ps.read_flag().unwrap(), 1);
+        assert_eq!(ps.read_flag().unwrap(), 1);
+        assert_eq!(ps.read_flag().unwrap(), 0);
+
+        // whitespace is not required around flags
+        let mut ps = SvgPathSyntax::new("01");
+        assert_eq!(ps.read_flag().unwrap(), 0);
+        assert_eq!(ps.read_flag().unwrap(), 1);
+
+        // only '0' and '1' are valid flags
+        let mut ps = SvgPathSyntax::new("2");
+        assert!(ps.read_flag().is_err());
+        let mut ps = SvgPathSyntax::new("1.0");
+        // will read the '1' as a flag, leaving '.0'
+        assert_eq!(ps.read_flag().unwrap(), 1);
+        assert!(ps.read_flag().is_err());
     }
 
     #[test]
@@ -518,6 +617,12 @@ mod tests {
 
         let mut ps = SvgPathSyntax::new("123 ,   456");
         assert_eq!(ps.read_coord().unwrap(), (123., 456.));
+
+        // Example from https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
+        // 'for the string "M 0.6.5" … the first coordinate will be "0.6" and
+        // the second coordinate will be ".5".'
+        let mut ps = SvgPathSyntax::new("0.6.5");
+        assert_eq!(ps.read_coord().unwrap(), (0.6, 0.5));
     }
 
     #[test]
@@ -544,6 +649,12 @@ mod tests {
         let mut pp = PathParser::new("m10 20 100 200");
         pp.evaluate().unwrap();
         assert_eq!(pp.position, Some((110., 220.)));
+        assert!(pp.tokens.at_end());
+
+        // Example from spec - grammar section.
+        let mut pp = PathParser::new("M 0.6.5");
+        pp.evaluate().unwrap();
+        assert_eq!(pp.position, Some((0.6, 0.5)));
         assert!(pp.tokens.at_end());
 
         //
