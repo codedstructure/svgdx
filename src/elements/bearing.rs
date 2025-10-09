@@ -16,7 +16,7 @@
 
 use super::path::PathSyntax;
 use crate::errors::{Error, Result};
-use crate::types::fstr;
+use crate::types::{attr_split, fstr, strpu};
 
 struct BearingPathSyntax {
     data: Vec<char>,
@@ -143,13 +143,97 @@ impl PathBearing {
     }
 }
 
+/// Support 'repeat' syntax as part of path data.
+///
+/// Syntax:
+///  `rep N [ ... ]`
+///
+/// Example:
+/// `"M 0 0 rep 3 [ l 10 0 ]"` => `"M 0 0 l 10 0 l 10 0 l 10 0"`
+///
+/// Repeat commands may be nested. Any unclosed repeat blocks at the
+/// end of the document are automatically closed.
+fn process_path_repeat(data: &str) -> Result<String> {
+    let tokens: Vec<_> = attr_split(data).collect();
+
+    // Base case: no repeat command found
+    let rep_pos = match tokens.iter().position(|s| s == "rep") {
+        Some(pos) => pos,
+        None => return Ok(data.to_string()), // TODO: Cow?
+    };
+
+    let mut result = String::new();
+
+    // Copy initial tokens
+    if rep_pos > 0 {
+        result.push_str(&tokens[..rep_pos].join(" "));
+        result.push(' ');
+    }
+
+    // Parse repeat count, default to 0 if missing or invalid
+    let count = tokens
+        .get(rep_pos + 1)
+        .and_then(|n| strpu(n).ok())
+        .unwrap_or(0);
+
+    // Check for opening bracket
+    if tokens.get(rep_pos + 2).is_none_or(|t| t != "[") {
+        return Err(Error::Parse("expected '[' after 'rep'".to_string()));
+    }
+
+    // Find matching closing bracket
+    let inner_start = rep_pos + 3; // after "rep N ["
+    let mut inner_tokens = Vec::new();
+
+    let mut nest_depth = 0;
+    while let Some(token) = tokens.get(inner_start + inner_tokens.len()) {
+        if token == "[" {
+            nest_depth += 1;
+        } else if token == "]" {
+            if nest_depth == 0 {
+                break;
+            }
+            nest_depth -= 1;
+        }
+        inner_tokens.push(token.clone());
+    }
+
+    let remaining = &tokens[inner_start + inner_tokens.len() + 1..];
+
+    // recurse on inner content
+    let content = process_path_repeat(&inner_tokens.join(" "))?;
+
+    // Repeat the content
+    for i in 0..count {
+        if i > 0 {
+            result.push(' ');
+        }
+        result.push_str(&content);
+    }
+
+    // Add remaining tokens
+    if !remaining.is_empty() {
+        result.push(' ');
+        result.push_str(
+            &remaining
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
+        );
+    }
+
+    Ok(result)
+}
+
 /// Convert a path string containing bearing commands into a standard SVG path string.
 ///
 /// Example: `<path d="m0 0 b60 h10 b120 h10 z"/>`
 ///
 /// Becomes an equilateral triangle: `<path d="m0 0 l5 8.66l-10 0z"/>`
 pub fn process_path_bearing(data: &str) -> Result<String> {
-    let mut pp = PathBearing::new(data);
+    let data = process_path_repeat(data)?;
+    let mut pp = PathBearing::new(&data);
     pp.evaluate()?;
     Ok(pp.output)
 }
@@ -159,6 +243,24 @@ mod tests {
     use assertables::{assert_contains, assert_not_contains};
 
     use super::*;
+
+    #[test]
+    fn test_path_repeat() {
+        let input = r#"M 0 0 rep 3 [ l 10 0 ] l 5 0"#;
+        assert_eq!(
+            process_path_repeat(input).unwrap(),
+            r#"M 0 0 l 10 0 l 10 0 l 10 0 l 5 0"#
+        );
+    }
+
+    #[test]
+    fn test_path_repeat_nested() {
+        let input = r#"M 0 0 rep 3 [ h 3 b 45 rep 2 [ l 10 0 ] ] l 5 0"#;
+        assert_eq!(
+            process_path_repeat(input).unwrap(),
+            r#"M 0 0 h 3 b 45 l 10 0 l 10 0 h 3 b 45 l 10 0 l 10 0 h 3 b 45 l 10 0 l 10 0 l 5 0"#
+        );
+    }
 
     #[test]
     fn test_path_bearing() {
