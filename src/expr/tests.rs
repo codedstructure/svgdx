@@ -1,20 +1,19 @@
-use super::expression::{
-    eval_expr, eval_vars, expr, tokenize, valid_symbol, EvalState, ExprValue, Token,
-};
-use crate::errors::{Error, Result};
-
+use std::cell::RefCell;
 use std::collections::HashMap;
 
-use crate::context::{ContextView, ElementMap, VariableMap};
-use crate::elements::SvgElement;
-use crate::geometry::{BoundingBox, Size};
-use crate::types::ElRef;
 use assertables::{assert_in_delta, assert_lt};
 use rand::prelude::*;
 use rand_pcg::Pcg32;
-use std::cell::RefCell;
 
-use super::*;
+use super::expression::{
+    eval_attr, eval_condition, eval_expr, eval_vars, expr, tokenize, valid_symbol, EvalState,
+    ExprValue, Token,
+};
+use crate::context::{ContextView, ElementMap, VariableMap};
+use crate::elements::SvgElement;
+use crate::errors::{Error, Result};
+use crate::geometry::{BoundingBox, Size};
+use crate::types::ElRef;
 
 struct TestContext {
     vars: HashMap<String, String>,
