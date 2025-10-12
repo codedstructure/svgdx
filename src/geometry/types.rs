@@ -1,7 +1,7 @@
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
-use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
+use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
 use crate::errors::{Error, Result};
 use crate::types::{attr_split, extract_elref, strp, ElRef};
 
@@ -388,27 +388,6 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),
-        }
-    }
-}
-
-pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
-    let (elref, remain) = extract_elref(s)?;
-    if remain.is_empty() {
-        return Ok((elref, None));
-    }
-    let remain = remain
-        .strip_prefix(SCALARSPEC_SEP)
-        .ok_or_else(|| Error::Parse(format!("invalid scalarspec: '{s}'")))?;
-    let mut chars = remain.chars();
-    let mut scalar = String::new();
-    loop {
-        match chars.next() {
-            Some(c) if c.is_whitespace() => {
-                return Err(Error::Parse(format!("invalid scalarspec: '{s}'")))
-            }
-            Some(c) => scalar.push(c),
-            None => return Ok((elref, Some(scalar.parse()?))),
         }
     }
 }

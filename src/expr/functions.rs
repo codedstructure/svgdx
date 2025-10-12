@@ -1,5 +1,6 @@
 use super::expression::{EvalState, ExprValue};
 use crate::errors::{Error, Result};
+use crate::geometry::{BoundingBox, LocSpec};
 
 use rand::Rng;
 use std::str::FromStr;
@@ -112,6 +113,47 @@ pub enum Function {
     Join,
     /// `_(a)` -- return a as text
     Text,
+
+    /// `surround(bb1, bb2, ...)` -- bounding box that surrounds all inputs
+    Surround,
+    /// `inside(bb1, bb2)` -- bounding box that is the 'inside' of 2 inputs
+    /// 3 cases: (overlap, between, contained)
+    /// |---a---|
+    ///     |---b---|
+    ///     #####
+    /// or
+    /// |---a---|   |---b---|
+    ///         #####
+    /// or
+    /// |---a---|
+    ///  |-b-|
+    ///  #####
+    ///
+    Inside,
+    /// `mid(P, Q)` -- midpoint between scalars / coords / bboxes P and Q
+    Mid,
+    /// `xy(bb)` -- x,y coord of bounding box bb
+    Xy,
+    /// `size(bb)` -- width,height of bounding box bb
+    Size,
+    /// `loc(bb)` -- x,y coord of locspec
+    Loc,
+    /// `x1(bb)` -- x1 coordinate of bounding box bb
+    X1,
+    /// `y1(bb)` -- y1 coordinate of bounding box bb
+    Y1,
+    /// `x2(bb)` -- x2 coordinate of bounding box bb
+    X2,
+    /// `y2(bb)` -- y2 coordinate of bounding box bb
+    Y2,
+    /// `cx(bb)` -- x coordinate of center of bounding box bb
+    Cx,
+    /// `cy(bb)` -- y coordinate of center of bounding box bb
+    Cy,
+    /// `width(bb)` -- width of bounding box bb
+    Width,
+    /// `height(bb)` -- height of bounding box bb
+    Height,
 }
 
 impl FromStr for Function {
@@ -172,6 +214,20 @@ impl FromStr for Function {
             "trim" => Self::Trim,
             "join" => Self::Join,
             "_" => Self::Text,
+            "surround" => Self::Surround,
+            "inside" => Self::Inside,
+            "mid" => Self::Mid,
+            "xy" => Self::Xy,
+            "wh" | "size" => Self::Size,
+            "loc" => Self::Loc,
+            "x1" => Self::X1,
+            "y1" => Self::Y1,
+            "x2" => Self::X2,
+            "y2" => Self::Y2,
+            "cx" => Self::Cx,
+            "cy" => Self::Cy,
+            "width" => Self::Width,
+            "height" => Self::Height,
             _ => return Err(Error::InvalidValue("function name".into(), value.into())),
         })
     }
@@ -497,6 +553,153 @@ pub fn eval_function(
         Function::Text => {
             let a = args.one_string()?;
             return Ok(ExprValue::Text(a));
+        }
+
+        // Bounding box functions
+        Function::Surround => {
+            if args.len() % 4 != 0 || args.is_empty() {
+                return Err(Error::Arity(
+                    "surround() requires one or more bounding boxes".to_string(),
+                ));
+            }
+            let bbox_list = args.bbox_list()?;
+            // Safety: union only returns None if the input list is empty, checked above
+            let surround = BoundingBox::union(bbox_list).unwrap();
+            return Ok(ExprValue::List(vec![
+                ExprValue::Number(surround.x1),
+                ExprValue::Number(surround.y1),
+                ExprValue::Number(surround.x2),
+                ExprValue::Number(surround.y2),
+            ]));
+        }
+        Function::Inside => {
+            let (a, b) = args
+                .bbox_pair()
+                .map_err(|_| Error::Arity("inside() requires two bounding boxes".to_string()))?;
+            // one bbox is completely inside the other
+            // |---a---|
+            //  |-b-|
+            //  #####
+            // overlapping bboxes
+            // |---a---|
+            //     |---b---|
+            //     #####
+            // non-overlapping bboxes - return bbox between them
+            // needs to consider each dimension separately; might
+            // overlap in one dimension but not the other; there's
+            // still a bbox 'between' them.
+            // |---a---|   |---b---|
+            //         #####
+            //
+            // For each dimension, if the intervals are separated take the gap between them,
+            // otherwise take their intersection. This yields the smallest rect "between"
+            // the two boxes that uses existing coordinates.
+            let x_low = a.x1.max(b.x1);
+            let x_high = a.x2.min(b.x2);
+            let y_low = a.y1.max(b.y1);
+            let y_high = a.y2.min(b.y2);
+
+            return Ok(ExprValue::List(vec![
+                ExprValue::Number(x_low.min(x_high)),
+                ExprValue::Number(y_low.min(y_high)),
+                ExprValue::Number(x_low.max(x_high)),
+                ExprValue::Number(y_low.max(y_high)),
+            ]));
+        }
+        Function::Mid => {
+            let args = args.number_list()?;
+            match args.len() {
+                2 => {
+                    // midpoint of two scalars
+                    (args[0] + args[1]) / 2.
+                }
+                4 => {
+                    // midpoint of two coords
+                    return Ok(ExprValue::List(vec![
+                        ExprValue::Number((args[0] + args[2]) / 2.),
+                        ExprValue::Number((args[1] + args[3]) / 2.),
+                    ]));
+                }
+                8 => {
+                    // midpoint of two bboxes
+                    let a = BoundingBox::new(args[0], args[1], args[2], args[3]);
+                    let b = BoundingBox::new(args[4], args[5], args[6], args[7]);
+                    let xmin = a.x1.min(b.x1);
+                    let ymin = a.y1.min(b.y1);
+                    let xmax = a.x2.max(b.x2);
+                    let ymax = a.y2.max(b.y2);
+                    return Ok(ExprValue::List(vec![
+                        ExprValue::Number((xmin + xmax) / 2.),
+                        ExprValue::Number((ymin + ymax) / 2.),
+                    ]));
+                }
+                _ => {
+                    return Err(Error::Arity(
+                        "mid() requires two scalars, two coords, or two bboxes".to_string(),
+                    ));
+                }
+            }
+        }
+        Function::Xy => {
+            let bb = args.one_bbox()?;
+            return Ok(ExprValue::List(vec![
+                ExprValue::Number(bb.x1),
+                ExprValue::Number(bb.y1),
+            ]));
+        }
+        Function::Size => {
+            let bb = args.one_bbox()?;
+            return Ok(ExprValue::List(vec![
+                ExprValue::Number(bb.width()),
+                ExprValue::Number(bb.height()),
+            ]));
+        }
+        Function::Loc => {
+            let args = args.flatten();
+            if args.len() != 5 {
+                return Err(Error::Arity(
+                    "loc() arguments require locspec followed by bbox".to_string(),
+                ));
+            }
+            let loc: LocSpec = args[0].one_string()?.parse()?;
+            let bb = ExprValue::from(&args[1..]).one_bbox()?;
+            let (x, y) = bb.locspec(loc);
+            return Ok(ExprValue::List(vec![
+                ExprValue::Number(x),
+                ExprValue::Number(y),
+            ]));
+        }
+        Function::X1 => {
+            let bb = args.one_bbox()?;
+            bb.x1
+        }
+        Function::Y1 => {
+            let bb = args.one_bbox()?;
+            bb.y1
+        }
+        Function::X2 => {
+            let bb = args.one_bbox()?;
+            bb.x2
+        }
+        Function::Y2 => {
+            let bb = args.one_bbox()?;
+            bb.y2
+        }
+        Function::Cx => {
+            let bb = args.one_bbox()?;
+            bb.center().0
+        }
+        Function::Cy => {
+            let bb = args.one_bbox()?;
+            bb.center().1
+        }
+        Function::Width => {
+            let bb = args.one_bbox()?;
+            bb.width()
+        }
+        Function::Height => {
+            let bb = args.one_bbox()?;
+            bb.height()
         }
     };
     Ok(e.into())

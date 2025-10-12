@@ -4,13 +4,13 @@ use std::str::FromStr;
 
 use super::functions::{eval_function, Function};
 use crate::constants::{
-    ELREF_ID_PREFIX, ELREF_PREVIOUS, EXPR_END, EXPR_START, VAR_END_BRACE, VAR_OPEN_BRACE,
-    VAR_PREFIX,
+    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, EXPR_END, EXPR_START, LOCSPEC_SEP, SCALARSPEC_SEP,
+    VAR_END_BRACE, VAR_OPEN_BRACE, VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Error, Result};
-use crate::geometry::parse_el_scalar;
-use crate::types::fstr;
+use crate::geometry::{BoundingBox, LocSpec, ScalarSpec};
+use crate::types::{extract_elref, fstr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {
@@ -40,6 +40,12 @@ impl From<Vec<f32>> for ExprValue {
 
 impl From<&[f32]> for ExprValue {
     fn from(v: &[f32]) -> Self {
+        Self::List(v.iter().copied().map(ExprValue::Number).collect())
+    }
+}
+
+impl<const N: usize> From<[f32; N]> for ExprValue {
+    fn from(v: [f32; N]) -> Self {
         Self::List(v.iter().copied().map(ExprValue::Number).collect())
     }
 }
@@ -245,6 +251,43 @@ impl ExprValue {
             ))
         }
     }
+
+    pub fn one_bbox(&self) -> Result<BoundingBox> {
+        if let [a, b, c, d] = self.number_list()?.as_slice() {
+            Ok(BoundingBox::new(*a, *b, *c, *d))
+        } else {
+            Err(Error::Arity(
+                "expected exactly four numeric arguments".to_owned(),
+            ))
+        }
+    }
+
+    pub fn bbox_pair(&self) -> Result<(BoundingBox, BoundingBox)> {
+        if let [a1, a2, a3, a4, b1, b2, b3, b4] = self.number_list()?.as_slice() {
+            Ok((
+                BoundingBox::new(*a1, *a2, *a3, *a4),
+                BoundingBox::new(*b1, *b2, *b3, *b4),
+            ))
+        } else {
+            Err(Error::Arity(
+                "expected exactly eight numeric arguments".to_owned(),
+            ))
+        }
+    }
+
+    pub fn bbox_list(&self) -> Result<Vec<BoundingBox>> {
+        let args = self.number_list()?;
+        if args.len() % 4 != 0 {
+            return Err(Error::Arity(
+                "expected a multiple of four numeric arguments".to_owned(),
+            ));
+        }
+        let mut out = Vec::new();
+        for b in args.chunks_exact(4) {
+            out.push(BoundingBox::new(b[0], b[1], b[2], b[3]));
+        }
+        Ok(out)
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -361,7 +404,9 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         } else {
             Err(Error::Parse(format!("missing closing brace in '{input}'")))
         }
-    } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
+    } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS, ELREF_NEXT]) {
+        // TODO: it's a bit dodgy that ELREF_NEXT is '+', grammar needs to
+        // be unambiguous wrt arithmetic '+' operator
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(num) = input.parse::<f32>() {
         Ok(Token::Number(num))
@@ -409,6 +454,8 @@ fn tokenize(input: &str) -> Result<Vec<Token>> {
         let next_token = match ch {
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
+            // TODO: how to handle '+' as part of an element ref?
+            // Maybe check the next char (after any further '+') is a valid id char?
             '+' => Token::Add,
             '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,
@@ -546,34 +593,33 @@ impl<'a> EvalState<'a> {
         result
     }
 
-    /// Extract a single numeric value according to the given spec.
+    /// Generate a scalar, coordinate, or bbox from an element reference
     ///
-    /// Example: `#abc~h` - height of element #abc
-    ///
-    /// The following values are available; all assuming a bounding box:
-    /// t - the y coordinate of the top of the element
-    /// r - the x coordinate of the right of the element
-    /// b - the y coordinate of the bottom of the element
-    /// l - the x coordinate of the left of the element
-    /// w - the width of the element
-    /// h - the height of the element
+    /// Examples:
+    ///  `#abc~h` - `h` height of element #abc
+    ///  `#abc@bl` - `x, y` coord of bottom left corner of element #abc
+    ///  `#abc` - `x1, y1, x2, y2` bounding box of element #abc
     fn element_ref(&self, v: &str) -> Result<ExprValue> {
-        // TODO: perhaps this should be in the SvgElement impl, so it can
-        // be re-used by other single-value attribute references, e.g.
-        // <line x1="#abc~l" .../>
-        if let Ok((elref, Some(scalar))) = parse_el_scalar(v) {
-            if let Some(elem) = self.context.get_element(&elref) {
-                if let Some(bb) = self.context.get_element_bbox(elem)? {
-                    Ok(bb.scalarspec(scalar).into())
-                } else {
-                    Err(Error::MissingBBox(elem.to_string()))
-                }
-            } else {
-                Err(Error::Reference(elref))
-            }
-        } else {
-            Err(Error::Parse(format!("invalid element_ref: '{v}'")))
+        let (elref, remain) = extract_elref(v)?;
+        let elem = self
+            .context
+            .get_element(&elref)
+            .ok_or_else(|| Error::Reference(elref))?;
+        let bb = self
+            .context
+            .get_element_bbox(elem)?
+            .ok_or_else(|| Error::MissingBBox(elem.to_string()))?;
+        if remain.is_empty() {
+            return Ok([bb.x1, bb.y1, bb.x2, bb.y2].into());
+        } else if let Some(ss) = remain.strip_prefix(SCALARSPEC_SEP) {
+            return Ok(bb.scalarspec(ScalarSpec::from_str(ss)?).into());
+        } else if let Some(ls) = remain.strip_prefix(LOCSPEC_SEP) {
+            let (x, y) = bb.locspec(LocSpec::from_str(ls)?);
+            return Ok([x, y].into());
         }
+        Err(Error::Parse(format!(
+            "expected locspec or scalarspec: '{v}'"
+        )))
     }
 }
 
