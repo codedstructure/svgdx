@@ -8,6 +8,10 @@ struct PathParser {
     position: Option<(f32, f32)>,
     start_pos: Option<(f32, f32)>,
     command: Option<char>,
+    // previous second control point (if any) for evaluating 'S' and 's'
+    cubic_cp2: Option<(f32, f32)>,
+    // previous control point (if any) for evaluating 'T' and 't'
+    quadratic_cp: Option<(f32, f32)>,
     min_x: f32,
     min_y: f32,
     max_x: f32,
@@ -179,6 +183,8 @@ impl PathParser {
             position: None,
             start_pos: None,
             command: None,
+            cubic_cp2: None,
+            quadratic_cp: None,
             min_x: 0.,
             min_y: 0.,
             max_x: 0.,
@@ -224,69 +230,198 @@ impl PathParser {
             self.command = Some(self.tokens.read_command()?);
         }
 
+        let mut cubic_cp2: Option<(f32, f32)> = None;
+        let mut quadratic_cp: Option<(f32, f32)> = None;
+
         match self.command.expect("Command should be already set") {
-            'M' | 'L' | 'T' => {
+            'M' | 'L' => {
                 // "(x y)+"
                 let xy = self.tokens.read_coord()?;
                 self.update_position(xy);
             }
-            'm' | 'l' | 't' => {
+            'm' | 'l' => {
                 let (dx, dy) = self.tokens.read_coord()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx + dx, cpy + dy));
+                let (px, py) = self.position.unwrap_or((0., 0.));
+                self.update_position((px + dx, py + dy));
             }
             'H' => {
                 let new_x = self.tokens.read_number()?;
-                let (_, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((new_x, cpy));
+                let (_, py) = self.position.unwrap_or((0., 0.));
+                self.update_position((new_x, py));
             }
             'h' => {
                 let dx = self.tokens.read_number()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx + dx, cpy));
+                let (px, py) = self.position.unwrap_or((0., 0.));
+                self.update_position((px + dx, py));
             }
             'V' => {
                 let new_y = self.tokens.read_number()?;
-                let (cpx, _) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx, new_y));
+                let (px, _) = self.position.unwrap_or((0., 0.));
+                self.update_position((px, new_y));
             }
             'v' => {
                 let dy = self.tokens.read_number()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx, cpy + dy));
+                let (px, py) = self.position.unwrap_or((0., 0.));
+                self.update_position((px, py + dy));
             }
             'Z' | 'z' => {
                 self.update_position(self.start_pos.unwrap_or((0., 0.)));
             }
             'C' => {
-                let _cp1 = self.tokens.read_coord()?; // control point 1
-                let _cp2 = self.tokens.read_coord()?; // control point 2
-                let xy = self.tokens.read_coord()?;
-                self.update_position(xy);
+                let cp1 = self.tokens.read_coord()?; // control point 1
+                let cp2 = self.tokens.read_coord()?; // control point 2
+                let end = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+
+                cubic_cp2 = Some(cp2);
+                let extrema = cubic_extrema(start, cp1, cp2, end);
+                for point in extrema {
+                    self.update_position(point);
+                }
+                self.update_position(end);
             }
             'c' => {
-                let _cp1 = self.tokens.read_coord()?; // control point 1
-                let _cp2 = self.tokens.read_coord()?; // control point 2
+                let cp1 = self.tokens.read_coord()?; // control point 1
+                let cp2 = self.tokens.read_coord()?; // control point 2
                 let (dx, dy) = self.tokens.read_coord()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx + dx, cpy + dy));
+                let (px, py) = self.position.unwrap_or((0., 0.));
+
+                let start = (px, py);
+                let end = (px + dx, py + dy);
+                let cp1 = (px + cp1.0, py + cp1.1);
+                let cp2 = (px + cp2.0, py + cp2.1);
+
+                cubic_cp2 = Some(cp2);
+                let extrema = cubic_extrema(start, cp1, cp2, end);
+                for point in extrema {
+                    self.update_position(point);
+                }
+                self.update_position(end);
             }
-            'S' | 'Q' => {
+            'S' => {
                 // S: "(x2 y2 x y)+"
-                // Q: "(x1 y1 x y)+"
-                // Both 'S' and 'Q' have the same format - a single control point followed by the
-                // target point - so deal with both together. They are semantically different though...
-                let _cp = self.tokens.read_coord()?; // control point
-                let xy = self.tokens.read_coord()?;
-                self.update_position(xy);
+                let cp2 = self.tokens.read_coord()?;
+                let end = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+
+                // "The first control point is assumed to be the reflection of the second
+                //  control point on the previous command relative to the current point.
+                //  If there is no previous command or if the previous command was not an
+                //  C, c, S or s, assume the first control point is coincident with the
+                //  current point."
+                let cp1 = if let Some((prev_cp2x, prev_cp2y)) = self.cubic_cp2 {
+                    let (px, py) = start;
+                    (2. * px - prev_cp2x, 2. * py - prev_cp2y)
+                } else {
+                    start
+                };
+
+                cubic_cp2 = Some(cp2);
+                let extrema = cubic_extrema(start, cp1, cp2, end);
+                for e in extrema {
+                    self.update_position(e);
+                }
+                self.update_position(end);
             }
-            's' | 'q' => {
+            's' => {
                 // s: "(x2 y2 x y)+"
-                // q: "(x1 y1 x y)+"
-                let _cp = self.tokens.read_coord()?; // control point
+                let cp2 = self.tokens.read_coord()?;
                 let (dx, dy) = self.tokens.read_coord()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx + dx, cpy + dy));
+                let (px, py) = self.position.unwrap_or((0., 0.));
+
+                let end = (px + dx, py + dy);
+                let start = (px, py);
+
+                // "The first control point is assumed to be the reflection of the second
+                //  control point on the previous command relative to the current point.
+                //  If there is no previous command or if the previous command was not an
+                //  C, c, S or s, assume the first control point is coincident with the
+                //  current point."
+                let cp1 = if let Some((prev_cp2x, prev_cp2y)) = self.cubic_cp2 {
+                    (2. * px - prev_cp2x, 2. * py - prev_cp2y)
+                } else {
+                    start
+                };
+                let cp2 = (px + cp2.0, py + cp2.1);
+
+                cubic_cp2 = Some(cp2);
+                let extrema = cubic_extrema(start, cp1, cp2, end);
+                for e in extrema {
+                    self.update_position(e);
+                }
+                self.update_position(end);
+            }
+            'Q' => {
+                // Q: "(x1 y1 x y)+"
+                let cp = self.tokens.read_coord()?;
+                let end = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+
+                quadratic_cp = Some(cp);
+                for e in quadratic_extrema(start, cp, end) {
+                    self.update_position(e);
+                }
+                self.update_position(end);
+            }
+            'q' => {
+                // q: "(x1 y1 x y)+"
+                let cp = self.tokens.read_coord()?; // control point
+                let (dx, dy) = self.tokens.read_coord()?;
+                let (px, py) = self.position.unwrap_or((0., 0.));
+
+                let start = (px, py);
+                let end = (px + dx, py + dy);
+                let cp = (px + cp.0, py + cp.1);
+
+                quadratic_cp = Some(cp);
+                for e in quadratic_extrema(start, cp, end) {
+                    self.update_position(e);
+                }
+                self.update_position(end);
+            }
+            'T' => {
+                // "(x y)+"
+                let end = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+                // "The control point is assumed to be the reflection of the control point
+                //  on the previous command relative to the current point. (If there is no
+                //  previous command or if the previous command was not a Q, q, T or t,
+                //  assume the control point is coincident with the current point.)"
+                let cp = if let Some((prev_cpx, prev_cpy)) = self.quadratic_cp {
+                    let (px, py) = start;
+                    (2. * px - prev_cpx, 2. * py - prev_cpy)
+                } else {
+                    start
+                };
+
+                quadratic_cp = Some(cp);
+                for e in quadratic_extrema(start, cp, end) {
+                    self.update_position(e);
+                }
+                self.update_position(end);
+            }
+            't' => {
+                // "(x y)+"
+                let (dx, dy) = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+                let (px, py) = start;
+                // "The control point is assumed to be the reflection of the control point
+                //  on the previous command relative to the current point. (If there is no
+                //  previous command or if the previous command was not a Q, q, T or t,
+                //  assume the control point is coincident with the current point.)"
+                let cp = if let Some((prev_cpx, prev_cpy)) = self.quadratic_cp {
+                    (2. * px - prev_cpx, 2. * py - prev_cpy)
+                } else {
+                    start
+                };
+
+                let end = (px + dx, py + dy);
+
+                quadratic_cp = Some(cp);
+                for e in quadratic_extrema(start, cp, end) {
+                    self.update_position(e);
+                }
+                self.update_position(end);
             }
             'A' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
@@ -314,6 +449,8 @@ impl PathParser {
                 self.command.unwrap_or_default().to_string(),
             ))?,
         }
+        self.cubic_cp2 = cubic_cp2;
+        self.quadratic_cp = quadratic_cp;
         Ok(())
     }
 
@@ -324,6 +461,110 @@ impl PathParser {
         }
         Ok(())
     }
+}
+
+/// Compute the extremal points of a quadratic Bezier
+/// by solving for dx/dt = 0, dy/dt = 0
+fn quadratic_extrema(start: (f32, f32), cp: (f32, f32), end: (f32, f32)) -> Vec<(f32, f32)> {
+    // Evaluate quadratic Bezier for a single coordinate
+    fn bezier(t: f32, p0: f32, p1: f32, p2: f32) -> f32 {
+        let mt = 1.0 - t;
+        mt * mt * p0 + 2.0 * mt * t * p1 + t * t * p2
+    }
+
+    // Compute stationary point t for one dimension,
+    // if it lies in (0,1) (the range of t for the curve)
+    fn stationary_t(p0: f32, p1: f32, p2: f32) -> Option<f32> {
+        // B'(t) = 2(1-t)(p1-p0) + 2t(p2-p1)
+        // B'(t) == 0  when  t = (p0-p1) / (p0-2p1+p2)
+        let denom = p0 - 2.0 * p1 + p2;
+        if denom.abs() < 1e-6_f32 {
+            None
+        } else {
+            let t = (p0 - p1) / denom;
+            if t > 0.0 && t < 1.0 {
+                Some(t)
+            } else {
+                None
+            }
+        }
+    }
+
+    [
+        stationary_t(start.0, cp.0, end.0),
+        stationary_t(start.1, cp.1, end.1),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|t| {
+        (
+            bezier(t, start.0, cp.0, end.0),
+            bezier(t, start.1, cp.1, end.1),
+        )
+    })
+    .collect()
+}
+
+fn cubic_extrema(
+    start: (f32, f32),
+    cp1: (f32, f32),
+    cp2: (f32, f32),
+    end: (f32, f32),
+) -> Vec<(f32, f32)> {
+    fn cubic(t: f32, p0: f32, p1: f32, p2: f32, p3: f32) -> f32 {
+        let mt = 1.0 - t;
+        mt * mt * mt * p0 + 3.0 * mt * mt * t * p1 + 3.0 * mt * t * t * p2 + t * t * t * p3
+    }
+
+    fn stationary_ts(p0: f32, p1: f32, p2: f32, p3: f32) -> Vec<f32> {
+        // Derivative of cubic Bezier: B'(t) = 3(1-t)^2 * (p1-p0) + 6(1-t)t(p2-p1) + 3t^2 * (p3-p2)
+        // Rearranging to standard form: at^2 + bt + c = 0
+        let a = 3.0 * (p3 - 3.0 * p2 + 3.0 * p1 - p0);
+        let b = 6.0 * (p2 - 2.0 * p1 + p0);
+        let c = 3.0 * (p1 - p0);
+
+        let mut ts = vec![];
+        if a.abs() < 1e-6_f32 {
+            // Linear case: bt + c = 0
+            if b.abs() >= 1e-6_f32 {
+                let t = -c / b;
+                if t > 0.0 && t < 1.0 {
+                    ts.push(t);
+                }
+            }
+        } else {
+            // Quadratic case
+            let disc = b * b - 4.0 * a * c;
+            if disc >= 0.0 {
+                let sqrt_disc = disc.sqrt();
+                let inv_2a = 1.0 / (2.0 * a);
+                let t1 = (-b + sqrt_disc) * inv_2a;
+                let t2 = (-b - sqrt_disc) * inv_2a;
+
+                if t1 > 0.0 && t1 < 1.0 {
+                    ts.push(t1);
+                }
+                if t2 > 0.0 && t2 < 1.0 {
+                    ts.push(t2);
+                }
+            }
+        }
+        ts
+    }
+
+    let mut all_t = Vec::new();
+    all_t.extend(stationary_ts(start.0, cp1.0, cp2.0, end.0));
+    all_t.extend(stationary_ts(start.1, cp1.1, cp2.1, end.1));
+
+    all_t
+        .into_iter()
+        .map(|t| {
+            (
+                cubic(t, start.0, cp1.0, cp2.0, end.0),
+                cubic(t, start.1, cp1.1, cp2.1, end.1),
+            )
+        })
+        .collect()
 }
 
 pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
