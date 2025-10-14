@@ -988,15 +988,57 @@ mod tests {
             pp.get_bbox(),
             Some(BoundingBox::new(-890., 20., 110., 370.))
         );
+    }
 
-        let mut pp = PathParser::new("M10 30 Q20 39 30 30 T 50 30");
-        pp.evaluate().unwrap();
-        assert_eq!(pp.get_bbox(), Some(BoundingBox::new(10., 30., 50., 30.)));
-
-        // Quadratic bezier
-        let mut pp = PathParser::new("M 10 30 Q 20 40 30 30 T 50 30");
-        pp.evaluate().unwrap();
-        assert_eq!(pp.get_bbox(), Some(BoundingBox::new(10., 30., 50., 30.)));
+    #[test]
+    fn test_bezier_curve_bbox() {
+        for (pd, exp) in [
+            // Simple cubic curve with extrema
+            ("M 0 0 c 10 20 30 20 40 0", [0., 0., 40., 15.]),
+            // Multiple cubic curves - simple horizontal curves
+            (
+                "M 10 10 c 0 5 5 5 10 0 c 0 -5 5 -5 10 0",
+                [10., 6.25, 30., 13.75],
+            ),
+            // Absolute cubic with clear extrema - symmetric arch
+            ("M 0 0 C 0 40 40 40 40 0", [0., 0., 40., 30.]),
+            // Simple S-curve
+            ("M 0 0 C 20 0 20 20 40 20", [0., 0., 40., 20.]),
+            // Smooth cubic with simple reflection
+            ("M 0 0 C 10 0 20 20 30 20 s 20 0 30 0", [0., 0., 60., 20.]),
+            // Smooth cubic without previous cubic (degenerate case)
+            ("M 20 20 s 10 9 20 0", [20., 20., 40., 24.]),
+            // Simple absolute smooth cubic
+            (
+                "M 0 0 C 0 20 20 20 20 0 S -15 -20 30 0",
+                [0., -15., 30., 15.],
+            ),
+            // S command without previous cubic
+            ("M 10 10 S 20 28 30 10", [10., 10., 30., 18.]),
+            // Simple quadratic arch
+            ("M 0 0 q 20 40 40 0", [0., 0., 40., 20.]),
+            // Quadratic with no extrema (straight line case)
+            ("M 10 10 q 10 10 20 20", [10., 10., 30., 30.]),
+            // Absolute quadratic arch
+            ("M 0 0 Q 20 40 40 0", [0., 0., 40., 20.]),
+            // Quadratic dipping below
+            ("M 0 20 Q 20 0 40 20", [0., 10., 40., 20.]),
+            // Smooth quadratic following Q - symmetric waves
+            ("M 0 0 Q 10 20 20 0 t 20 0", [0., -10., 40., 10.]),
+            // t command without previous quadratic (degenerate)
+            ("M 10 10 t 20 0", [10., 10., 30., 10.]),
+            // Absolute smooth quadratic - symmetric arches
+            ("M 0 0 Q 20 40 40 0 T 80 0", [0., -20., 80., 20.]),
+            // T command without previous quadratic
+            ("M 10 10 T 30 20", [10., 10., 30., 20.]),
+            // oblique quadratic with different t values in x and y
+            ("M 0 0 q 60 120 30 0", [0., 0., 40., 60.]),
+        ] {
+            let mut pp = PathParser::new(pd);
+            pp.evaluate().unwrap();
+            let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
+            assert_eq!(pp.get_bbox(), Some(exp_bbox));
+        }
     }
 
     #[test]
