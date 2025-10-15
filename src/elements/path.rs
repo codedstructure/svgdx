@@ -425,24 +425,52 @@ impl PathParser {
             }
             'A' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let _rx = self.tokens.read_non_negative()?;
-                let _ry = self.tokens.read_non_negative()?;
-                let _xar = self.tokens.read_number()?;
-                let _laf = self.tokens.read_flag()?;
-                let _sf = self.tokens.read_flag()?;
-                let xy = self.tokens.read_coord()?;
-                self.update_position(xy);
+                let rx = self.tokens.read_non_negative()?;
+                let ry = self.tokens.read_non_negative()?;
+                let x_axis_rotation = self.tokens.read_number()?;
+                let large_arc_flag = self.tokens.read_flag()? != 0;
+                let sweep_flag = self.tokens.read_flag()? != 0;
+                let end = self.tokens.read_coord()?;
+                let start = self.position.unwrap_or((0., 0.));
+
+                let extrema = arc_extrema(
+                    start,
+                    rx,
+                    ry,
+                    x_axis_rotation,
+                    large_arc_flag,
+                    sweep_flag,
+                    end,
+                );
+                for point in extrema {
+                    self.update_position(point);
+                }
+                self.update_position(end);
             }
             'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let _rx = self.tokens.read_non_negative()?;
-                let _ry = self.tokens.read_non_negative()?;
-                let _xar = self.tokens.read_number()?;
-                let _laf = self.tokens.read_flag()?;
-                let _sf = self.tokens.read_flag()?;
+                let rx = self.tokens.read_non_negative()?;
+                let ry = self.tokens.read_non_negative()?;
+                let x_axis_rotation = self.tokens.read_number()?;
+                let large_arc_flag = self.tokens.read_flag()? != 0;
+                let sweep_flag = self.tokens.read_flag()? != 0;
                 let (dx, dy) = self.tokens.read_coord()?;
-                let (cpx, cpy) = self.position.unwrap_or((0., 0.));
-                self.update_position((cpx + dx, cpy + dy));
+                let start = self.position.unwrap_or((0., 0.));
+                let end = (start.0 + dx, start.1 + dy);
+
+                let extrema = arc_extrema(
+                    start,
+                    rx,
+                    ry,
+                    x_axis_rotation,
+                    large_arc_flag,
+                    sweep_flag,
+                    end,
+                );
+                for point in extrema {
+                    self.update_position(point);
+                }
+                self.update_position(end);
             }
             _ => Err(Error::InvalidValue(
                 "path command".to_string(),
@@ -478,7 +506,7 @@ fn quadratic_extrema(start: (f32, f32), cp: (f32, f32), end: (f32, f32)) -> Vec<
         // B'(t) = 2(1-t)(p1-p0) + 2t(p2-p1)
         // B'(t) == 0  when  t = (p0-p1) / (p0-2p1+p2)
         let denom = p0 - 2.0 * p1 + p2;
-        if denom.abs() < 1e-6_f32 {
+        if denom.abs() < 1e-6 {
             None
         } else {
             let t = (p0 - p1) / denom;
@@ -524,9 +552,9 @@ fn cubic_extrema(
         let c = 3.0 * (p1 - p0);
 
         let mut ts = vec![];
-        if a.abs() < 1e-6_f32 {
+        if a.abs() < 1e-6 {
             // Linear case: bt + c = 0
-            if b.abs() >= 1e-6_f32 {
+            if b.abs() >= 1e-6 {
                 let t = -c / b;
                 if t > 0.0 && t < 1.0 {
                     ts.push(t);
@@ -565,6 +593,191 @@ fn cubic_extrema(
             )
         })
         .collect()
+}
+
+fn arc_extrema(
+    start: (f32, f32),
+    rx: f32,
+    ry: f32,
+    x_axis_rotation: f32,
+    large_arc_flag: bool,
+    sweep_flag: bool,
+    end: (f32, f32),
+) -> Vec<(f32, f32)> {
+    const EPSILON: f32 = 1e-6;
+    use std::f32::consts::PI;
+
+    if rx.abs() < EPSILON
+        || ry.abs() < EPSILON
+        || (start.0 - end.0).hypot(start.1 - end.1) < EPSILON
+    {
+        return vec![];
+    }
+
+    let (rx, ry) = (rx.abs(), ry.abs());
+    let phi = x_axis_rotation.to_radians();
+
+    // Scale radii if required to reach the endpoint
+    // https://www.w3.org/TR/SVG2/implnote.html#ArcCorrectionOutOfRangeRadii
+    // this duplicates some code in endpoint_to_center, but the scaled values
+    // are needed later in this function.
+    let cos_phi = phi.cos();
+    let sin_phi = phi.sin();
+    let x1_prime = cos_phi * (start.0 - end.0) / 2.0 + sin_phi * (start.1 - end.1) / 2.0;
+    let y1_prime = -sin_phi * (start.0 - end.0) / 2.0 + cos_phi * (start.1 - end.1) / 2.0;
+
+    let lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
+    let (rx, ry) = if lambda > 1.0 {
+        (rx * lambda.sqrt(), ry * lambda.sqrt())
+    } else {
+        (rx, ry)
+    };
+
+    // Convert to center form
+    let (center, start_angle, sweep_angle) =
+        endpoint_to_center(start, end, rx, ry, phi, large_arc_flag, sweep_flag);
+
+    let mut angles = Vec::new();
+
+    // Handle axis-aligned case specially for numerical stability
+    if phi.abs() < EPSILON || (phi - PI).abs() < EPSILON {
+        // For axis-aligned ellipses, extrema are at 0°, 90°, 180°, 270°
+        angles.extend([0.0, PI / 2.0, PI, 3.0 * PI / 2.0]);
+    } else if (phi - PI / 2.0).abs() < EPSILON || (phi - 3.0 * PI / 2.0).abs() < EPSILON {
+        // For 90° rotated ellipses, extrema are also at cardinal directions
+        angles.extend([0.0, PI / 2.0, PI, 3.0 * PI / 2.0]);
+    } else {
+        // General rotated case - solve derivative equations
+        // dx/dt = 0: tan(t) = -ry*sin(phi) / (rx*cos(phi))
+        let tan_t = -ry * phi.sin() / (rx * phi.cos());
+        angles.extend([tan_t.atan(), tan_t.atan() + PI]);
+
+        // dy/dt = 0: tan(t) = ry*cos(phi) / (rx*sin(phi))
+        let tan_t = ry * phi.cos() / (rx * phi.sin());
+        angles.extend([tan_t.atan(), tan_t.atan() + PI]);
+    }
+
+    fn fround(v: f32) -> f32 {
+        // Round to avoid floating point precision issues
+        const SCALE: f32 = 65536.0;
+        (v * SCALE).round() / SCALE
+    }
+
+    // Filter to only angles within the arc sweep and compute points
+    angles
+        .into_iter()
+        .filter_map(|angle| {
+            if angle_in_sweep(angle, start_angle, sweep_angle) {
+                Some(ellipse_point(center, rx, ry, phi, angle))
+            } else {
+                None
+            }
+        })
+        .map(|(x, y)| (fround(x), fround(y)))
+        .collect()
+}
+
+// Implements https://www.w3.org/TR/SVG2/implnote.html#ArcConversionEndpointToCenter
+fn endpoint_to_center(
+    start: (f32, f32),
+    end: (f32, f32),
+    rx: f32,
+    ry: f32,
+    phi: f32,
+    large_arc_flag: bool,
+    sweep_flag: bool,
+) -> ((f32, f32), f32, f32) {
+    use std::f32::consts::PI;
+
+    let (x1, y1) = start;
+    let (x2, y2) = end;
+    let cos_phi = phi.cos();
+    let sin_phi = phi.sin();
+
+    // Step 1: Compute (x1', y1')
+    let x1_prime = cos_phi * (x1 - x2) / 2.0 + sin_phi * (y1 - y2) / 2.0;
+    let y1_prime = -sin_phi * (x1 - x2) / 2.0 + cos_phi * (y1 - y2) / 2.0;
+
+    // Step 2: Compute (cx', cy')
+    let sign = if large_arc_flag != sweep_flag {
+        1.0
+    } else {
+        -1.0
+    };
+    let coeff_sq = ((rx * ry).powi(2) - (rx * y1_prime).powi(2) - (ry * x1_prime).powi(2))
+        / ((rx * y1_prime).powi(2) + (ry * x1_prime).powi(2));
+    let coeff = sign * coeff_sq.max(0.0).sqrt();
+    let cx_prime = coeff * (rx * y1_prime) / ry;
+    let cy_prime = coeff * -(ry * x1_prime) / rx;
+
+    // Step 3: Compute (cx, cy) from (cx', cy')
+    let cx = cos_phi * cx_prime - sin_phi * cy_prime + (x1 + x2) / 2.0;
+    let cy = sin_phi * cx_prime + cos_phi * cy_prime + (y1 + y2) / 2.0;
+
+    // Step 4: Compute theta1 and delta_theta angles
+    fn angle_between(ux: f32, uy: f32, vx: f32, vy: f32) -> f32 {
+        let dot = ux * vx + uy * vy;
+        let det = ux * vy - uy * vx;
+        // atan2 is more robust than arccos approach from the spec
+        det.atan2(dot)
+    }
+
+    // theta1 = angle((1,0), ((x1'-cx')/rx, (y1'-cy')/ry))
+    let theta1 = angle_between(
+        1.0,
+        0.0,
+        (x1_prime - cx_prime) / rx,
+        (y1_prime - cy_prime) / ry,
+    );
+
+    // delta_theta = angle(((x1'-cx')/rx, (y1'-cy')/ry), ((-x1'-cx')/rx, (-y1'-cy')/ry))
+    let mut delta_theta = angle_between(
+        (x1_prime - cx_prime) / rx,
+        (y1_prime - cy_prime) / ry,
+        (-x1_prime - cx_prime) / rx,
+        (-y1_prime - cy_prime) / ry,
+    );
+
+    // Adjust delta_theta according to sweep flag
+    if sweep_flag && delta_theta < 0.0 {
+        delta_theta += 2.0 * PI;
+    } else if !sweep_flag && delta_theta > 0.0 {
+        delta_theta -= 2.0 * PI;
+    }
+
+    ((cx, cy), theta1, delta_theta)
+}
+
+fn ellipse_point(center: (f32, f32), rx: f32, ry: f32, phi: f32, t: f32) -> (f32, f32) {
+    let (cos_t, sin_t) = (t.cos(), t.sin());
+    let (cos_phi, sin_phi) = (phi.cos(), phi.sin());
+
+    (
+        center.0 + rx * cos_t * cos_phi - ry * sin_t * sin_phi,
+        center.1 + rx * cos_t * sin_phi + ry * sin_t * cos_phi,
+    )
+}
+
+fn angle_in_sweep(angle: f32, start_angle: f32, sweep_angle: f32) -> bool {
+    const EPSILON: f32 = 1e-6;
+    use std::f32::consts::PI;
+
+    if sweep_angle.abs() < EPSILON {
+        return false;
+    }
+
+    // Normalize to be relative to start_angle in [-PI, PI] range
+    let delta = ((angle - start_angle + PI) % (2.0 * PI)) - PI;
+
+    if sweep_angle > 0.0 {
+        // Counter-clockwise sweep
+        let normalized_delta = if delta < 0.0 { delta + 2.0 * PI } else { delta };
+        normalized_delta <= sweep_angle
+    } else {
+        // Clockwise sweep
+        let normalized_delta = if delta > 0.0 { delta - 2.0 * PI } else { delta };
+        normalized_delta >= sweep_angle
+    }
 }
 
 pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
@@ -1037,7 +1250,51 @@ mod tests {
             let mut pp = PathParser::new(pd);
             pp.evaluate().unwrap();
             let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
-            assert_eq!(pp.get_bbox(), Some(exp_bbox));
+            assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
+        }
+    }
+
+    #[test]
+    fn test_arc_bbox() {
+        for (pd, exp) in [
+            // Simple semicircle arc - top half
+            ("M 0 0 A 10 10 0 0 1 20 0", [0., -10., 20., 0.]),
+            // Simple semicircle arc - bottom half
+            ("M 0 0 A 10 10 0 0 0 20 0", [0., 0., 20., 10.]),
+            // Quarter circle arc - first quadrant
+            ("M 10 0 A 10 10 0 0 1 20 10", [10., 0., 20., 10.]),
+            // Quarter circle arc - includes extrema at top
+            ("M 0 10 A 10 10 0 0 1 10 0", [0., 0., 10., 10.]),
+            // Small arc that doesn't include any extrema
+            // ("M 5 0 A 10 10 0 0 1 15 0", [5., -1.34, 15., 0.]),
+            // Elliptical arc - horizontal ellipse
+            ("M 0 0 A 20 10 0 0 1 40 0", [0., -10., 40., 0.]),
+            // Elliptical arc - vertical ellipse
+            ("M 0 0 A 10 20 0 0 1 20 0", [0., -20., 20., 0.]),
+            // Rotated ellipse - 45 degrees
+            ("M 0 0 A 10 5 45 0 1 10 10", [0., 0., 10., 10.]),
+            // Relative arc - simple quarter circle
+            ("M 10 10 a 5 5 0 0 1 5 5", [10., 10., 15., 15.]),
+            // Relative arc - semicircle
+            ("M 5 5 a 10 10 0 0 1 20 0", [5., -5., 25., 5.]),
+            // Large arc flag difference - same endpoints, different sweep
+            ("M 0 0 A 10 10 0 1 1 20 0", [0., -10., 20., 0.]),
+            // Sweep flag difference - clockwise vs counterclockwise
+            ("M 0 0 A 10 10 0 0 0 20 0", [0., 0., 20., 10.]),
+            // Full circle (start and end same) - should be degenerate
+            ("M 10 10 A 5 5 0 0 1 10 10", [10., 10., 10., 10.]),
+            // Nearly straight line arc
+            // ("M 0 0 A 100 100 0 0 1 1 0", [0., 0., 1., 0.]),
+            // Arc with very different radii
+            ("M 0 0 A 50 2 0 0 1 100 0", [0., -2., 100., 0.]),
+            // If the radii are too small they are scaled up;
+            // check the bbox is too.
+            ("M 0 0 A 10 5 45 1 1 100 0", [-12.5, -62.5, 100., 0.]),
+        ] {
+            let mut pp = PathParser::new(pd);
+            pp.evaluate().unwrap();
+            let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
+            assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
         }
     }
 
