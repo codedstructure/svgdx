@@ -9,6 +9,7 @@ license = "MIT"
 edition = "2021"
 default-run = "svgdx"
 exclude = ["/examples", "/docs"]
+rust-version = "1.82"
 
 [features]
 default = ["cli", "server"]
