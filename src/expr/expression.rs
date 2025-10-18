@@ -1,5 +1,6 @@
 /// Recursive descent expression parser
 use std::fmt::{self, Display, Formatter};
+use std::iter::repeat_n;
 use std::str::FromStr;
 
 use super::functions::{eval_function, Function};
@@ -442,19 +443,38 @@ pub(super) fn tokenize(input: &str) -> Result<Vec<Token>> {
     // rather than being tokenized further. This allows element references
     // containing operator characters such as '+', and strings with unescaped
     // quote chars.
+    // Multiple (consecutive) opening and closing brackets are supported to
+    // allow unescaped brackets within delimited atoms, analogous to the
+    // delimiters in Rust's raw strings: `[['Apple ][']]` etc.
     let mut in_delimited_atom = false;
+    let mut delimited_atom_open_count = 0;
 
     let mut string_escape = false;
     let mut atom_escape = false;
-    for ch in input.chars() {
+    let mut chars = input.chars().peekable();
+
+    while let Some(ch) = chars.next() {
         if in_delimited_atom {
             match (ch, atom_escape) {
                 (']', false) => {
-                    in_delimited_atom = false;
-                    atom_escape = false;
-                    let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
-                    buffer.clear();
-                    tokens.push(buffer_token);
+                    // Count consecutive closing brackets
+                    let mut close_count = 1;
+                    while chars.peek() == Some(&']') {
+                        chars.next();
+                        close_count += 1;
+                    }
+
+                    if close_count == delimited_atom_open_count {
+                        // we're done here.
+                        in_delimited_atom = false;
+                        atom_escape = false;
+                        let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
+                        buffer.clear();
+                        tokens.push(buffer_token);
+                    } else {
+                        // Still in the atom - add brackets to buffer
+                        buffer.extend(repeat_n(']', close_count));
+                    }
                 }
                 ('\\', false) => {
                     atom_escape = true;
@@ -493,7 +513,14 @@ pub(super) fn tokenize(input: &str) -> Result<Vec<Token>> {
         }
         let next_token = match ch {
             '[' => {
+                // count consecutive opening brackets
+                let mut open_count = 1;
+                while chars.peek() == Some(&'[') {
+                    chars.next();
+                    open_count += 1;
+                }
                 in_delimited_atom = true;
+                delimited_atom_open_count = open_count;
                 continue;
             }
             '(' => Token::OpenParen,

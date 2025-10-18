@@ -540,6 +540,15 @@ fn test_tokenize_delimited_atom() {
     );
     // check brackets within strings are handled correctly
     assert!(tokenize(r"'brackets in a string [[[ ]'").is_ok());
+    // check nested brackets are handled correctly
+    for (a, b) in [
+        (r"[[['nested brackets']]]", r"'nested brackets'"),
+        (r"[['Apple ][']]", r"'Apple ]['"),
+        (r"[[['nested ] ] ]']]]", r"'nested ] ] ]'"),
+        (r"[[['nested [] [[]]']]]", r"'nested [] [[]]'"),
+    ] {
+        assert_eq!(tokenize(a).unwrap(), tokenize(b).unwrap());
+    }
 }
 
 #[test]
