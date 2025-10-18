@@ -516,6 +516,33 @@ fn test_good_tokenize() {
 }
 
 #[test]
+fn test_tokenize_delimited_atom() {
+    // redundant delimiting should not affect things
+    for (a, b) in [
+        ("[#element]", "#element"),
+        ("['thing']", "'thing'"),
+        ("['can't']", r"'can\'t'"),
+    ] {
+        assert_eq!(tokenize(a).unwrap(), tokenize(b).unwrap());
+    }
+
+    // check things which _require_ delimiting are accepted
+    for expr in ["[+@tl]", "[^|h]"] {
+        let t = tokenize(expr);
+        assert!(t.is_ok(), "Should succeed: {expr} => {t:?}");
+    }
+
+    // check overlapping quotes and brackets are handled correctly
+    // and escaped close bracket works.
+    assert_eq!(
+        tokenize(r"['escaped close bracket \] in string']").unwrap(),
+        tokenize("'escaped close bracket ] in string'").unwrap()
+    );
+    // check brackets within strings are handled correctly
+    assert!(tokenize(r"'brackets in a string [[[ ]'").is_ok());
+}
+
+#[test]
 fn test_infix_comparison() {
     for expr in [
         ("1 eq 1", 1.),

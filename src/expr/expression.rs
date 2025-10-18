@@ -4,8 +4,8 @@ use std::str::FromStr;
 
 use super::functions::{eval_function, Function};
 use crate::constants::{
-    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, EXPR_END, EXPR_START, LOCSPEC_SEP, SCALARSPEC_SEP,
-    VAR_END_BRACE, VAR_OPEN_BRACE, VAR_PREFIX,
+    ELREF_ID_PREFIX, EXPR_END, EXPR_START, LOCSPEC_SEP, SCALARSPEC_SEP, VAR_END_BRACE,
+    VAR_OPEN_BRACE, VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Error, Result};
@@ -340,7 +340,7 @@ pub(super) enum Token {
     Number(f32),
     /// A variable reference, beginning with '$'
     Var(String),
-    /// Reference to an element-derived value, beginning with '#'
+    /// Reference to an element-derived value
     ElementRef(String),
     /// String surrounded by single or double quotes
     String(String),
@@ -392,6 +392,19 @@ pub(super) fn valid_symbol(s: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
+/// Return inner text of a quoted string, or None if not a quoted string
+fn extract_string(s: &str) -> Option<String> {
+    let first = s.chars().next().unwrap_or(' ');
+    let last = s.chars().last().unwrap_or(' ');
+    if (first == '\'' || first == '"') && first == last {
+        // strip matching surrounding quote char
+        let inner = &s[1..s.len() - 1];
+        Some(inner.to_owned())
+    } else {
+        None
+    }
+}
+
 fn tokenize_atom(input: &str) -> Result<Token> {
     if let Some(input) = input.strip_prefix(VAR_PREFIX) {
         let var_name = if let Some(input) = input.strip_prefix(VAR_OPEN_BRACE) {
@@ -404,9 +417,11 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         } else {
             Err(Error::Parse(format!("missing closing brace in '{input}'")))
         }
-    } else if input.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS, ELREF_NEXT]) {
-        // TODO: it's a bit dodgy that ELREF_NEXT is '+', grammar needs to
-        // be unambiguous wrt arithmetic '+' operator
+    } else if let Some(content) = extract_string(input) {
+        // using delimited-atoms strings (e.g. `["hello world"]`) allows
+        // unescaped quote chars within the string
+        Ok(Token::String(content))
+    } else if extract_elref(input).is_ok() {
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(num) = input.parse::<f32>() {
         Ok(Token::Number(num))
@@ -423,9 +438,34 @@ pub(super) fn tokenize(input: &str) -> Result<Vec<Token>> {
     // hack to allow '-' in id-based element references
     let mut in_elref_id = false;
     let mut in_quote = None;
+    // expr fragments contained in [...] are collected and treated as atoms
+    // rather than being tokenized further. This allows element references
+    // containing operator characters such as '+', and strings with unescaped
+    // quote chars.
+    let mut in_delimited_atom = false;
 
     let mut string_escape = false;
+    let mut atom_escape = false;
     for ch in input.chars() {
+        if in_delimited_atom {
+            match (ch, atom_escape) {
+                (']', false) => {
+                    in_delimited_atom = false;
+                    atom_escape = false;
+                    let buffer_token = tokenize_atom(&buffer.iter().collect::<String>())?;
+                    buffer.clear();
+                    tokens.push(buffer_token);
+                }
+                ('\\', false) => {
+                    atom_escape = true;
+                }
+                _ => {
+                    buffer.push(ch);
+                    atom_escape = false;
+                }
+            }
+            continue;
+        }
         if let Some(qt) = in_quote {
             // Avoid considering other tokens within a string
             // Strings are surrounded with either ' or " and may contain
@@ -452,10 +492,12 @@ pub(super) fn tokenize(input: &str) -> Result<Vec<Token>> {
             continue;
         }
         let next_token = match ch {
+            '[' => {
+                in_delimited_atom = true;
+                continue;
+            }
             '(' => Token::OpenParen,
             ')' => Token::CloseParen,
-            // TODO: how to handle '+' as part of an element ref?
-            // Maybe check the next char (after any further '+') is a valid id char?
             '+' => Token::Add,
             '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,

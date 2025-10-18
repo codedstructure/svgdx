@@ -215,3 +215,21 @@ fn test_bbox_values() {
         assert_contains!(output, exp);
     }
 }
+
+#[test]
+fn test_bbox_expr_next_prev() {
+    // Note the use of '[+]' as a 'delimited atom' to indicate the 'next'
+    // element, which would otherwise confuse the tokenizer.
+    let input = r##"
+  <rect x="10" y="20" width="30" height="40"/>
+  <text text="xy: {{xy(^)}}"/>
+  <text text="next tr: {{[++@tr]}}"/>
+  <text text="height: {{height([+])}}"/>
+  <rect x="30" y="40" width="50" height="60"/>
+"##;
+    let expected = &["xy: 10, 20<", "next tr: 80, 40<", "height: 60<"];
+    let output = transform_str_default(input).unwrap();
+    for exp in expected {
+        assert_contains!(output, exp);
+    }
+}
