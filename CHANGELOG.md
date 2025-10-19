@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0 - 2025-10-19]
+
+- Breaking change: rationalised error handling, including a rename of
+  `SvgdxError` to simply `svgdx::Error`. Several variants of this type have also
+  been renamed or otherwise changed; clients consuming errors from svgdx will
+  need updating.
+
+- Added: support for more complex connector routing for polylines involving more
+  than 2 corners. Note the `corner-offset` value interpretation may be different
+  in some cases.
+
+- Added: elref-based functions in expressions, including `mid()`, `surround()`,
+  `inside()`,  and `loc()` as well as various scalar functions (`x1()`,
+  `width()`, etc).
+
+- Added: "raw tokens" in expressions (internally: 'delimited atoms'). These
+  allow expression fragments which would otherwise be tokenized badly to be
+  delimited using '[...]' (or more generally, any number of '[' chars closed
+  with the same number of ']' chars). Two use-cases for this: strings containing
+  quote characters (which no longer require escaping), and ElRef::Next
+  (starting with '+') which would otherwise break expression parsing.
+
 - Added: new 'rational' length type, available as position and size deltas
   similar to the existing 'percentage' ratio type. Rational values are given
   as 'p/q', e.g. '3/10', where both numerator and denominator are integers
