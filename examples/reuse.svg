@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="56mm" height="74mm" viewBox="5 1 56 74">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="56mm" height="76mm" viewBox="5 -1 56 76">
   <style>
     <![CDATA[
       line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
@@ -32,8 +32,8 @@
       a 10 5 0 0 0 20 0
       v -10" style="stroke-width: 0.1; fill: limegreen;" class="pipeline"/>
 
-  <rect id="border" x="26" y="8" width="28" height="39" class="d-surround"/>
-  <path d="M 26 8 l 2 -2 h 28 l -2 2 z M 54 8 v 39 l 2 -2 v -39 z" style="fill: lightgrey;" class="box3d"/>
+  <rect id="border" x="26" y="6" width="28" height="43" class="d-surround"/>
+  <path d="M 26 6 l 2 -2 h 28 l -2 2 z M 54 6 v 43 l 2 -2 v -43 z" style="fill: lightgrey;" class="box3d"/>
 
   <rect id="box" x="10" y="60" width="40" height="10"/>
   <path d="M 10 60 l 2 -2 h 40 l -2 2 z M 50 60 v 10 l 2 -2 v -10 z" style="fill: lightgrey;" class="box3d"/>
