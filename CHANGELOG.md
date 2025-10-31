@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Improved: path bounding box evaluation now handles curves (quadratic and
+  cubic beziers, elliptical arcs) properly, as well as various fixes to path
+  data comprising multiple subpaths. Together, these changes make using SVGs
+  from other sources (often little more than lumps of complex path data) in
+  svgdx much more practical.
+
 ## [0.24.0 - 2025-10-19]
 
 - Breaking change: rationalised error handling, including a rename of
