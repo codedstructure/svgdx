@@ -5,8 +5,12 @@ use crate::types::{attr_split, fstr, strp};
 
 struct PathParser {
     tokens: SvgPathSyntax,
+    // current position, updated as commands are processed
     position: Option<(f32, f32)>,
-    start_pos: Option<(f32, f32)>,
+    // location to return to for 'Z'/'z' commands
+    subpath_start: Option<(f32, f32)>,
+    // current command being processed; most commands take multiple parameter
+    // sets without repeating the command character
     command: Option<char>,
     // previous second control point (if any) for evaluating 'S' and 's'
     cubic_cp2: Option<(f32, f32)>,
@@ -181,7 +185,7 @@ impl PathParser {
         PathParser {
             tokens: SvgPathSyntax::new(data),
             position: None,
-            start_pos: None,
+            subpath_start: None,
             command: None,
             cubic_cp2: None,
             quadratic_cp: None,
@@ -195,8 +199,8 @@ impl PathParser {
     fn update_position(&mut self, pos: (f32, f32)) {
         let old_pos = self.position;
         self.position = Some(pos);
-        if self.start_pos.is_none() {
-            self.start_pos = self.position;
+        if self.subpath_start.is_none() {
+            self.subpath_start = self.position;
         }
         if old_pos.is_none() {
             self.min_x = pos.0;
@@ -212,12 +216,12 @@ impl PathParser {
     }
 
     fn get_bbox(&self) -> Option<BoundingBox> {
-        if self.start_pos.is_some() {
+        if self.position.is_some() {
             Some(BoundingBox::new(
                 self.min_x, self.min_y, self.max_x, self.max_y,
             ))
         } else {
-            None
+            None // we've never called update_position()
         }
     }
 
@@ -240,34 +244,45 @@ impl PathParser {
                 self.update_position(xy);
             }
             'm' | 'l' => {
+                // "(x y)+"
                 let (dx, dy) = self.tokens.read_coord()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
                 self.update_position((px + dx, py + dy));
             }
             'H' => {
+                // "x+"
                 let new_x = self.tokens.read_number()?;
                 let (_, py) = self.position.unwrap_or((0., 0.));
                 self.update_position((new_x, py));
             }
             'h' => {
+                // "x+"
                 let dx = self.tokens.read_number()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
                 self.update_position((px + dx, py));
             }
             'V' => {
+                // "y+"
                 let new_y = self.tokens.read_number()?;
                 let (px, _) = self.position.unwrap_or((0., 0.));
                 self.update_position((px, new_y));
             }
             'v' => {
+                // "y+"
                 let dy = self.tokens.read_number()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
                 self.update_position((px, py + dy));
             }
             'Z' | 'z' => {
-                self.update_position(self.start_pos.unwrap_or((0., 0.)));
+                self.update_position(self.subpath_start.unwrap_or((0., 0.)));
+                // subsequent 'm'/'M' after 'z' resets the new subpath starting point
+                self.subpath_start = None;
+                // since this doesn't consume further tokens, we must clear the command
+                // to force getting a new command token, or we could loop forever
+                self.command = None;
             }
             'C' => {
+                // (x1 y1 x2 y2 x y)+
                 let cp1 = self.tokens.read_coord()?; // control point 1
                 let cp2 = self.tokens.read_coord()?; // control point 2
                 let end = self.tokens.read_coord()?;
@@ -281,6 +296,7 @@ impl PathParser {
                 self.update_position(end);
             }
             'c' => {
+                // (x1 y1 x2 y2 x y)+
                 let cp1 = self.tokens.read_coord()?; // control point 1
                 let cp2 = self.tokens.read_coord()?; // control point 2
                 let (dx, dy) = self.tokens.read_coord()?;
@@ -1296,6 +1312,13 @@ mod tests {
             let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
             assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
         }
+    }
+
+    #[test]
+    fn test_multiple_subpath_bbox() {
+        let mut pp = PathParser::new("m0 0 20 20h-10zm 5 -10h20v-10zm20 10l20 30");
+        pp.evaluate().unwrap();
+        assert_eq!(pp.get_bbox(), Some(BoundingBox::new(0., -20., 45., 30.)));
     }
 
     #[test]
