@@ -199,9 +199,6 @@ impl PathParser {
     fn update_position(&mut self, pos: (f32, f32)) {
         let old_pos = self.position;
         self.position = Some(pos);
-        if self.subpath_start.is_none() {
-            self.subpath_start = self.position;
-        }
         if old_pos.is_none() {
             self.min_x = pos.0;
             self.min_y = pos.1;
@@ -232,18 +229,50 @@ impl PathParser {
             // "L" in "M 100 200 L 200 100 L -100 -200" and use "M 100 200 L 200 100
             // -100 -200" instead)."
             self.command = Some(self.tokens.read_command()?);
+        } else {
+            // this will only happen for subsequent values to an existing command
+            match self.command {
+                // "If a moveto is followed by multiple pairs of coordinates,
+                // the subsequent pairs are treated as implicit lineto commands."
+                Some('m') => {
+                    self.command = Some('l');
+                }
+                Some('M') => {
+                    self.command = Some('L');
+                }
+                _ => {}
+            }
         }
 
         let mut cubic_cp2: Option<(f32, f32)> = None;
         let mut quadratic_cp: Option<(f32, f32)> = None;
 
         match self.command.expect("Command should be already set") {
-            'M' | 'L' => {
+            'M' => {
+                // "(x y)+"
+                let xy = self.tokens.read_coord()?;
+                self.update_position(xy);
+                // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
+                // the first command) represent the start of a new subpath'
+                // (the first moveto is also the start of a subpath)
+                self.subpath_start = Some(xy);
+            }
+            'm' => {
+                // "(x y)+"
+                let (dx, dy) = self.tokens.read_coord()?;
+                let (px, py) = self.position.unwrap_or((0., 0.));
+                let xy = (px + dx, py + dy);
+                self.update_position(xy);
+                // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
+                // the first command) represent the start of a new subpath'
+                self.subpath_start = Some(xy);
+            }
+            'L' => {
                 // "(x y)+"
                 let xy = self.tokens.read_coord()?;
                 self.update_position(xy);
             }
-            'm' | 'l' => {
+            'l' => {
                 // "(x y)+"
                 let (dx, dy) = self.tokens.read_coord()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
@@ -275,8 +304,6 @@ impl PathParser {
             }
             'Z' | 'z' => {
                 self.update_position(self.subpath_start.unwrap_or((0., 0.)));
-                // subsequent 'm'/'M' after 'z' resets the new subpath starting point
-                self.subpath_start = None;
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
                 self.command = None;
