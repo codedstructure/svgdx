@@ -16,7 +16,7 @@
 
 use super::path::PathSyntax;
 use crate::errors::{Error, Result};
-use crate::types::{attr_split, fstr, strpu};
+use crate::types::fstr;
 
 struct BearingPathSyntax {
     data: Vec<char>,
@@ -143,97 +143,167 @@ impl PathBearing {
     }
 }
 
-/// Support 'repeat' syntax as part of path data.
-///
-/// Syntax:
-///  `rep N [ ... ]`
-///
-/// Example:
-/// `"M 0 0 rep 3 [ l 10 0 ]"` => `"M 0 0 l 10 0 l 10 0 l 10 0"`
-///
-/// Repeat commands may be nested. Any unclosed repeat blocks at the
-/// end of the document are automatically closed.
-fn process_path_repeat(data: &str) -> Result<String> {
-    let tokens: Vec<_> = attr_split(data).collect();
-
-    // Base case: no repeat command found
-    let rep_pos = match tokens.iter().position(|s| s == "rep") {
-        Some(pos) => pos,
-        None => return Ok(data.to_string()), // TODO: Cow?
-    };
-
-    let mut result = String::new();
-
-    // Copy initial tokens
-    if rep_pos > 0 {
-        result.push_str(&tokens[..rep_pos].join(" "));
-        result.push(' ');
-    }
-
-    // Parse repeat count, default to 0 if missing or invalid
-    let count = tokens
-        .get(rep_pos + 1)
-        .and_then(|n| strpu(n).ok())
-        .unwrap_or(0);
-
-    // Check for opening bracket
-    if tokens.get(rep_pos + 2).is_none_or(|t| t != "[") {
-        return Err(Error::Parse("expected '[' after 'rep'".to_string()));
-    }
-
-    // Find matching closing bracket
-    let inner_start = rep_pos + 3; // after "rep N ["
-    let mut inner_tokens = Vec::new();
-
-    let mut nest_depth = 0;
-    while let Some(token) = tokens.get(inner_start + inner_tokens.len()) {
-        if token == "[" {
-            nest_depth += 1;
-        } else if token == "]" {
-            if nest_depth == 0 {
-                break;
-            }
-            nest_depth -= 1;
-        }
-        inner_tokens.push(token.clone());
-    }
-
-    let remaining = &tokens[inner_start + inner_tokens.len() + 1..];
-
-    // recurse on inner content
-    let content = process_path_repeat(&inner_tokens.join(" "))?;
-
-    // Repeat the content
-    for i in 0..count {
-        if i > 0 {
-            result.push(' ');
-        }
-        result.push_str(&content);
-    }
-
-    // Add remaining tokens
-    if !remaining.is_empty() {
-        result.push(' ');
-        result.push_str(
-            &remaining
-                .iter()
-                .map(|s| s.as_str())
-                .collect::<Vec<_>>()
-                .join(" "),
-        );
-    }
-
-    Ok(result)
-}
-
 /// Convert a path string containing bearing commands into a standard SVG path string.
 ///
 /// Example: `<path d="m0 0 b60 h10 b120 h10 z"/>`
 ///
 /// Becomes an equilateral triangle: `<path d="m0 0 l5 8.66l-10 0z"/>`
 pub fn process_path_bearing(data: &str) -> Result<String> {
-    let data = process_path_repeat(data)?;
-    let mut pp = PathBearing::new(&data);
+    let mut pp = PathBearing::new(data);
+    pp.evaluate()?;
+    Ok(pp.output)
+}
+
+pub struct RepeatPathSyntax {
+    data: Vec<char>,
+    index: usize,
+}
+
+impl RepeatPathSyntax {
+    pub fn new(data: &str) -> Self {
+        Self {
+            data: data.chars().collect(),
+            index: 0,
+        }
+    }
+}
+
+impl PathSyntax for RepeatPathSyntax {
+    fn at_command(&self) -> Result<bool> {
+        self.check_not_end()?;
+        let c = self
+            .current()
+            .ok_or_else(|| Error::Parse("no data".to_string()))?;
+        // Adds 'r', 'R', '[' and ']' to the set of SVG commands.
+        // Also includes 'B' and 'b' bearing commands; repeat should
+        // be evaluated before bearing.
+        Ok("MmLlHhVvZzCcSsQqTtAaRr[]Bb".contains(c))
+    }
+
+    fn current(&self) -> Option<char> {
+        self.data.get(self.index).copied()
+    }
+
+    fn advance(&mut self) {
+        self.index += 1;
+    }
+
+    fn at_end(&self) -> bool {
+        self.index >= self.data.len()
+    }
+}
+
+struct PathRepeat {
+    tokens: RepeatPathSyntax,
+    output: String,
+    command: Option<char>,
+}
+
+impl PathRepeat {
+    fn new(data: &str) -> Self {
+        PathRepeat {
+            tokens: RepeatPathSyntax::new(data),
+            output: String::new(),
+            command: None,
+        }
+    }
+
+    fn process_instruction(&mut self) -> Result<()> {
+        if self.command.is_none() || self.tokens.at_command()? {
+            // "The command letter can be eliminated on subsequent commands if the same
+            // command is used multiple times in a row (e.g., you can drop the second
+            // "L" in "M 100 200 L 200 100 L -100 -200" and use "M 100 200 L 200 100
+            // -100 -200" instead)."
+            self.command = Some(self.tokens.read_command()?);
+        }
+
+        let cmd = self.command.expect("Command should be already set");
+        match cmd {
+            'R' | 'r' => {
+                // Repeat command
+                let count = self.tokens.read_count()?;
+                self.tokens.skip_whitespace();
+                if self.tokens.current() != Some('[') {
+                    return Err(Error::Parse(format!("expected '[' after '{cmd} COUNT'")));
+                }
+                self.tokens.advance(); // skip '['
+
+                // Collect inner tokens
+                let mut inner_tokens = String::new();
+                let mut nest_depth = 0;
+                while !self.tokens.at_end() {
+                    let c = self.tokens.current().unwrap();
+                    if c == '[' {
+                        nest_depth += 1;
+                    } else if c == ']' {
+                        if nest_depth == 0 {
+                            break;
+                        }
+                        nest_depth -= 1;
+                    }
+                    inner_tokens.push(c);
+                    self.tokens.advance();
+                }
+
+                if self.tokens.current() != Some(']') {
+                    return Err(Error::Parse(
+                        "expected ']' to close repeat block".to_string(),
+                    ));
+                }
+                self.tokens.advance(); // skip ']'
+
+                // Process inner content recursively
+                let content = process_path_repeat(&inner_tokens)?.trim().to_string();
+
+                // Repeat the content
+                for i in 0..count {
+                    if i > 0 {
+                        self.output.push(' ');
+                    }
+                    self.output.push_str(&content);
+                }
+                self.output.push(' ');
+                self.tokens.skip_whitespace();
+                self.command = None;
+            }
+            _ => {
+                // copy to output
+                self.output.push(cmd);
+                while !self.tokens.at_end() {
+                    if self.tokens.at_command()? {
+                        break;
+                    }
+                    self.output.push(self.tokens.current().unwrap());
+                    self.tokens.advance();
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn evaluate(&mut self) -> Result<&String> {
+        self.tokens.skip_whitespace();
+        while !self.tokens.at_end() {
+            self.process_instruction()?;
+        }
+        Ok(&self.output)
+    }
+}
+
+/// Support 'repeat' syntax as part of path data.
+///
+/// Syntax:
+///  `r N [ ... ]`
+///
+/// as with 'z', this command can be upper or lower case.
+///
+/// Example:
+/// `"M 0 0 r 3 [ l 10 0 ]"` => `"M 0 0 l 10 0 l 10 0 l 10 0"`
+///
+/// Repeat commands may be nested. Any unclosed repeat blocks at the
+/// end of the document are automatically closed.
+pub fn process_path_repeat(data: &str) -> Result<String> {
+    let mut pp = PathRepeat::new(data);
     pp.evaluate()?;
     Ok(pp.output)
 }
@@ -246,19 +316,17 @@ mod tests {
 
     #[test]
     fn test_path_repeat() {
-        let input = r#"M 0 0 rep 3 [ l 10 0 ] l 5 0"#;
-        assert_eq!(
-            process_path_repeat(input).unwrap(),
-            r#"M 0 0 l 10 0 l 10 0 l 10 0 l 5 0"#
-        );
+        let input = r#"M0 0 r 3 [ l 10 0 ] l 5 0"#;
+        let output = process_path_repeat(input).unwrap();
+        assert_eq!(output, r#"M0 0 l10 0 l10 0 l10 0 l5 0"#);
     }
 
     #[test]
     fn test_path_repeat_nested() {
-        let input = r#"M 0 0 rep 3 [ h 3 b 45 rep 2 [ l 10 0 ] ] l 5 0"#;
+        let input = r#"M 0 0 r 3 [ h 3 b 45 r 2 [ l 10 0 ] ] l 5 0"#;
         assert_eq!(
             process_path_repeat(input).unwrap(),
-            r#"M 0 0 h 3 b 45 l 10 0 l 10 0 h 3 b 45 l 10 0 l 10 0 h 3 b 45 l 10 0 l 10 0 l 5 0"#
+            r#"M0 0 h3 b45 l10 0 l10 0 h3 b45 l10 0 l10 0 h3 b45 l10 0 l10 0 l5 0"#
         );
     }
 

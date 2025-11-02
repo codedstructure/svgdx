@@ -28,13 +28,6 @@ pub fn strp(s: &str) -> Result<f32> {
         .map_err(|_| Error::Parse(format!("expected a number: '{s}'")))
 }
 
-// TODO: better names!
-pub fn strpu(s: &str) -> Result<u32> {
-    s.trim()
-        .parse::<u32>()
-        .map_err(|_| Error::Parse(format!("expected a non-negative integer: '{s}'")))
-}
-
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
 pub fn split_unit(s: &str) -> Result<(f32, String)> {
     let mut value = String::new();

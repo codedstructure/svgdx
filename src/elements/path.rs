@@ -107,6 +107,22 @@ pub trait PathSyntax {
         Ok(res)
     }
 
+    fn read_count(&mut self) -> Result<usize> {
+        // non-negative integer; read until non-digit
+        let mut c = String::new();
+        while let Some(ch) = self.current() {
+            match ch {
+                '0'..='9' => {
+                    c.push(ch);
+                    self.advance();
+                }
+                _ => break,
+            }
+        }
+        self.skip_wsp_comma();
+        Ok(c.parse()?)
+    }
+
     fn read_number(&mut self) -> Result<f32> {
         self.check_not_end()?;
         let mut mult = 1.;
@@ -169,7 +185,7 @@ pub trait PathSyntax {
         if self.at_command()? {
             let command = self.current().unwrap();
             self.advance();
-            self.skip_wsp_comma();
+            self.skip_whitespace();
             Ok(command)
         } else {
             Err(Error::InvalidValue(
