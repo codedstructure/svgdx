@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for 'repeat' commands in path element data, extending the
+  turtle graphics support. Example: `d="m0 0 r 4 [h 10 b 90]"` will draw
+  a square, repeating ('r' or 'R' command, both identical) '4' times the
+  content of the `[ ... ]` block. Repeated blocks may be nested.
+
 - Improved: path bounding box evaluation now handles curves (quadratic and
   cubic beziers, elliptical arcs) properly, as well as various fixes to path
   data comprising multiple subpaths. Together, these changes make using SVGs
