@@ -4,6 +4,7 @@ use super::{
     ReuseElement, SpecsElement, VarElement,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
+use crate::elements::bearing::process_path_repeat;
 use crate::elements::path::points_to_path;
 use crate::errors::{Error, Result};
 use crate::events::{InputList, OutputEvent, OutputList};
@@ -518,9 +519,14 @@ impl SvgElement {
     pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
         if self.name == "path" {
             if let Some(d) = self.get_attr("d") {
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(d)?)
+                let mut d = d.to_string();
+                if d.chars().any(|c| c == 'r' || c == 'R') {
+                    d = process_path_repeat(&d)?;
                 }
+                if d.chars().any(|c| c == 'b' || c == 'B') {
+                    d = process_path_bearing(&d)?;
+                }
+                self.set_attr("d", &d);
             }
         }
 
