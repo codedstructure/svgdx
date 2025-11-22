@@ -1,11 +1,10 @@
 use super::{
-    is_connector, process_path_bearing, process_text_attr, ConfigElement, ConnectionType,
-    Connector, Container, DefaultsElement, ForElement, GroupElement, IfElement, LoopElement,
-    ReuseElement, SpecsElement, VarElement,
+    is_connector, process_text_attr, ConfigElement, ConnectionType, Connector, Container,
+    DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement,
+    VarElement,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
-use crate::elements::bearing::process_path_repeat;
-use crate::elements::path::points_to_path;
+use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
 use crate::errors::{Error, Result};
 use crate::events::{InputList, OutputEvent, OutputList};
 use crate::expr::eval_attr;
