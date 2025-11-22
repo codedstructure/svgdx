@@ -80,6 +80,10 @@ struct Arguments {
     #[arg(long, default_value = "100")]
     depth_limit: u32,
 
+    /// Path repeat expansion limit
+    #[arg(long, default_value = "10000")]
+    path_repeat_limit: u32,
+
     /// Default font-size (in user-units)
     ///
     /// Text size classes (such as d-text-smaller) are based on this value.
@@ -165,6 +169,7 @@ impl Config {
                 loop_limit: args.loop_limit,
                 var_limit: args.var_limit,
                 depth_limit: args.depth_limit,
+                path_repeat_limit: args.path_repeat_limit,
                 font_size: args.font_size,
                 font_family: args.font_family,
                 theme: args.theme,

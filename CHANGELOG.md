@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a square, repeating ('r' or 'R' command, both identical) '4' times the
   content of the `[ ... ]` block. Repeated blocks may be nested.
 
+- A new config value `path-repeat-limit` setting a limit to the total number
+  of repeat expansions (including multiply by nested repeats) using the new
+  `r` path command, defaulting to 1000.
+
 - Improved: path bounding box evaluation now handles curves (quadratic and
   cubic beziers, elliptical arcs) properly, as well as various fixes to path
   data comprising multiple subpaths. Together, these changes make using SVGs

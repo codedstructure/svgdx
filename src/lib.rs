@@ -86,6 +86,8 @@ pub struct TransformConfig {
     pub var_limit: u32,
     /// Maximum depth of recursion
     pub depth_limit: u32,
+    /// Maximum path repeat expansion (`r` command)
+    pub path_repeat_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
     /// Default font-size (in user-units)
@@ -112,6 +114,7 @@ impl Default for TransformConfig {
             loop_limit: 1000,
             var_limit: 1024,
             depth_limit: 100,
+            path_repeat_limit: 10000,
             add_metadata: false,
             font_size: 3.0,
             font_family: "sans-serif".to_owned(),

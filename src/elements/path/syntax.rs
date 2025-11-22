@@ -85,7 +85,7 @@ pub trait PathSyntax {
         Ok(res)
     }
 
-    fn read_count(&mut self) -> Result<usize> {
+    fn read_count(&mut self) -> Result<u32> {
         // non-negative integer; read until non-digit
         let mut c = String::new();
         while let Some(ch) = self.current() {

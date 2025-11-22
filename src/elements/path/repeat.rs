@@ -7,6 +7,10 @@
 //! - repeated blocks may be nested.
 //! - analogous to the 'z' command, 'r' may be upper or lower case.
 //!
+//! Expansion accounting, limited by path-repeat-limit config value:
+//! - Nested repeats multiply (`r9[r9[...]]` => 81)
+//! - Sequential repeats sum (`r9[...] r9[...]` => 18)
+//!
 //! Example: `<path d="M 0 0 r 6 [ h 10 b 60 ]"/>`
 
 use super::PathSyntax;
@@ -55,18 +59,21 @@ struct PathRepeat {
     tokens: RepeatPathSyntax,
     output: String,
     command: Option<char>,
+    limit: u32,
 }
 
 impl PathRepeat {
-    fn new(data: &str) -> Self {
+    fn new(data: &str, limit: u32) -> Self {
         PathRepeat {
             tokens: RepeatPathSyntax::new(data),
             output: String::new(),
             command: None,
+            limit,
         }
     }
 
-    fn process_instruction(&mut self) -> Result<()> {
+    // returns the number of repetitions processed
+    fn process_instruction(&mut self) -> Result<u32> {
         if self.command.is_none() || self.tokens.at_command()? {
             // "The command letter can be eliminated on subsequent commands if the same
             // command is used multiple times in a row (e.g., you can drop the second
@@ -76,7 +83,7 @@ impl PathRepeat {
         }
 
         let cmd = self.command.expect("Command should be already set");
-        match cmd {
+        let rep_count = match cmd {
             'R' | 'r' => {
                 // Repeat command
                 let count = self.tokens.read_count()?;
@@ -87,6 +94,7 @@ impl PathRepeat {
                 self.tokens.advance(); // skip '['
 
                 // Collect inner tokens
+                // TODO: just use indices/slices here rather than building a new string
                 let mut inner_tokens = String::new();
                 let mut nest_depth = 0;
                 while !self.tokens.at_end() {
@@ -111,7 +119,21 @@ impl PathRepeat {
                 self.tokens.advance(); // skip ']'
 
                 // Process inner content recursively
-                let content = process_path_repeat(&inner_tokens)?.trim().to_string();
+                let (content, inner_rep_count) =
+                    process_path_repeat_with_limit(&inner_tokens, self.limit)?;
+                let content = content.trim().to_string();
+
+                // Ensure we don't exceed repeat expansion limits
+                let nested_rep_count = if inner_rep_count > 0 {
+                    count
+                        .checked_mul(inner_rep_count)
+                        .ok_or_else(|| Error::PathRepeatLimit(u32::MAX, self.limit))?
+                } else {
+                    count
+                };
+                if nested_rep_count > self.limit {
+                    return Err(Error::PathRepeatLimit(nested_rep_count, self.limit));
+                }
 
                 // Repeat the content
                 for i in 0..count {
@@ -123,6 +145,8 @@ impl PathRepeat {
                 self.output.push(' ');
                 self.tokens.skip_whitespace();
                 self.command = None;
+
+                nested_rep_count
             }
             _ => {
                 // copy to output
@@ -134,17 +158,23 @@ impl PathRepeat {
                     self.output.push(self.tokens.current().unwrap());
                     self.tokens.advance();
                 }
+
+                0
             }
-        }
-        Ok(())
+        };
+        Ok(rep_count)
     }
 
-    fn evaluate(&mut self) -> Result<&String> {
+    fn evaluate(&mut self) -> Result<u32> {
         self.tokens.skip_whitespace();
+        let mut total_repeats = 0;
         while !self.tokens.at_end() {
-            self.process_instruction()?;
+            total_repeats += self.process_instruction()?;
+            if total_repeats > self.limit {
+                return Err(Error::PathRepeatLimit(total_repeats, self.limit));
+            }
         }
-        Ok(&self.output)
+        Ok(total_repeats)
     }
 }
 
@@ -161,10 +191,14 @@ impl PathRepeat {
 ///
 /// Repeat commands may be nested. Any unclosed repeat blocks at the
 /// end of the document are automatically closed.
-pub fn process_path_repeat(data: &str) -> Result<String> {
-    let mut pp = PathRepeat::new(data);
-    pp.evaluate()?;
-    Ok(pp.output)
+pub fn process_path_repeat(data: &str, limit: u32) -> Result<String> {
+    Ok(process_path_repeat_with_limit(data, limit)?.0)
+}
+
+fn process_path_repeat_with_limit(data: &str, limit: u32) -> Result<(String, u32)> {
+    let mut pp = PathRepeat::new(data, limit);
+    let reps = pp.evaluate()?;
+    Ok((pp.output, reps))
 }
 
 #[cfg(test)]
@@ -174,7 +208,7 @@ mod tests {
     #[test]
     fn test_path_repeat() {
         let input = r#"M0 0 r 3 [ l 10 0 ] l 5 0"#;
-        let output = process_path_repeat(input).unwrap();
+        let output = process_path_repeat(input, 100).unwrap();
         assert_eq!(output, r#"M0 0 l10 0 l10 0 l10 0 l5 0"#);
     }
 
@@ -182,8 +216,41 @@ mod tests {
     fn test_path_repeat_nested() {
         let input = r#"M 0 0 r 3 [ h 3 b 45 r 2 [ l 10 0 ] ] l 5 0"#;
         assert_eq!(
-            process_path_repeat(input).unwrap(),
+            process_path_repeat(input, 100).unwrap(),
             r#"M0 0 h3 b45 l10 0 l10 0 h3 b45 l10 0 l10 0 h3 b45 l10 0 l10 0 l5 0"#
         );
+    }
+
+    #[test]
+    fn test_path_repeat_limit() {
+        // Check simple repeat exceeding limit
+        let input = r#"M0 0 r 1000 [ l 10 0 ]"#;
+        let result = process_path_repeat(input, 999);
+        assert!(result.is_err());
+        let result = process_path_repeat(input, 1000);
+        assert!(result.is_ok());
+
+        // Check nested repeats exceeding limit
+        let input = r#"M0 0 r 10 [ r 100 [ l 10 0 ] ]"#;
+        let result = process_path_repeat(input, 500);
+        assert!(result.is_err());
+
+        // Check massive repeat exceeding limit (resource exhaustion if not limited)
+        let input = r#"M0 0 r999[r999[r999[r999[r999[h1]]]]]"#;
+        let result = process_path_repeat(input, 1_000_000);
+        assert!(result.is_err());
+
+        // Check multiple repeat instances are summed
+        let input = r#"M0 0 r10[h1] r10[v1]"#;
+        let result = process_path_repeat(input, 19);
+        assert!(result.is_err());
+        let result = process_path_repeat(input, 20);
+        assert!(result.is_ok());
+
+        let input = r#"M0 0 r10[h1] r10[r2[v1]] r0[h1] h1 r3[v1 h1]"#;
+        let result = process_path_repeat(input, 32);
+        assert!(result.is_err());
+        let result = process_path_repeat(input, 33);
+        assert!(result.is_ok());
     }
 }

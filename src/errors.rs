@@ -27,6 +27,8 @@ pub enum Error {
     LoopLimit(u32, u32),
     /// Recursion or element nesting has exceeded the configured limit
     DepthLimit(u32, u32),
+    /// Path repeat expansion has exceeded the configured limit
+    PathRepeatLimit(u32, u32),
     /// Circular reference detected
     CircularRef(String),
     /// Document structure is invalid
@@ -64,6 +66,9 @@ impl std::fmt::Display for Error {
             Error::DepthLimit(depth, limit) => {
                 write!(f, "Depth {depth} exceeded limit {limit}")
             }
+            Error::PathRepeatLimit(rep, limit) => {
+                write!(f, "Path repeat expansion {rep} exceeded limit {limit}")
+            }
             Error::CircularRef(reason) => {
                 write!(f, "Circular reference error: {reason}")
             }
@@ -98,6 +103,7 @@ impl std::error::Error for Error {
             Error::VarLimit(_, _, _) => None,
             Error::LoopLimit(_, _) => None,
             Error::DepthLimit(_, _) => None,
+            Error::PathRepeatLimit(_, _) => None,
             Error::CircularRef(_) => None,
             Error::Document(_) => None,
             Error::InvalidAttr(_) => None,

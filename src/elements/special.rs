@@ -57,6 +57,7 @@ impl EventGen for ConfigElement {
                 "loop-limit" => new_config.loop_limit = value.parse()?,
                 "var-limit" => new_config.var_limit = value.parse()?,
                 "depth-limit" => new_config.depth_limit = value.parse()?,
+                "path-repeat-limit" => new_config.path_repeat_limit = value.parse()?,
                 "font-size" => new_config.font_size = value.parse()?,
                 "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = value.parse()?,
