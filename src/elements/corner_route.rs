@@ -264,28 +264,28 @@ fn cost_function(
     // needs to be comparable to or larger than total_bb_size
     let corner_cost = 1 + total_bb_size;
     let mut edge_costs = vec![vec![]; edge_set.len()];
-    for i in 0..edge_set.len() {
-        for j in 0..edge_set[i].len() {
-            let ind_1 = i;
-            let ind_2 = edge_set[i][j];
+    for (i, neighbors) in edge_set.iter().enumerate() {
+        let p1 = point_set[i];
 
-            let mid_point_mul_x = if mid_x != usize::MAX && point_set[ind_1].0 == x_lines[mid_x] {
-                0.5
-            } else {
-                1.0
-            };
-            let mid_point_mul_y = if mid_y != usize::MAX && point_set[ind_1].1 == y_lines[mid_y] {
-                0.5
-            } else {
-                1.0
-            };
+        let mid_point_mul_x = if mid_x != usize::MAX && p1.0 == x_lines[mid_x] {
+            0.5
+        } else {
+            1.0
+        };
+        let mid_point_mul_y = if mid_y != usize::MAX && p1.1 == y_lines[mid_y] {
+            0.5
+        } else {
+            1.0
+        };
 
-            edge_costs[i].push(
-                ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
-                    + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x)
+        let costs_i = &mut edge_costs[i];
+        for &j in neighbors {
+            let p2 = point_set[j];
+            costs_i.push(
+                ((p1.0 - p2.0).abs() * mid_point_mul_y + (p1.1 - p2.1).abs() * mid_point_mul_x)
                     as u32
                     + corner_cost,
-            ); // round may cause some problems
+            );
         }
     }
 
