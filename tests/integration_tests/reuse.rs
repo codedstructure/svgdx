@@ -257,7 +257,7 @@ fn test_reuse_attr_eval() {
 <specs>
 <g id="a"><rect xy="0" wh="10" text="{{$target~w}}"/></g>
 </specs>
-<loop count="3" start="1" loop-var="ii">
+<loop count="3" start="1" var="ii">
   <rect id="r${ii}" height="2" width="{{$ii * 5}}"/>
   <reuse href="#a" target="#r${ii}"/>
 </loop>

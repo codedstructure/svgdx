@@ -28,7 +28,11 @@ impl TryFrom<&SvgElement> for LoopDef {
                 "LoopType can only be created from a loop element".to_string(),
             ));
         }
-        let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
+        let loop_spec = if let Some(loop_var) = element
+            .get_attr("var")
+            // loop-var is deprecated and may be removed in future
+            .or_else(|| element.get_attr("loop-var"))
+        {
             // Note we don't parse attributes here as they might be expressions,
             // and we don't have access to a context to evaluate them
             let start = element.get_attr("start").unwrap_or("0");
@@ -138,7 +142,10 @@ impl TryFrom<&SvgElement> for ForDef {
         let var_name = element
             .get_attr("var")
             .ok_or_else(|| Error::MissingAttr("var".to_string()))?;
-        let idx_name = element.get_attr("idx-var");
+        let idx_name = element
+            .get_attr("idx")
+            // idx-var is deprecated and may be removed in future
+            .or_else(|| element.get_attr("idx-var"));
         let data = element
             .get_attr("data")
             .ok_or_else(|| Error::MissingAttr("data".to_string()))?;

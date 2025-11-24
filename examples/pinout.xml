@@ -2,7 +2,7 @@
   <config font-size="2" border="12"/>
   <rect id="ic1" wh="10 15" text="555" class="d-text-bold d-text-large d-text-vertical"/>
   <circle xy="^@tl 1" r="1"/>
-  <loop count="4" start="20" step="20" loop-var="i">
+  <loop count="4" start="20" step="20" var="i">
     <rect x2="#ic1@l" cy="#ic1@l:${i}%" wh="1 2"/>
     <rect x1="#ic1@r" cy="#ic1@r:${i}%" wh="1 2"/>
   </loop>
@@ -17,7 +17,7 @@
 
   <rect id="ic2" xy="20" wh="10 15" text="TL081" class="d-text-bold d-text-large d-text-vertical"/>
   <circle xy="^@tl 1" r="1"/>
-  <loop count="4" start="20" step="20" loop-var="i">
+  <loop count="4" start="20" step="20" var="i">
     <rect x2="#ic2@l" cy="#ic2@l:${i}%" wh="1 2"/>
     <rect x1="#ic2@r" cy="#ic2@r:${i}%" wh="1 2"/>
   </loop>

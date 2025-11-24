@@ -1,7 +1,7 @@
 <svg>
-  <loop count="6" loop-var="i" step="20">
-    <loop count="6" loop-var="j" step="20">
-      <loop count="{{randint(2,6)}}" loop-var="k" start="{{randint(0,10) / 10}}" step="{{-2 * random()}}">
+  <loop count="6" var="i" step="20">
+    <loop count="6" var="j" step="20">
+      <loop count="{{randint(2,6)}}" var="k" start="{{randint(0,10) / 10}}" step="{{-2 * random()}}">
         <rect wh="15" xy="{{$j + $k, $i + $k}}" class="d-softshadow"/>
       </loop>
     </loop>

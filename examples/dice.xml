@@ -22,7 +22,7 @@
     </g>
   </specs>
 
-  <loop count="5" loop-var="xx">
+  <loop count="5" var="xx">
     <reuse href="#dice" x="{{$xx * 12}}" n="{{randint(1, 6)}}"/>
   </loop>
 </svg>

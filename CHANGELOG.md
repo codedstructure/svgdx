@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: more concise loop attribute names: `loop-var` becomes `var` for the
+  `<loop>` element, and `idx-var` becomes `idx` for the `<for>` element. The
+  older names may be removed in a future version.
+
 ## [0.25.0 - 2025-11-22]
 
 - Added: support for 'repeat' commands in path element data, extending the

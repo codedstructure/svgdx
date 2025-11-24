@@ -8,7 +8,7 @@
   </specs>
 
   <g id="skyline">
-   <loop count="10" loop-var="ii">
+   <loop count="10" var="ii">
     <rect id="b${ii}" y2="0" x="{{10 * $ii}}" width="10" height="{{randint(4, 50)}}" class="d-fill-lightgrey"/>
     <reuse href="#shade" target="#b${ii}"/>
    </loop>
