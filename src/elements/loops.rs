@@ -59,14 +59,14 @@ impl TryFrom<&SvgElement> for LoopDef {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoopElement(pub SvgElement);
+pub struct LoopElement<'a>(pub &'a SvgElement);
 
-impl EventGen for LoopElement {
+impl EventGen for LoopElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = &self.0;
+        let event_element = self.0;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         if let (Ok(loop_def), Some(inner_events)) = (
@@ -158,14 +158,14 @@ impl TryFrom<&SvgElement> for ForDef {
 }
 
 #[derive(Debug, Clone)]
-pub struct ForElement(pub SvgElement);
+pub struct ForElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ForElement {
+impl EventGen for ForElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = &self.0;
+        let event_element = self.0;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         let mut idx = 0;

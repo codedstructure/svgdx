@@ -24,20 +24,20 @@ impl EventGen for SvgElement {
         // early update: may be updated further during processing
         context.update_element(self);
         let res = match self.name() {
-            "loop" => LoopElement(self.clone()).generate_events(context),
-            "config" => ConfigElement(self.clone()).generate_events(context),
-            "reuse" => ReuseElement(self.clone()).generate_events(context),
-            "specs" => SpecsElement(self.clone()).generate_events(context),
-            "var" => VarElement(self.clone()).generate_events(context),
-            "if" => IfElement(self.clone()).generate_events(context),
-            "defaults" => DefaultsElement(self.clone()).generate_events(context),
-            "for" => ForElement(self.clone()).generate_events(context),
-            "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
+            "loop" => LoopElement(self).generate_events(context),
+            "config" => ConfigElement(self).generate_events(context),
+            "reuse" => ReuseElement(self).generate_events(context),
+            "specs" => SpecsElement(self).generate_events(context),
+            "var" => VarElement(self).generate_events(context),
+            "if" => IfElement(self).generate_events(context),
+            "defaults" => DefaultsElement(self).generate_events(context),
+            "for" => ForElement(self).generate_events(context),
+            "g" | "symbol" => GroupElement(self).generate_events(context),
             _ => match self.event_range {
                 Some((start, end)) if start != end => {
-                    return Container(self.clone()).generate_events(context);
+                    return Container(self).generate_events(context);
                 }
-                _ => OtherElement(self.clone()).generate_events(context),
+                _ => OtherElement(self).generate_events(context),
             },
         };
         context.dec_depth()?;
@@ -65,9 +65,9 @@ impl EventGen for SvgElement {
 }
 
 #[derive(Debug, Clone)]
-struct OtherElement(pub SvgElement);
+struct OtherElement<'a>(pub &'a SvgElement);
 
-impl EventGen for OtherElement {
+impl EventGen for OtherElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,

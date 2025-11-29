@@ -7,9 +7,9 @@ use crate::transform::{process_events, EventGen};
 use crate::types::{fstr, strp, ElRef};
 
 #[derive(Debug, Clone)]
-pub struct ReuseElement(pub SvgElement);
+pub struct ReuseElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ReuseElement {
+impl EventGen for ReuseElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,

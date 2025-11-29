@@ -8,16 +8,16 @@ use crate::transform::{process_events, EventGen};
 use crate::AutoStyleMode;
 
 #[derive(Debug, Clone)]
-pub struct DefaultsElement(pub SvgElement);
+pub struct DefaultsElement<'a>(pub &'a SvgElement);
 
-impl EventGen for DefaultsElement {
+impl EventGen for DefaultsElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         // both the `defaults` element itself and any inner elements
         // are used to set default attr values.
-        context.set_element_default(&self.0);
+        context.set_element_default(self.0);
         for ev in self.0.inner_events(context).unwrap_or_default() {
             // we only care about Element-generating (i.e. start/empty) events
             if let Ok(el) = SvgElement::try_from(ev.clone()) {
@@ -29,9 +29,9 @@ impl EventGen for DefaultsElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigElement(pub SvgElement);
+pub struct ConfigElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ConfigElement {
+impl EventGen for ConfigElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -72,9 +72,9 @@ impl EventGen for ConfigElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct SpecsElement(pub SvgElement);
+pub struct SpecsElement<'a>(pub &'a SvgElement);
 
-impl EventGen for SpecsElement {
+impl EventGen for SpecsElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -94,9 +94,9 @@ impl EventGen for SpecsElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct VarElement(pub SvgElement);
+pub struct VarElement<'a>(pub &'a SvgElement);
 
-impl EventGen for VarElement {
+impl EventGen for VarElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -129,9 +129,9 @@ impl EventGen for VarElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfElement(pub SvgElement);
+pub struct IfElement<'a>(pub &'a SvgElement);
 
-impl EventGen for IfElement {
+impl EventGen for IfElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,

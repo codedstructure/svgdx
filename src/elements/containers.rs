@@ -8,9 +8,9 @@ use crate::transform::{process_events, EventGen};
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
 #[derive(Debug, Clone)]
-pub struct Container(pub SvgElement);
+pub struct Container<'a>(pub &'a SvgElement);
 
-impl EventGen for Container {
+impl EventGen for Container<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -38,7 +38,7 @@ impl EventGen for Container {
                     el.event_range = Some((start, start)); // emulate an Empty element
                 }
             }
-            if let (true, Some(text)) = (is_graphics_element(&self.0), &inner_text) {
+            if let (true, Some(text)) = (is_graphics_element(self.0), &inner_text) {
                 let mut el = self.0.clone();
                 el.set_attr("text", text);
                 if let Some((start, _end)) = self.0.event_range {
@@ -100,9 +100,9 @@ impl EventGen for Container {
 }
 
 #[derive(Debug, Clone)]
-pub struct GroupElement(pub SvgElement);
+pub struct GroupElement<'a>(pub &'a SvgElement);
 
-impl EventGen for GroupElement {
+impl EventGen for GroupElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -113,7 +113,7 @@ impl EventGen for GroupElement {
         new_el.eval_attributes(context)?;
 
         // push variables onto the stack
-        context.push_element(&self.0);
+        context.push_element(self.0);
 
         let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
             // get the inner events / bbox first, as some outer element attrs
