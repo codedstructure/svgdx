@@ -1,9 +1,10 @@
+use std::fmt::Display;
 use std::num::NonZeroU32;
 use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
 use crate::errors::{Error, Result};
-use crate::types::{attr_split, extract_elref, strp, ElRef};
+use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
@@ -123,6 +124,19 @@ impl FromStr for Length {
             Ok(Length::Rational(numer, denom))
         } else {
             Ok(Length::Absolute(strp(value)?))
+        }
+    }
+}
+
+// Convert to SVG-friendly string (e.g. Rational => %age)
+impl Display for Length {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Absolute(v) => write!(f, "{v}"),
+            Self::Ratio(v) => write!(f, "{}%", fstr(v * 100.)),
+            Self::Rational(numer, denom) => {
+                write!(f, "{}%", fstr((*numer as f32 / denom.get() as f32) * 100.))
+            }
         }
     }
 }
