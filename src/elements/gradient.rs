@@ -1,14 +1,13 @@
 // simplify linearGradient and radialGradient elements
 
+use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::events::{OutputEvent, OutputList};
 use crate::geometry::{BoundingBox, Length};
 use crate::transform::{process_events, EventGen};
-use crate::types::attr_split;
+use crate::types::{attr_split, split_compound_attr, strp};
 use crate::Error;
-
-use super::SvgElement;
 
 pub struct LinearGradient<'a>(pub &'a SvgElement);
 
@@ -40,13 +39,16 @@ impl EventGen for LinearGradient<'_> {
                 .parse()
                 .map_err(|e| Error::Parse(format!("stops: {e}")))?;
             for stop in stop_list.stops {
-                let stop_el = SvgElement::new(
+                let mut stop_el = SvgElement::new(
                     "stop",
                     &[
                         ("offset".into(), stop.offset.to_string()),
                         ("stop-color".into(), stop.colour),
                     ],
                 );
+                if let Some(opacity) = stop.opacity {
+                    stop_el.set_attr("stop-opacity", &opacity.to_string());
+                }
                 new_inner.push(stop_el);
             }
         }
@@ -103,6 +105,46 @@ impl EventGen for LinearGradient<'_> {
 struct GradStop {
     offset: Length,
     colour: String,
+    opacity: Option<f32>,
+}
+
+impl std::str::FromStr for GradStop {
+    type Err = Error;
+
+    // format: "offset colour [opacity]"
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let mut pieces = attr_split(s);
+        let offset_str = pieces.next().ok_or_else(|| {
+            Error::InvalidValue(
+                "Missing offset in stop definition".to_string(),
+                s.to_string(),
+            )
+        })?;
+        let colour = pieces.next().ok_or_else(|| {
+            Error::InvalidValue(
+                "Missing colour in stop definition".to_string(),
+                s.to_string(),
+            )
+        })?;
+        let opacity = pieces
+            .next()
+            .map(|o_str| {
+                strp(&o_str).and_then(|o| {
+                    (0.0..=1.0).contains(&o).then_some(o).ok_or_else(|| {
+                        Error::InvalidValue("Invalid opacity".into(), o_str.to_owned())
+                    })
+                })
+            })
+            .transpose()?;
+        let offset: Length = offset_str
+            .parse()
+            .map_err(|_| Error::InvalidValue("Invalid stop offset".into(), offset_str))?;
+        Ok(GradStop {
+            offset,
+            colour,
+            opacity,
+        })
+    }
 }
 
 struct GradStopList {
@@ -110,7 +152,7 @@ struct GradStopList {
 }
 
 impl std::str::FromStr for GradStopList {
-    type Err = String;
+    type Err = Error;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let mut stops = Vec::new();
@@ -119,17 +161,7 @@ impl std::str::FromStr for GradStopList {
             if part.is_empty() {
                 continue;
             }
-            let mut pieces = attr_split(part);
-            let offset_str = pieces
-                .next()
-                .ok_or_else(|| "Missing offset in stop definition".to_string())?;
-            let colour = pieces
-                .next()
-                .ok_or_else(|| "Missing colour in stop definition".to_string())?;
-            let offset: Length = offset_str
-                .parse()
-                .map_err(|e| format!("Invalid stop offset '{}': {}", offset_str, e))?;
-            stops.push(GradStop { offset, colour });
+            stops.push(part.parse()?)
         }
         Ok(GradStopList { stops })
     }
@@ -150,39 +182,66 @@ fn dir_to_coords(angle: f32) -> Result<(Length, Length, Length, Length)> {
     let angle = angle % 360.0;
     let angle = if angle < 0.0 { angle + 360.0 } else { angle };
 
-    let (x1, y1, x2, y2) = if angle >= 0.0 && angle <= 90.0 {
-        // Quadrant 1: anchor at (0,0), project to edge of unit square
-        let x = rad.cos();
-        let y = rad.sin();
-        // Scale to reach edge: either x=1 or y=1
-        let scale = if x > y { 1.0 / x } else { 1.0 / y };
-        (0.0, 0.0, x * scale, y * scale)
-    } else if angle > 90.0 && angle <= 180.0 {
-        // Quadrant 2: anchor at (1,0), project to edge
-        let x = rad.cos();
-        let y = rad.sin();
-        // Scale to reach edge: either x=0 (left) or y=1 (bottom)
-        let scale = if x.abs() > y { 1.0 / x.abs() } else { 1.0 / y };
-        (1.0, 0.0, 1.0 + x * scale, y * scale)
-    } else if angle > 180.0 && angle < 270.0 {
-        // Quadrant 3: anchor at (1,1), project to edge
-        let x = rad.cos();
-        let y = rad.sin();
-        // Scale to reach edge: either x=0 (left) or y=0 (top)
-        let scale = if x.abs() > y.abs() {
-            1.0 / x.abs()
-        } else {
-            1.0 / y.abs()
-        };
-        (1.0, 1.0, 1.0 + x * scale, 1.0 + y * scale)
-    } else {
-        // Quadrant 4 (>=270 and <360): anchor at (0,1), project to edge
-        let x = rad.cos();
-        let y = rad.sin();
-        // Scale to reach edge: either x=1 (right) or y=0 (top)
-        let scale = if x > y.abs() { 1.0 / x } else { 1.0 / y.abs() };
-        (0.0, 1.0, x * scale, 1.0 + y * scale)
-    };
+    const ANGLE_EPSILON: f32 = 0.05; // degrees
+
+    // special-case cardinal directions
+    if (angle - 0.0).abs() < ANGLE_EPSILON {
+        return Ok((
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+            Length::Ratio(1.0),
+            Length::Ratio(0.0),
+        ));
+    } else if (angle - 90.0).abs() < ANGLE_EPSILON {
+        return Ok((
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+            Length::Ratio(1.0),
+        ));
+    } else if (angle - 180.0).abs() < ANGLE_EPSILON {
+        return Ok((
+            Length::Ratio(1.0),
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+        ));
+    } else if (angle - 270.0).abs() < ANGLE_EPSILON {
+        return Ok((
+            Length::Ratio(0.0),
+            Length::Ratio(1.0),
+            Length::Ratio(0.0),
+            Length::Ratio(0.0),
+        ));
+    }
+
+    // Ray-box intersection from center
+    let dx = rad.cos();
+    let dy = rad.sin();
+
+    let mut t_min = f32::NEG_INFINITY;
+    let mut t_max = f32::INFINITY;
+
+    // Intersect with vertical edges (x=0 and x=1)
+    if dx.abs() > 1e-6 {
+        let t1 = (0.0 - 0.5) / dx;
+        let t2 = (1.0 - 0.5) / dx;
+        t_min = t_min.max(t1.min(t2));
+        t_max = t_max.min(t1.max(t2));
+    }
+
+    // Intersect with horizontal edges (y=0 and y=1)
+    if dy.abs() > 1e-6 {
+        let t1 = (0.0 - 0.5) / dy;
+        let t2 = (1.0 - 0.5) / dy;
+        t_min = t_min.max(t1.min(t2));
+        t_max = t_max.min(t1.max(t2));
+    }
+
+    let x1 = 0.5 + t_min * dx;
+    let y1 = 0.5 + t_min * dy;
+    let x2 = 0.5 + t_max * dx;
+    let y2 = 0.5 + t_max * dy;
 
     Ok((
         Length::Ratio(x1),
@@ -209,15 +268,34 @@ impl EventGen for RadialGradient<'_> {
                 .parse()
                 .map_err(|e| Error::Parse(format!("stops: {e}")))?;
             for stop in stop_list.stops {
-                let stop_el = SvgElement::new(
+                let mut stop_el = SvgElement::new(
                     "stop",
                     &[
                         ("offset".into(), stop.offset.to_string()),
                         ("stop-color".into(), stop.colour),
                     ],
                 );
+                if let Some(opacity) = stop.opacity {
+                    stop_el.set_attr("stop-opacity", &opacity.to_string());
+                }
                 new_inner.push(stop_el);
             }
+        }
+
+        // outermost circle is defined by cx,cy,r, and corresponding to a
+        // stop at offset 1.0; defaults to 50%/50%/50%
+        if let Some(cxy) = new_el.pop_attr("cxy") {
+            let (cx, cy) = split_compound_attr(&cxy);
+            new_el.set_default_attr("cx", &cx);
+            new_el.set_default_attr("cy", &cy);
+        }
+
+        // focal point of radial gradient; corresponds to stop at offset 0
+        // and defaults to cx,cy
+        if let Some(cxy) = new_el.pop_attr("fxy") {
+            let (cx, cy) = split_compound_attr(&cxy);
+            new_el.set_default_attr("fx", &cx);
+            new_el.set_default_attr("fy", &cy);
         }
 
         // push variables onto the stack
