@@ -12,6 +12,7 @@ mod defaults;
 mod error_handling;
 mod eval_locs;
 mod expression;
+mod gradient;
 mod group;
 mod if_element;
 mod indent;

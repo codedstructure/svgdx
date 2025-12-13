@@ -1,107 +1,37 @@
-// simplify linearGradient and radialGradient elements
+//! Simple linear and radial gradient elements
+//!
+//! linearGradient or radialGradient elements may be given a 'stops' attribute,
+//! which is converted into additional `stop` child elements.
+//!
+//! The `stops` attribute format is:
+//!
+//!  `offset1 color1 [opacity1]; offset2 color2 [opacity2]; ...`
+//!
+//! which expands to:
+//!
+//!  `stop offset="offset1" stop-color="color1" [stop-opacity="opacity1"]/>`
+//!
+//! For linearGradient, the gradient 'line' is defined by (x1,y1) to (x2,y2).
+//!
+//! Additional 'dir' and 'length' attrs allow polar specification of this:
+//!
+//! * dir: angle in degrees (0 = left to right, 90 = top to bottom, etc)
+//! * length: length of gradient line; default is to extend to unit square edge
+//!
+//! if dir and/or length are provided, either (x1,y1) or (x2,y2) may be omitted,
+//! and will be computed accordingly; if both are provided, both points must be
+//! specified explicitly.
 
 use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::events::{OutputEvent, OutputList};
-use crate::geometry::{BoundingBox, Length};
+use crate::geometry::{strp_length, BoundingBox, Length};
 use crate::transform::{process_events, EventGen};
-use crate::types::{attr_split, split_compound_attr, strp};
+use crate::types::{attr_split, fstr, split_compound_attr, strp};
 use crate::Error;
 
-pub struct LinearGradient<'a>(pub &'a SvgElement);
-
-impl EventGen for LinearGradient<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        // thoughts:
-        // if an empty element with 'stops' attr, generate stops from that
-        // else process inner elements as normal
-        // stops format is "offset1 color1; offset2 color2; ..." which expands to
-        // <stop offset="offset1" stop-color="color1" /> etc.
-        // direction can be specified with dir="angle" or "x1,y1,x2,y2"
-        // default is top to bottom (0,0 to 0,1), equivalent to dir="90"
-
-        // so... what sort of trait derived from SvgElement would be useful here?
-        // got the basic get_attr/pop_attr stuff, but need to generate inner events,
-        // or maybe just transform the element into an element that contains other
-        // synthesised elements?
-
-        let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
-
-        let stops = new_el.pop_attr("stops");
-        let mut new_inner = Vec::new();
-        if let Some(stops) = stops {
-            let stop_list: GradStopList = stops
-                .parse()
-                .map_err(|e| Error::Parse(format!("stops: {e}")))?;
-            for stop in stop_list.stops {
-                let mut stop_el = SvgElement::new(
-                    "stop",
-                    &[
-                        ("offset".into(), stop.offset.to_string()),
-                        ("stop-color".into(), stop.colour),
-                    ],
-                );
-                if let Some(opacity) = stop.opacity {
-                    stop_el.set_attr("stop-opacity", &opacity.to_string());
-                }
-                new_inner.push(stop_el);
-            }
-        }
-
-        // push variables onto the stack
-        context.push_element(self.0);
-
-        if let Some(dir) = new_el.pop_attr("dir") {
-            let angle: f32 = dir.parse().map_err(|e| Error::Parse(format!("dir: {e}")))?;
-            let (x1, y1, x2, y2) = dir_to_coords(angle)?;
-            new_el.set_attr("x1", &x1.to_string());
-            new_el.set_attr("y1", &y1.to_string());
-            new_el.set_attr("x2", &x2.to_string());
-            new_el.set_attr("y2", &y2.to_string());
-        }
-
-        let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
-            // get the inner events / bbox first, as some outer element attrs
-            // (e.g. `transform` via rotate) may depend on the bbox.
-            let mut inner_events = inner_events.clone();
-            inner_events.rebase_under(new_el.order_index.clone());
-            process_events(inner_events, context).inspect_err(|_| {
-                context.pop_element();
-            })?
-        } else {
-            (OutputList::new(), None)
-        };
-
-        // pop variables off the stack
-        context.pop_element();
-
-        // Need bbox to provide center of rotation
-        new_el.handle_rotation()?;
-
-        let mut events = OutputList::new();
-        if self.0.is_empty_element() && new_inner.is_empty() {
-            events.push(OutputEvent::Empty(new_el.clone()));
-        } else {
-            let el_name = new_el.name().to_owned();
-            events.push(OutputEvent::Start(new_el.clone()));
-            events.extend(inner);
-            for el in new_inner {
-                events.extend(el.generate_events(context)?.0);
-            }
-            events.push(OutputEvent::End(el_name));
-        }
-
-        context.update_element(&new_el);
-
-        Ok((events, None))
-    }
-}
-
+#[derive(Debug, PartialEq)]
 struct GradStop {
     offset: Length,
     colour: String,
@@ -167,88 +97,222 @@ impl std::str::FromStr for GradStopList {
     }
 }
 
-// convert 'dir=angle' to x1,y1,x2,y2
-fn dir_to_coords(angle: f32) -> Result<(Length, Length, Length, Length)> {
-    let rad = angle.to_radians();
-    // SVG defaults are (0%, 0%) to (100%, 0%), i.e. left to right; this corresponds to dir="0".
-    // generated coords are in %age terms, but should be normalised to fit in a unit square,
-    // so a 45% angle becomes (0,0) to (1,1).
-    // the quadrant should be considered, e.g. between 0 and 90, start at (0,0) (this includes
-    // the default settings of x1/y1/x2/y2 being 0/0/100%/0).
-    // Between 90 and 180, start at (1,0), betwee n 180 and 270 start at (1,1), and
-    // between 270 and 360 start at (0,1).
-
-    // Normalize angle to 0-360 range
-    let angle = angle % 360.0;
-    let angle = if angle < 0.0 { angle + 360.0 } else { angle };
-
-    const ANGLE_EPSILON: f32 = 0.05; // degrees
-
-    // special-case cardinal directions
-    if (angle - 0.0).abs() < ANGLE_EPSILON {
-        return Ok((
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-            Length::Ratio(1.0),
-            Length::Ratio(0.0),
-        ));
-    } else if (angle - 90.0).abs() < ANGLE_EPSILON {
-        return Ok((
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-            Length::Ratio(1.0),
-        ));
-    } else if (angle - 180.0).abs() < ANGLE_EPSILON {
-        return Ok((
-            Length::Ratio(1.0),
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-        ));
-    } else if (angle - 270.0).abs() < ANGLE_EPSILON {
-        return Ok((
-            Length::Ratio(0.0),
-            Length::Ratio(1.0),
-            Length::Ratio(0.0),
-            Length::Ratio(0.0),
-        ));
+fn stop_elements(stops: &str) -> Result<Vec<SvgElement>> {
+    let mut new_inner = Vec::new();
+    let stop_list: GradStopList = stops
+        .parse()
+        .map_err(|e| Error::Parse(format!("stops: {e}")))?;
+    for stop in stop_list.stops {
+        let mut stop_el = SvgElement::new(
+            "stop",
+            &[
+                ("offset".into(), stop.offset.to_string()),
+                ("stop-color".into(), stop.colour),
+            ],
+        );
+        if let Some(opacity) = stop.opacity {
+            stop_el.set_attr("stop-opacity", &opacity.to_string());
+        }
+        new_inner.push(stop_el);
     }
+    Ok(new_inner)
+}
 
-    // Ray-box intersection from center
+pub struct LinearGradient<'a>(pub &'a SvgElement);
+
+impl EventGen for LinearGradient<'_> {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        let mut new_el = self.0.clone();
+        new_el.eval_attributes(context)?;
+
+        let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
+            stop_elements(&stops)?
+        } else {
+            Vec::new()
+        };
+
+        // push variables onto the stack
+        context.push_element(self.0);
+
+        // expand any provided compound attributes
+        if let Some(xy1) = new_el.pop_attr("xy1") {
+            let (x1, y1) = split_compound_attr(&xy1);
+            new_el.set_default_attr("x1", &x1);
+            new_el.set_default_attr("y1", &y1);
+        }
+        let origin: Option<(f32, f32)> = {
+            let x1 = new_el.get_attr("x1").map(strp_length).transpose()?;
+            let y1 = new_el.get_attr("y1").map(strp_length).transpose()?;
+            match (x1, y1) {
+                (Some(x1), Some(y1)) => Some((x1.evaluate(1.), y1.evaluate(1.))),
+                _ => None,
+            }
+        };
+        if let Some(xy2) = new_el.pop_attr("xy2") {
+            let (x2, y2) = split_compound_attr(&xy2);
+            new_el.set_default_attr("x2", &x2);
+            new_el.set_default_attr("y2", &y2);
+        }
+        let endpoint: Option<(f32, f32)> = {
+            let x2 = new_el.get_attr("x2").map(strp_length).transpose()?;
+            let y2 = new_el.get_attr("y2").map(strp_length).transpose()?;
+            match (x2, y2) {
+                (Some(x2), Some(y2)) => Some((x2.evaluate(1.), y2.evaluate(1.))),
+                _ => None,
+            }
+        };
+
+        let length = new_el
+            .pop_attr("length")
+            .map(|length| {
+                strp_length(&length)
+                    .map_err(|e| Error::InvalidValue(format!("invalid length: {e}"), length))
+            })
+            .transpose()?;
+
+        let dir = new_el
+            .pop_attr("dir")
+            .map(|dir| {
+                {
+                    // normalize angle to 0-360 range
+                    strp(&dir).map(|a| {
+                        let a = a % 360.0;
+                        if a < 0.0 {
+                            a + 360.0
+                        } else {
+                            a
+                        }
+                    })
+                }
+                .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))
+            })
+            .transpose()?;
+
+        match (origin, endpoint, length, dir) {
+            (Some(_), Some(_), None, None) | (None, None, None, None) => {
+                // no-op; either have all coords or nothing
+            }
+            (Some(_), None, maybe_len, maybe_dir)
+            | (None, Some(_), maybe_len, maybe_dir)
+            | (None, None, maybe_len, maybe_dir) => {
+                let dir = maybe_dir.unwrap_or(0.0);
+
+                // Determine fixed coord
+                let fixed = if let Some(xy1) = origin {
+                    xy1
+                } else if let Some(xy2) = endpoint {
+                    xy2
+                } else {
+                    // Select corner based on angle quadrant
+                    match dir {
+                        d if (0.0..=90.0).contains(&d) => (0.0, 0.0),
+                        d if (90.0..180.0).contains(&d) => (1.0, 0.0),
+                        d if (180.0..=270.0).contains(&d) => (1.0, 1.0),
+                        _ => (0.0, 1.0),
+                    }
+                };
+
+                let (x_fixed, y_fixed) = fixed;
+                let rad = dir.to_radians();
+
+                // Calculate the other endpoint
+                let (x_calc, y_calc) = if let Some(length) = maybe_len {
+                    let icept = intercept_unit_square(fixed, dir);
+                    let dist = ((icept.0 - x_fixed).powi(2) + (icept.1 - y_fixed).powi(2)).sqrt();
+                    (
+                        x_fixed + length.evaluate(dist) * rad.cos(),
+                        y_fixed + length.evaluate(dist) * rad.sin(),
+                    )
+                } else {
+                    intercept_unit_square(fixed, dir)
+                };
+
+                // Set the appropriate missing coordinate pair(s)
+                if origin.is_none() && endpoint.is_none() {
+                    // No coordinates provided - set all four
+                    new_el.set_default_attr("x1", &fstr(x_fixed));
+                    new_el.set_default_attr("y1", &fstr(y_fixed));
+                    new_el.set_default_attr("x2", &fstr(x_calc));
+                    new_el.set_default_attr("y2", &fstr(y_calc));
+                } else if endpoint.is_none() {
+                    // Have origin, set endpoint
+                    new_el.set_default_attr("x2", &fstr(x_calc));
+                    new_el.set_default_attr("y2", &fstr(y_calc));
+                } else {
+                    // Have endpoint, set origin
+                    new_el.set_default_attr("x1", &fstr(x_calc));
+                    new_el.set_default_attr("y1", &fstr(y_calc));
+                }
+            }
+            (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {
+                // origin + endpoint together with either length or dir is over-constrained
+                return Err(Error::InvalidValue(
+                    "Over-constrained linearGradient definition".into(),
+                    self.0.to_string(),
+                ));
+            }
+        }
+
+        let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
+            // get the inner events / bbox first, as some outer element attrs
+            // (e.g. `transform` via rotate) may depend on the bbox.
+            let mut inner_events = inner_events.clone();
+            inner_events.rebase_under(new_el.order_index.clone());
+            process_events(inner_events, context).inspect_err(|_| {
+                context.pop_element();
+            })?
+        } else {
+            (OutputList::new(), None)
+        };
+
+        // pop variables off the stack
+        context.pop_element();
+
+        let mut events = OutputList::new();
+        if self.0.is_empty_element() && new_inner.is_empty() {
+            events.push(OutputEvent::Empty(new_el.clone()));
+        } else {
+            let el_name = new_el.name().to_owned();
+            events.push(OutputEvent::Start(new_el.clone()));
+            events.extend(inner);
+            for el in new_inner {
+                events.extend(el.generate_events(context)?.0);
+            }
+            events.push(OutputEvent::End(el_name));
+        }
+
+        context.update_element(&new_el);
+
+        Ok((events, None))
+    }
+}
+
+// given an origin (assumed inside unit square) and direction (in degrees),
+// return the intersection point of the corresponding ray with the unit square
+fn intercept_unit_square(origin: (f32, f32), dir: f32) -> (f32, f32) {
+    let rad = dir.to_radians();
     let dx = rad.cos();
     let dy = rad.sin();
+    let (ox, oy) = origin;
 
-    let mut t_min = f32::NEG_INFINITY;
-    let mut t_max = f32::INFINITY;
+    let mut t = f32::INFINITY;
 
-    // Intersect with vertical edges (x=0 and x=1)
-    if dx.abs() > 1e-6 {
-        let t1 = (0.0 - 0.5) / dx;
-        let t2 = (1.0 - 0.5) / dx;
-        t_min = t_min.max(t1.min(t2));
-        t_max = t_max.min(t1.max(t2));
+    if dx > 1e-6 {
+        t = t.min((1.0 - ox) / dx);
+    } else if dx < -1e-6 {
+        t = t.min(-ox / dx);
     }
 
-    // Intersect with horizontal edges (y=0 and y=1)
-    if dy.abs() > 1e-6 {
-        let t1 = (0.0 - 0.5) / dy;
-        let t2 = (1.0 - 0.5) / dy;
-        t_min = t_min.max(t1.min(t2));
-        t_max = t_max.min(t1.max(t2));
+    if dy > 1e-6 {
+        t = t.min((1.0 - oy) / dy);
+    } else if dy < -1e-6 {
+        t = t.min(-oy / dy);
     }
 
-    let x1 = 0.5 + t_min * dx;
-    let y1 = 0.5 + t_min * dy;
-    let x2 = 0.5 + t_max * dx;
-    let y2 = 0.5 + t_max * dy;
-
-    Ok((
-        Length::Ratio(x1),
-        Length::Ratio(y1),
-        Length::Ratio(x2),
-        Length::Ratio(y2),
-    ))
+    (ox + t * dx, oy + t * dy)
 }
 
 pub struct RadialGradient<'a>(pub &'a SvgElement);
@@ -261,26 +325,11 @@ impl EventGen for RadialGradient<'_> {
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
 
-        let stops = new_el.pop_attr("stops");
-        let mut new_inner = Vec::new();
-        if let Some(stops) = stops {
-            let stop_list: GradStopList = stops
-                .parse()
-                .map_err(|e| Error::Parse(format!("stops: {e}")))?;
-            for stop in stop_list.stops {
-                let mut stop_el = SvgElement::new(
-                    "stop",
-                    &[
-                        ("offset".into(), stop.offset.to_string()),
-                        ("stop-color".into(), stop.colour),
-                    ],
-                );
-                if let Some(opacity) = stop.opacity {
-                    stop_el.set_attr("stop-opacity", &opacity.to_string());
-                }
-                new_inner.push(stop_el);
-            }
-        }
+        let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
+            stop_elements(&stops)?
+        } else {
+            Vec::new()
+        };
 
         // outermost circle is defined by cx,cy,r, and corresponding to a
         // stop at offset 1.0; defaults to 50%/50%/50%
@@ -315,9 +364,6 @@ impl EventGen for RadialGradient<'_> {
 
         // pop variables off the stack
         context.pop_element();
-
-        // Need bbox to provide center of rotation
-        new_el.handle_rotation()?;
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() && new_inner.is_empty() {
@@ -354,44 +400,92 @@ mod tests {
     }
 
     #[test]
-    fn test_dir_to_coords() {
-        let (x1, y1, x2, y2) = dir_to_coords(0.).unwrap();
-        // SVG defaults are (0%, 0%) to (100%, 0%)
-        assert_eq_approx!(x1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 1.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 0.0);
+    fn test_gradstoplist_parse() {
+        let input = "0% red; 50% green; 100% blue";
+        let stop_list: GradStopList = input.parse().unwrap();
+        assert_eq!(stop_list.stops.len(), 3);
+        assert_eq!(
+            stop_list.stops,
+            [
+                GradStop {
+                    offset: Length::Ratio(0.0),
+                    colour: "red".into(),
+                    opacity: None,
+                },
+                GradStop {
+                    offset: Length::Ratio(0.5),
+                    colour: "green".into(),
+                    opacity: None,
+                },
+                GradStop {
+                    offset: Length::Ratio(1.0),
+                    colour: "blue".into(),
+                    opacity: None,
+                }
+            ]
+        );
 
-        let (x1, y1, x2, y2) = dir_to_coords(90.).unwrap();
-        assert_eq_approx!(x1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 1.0);
+        let input = "0 red 1; 1 blue 0.5";
+        let stop_list: GradStopList = input.parse().unwrap();
+        assert_eq!(stop_list.stops.len(), 2);
+        assert_eq!(
+            stop_list.stops,
+            [
+                GradStop {
+                    offset: Length::Absolute(0.0),
+                    colour: "red".into(),
+                    opacity: Some(1.0),
+                },
+                GradStop {
+                    offset: Length::Absolute(1.0),
+                    colour: "blue".into(),
+                    opacity: Some(0.5),
+                }
+            ]
+        );
+    }
 
-        let (x1, y1, x2, y2) = dir_to_coords(45.).unwrap();
-        assert_eq_approx!(x1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 1.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 1.0);
+    #[test]
+    fn test_intercept_unit_square() {
+        let (x, y) = intercept_unit_square((0.5, 0.5), 0.);
+        assert_eq_approx!(x, 1.0);
+        assert_eq_approx!(y, 0.5);
 
-        let (x1, y1, x2, y2) = dir_to_coords(135.).unwrap();
-        assert_eq_approx!(x1.ratio().unwrap(), 1.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 1.0);
+        let (x, y) = intercept_unit_square((0.5, 0.5), 90.);
+        assert_eq_approx!(x, 0.5);
+        assert_eq_approx!(y, 1.0);
 
-        // 180
-        let (x1, y1, x2, y2) = dir_to_coords(180.).unwrap();
-        assert_eq_approx!(x1.ratio().unwrap(), 1.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 0.0);
+        let (x, y) = intercept_unit_square((0.5, 0.5), -45.);
+        assert_eq_approx!(x, 1.0);
+        assert_eq_approx!(y, 0.0);
 
-        // 270
-        let (x1, y1, x2, y2) = dir_to_coords(270.).unwrap();
-        assert_eq_approx!(x1.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y1.ratio().unwrap(), 1.0);
-        assert_eq_approx!(x2.ratio().unwrap(), 0.0);
-        assert_eq_approx!(y2.ratio().unwrap(), 0.0);
+        let (x, y) = intercept_unit_square((0.5, 0.5), 45.);
+        assert_eq_approx!(x, 1.0);
+        assert_eq_approx!(y, 1.0);
+
+        let (x, y) = intercept_unit_square((0.5, 0.5), 135.);
+        assert_eq_approx!(x, 0.0);
+        assert_eq_approx!(y, 1.0);
+
+        let (x, y) = intercept_unit_square((0.5, 0.5), 225.);
+        assert_eq_approx!(x, 0.0);
+        assert_eq_approx!(y, 0.0);
+
+        let (x, y) = intercept_unit_square((0.5, 0.5), 315.);
+        assert_eq_approx!(x, 1.0);
+        assert_eq_approx!(y, 0.0);
+
+        // non-centre origin
+        let (x, y) = intercept_unit_square((0.2, 0.2), 45.);
+        assert_eq_approx!(x, 1.0);
+        assert_eq_approx!(y, 1.0);
+
+        let (x, y) = intercept_unit_square((0.25, 0.5), 45.);
+        assert_eq_approx!(x, 0.75);
+        assert_eq_approx!(y, 1.0);
+
+        let (x, y) = intercept_unit_square((1., 0.5), 180.);
+        assert_eq_approx!(x, 0.0);
+        assert_eq_approx!(y, 0.5);
     }
 }
