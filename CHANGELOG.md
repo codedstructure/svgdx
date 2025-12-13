@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: simple gradient specification. A `stops` attribute can be provided
+  to `linearGradient` or `radialGradient` elements, containing semicolon
+  separated `offset colour [opacity]` values. The various gradient vector
+  attributes (x1, y1, x2, y2 for linear; cx, cy, fx, fy for radial) may be
+  given in compound form, e.g. `xy1="50%"`, and the gradient vector for
+  `linearGradient` may be further specified by `dir` angle and `length`
+  attributes if zero or one of `xy1`, `xy2` are given.
+  Example: `<linearGradient id="g1" dir="90" stops="0 red; 1 blue"/>` defines
+  a gradient from red at the top to blue at the bottom.
+
 - Added: more concise loop attribute names: `loop-var` becomes `var` for the
   `<loop>` element, and `idx-var` becomes `idx` for the `<for>` element. The
   older names may be removed in a future version.
