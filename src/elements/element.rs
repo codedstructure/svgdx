@@ -1,7 +1,7 @@
 use super::{
     is_connector, process_text_attr, ConfigElement, ConnectionType, Connector, Container,
-    DefaultsElement, ForElement, GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement,
-    VarElement,
+    DefaultsElement, ForElement, GroupElement, IfElement, LinearGradient, LoopElement,
+    RadialGradient, ReuseElement, SpecsElement, VarElement,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
@@ -33,6 +33,8 @@ impl EventGen for SvgElement {
             "defaults" => DefaultsElement(self).generate_events(context),
             "for" => ForElement(self).generate_events(context),
             "g" | "symbol" => GroupElement(self).generate_events(context),
+            "linearGradient" => LinearGradient(self).generate_events(context),
+            "radialGradient" => RadialGradient(self).generate_events(context),
             _ => match self.event_range {
                 Some((start, end)) if start != end => {
                     return Container(self).generate_events(context);
