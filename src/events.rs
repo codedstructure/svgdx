@@ -13,11 +13,7 @@ use quick_xml::{Reader, Writer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputEvent {
     event: Event<'static>,
-    pub index: usize,
-    order: OrderIndex,
-    line: usize,
-    indent: usize,
-    pub alt_idx: Option<usize>,
+    meta: EventMeta,
 }
 
 impl InputEvent {
@@ -37,8 +33,37 @@ impl InputEvent {
 
     pub fn with_base_index(&self, order: &OrderIndex) -> Self {
         Self {
-            order: order.with_sub_index(&self.order),
+            meta: EventMeta {
+                order: order.with_sub_index(&self.meta.order),
+                ..self.meta.clone()
+            },
             ..self.clone()
+        }
+    }
+
+    pub fn set_span(&mut self, index: usize, alt_idx: usize) {
+        self.meta.index = index;
+        self.meta.alt_idx = Some(alt_idx);
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct EventMeta {
+    index: usize,
+    order: OrderIndex,
+    line: usize,
+    indent: usize,
+    alt_idx: Option<usize>,
+}
+
+impl Default for EventMeta {
+    fn default() -> Self {
+        Self {
+            index: 0,
+            order: OrderIndex::new(0),
+            line: 0,
+            indent: 0,
+            alt_idx: None,
         }
     }
 }
@@ -47,11 +72,7 @@ impl From<Event<'_>> for InputEvent {
     fn from(value: Event) -> Self {
         Self {
             event: value.into_owned(),
-            index: 0,
-            order: OrderIndex::new(0),
-            line: 0,
-            indent: 0,
-            alt_idx: None,
+            meta: EventMeta::default(),
         }
     }
 }
@@ -70,17 +91,7 @@ pub struct InputList {
 impl From<&[InputEvent]> for InputList {
     fn from(value: &[InputEvent]) -> Self {
         Self {
-            events: value
-                .iter()
-                .map(|v| InputEvent {
-                    event: v.event.clone(),
-                    index: v.index,
-                    order: v.order.clone(),
-                    line: v.line,
-                    indent: v.indent,
-                    alt_idx: v.alt_idx,
-                })
-                .collect(),
+            events: value.to_vec(),
         }
     }
 }
@@ -158,6 +169,13 @@ impl InputList {
             };
             let ev =
                 ev.map_err(|e| Error::Document(format!("XML error near line {src_line}: {e:?}")))?;
+            let meta = EventMeta {
+                index,
+                order: order.clone(),
+                line: src_line,
+                indent,
+                alt_idx: None,
+            };
 
             match &ev {
                 Event::Eof => break, // exits the loop when reaching end of file
@@ -170,22 +188,14 @@ impl InputList {
 
                     events.push(InputEvent {
                         event: ev.into_owned(),
-                        index,
-                        order: order.clone(),
-                        line: src_line,
-                        indent,
-                        alt_idx: None,
+                        meta,
                     });
                     order.step();
                 }
                 Event::Start(_) => {
                     events.push(InputEvent {
                         event: ev.into_owned(),
-                        index,
-                        order: order.clone(),
-                        line: src_line,
-                        indent,
-                        alt_idx: None,
+                        meta,
                     });
                     event_idx_stack.push(index);
                     order.down();
@@ -193,27 +203,22 @@ impl InputList {
                 Event::End(_) => {
                     let start_idx = event_idx_stack.pop();
                     if let Some(start_idx) = start_idx {
-                        events[start_idx].alt_idx = Some(index);
+                        events[start_idx].meta.alt_idx = Some(index);
                     }
                     order.up();
                     events.push(InputEvent {
                         event: ev.into_owned(),
-                        index,
-                        order: order.clone(),
-                        line: src_line,
-                        indent,
-                        alt_idx: start_idx,
+                        meta: EventMeta {
+                            alt_idx: start_idx,
+                            ..meta
+                        },
                     });
                     order.step();
                 }
                 e => {
                     events.push(InputEvent {
                         event: e.clone().into_owned(),
-                        index,
-                        order: order.clone(),
-                        line: src_line,
-                        indent,
-                        alt_idx: None,
+                        meta,
                     });
                     order.step();
                 }
@@ -245,18 +250,18 @@ impl InputList {
         for ev in &mut self.events {
             match &ev.event {
                 Event::Start(_) => {
-                    ev.order = oi.clone();
+                    ev.meta.order = oi.clone();
                     oi.down();
                 }
                 // end events will have the same order index as the start event,
                 // but should never have their order index used...
                 Event::End(_) => {
                     oi.up();
-                    ev.order = oi.clone();
+                    ev.meta.order = oi.clone();
                     oi.step();
                 }
                 _ => {
-                    ev.order = oi.clone();
+                    ev.meta.order = oi.clone();
                     oi.step();
                 }
             }
@@ -326,17 +331,17 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
                     Error::Document(format!(
                         "could not extract element at line {}",
-                        input_ev.line
+                        input_ev.meta.line
                     ))
                 })?;
-                if let Some(alt_idx) = input_ev.alt_idx {
-                    event_element.set_event_range((input_ev.index, alt_idx));
+                if let Some(alt_idx) = input_ev.meta.alt_idx {
+                    event_element.set_event_range((input_ev.meta.index, alt_idx));
                     // Scan ahead to the end of this element, matching alt_idx.
                     // Note when called recursively on a subset of events, alt_idx
                     // won't be the same as next_idx, so we need to scan rather than
                     // just setting ev_idx = alt_idx + 1.
                     for next_idx in ev_idx..events.len() {
-                        if events.events[next_idx].index == alt_idx {
+                        if events.events[next_idx].meta.index == alt_idx {
                             ev_idx = next_idx + 1; // skip the End event itself
                             break;
                         }
@@ -348,22 +353,22 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
                     Error::Document(format!(
                         "could not extract element at line {}",
-                        input_ev.line
+                        input_ev.meta.line
                     ))
                 })?;
-                event_element.set_event_range((input_ev.index, input_ev.index));
+                event_element.set_event_range((input_ev.meta.index, input_ev.meta.index));
                 tags.push(Tag::Leaf(event_element, None));
             }
             Event::Comment(c) => {
                 let text = String::from_utf8(c.to_vec())?;
-                tags.push(Tag::Comment(input_ev.order.clone(), text, None));
+                tags.push(Tag::Comment(input_ev.meta.order.clone(), text, None));
             }
             Event::Text(t) => {
                 let text = String::from_utf8(t.to_vec())?;
                 if let Some(t) = tags.last_mut() {
                     t.set_text(text)
                 } else {
-                    tags.push(Tag::Text(input_ev.order.clone(), text));
+                    tags.push(Tag::Text(input_ev.meta.order.clone(), text));
                 }
             }
             Event::CData(c) => {
@@ -371,7 +376,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 if let Some(t) = tags.last_mut() {
                     t.set_text(text)
                 } else {
-                    tags.push(Tag::CData(input_ev.order.clone(), text));
+                    tags.push(Tag::CData(input_ev.meta.order.clone(), text));
                 }
             }
             _ => {
@@ -662,9 +667,9 @@ impl TryFrom<InputEvent> for SvgElement {
             Event::Start(ref e) | Event::Empty(ref e) => {
                 let mut element = SvgElement::try_from(e)?;
                 element.original = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
-                element.set_indent(ev.indent);
-                element.set_src_line(ev.line);
-                element.set_order_index(&ev.order);
+                element.set_indent(ev.meta.indent);
+                element.set_src_line(ev.meta.line);
+                element.set_order_index(&ev.meta.order);
                 Ok(element)
             }
             _ => Err(Error::Document(format!(
@@ -684,9 +689,9 @@ mod tests {
         let input = r#"<svg></svg>"#;
         let el = InputList::from_str(input).unwrap();
         assert_eq!(el.events.len(), 2);
-        assert_eq!(el.events[0].line, 1);
+        assert_eq!(el.events[0].meta.line, 1);
         assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
-        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].meta.line, 1);
         assert_eq!(el.events[1].event, Event::End(BytesEnd::new("svg")));
     }
 
@@ -696,17 +701,17 @@ mod tests {
         </svg>"#;
         let el = InputList::from_str(input).unwrap();
         assert_eq!(el.events.len(), 3);
-        assert_eq!(el.events[0].line, 1);
-        assert_eq!(el.events[0].indent, 0);
+        assert_eq!(el.events[0].meta.line, 1);
+        assert_eq!(el.events[0].meta.indent, 0);
         assert_eq!(el.events[0].event, Event::Start(BytesStart::new("svg")));
         // Multi-line events (e.g. text here) store starting line number
-        assert_eq!(el.events[1].line, 1);
+        assert_eq!(el.events[1].meta.line, 1);
         assert_eq!(
             el.events[1].event,
             Event::Text(BytesText::new("\n        "))
         );
-        assert_eq!(el.events[2].line, 2);
-        assert_eq!(el.events[2].indent, 8);
+        assert_eq!(el.events[2].meta.line, 2);
+        assert_eq!(el.events[2].meta.indent, 8);
         assert_eq!(el.events[2].event, Event::End(BytesEnd::new("svg")));
     }
 
