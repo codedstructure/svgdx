@@ -377,6 +377,18 @@ impl SvgElement {
     pub fn get_attrs(&self) -> Vec<(String, String)> {
         self.attrs.to_vec()
     }
+
+    /// get attrs including styles and classes
+    pub fn get_full_attrs(&self) -> Vec<(String, String)> {
+        let mut all_attrs = self.attrs.to_vec();
+        if !self.styles.is_empty() {
+            all_attrs.push(("style".to_string(), self.styles.to_string()));
+        }
+        if !self.classes.is_empty() {
+            all_attrs.push(("class".to_string(), self.get_classes().join(" ")));
+        }
+        all_attrs
+    }
 }
 
 impl SvgElement {
