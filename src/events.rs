@@ -1,3 +1,4 @@
+// TODO: should probably only have 'RawElement' used in this module.
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
@@ -12,29 +13,13 @@ use quick_xml::{Reader, Writer};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum EventKind {
-    Empty {
-        name: String,
-        attributes: Attributes,
-    },
-    Start {
-        name: String,
-        attributes: Attributes,
-    },
-    End {
-        name: String,
-    },
-    Comment {
-        content: String,
-    },
-    Text {
-        content: String,
-    },
-    CData {
-        content: String,
-    },
-    Other {
-        event: XmlEvent<'static>,
-    },
+    Empty(RawElement),
+    Start(RawElement),
+    End { name: String },
+    Comment { content: String },
+    Text { content: String },
+    CData { content: String },
+    Other { event: XmlEvent<'static> },
 }
 
 impl EventKind {
@@ -47,20 +32,8 @@ impl TryFrom<XmlEvent<'_>> for EventKind {
     type Error = Error;
     fn try_from(event: XmlEvent) -> Result<Self> {
         let res = match event {
-            XmlEvent::Empty(bs) => {
-                let name = String::from_utf8(bs.name().into_inner().to_vec()).expect("utf8");
-                EventKind::Empty {
-                    name,
-                    attributes: bs.try_into()?,
-                }
-            }
-            XmlEvent::Start(bs) => {
-                let name = String::from_utf8(bs.name().into_inner().to_vec()).expect("utf8");
-                EventKind::Start {
-                    name,
-                    attributes: bs.try_into()?,
-                }
-            }
+            XmlEvent::Empty(bs) => EventKind::Empty(bs.try_into()?),
+            XmlEvent::Start(bs) => EventKind::Start(bs.try_into()?),
             XmlEvent::End(e) => {
                 let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
                 EventKind::End { name }
@@ -144,12 +117,16 @@ impl Default for EventMeta {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Attributes(Vec<(String, String)>);
+struct RawElement(String, Vec<(String, String)>);
 
-impl TryFrom<BytesStart<'_>> for Attributes {
+impl TryFrom<BytesStart<'_>> for RawElement {
     type Error = Error;
 
+    /// Build a `RawElement` from a `BytesStart` value. Failures here are are low-level
+    /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
+    /// semantic about svgdx / svg formats.
     fn try_from(e: BytesStart) -> Result<Self> {
+        let name = String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
         // TODO: in a non-strict mode, consider .filter_map(|a| { a.ok().and_then(|aa| { ...
         let attrs: Result<Vec<(String, String)>> = e
             .attributes()
@@ -160,7 +137,7 @@ impl TryFrom<BytesStart<'_>> for Attributes {
                 Ok((key, value))
             })
             .collect();
-        Ok(Self(attrs?))
+        Ok(Self(name, attrs?))
     }
 }
 
@@ -170,20 +147,8 @@ impl TryFrom<XmlEvent<'_>> for InputEvent {
     fn try_from(value: XmlEvent) -> Result<Self> {
         Ok(Self {
             event: match value {
-                XmlEvent::Empty(e) => {
-                    let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
-                    EventKind::Empty {
-                        name,
-                        attributes: e.try_into()?,
-                    }
-                }
-                XmlEvent::Start(e) => {
-                    let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
-                    EventKind::Start {
-                        name,
-                        attributes: e.try_into()?,
-                    }
-                }
+                XmlEvent::Empty(e) => EventKind::Empty(e.try_into()?),
+                XmlEvent::Start(e) => EventKind::Start(e.try_into()?),
                 XmlEvent::End(e) => {
                     let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
                     EventKind::End { name }
@@ -226,10 +191,7 @@ impl From<OutputEvent> for InputEvent {
                 meta,
             },
             OutputEvent::Start(el) => InputEvent {
-                event: EventKind::Start {
-                    name: el.name().to_owned(),
-                    attributes: Attributes(el.get_full_attrs().to_vec()),
-                },
+                event: EventKind::Start(el.clone().into()),
                 meta: EventMeta {
                     line: el.src_line,
                     indent: el.indent,
@@ -239,10 +201,7 @@ impl From<OutputEvent> for InputEvent {
                 },
             },
             OutputEvent::Empty(el) => InputEvent {
-                event: EventKind::Empty {
-                    name: el.name().to_owned(),
-                    attributes: Attributes(el.get_full_attrs().to_vec()),
-                },
+                event: EventKind::Empty(el.clone().into()),
                 meta: EventMeta {
                     line: el.src_line,
                     indent: el.indent,
@@ -376,9 +335,9 @@ impl InputList {
                     });
                     order.step();
                 }
-                EventKind::Start { name, attributes } => {
+                EventKind::Start(el) => {
                     events.push(InputEvent {
-                        event: EventKind::Start { name, attributes },
+                        event: EventKind::Start(el),
                         meta,
                     });
                     event_idx_stack.push(index);
@@ -579,15 +538,21 @@ pub enum OutputEvent {
     Other(XmlEvent<'static>),
 }
 
+impl From<SvgElement> for RawElement {
+    fn from(value: SvgElement) -> Self {
+        Self(value.name().to_owned(), value.get_full_attrs().to_vec())
+    }
+}
+
 impl From<InputEvent> for OutputEvent {
     fn from(value: InputEvent) -> Self {
         match value.event {
-            EventKind::Empty { name, attributes } => {
-                let el = SvgElement::new(&name, &attributes.0);
+            EventKind::Empty(el) => {
+                let el = SvgElement::new(&el.0, &el.1);
                 OutputEvent::Empty(el)
             }
-            EventKind::Start { name, attributes } => {
-                let el = SvgElement::new(&name, &attributes.0);
+            EventKind::Start(el) => {
+                let el = SvgElement::new(&el.0, &el.1);
                 OutputEvent::Start(el)
             }
             EventKind::End { name } => OutputEvent::End(name),
@@ -763,6 +728,7 @@ impl<'a> From<OutputEvent> for XmlEvent<'a> {
     }
 }
 
+// TODO: switch to RawElement, but ensure style/class handling is preserved.
 impl SvgElement {
     /// Convert an `SvgElement` into a `BytesStart` value.
     ///
@@ -800,36 +766,13 @@ impl SvgElement {
     }
 }
 
-impl TryFrom<&BytesStart<'_>> for SvgElement {
-    type Error = Error;
-
-    /// Build a `SvgElement` from a `BytesStart` value. Failures here are are low-level
-    /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
-    /// semantic about svgdx / svg formats.
-    fn try_from(e: &BytesStart) -> Result<Self> {
-        let elem_name: String =
-            String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
-
-        let attrs: Result<Vec<(String, String)>> = e
-            .attributes()
-            .map(move |a| {
-                let aa = a.map_err(Error::from_err)?;
-                let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let value = aa.unescape_value().map_err(Error::from_err)?.into_owned();
-                Ok((key, value))
-            })
-            .collect();
-        Ok(Self::new(&elem_name, &attrs?))
-    }
-}
-
 impl TryFrom<InputEvent> for SvgElement {
     type Error = Error;
 
     fn try_from(ev: InputEvent) -> Result<Self> {
         match ev.event {
-            EventKind::Start { name, attributes } | EventKind::Empty { name, attributes } => {
-                let mut element = SvgElement::new(&name, &attributes.0);
+            EventKind::Start(el) | EventKind::Empty(el) => {
+                let mut element = SvgElement::new(&el.0, &el.1);
                 // TODO: reinstate this!!
                 // element.original = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
                 element.set_indent(ev.meta.indent);
