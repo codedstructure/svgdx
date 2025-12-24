@@ -25,7 +25,7 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::errors::Result;
-use crate::events::{OutputEvent, OutputList};
+use crate::events::{EventKind, OutputList};
 use crate::geometry::{strp_length, BoundingBox, Length};
 use crate::transform::{process_events, EventGen};
 use crate::types::{attr_split, fstr, split_compound_attr, strp};
@@ -273,15 +273,15 @@ impl EventGen for LinearGradient<'_> {
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() && new_inner.is_empty() {
-            events.push(OutputEvent::Empty(new_el.clone()));
+            events.push(EventKind::Empty(new_el.clone().into()));
         } else {
             let el_name = new_el.name().to_owned();
-            events.push(OutputEvent::Start(new_el.clone()));
+            events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
             for el in new_inner {
                 events.extend(el.generate_events(context)?.0);
             }
-            events.push(OutputEvent::End(el_name));
+            events.push(EventKind::End(el_name));
         }
 
         context.update_element(&new_el);
@@ -367,15 +367,15 @@ impl EventGen for RadialGradient<'_> {
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() && new_inner.is_empty() {
-            events.push(OutputEvent::Empty(new_el.clone()));
+            events.push(EventKind::Empty(new_el.clone().into()));
         } else {
             let el_name = new_el.name().to_owned();
-            events.push(OutputEvent::Start(new_el.clone()));
+            events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
             for el in new_inner {
                 events.extend(el.generate_events(context)?.0);
             }
-            events.push(OutputEvent::End(el_name));
+            events.push(EventKind::End(el_name));
         }
 
         context.update_element(&new_el);

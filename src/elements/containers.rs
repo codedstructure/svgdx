@@ -1,7 +1,7 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::errors::Result;
-use crate::events::{OutputEvent, OutputList};
+use crate::events::{EventKind, OutputList};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 
@@ -68,7 +68,7 @@ impl EventGen for Container<'_> {
                     new_el.set_attr("data-src-line", &self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
-                events.push(OutputEvent::Start(new_el.clone()));
+                events.push(EventKind::Start(new_el.clone().into()));
                 let (evlist, inner_bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
@@ -78,7 +78,7 @@ impl EventGen for Container<'_> {
                     process_events(inner_events, context)?
                 };
                 events.extend(evlist);
-                events.push(OutputEvent::End(self.0.name().to_owned()));
+                events.push(EventKind::End(self.0.name().to_owned()));
 
                 if is_container_element(&new_el) {
                     bbox = inner_bbox;
@@ -137,12 +137,12 @@ impl EventGen for GroupElement<'_> {
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() {
-            events.push(OutputEvent::Empty(new_el.clone()));
+            events.push(EventKind::Empty(new_el.clone().into()));
         } else {
             let el_name = new_el.name().to_owned();
-            events.push(OutputEvent::Start(new_el.clone()));
+            events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
-            events.push(OutputEvent::End(el_name));
+            events.push(EventKind::End(el_name));
         }
 
         context.update_element(&new_el);

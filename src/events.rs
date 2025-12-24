@@ -1,7 +1,8 @@
 // TODO: should probably only have 'RawElement' used in this module.
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
-use crate::types::OrderIndex;
+use crate::style::{Selectable, Stylable};
+use crate::types::{OrderIndex, StyleMap};
 
 use std::io::{BufRead, BufReader, Cursor, Write};
 use std::str::FromStr;
@@ -12,19 +13,19 @@ use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event as Xm
 use quick_xml::{Reader, Writer};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum EventKind {
+pub enum EventKind {
     Empty(RawElement),
     Start(RawElement),
-    End { name: String },
-    Comment { content: String },
-    Text { content: String },
-    CData { content: String },
-    Other { event: XmlEvent<'static> },
+    End(String),
+    Comment(String),
+    Text(String),
+    CData(String),
+    Other(XmlEvent<'static>),
 }
 
 impl EventKind {
     pub fn is_eof(&self) -> bool {
-        matches!(self, EventKind::Other { event } if matches!(event, XmlEvent::Eof))
+        matches!(self, EventKind::Other ( event ) if matches!(event, XmlEvent::Eof))
     }
 }
 
@@ -36,23 +37,21 @@ impl TryFrom<XmlEvent<'_>> for EventKind {
             XmlEvent::Start(bs) => EventKind::Start(bs.try_into()?),
             XmlEvent::End(e) => {
                 let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
-                EventKind::End { name }
+                EventKind::End(name)
             }
             XmlEvent::Text(t) => {
                 let content = String::from_utf8(t.into_inner().to_vec()).expect("utf8");
-                EventKind::Text { content }
+                EventKind::Text(content)
             }
             XmlEvent::CData(c) => {
                 let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
-                EventKind::CData { content }
+                EventKind::CData(content)
             }
             XmlEvent::Comment(c) => {
                 let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
-                EventKind::Comment { content }
+                EventKind::Comment(content)
             }
-            other => EventKind::Other {
-                event: other.into_owned(),
-            },
+            other => EventKind::Other(other.into_owned()),
         };
         Ok(res)
     }
@@ -60,21 +59,21 @@ impl TryFrom<XmlEvent<'_>> for EventKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InputEvent {
-    event: EventKind,
-    meta: EventMeta,
+    pub event: EventKind,
+    pub meta: EventMeta,
 }
 
 impl InputEvent {
     pub fn text_string(&self) -> Option<String> {
         match &self.event {
-            EventKind::Text { content } => Some(content.to_owned()),
+            EventKind::Text(content) => Some(content.to_owned()),
             _ => None,
         }
     }
 
     pub fn cdata_string(&self) -> Option<String> {
         match &self.event {
-            EventKind::CData { content } => Some(content.to_owned()),
+            EventKind::CData(content) => Some(content.to_owned()),
             _ => None,
         }
     }
@@ -96,7 +95,7 @@ impl InputEvent {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct EventMeta {
+pub struct EventMeta {
     index: usize,
     order: OrderIndex,
     line: usize,
@@ -117,7 +116,31 @@ impl Default for EventMeta {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct RawElement(String, Vec<(String, String)>);
+pub struct RawElement(String, Vec<(String, String)>);
+
+impl RawElement {
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+
+    pub fn get_attrs(&self) -> &Vec<(String, String)> {
+        &self.1
+    }
+
+    pub fn get_attrs_mut(&mut self) -> &mut Vec<(String, String)> {
+        &mut self.1
+    }
+}
+
+impl std::fmt::Display for RawElement {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)?;
+        for (k, v) in &self.1 {
+            write!(f, r#" {}="{}""#, k, v)?;
+        }
+        Ok(())
+    }
+}
 
 impl TryFrom<BytesStart<'_>> for RawElement {
     type Error = Error;
@@ -151,74 +174,24 @@ impl TryFrom<XmlEvent<'_>> for InputEvent {
                 XmlEvent::Start(e) => EventKind::Start(e.try_into()?),
                 XmlEvent::End(e) => {
                     let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
-                    EventKind::End { name }
+                    EventKind::End(name)
                 }
                 XmlEvent::Text(t) => {
                     let content = String::from_utf8(t.into_inner().to_vec()).expect("utf8");
-                    EventKind::Text { content }
+                    EventKind::Text(content)
                 }
                 XmlEvent::CData(c) => {
                     let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
-                    EventKind::CData { content }
+                    EventKind::CData(content)
                 }
                 XmlEvent::Comment(c) => {
                     let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
-                    EventKind::Comment { content }
+                    EventKind::Comment(content)
                 }
-                _ => EventKind::Other {
-                    event: value.into_owned(),
-                },
+                _ => EventKind::Other(value.into_owned()),
             },
             meta: EventMeta::default(),
         })
-    }
-}
-
-impl From<OutputEvent> for InputEvent {
-    fn from(value: OutputEvent) -> Self {
-        let meta = EventMeta::default();
-        match value {
-            OutputEvent::Comment(c) => InputEvent {
-                event: EventKind::Comment { content: c },
-                meta,
-            },
-            OutputEvent::Text(t) => InputEvent {
-                event: EventKind::Text { content: t },
-                meta,
-            },
-            OutputEvent::CData(t) => InputEvent {
-                event: EventKind::CData { content: t },
-                meta,
-            },
-            OutputEvent::Start(el) => InputEvent {
-                event: EventKind::Start(el.clone().into()),
-                meta: EventMeta {
-                    line: el.src_line,
-                    indent: el.indent,
-                    order: el.order_index,
-                    index: el.event_range.unwrap_or((0, 0)).0,
-                    alt_idx: el.event_range.map(|(_, alt)| alt),
-                },
-            },
-            OutputEvent::Empty(el) => InputEvent {
-                event: EventKind::Empty(el.clone().into()),
-                meta: EventMeta {
-                    line: el.src_line,
-                    indent: el.indent,
-                    order: el.order_index,
-                    index: el.event_range.unwrap_or((0, 0)).0,
-                    alt_idx: el.event_range.map(|(_, alt)| alt),
-                },
-            },
-            OutputEvent::End(name) => InputEvent {
-                event: EventKind::End { name },
-                meta,
-            },
-            OutputEvent::Other(event) => InputEvent {
-                event: EventKind::Other { event },
-                meta,
-            },
-        }
     }
 }
 
@@ -322,7 +295,7 @@ impl InputList {
             }
 
             match e {
-                EventKind::Text { content } => {
+                EventKind::Text(content) => {
                     let mut t_str = content.clone();
                     if let Some((_, rest)) = t_str.rsplit_once('\n') {
                         t_str = rest.to_string();
@@ -330,7 +303,7 @@ impl InputList {
                     indent = t_str.len() - t_str.trim_end_matches(' ').len();
                     meta.indent = indent;
                     events.push(InputEvent {
-                        event: EventKind::Text { content },
+                        event: EventKind::Text(content),
                         meta,
                     });
                     order.step();
@@ -343,7 +316,7 @@ impl InputList {
                     event_idx_stack.push(index);
                     order.down();
                 }
-                EventKind::End { name } => {
+                EventKind::End(name) => {
                     let start_idx = event_idx_stack.pop();
                     if let Some(start_idx) = start_idx {
                         events[start_idx].meta.alt_idx = Some(index);
@@ -351,7 +324,7 @@ impl InputList {
                     order.up();
                     meta.alt_idx = start_idx;
                     events.push(InputEvent {
-                        event: EventKind::End { name },
+                        event: EventKind::End(name),
                         meta,
                     });
                     order.step();
@@ -465,7 +438,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
         ev_idx += 1;
         let ev = &input_ev.event;
         match ev {
-            EventKind::Start { .. } => {
+            EventKind::Start(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
                     Error::Document(format!(
                         "could not extract element at line {}",
@@ -487,7 +460,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 } // TODO: else warning message
                 tags.push(Tag::Compound(event_element, None));
             }
-            EventKind::Empty { .. } => {
+            EventKind::Empty(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
                     Error::Document(format!(
                         "could not extract element at line {}",
@@ -497,21 +470,21 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                 event_element.set_event_range((input_ev.meta.index, input_ev.meta.index));
                 tags.push(Tag::Leaf(event_element, None));
             }
-            EventKind::Comment { content } => {
+            EventKind::Comment(content) => {
                 tags.push(Tag::Comment(
                     input_ev.meta.order.clone(),
                     content.clone(),
                     None,
                 ));
             }
-            EventKind::Text { content } => {
+            EventKind::Text(content) => {
                 if let Some(t) = tags.last_mut() {
                     t.set_text(content.clone())
                 } else {
                     tags.push(Tag::Text(input_ev.meta.order.clone(), content.clone()));
                 }
             }
-            EventKind::CData { content } => {
+            EventKind::CData(content) => {
                 if let Some(t) = tags.last_mut() {
                     t.set_text(content.clone())
                 } else {
@@ -527,70 +500,41 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
     Ok(tags)
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum OutputEvent {
-    Comment(String),
-    Text(String),
-    CData(String),
-    Start(SvgElement),
-    Empty(SvgElement),
-    End(String),
-    Other(XmlEvent<'static>),
-}
-
 impl From<SvgElement> for RawElement {
     fn from(value: SvgElement) -> Self {
         Self(value.name().to_owned(), value.get_full_attrs().to_vec())
     }
 }
 
-impl From<InputEvent> for OutputEvent {
-    fn from(value: InputEvent) -> Self {
-        match value.event {
-            EventKind::Empty(el) => {
-                let el = SvgElement::new(&el.0, &el.1);
-                OutputEvent::Empty(el)
-            }
-            EventKind::Start(el) => {
-                let el = SvgElement::new(&el.0, &el.1);
-                OutputEvent::Start(el)
-            }
-            EventKind::End { name } => OutputEvent::End(name),
-            EventKind::Text { content } => OutputEvent::Text(content),
-            EventKind::CData { content } => OutputEvent::CData(content),
-            EventKind::Comment { content } => OutputEvent::Comment(content),
-            EventKind::Other { event } => OutputEvent::Other(event),
-        }
-    }
-}
-
 #[derive(Debug, Default, Clone)]
 pub struct OutputList {
-    events: Vec<OutputEvent>,
+    events: Vec<InputEvent>,
 }
 
-impl From<&[OutputEvent]> for OutputList {
-    fn from(value: &[OutputEvent]) -> Self {
+impl From<Vec<EventKind>> for OutputList {
+    fn from(value: Vec<EventKind>) -> Self {
         Self {
-            events: value.to_vec(),
+            events: value
+                .into_iter()
+                .map(|ev| InputEvent {
+                    event: ev,
+                    meta: EventMeta::default(),
+                })
+                .collect(),
         }
     }
 }
 
-impl From<Vec<OutputEvent>> for OutputList {
-    fn from(value: Vec<OutputEvent>) -> Self {
-        Self { events: value }
+impl Extend<EventKind> for OutputList {
+    fn extend<T: IntoIterator<Item = EventKind>>(&mut self, iter: T) {
+        for ev in iter {
+            self.push(ev);
+        }
     }
 }
 
-impl Extend<OutputEvent> for OutputList {
-    fn extend<T: IntoIterator<Item = OutputEvent>>(&mut self, iter: T) {
-        self.events.extend(iter);
-    }
-}
-
-impl<'a> Extend<&'a OutputEvent> for OutputList {
-    fn extend<T: IntoIterator<Item = &'a OutputEvent>>(&mut self, iter: T) {
+impl<'a> Extend<&'a InputEvent> for OutputList {
+    fn extend<T: IntoIterator<Item = &'a InputEvent>>(&mut self, iter: T) {
         self.events.extend(iter.into_iter().cloned());
     }
 }
@@ -598,7 +542,7 @@ impl<'a> Extend<&'a OutputEvent> for OutputList {
 impl From<InputList> for OutputList {
     fn from(value: InputList) -> Self {
         Self {
-            events: value.events.into_iter().map(|ev| ev.into()).collect(),
+            events: value.events,
         }
     }
 }
@@ -617,17 +561,21 @@ impl OutputList {
         self.events.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &OutputEvent> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = &InputEvent> + '_ {
         self.events.iter()
     }
 
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut OutputEvent> + '_ {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut InputEvent> + '_ {
         self.events.iter_mut()
     }
 
-    pub fn push(&mut self, ev: impl Into<OutputEvent>) {
-        let ev = ev.into();
-        self.events.push(ev.clone());
+    pub fn push(&mut self, ev: impl Into<EventKind>) {
+        let input_ev = InputEvent {
+            event: ev.into(),
+            // TODO: if we don't actually use meta, should OutputList just be Vec<EventKind>?
+            meta: EventMeta::default(),
+        };
+        self.events.push(input_ev);
     }
 
     fn blank_line_remover(s: &str) -> String {
@@ -658,13 +606,13 @@ impl OutputList {
         let mut text_buf = String::new();
 
         for event_pos in &self.events {
-            let event = event_pos.clone();
-            if let OutputEvent::Text(ref content) = event {
+            let event = event_pos.event.clone();
+            if let EventKind::Text(ref content) = event {
                 text_buf.push_str(content);
                 continue;
             } else if !text_buf.is_empty() {
                 let content = Self::blank_line_remover(&text_buf);
-                let text_event = OutputEvent::Text(content);
+                let text_event = EventKind::Text(content);
                 text_buf.clear();
                 writer.write_event(text_event).map_err(Error::from_err)?;
             }
@@ -673,14 +621,14 @@ impl OutputList {
         // re-add any trailing text
         if !text_buf.is_empty() {
             let content = Self::blank_line_remover(&text_buf);
-            let text_event = OutputEvent::Text(content);
+            let text_event = EventKind::Text(content);
             writer.write_event(text_event).map_err(Error::from_err)?;
         }
         Ok(())
     }
 
     /// Split an `OutputList` into (up to) 3 parts: before, pivot, after.
-    pub fn partition(&self, name: &str) -> (Self, Option<OutputEvent>, Self) {
+    pub fn partition(&self, name: &str) -> (Self, Option<InputEvent>, Self) {
         let mut before = vec![];
         let mut pivot = None;
         let mut after = vec![];
@@ -688,9 +636,9 @@ impl OutputList {
             if pivot.is_some() {
                 after.push(output_ev);
             } else {
-                match &output_ev {
-                    OutputEvent::Start(e) | OutputEvent::Empty(e) => {
-                        if e.name() == name {
+                match &output_ev.event {
+                    EventKind::Start(e) | EventKind::Empty(e) => {
+                        if e.0 == name {
                             pivot = Some(output_ev);
                         } else {
                             before.push(output_ev);
@@ -706,61 +654,39 @@ impl OutputList {
 }
 
 impl IntoIterator for OutputList {
-    type Item = OutputEvent;
-    type IntoIter = std::vec::IntoIter<OutputEvent>;
+    type Item = EventKind;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.events.into_iter()
+        self.events
+            .iter()
+            .map(|ev| ev.event.clone())
+            .collect::<Vec<_>>()
+            .into_iter()
     }
 }
 
-impl<'a> From<OutputEvent> for XmlEvent<'a> {
-    fn from(svg_ev: OutputEvent) -> XmlEvent<'a> {
+impl<'a> From<EventKind> for XmlEvent<'a> {
+    fn from(svg_ev: EventKind) -> XmlEvent<'a> {
         match svg_ev {
-            OutputEvent::Empty(e) => XmlEvent::Empty(e.into_bytesstart()),
-            OutputEvent::Start(e) => XmlEvent::Start(e.into_bytesstart()),
-            OutputEvent::Comment(t) => XmlEvent::Comment(BytesText::from_escaped(t)),
-            OutputEvent::Text(t) => XmlEvent::Text(BytesText::from_escaped(partial_escape(t))),
-            OutputEvent::CData(t) => XmlEvent::CData(BytesCData::new(t)),
-            OutputEvent::End(name) => XmlEvent::End(BytesEnd::new(name)),
-            OutputEvent::Other(e) => e,
+            EventKind::Empty(e) => XmlEvent::Empty(e.into()),
+            EventKind::Start(e) => XmlEvent::Start(e.into()),
+            EventKind::Comment(content) => XmlEvent::Comment(BytesText::from_escaped(content)),
+            EventKind::Text(content) => {
+                XmlEvent::Text(BytesText::from_escaped(partial_escape(content)))
+            }
+            EventKind::CData(content) => XmlEvent::CData(BytesCData::new(content)),
+            EventKind::End(name) => XmlEvent::End(BytesEnd::new(name)),
+            EventKind::Other(event) => event,
         }
     }
 }
 
-// TODO: switch to RawElement, but ensure style/class handling is preserved.
-impl SvgElement {
-    /// Convert an `SvgElement` into a `BytesStart` value.
-    ///
-    /// Implemented as a method rather than a `From` impl to keep private
-    fn into_bytesstart(self) -> BytesStart<'static> {
-        let mut style_attr = None;
-        let mut bs = BytesStart::new(self.name().to_owned());
-        for (k, v) in self.get_attrs() {
-            if k == "style" {
-                // generally `style` shouldn't exists in attrs, but it will if
-                // malformed, to support round-tripping.
-                style_attr = Some(v.clone());
-            } else {
-                bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
-            }
-        }
-        let s = self.get_styles();
-        let style = match (style_attr, s.to_string().as_str()) {
-            (Some(attr), "") => attr,
-            (None, s) if !s.is_empty() => s.to_string(),
-            (Some(attr), s) if !s.is_empty() => format!("{attr};{s}"),
-            _ => String::new(),
-        };
-        if !style.is_empty() {
-            bs.push_attribute(Attribute::from(("style".as_bytes(), style.as_bytes())));
-        }
-        let c = self.get_classes();
-        if !c.is_empty() {
-            bs.push_attribute(Attribute::from((
-                "class".as_bytes(),
-                c.join(" ").as_bytes(),
-            )));
+impl From<RawElement> for BytesStart<'static> {
+    fn from(e: RawElement) -> Self {
+        let mut bs = BytesStart::new(e.0);
+        for (k, v) in e.1 {
+            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
         }
         bs
     }
@@ -773,8 +699,7 @@ impl TryFrom<InputEvent> for SvgElement {
         match ev.event {
             EventKind::Start(el) | EventKind::Empty(el) => {
                 let mut element = SvgElement::new(&el.0, &el.1);
-                // TODO: reinstate this!!
-                // element.original = String::from_utf8(e.to_owned().to_vec()).expect("utf8");
+                element.original = el.to_string();
                 element.set_indent(ev.meta.indent);
                 element.set_src_line(ev.meta.line);
                 element.set_order_index(&ev.meta.order);
@@ -785,6 +710,58 @@ impl TryFrom<InputEvent> for SvgElement {
                 ev.event
             ))),
         }
+    }
+}
+
+// TODO: need mut and non-mut versions of this
+pub struct EventStyleWrapper<'a> {
+    raw: &'a mut RawElement,
+}
+
+impl<'a> EventStyleWrapper<'a> {
+    pub fn from_event(event: &'a mut EventKind) -> Option<Self> {
+        match event {
+            EventKind::Start(raw) | EventKind::Empty(raw) => Some(Self { raw }),
+            _ => None,
+        }
+    }
+}
+
+impl Stylable for EventStyleWrapper<'_> {
+    fn apply_styles(&mut self, styles: &StyleMap) {
+        if styles.is_empty() {
+            return;
+        }
+        let mut styles = styles.to_string();
+        for (key, value) in self.raw.get_attrs_mut().iter_mut() {
+            if key == "style" {
+                styles = format!("{}; {}", value, styles);
+                break;
+            }
+        }
+
+        if !styles.is_empty() {
+            self.raw.get_attrs_mut().push(("style".to_string(), styles));
+        }
+    }
+}
+
+impl Selectable for EventStyleWrapper<'_> {
+    fn name(&self) -> &str {
+        self.raw.name()
+    }
+
+    fn get_classes(&self) -> Vec<String> {
+        self.raw
+            .get_attrs()
+            .iter()
+            .find(|(k, _)| k == "class")
+            .map(|(_, v)| {
+                v.split_whitespace()
+                    .map(|s| s.to_string())
+                    .collect::<Vec<String>>()
+            })
+            .unwrap_or_default()
     }
 }
 
@@ -845,8 +822,8 @@ mod tests {
         let (before, pivot, after) = output_list.partition("rect");
         assert!(pivot.is_some());
         assert_eq!(
-            pivot.unwrap(),
-            OutputEvent::Empty(SvgElement::new("rect", &[]))
+            pivot.unwrap().event,
+            EventKind::Empty(RawElement("rect".into(), vec![])),
         );
 
         let mut cursor = Cursor::new(Vec::new());
@@ -869,8 +846,8 @@ mod tests {
         let (before, pivot, after) = output_list.partition("circle");
         assert!(pivot.is_some());
         assert_eq!(
-            pivot.unwrap(),
-            OutputEvent::Empty(SvgElement::new("circle", &[]))
+            pivot.unwrap().event,
+            EventKind::Empty(RawElement("circle".into(), vec![]))
         );
 
         let mut cursor = Cursor::new(Vec::new());
@@ -893,8 +870,8 @@ mod tests {
         let (before, pivot, after) = output_list.partition("ellipse");
         assert!(pivot.is_some());
         assert_eq!(
-            pivot.unwrap(),
-            OutputEvent::Empty(SvgElement::new("ellipse", &[]))
+            pivot.unwrap().event,
+            EventKind::Empty(RawElement("ellipse".into(), vec![]))
         );
 
         let mut cursor = Cursor::new(Vec::new());
