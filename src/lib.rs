@@ -43,9 +43,9 @@ use tempfile::NamedTempFile;
 pub mod cli;
 mod constants;
 mod context;
+mod document;
 mod elements;
 mod errors;
-mod events;
 mod expr;
 mod geometry;
 #[cfg(feature = "server")]

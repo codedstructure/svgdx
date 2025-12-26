@@ -1,6 +1,6 @@
+use crate::document::InputEvent;
 use crate::elements::{is_layout_element, SvgElement};
 use crate::errors::{Error, Result};
-use crate::events::InputEvent;
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size};
 use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex, StyleMap};

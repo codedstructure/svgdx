@@ -1,7 +1,7 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
+use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
-use crate::events::{EventKind, OutputList};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 

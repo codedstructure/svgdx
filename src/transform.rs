@@ -1,7 +1,8 @@
 use crate::context::TransformerContext;
+use crate::document::tag::{tagify_events, Tag};
+use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList};
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
-use crate::events::{tagify_events, EventKind, EventStyleWrapper, InputList, OutputList, Tag};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};

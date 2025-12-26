@@ -4,9 +4,9 @@ use super::{
     RadialGradient, ReuseElement, SpecsElement, VarElement,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
+use crate::document::{EventKind, InputList, OutputList};
 use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
 use crate::errors::{Error, Result};
-use crate::events::{EventKind, InputList, OutputList};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
