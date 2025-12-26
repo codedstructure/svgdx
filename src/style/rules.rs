@@ -549,24 +549,24 @@ impl PatternStyles {
         let mut lines = String::with_capacity(256);
         if let PatternType::Horizontal | PatternType::Grid = pattern_type {
             lines.push_str(&format!(
-                r#"<line x1="0" y1="0" x2="{spacing}" y2="0" style="stroke-width: {sw}; stroke: {stroke}"/>"#
+                r#"<line x1="0" y1="0" x2="{spacing}" y2="0" style="stroke-width: {sw}; stroke: {stroke};"/>"#
             ));
         }
         if let PatternType::Vertical | PatternType::Grid = pattern_type {
             lines.push_str(&format!(
-                r#"<line x1="0" y1="0" x2="0" y2="{spacing}" style="stroke-width: {sw}; stroke: {stroke}"/>"#
+                r#"<line x1="0" y1="0" x2="0" y2="{spacing}" style="stroke-width: {sw}; stroke: {stroke};"/>"#
             ));
         }
         if let PatternType::Stipple = pattern_type {
             let gs = fstr(spacing as f32 / 2.);
             let r = fstr((spacing as f32).sqrt() / 5.);
             lines.push_str(&format!(
-                r#"<circle cx="{gs}" cy="{gs}" r="{r}" style="stroke: none; fill: {stroke}"/>"#
+                r#"<circle cx="{gs}" cy="{gs}" r="{r}" style="stroke: none; fill: {stroke};"/>"#
             ));
         }
         format!(
             r#"<pattern id="{ptn_id}" x="0" y="0" width="{spacing}" height="{spacing}"{rotate} patternUnits="userSpaceOnUse" >
-    <rect width="100%" height="100%" style="stroke: none; fill: none"/>
+    <rect width="100%" height="100%" style="stroke: none; fill: none;"/>
     {lines}
     </pattern>"#,
         )

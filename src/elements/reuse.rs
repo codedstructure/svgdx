@@ -1,7 +1,7 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
+use crate::document::{EventKind, InputEvent, InputList, OutputList};
 use crate::errors::{Error, Result};
-use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 use crate::types::{fstr, strp, ElRef};
@@ -122,14 +122,20 @@ impl EventGen for ReuseElement<'_> {
             let mut new_events = InputList::new();
             let tag_name = instance_element.name().to_owned();
             let inner_events = instance_element.inner_events(context);
-            let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
+            let mut start_ev = InputEvent {
+                event: EventKind::Start(instance_element.into()),
+                meta: Default::default(),
+            };
             start_ev.set_span(start, end);
             new_events.push(start_ev);
             if let Some(inner_events) = inner_events {
                 // need to clone as we may be reusing the same element multiple times
                 new_events.extend(&inner_events);
             }
-            let mut end_ev = InputEvent::from(OutputEvent::End(tag_name));
+            let mut end_ev = InputEvent {
+                event: EventKind::End(tag_name),
+                meta: Default::default(),
+            };
             end_ev.set_span(end, start); // note param order for End event
             new_events.push(end_ev);
             new_events.rebase_index(reuse_element.order_index);
