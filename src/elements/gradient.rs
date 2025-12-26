@@ -192,8 +192,9 @@ impl EventGen for LinearGradient<'_> {
             .transpose()?;
 
         match (origin, endpoint, length, dir) {
-            (Some(_), Some(_), None, None) | (None, None, None, None) => {
-                // no-op; either have all coords or nothing
+            (_, Some(_), None, None) | (Some(_), None, None, None) | (None, None, None, None) => {
+                // no-op; one or zero coord pairs with no further constraints,
+                // leave to SVG's defaults.
             }
             (Some(_), None, maybe_len, maybe_dir)
             | (None, Some(_), maybe_len, maybe_dir)

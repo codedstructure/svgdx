@@ -2,6 +2,38 @@ use assertables::assert_contains;
 use svgdx::transform_str_default;
 
 #[test]
+fn test_gradient_noop() {
+    let input = r#"
+<linearGradient id="g" x2="1" y2="0.2">
+  <stop stop-color="azure" offset="0.2"/>
+  <stop stop-color="silver" offset="0.4"/>
+</linearGradient>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, input.trim());
+}
+
+#[test]
+fn test_gradient_expand() {
+    let input = r#"
+<linearGradient id="g" xy2="1 0.2">
+  <stop stop-color="azure" offset="0.2"/>
+  <stop stop-color="silver" offset="0.4"/>
+</linearGradient>"#;
+    let expected = r#"<linearGradient id="g" x2="1" y2="0.2">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"
+<linearGradient id="g" xy1="0.5">
+  <stop stop-color="azure" offset="0.2"/>
+  <stop stop-color="silver" offset="0.4"/>
+</linearGradient>"#;
+    let expected = r#"<linearGradient id="g" x1="0.5" y1="0.5">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
 fn test_gradient_empty() {
     let input = r#"<linearGradient id="grad"/>"#;
     let expected = r#"<linearGradient id="grad"/>"#;
