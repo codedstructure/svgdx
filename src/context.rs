@@ -2,7 +2,7 @@ use crate::document::InputEvent;
 use crate::elements::{is_layout_element, SvgElement};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
-use crate::geometry::{BoundingBox, Size};
+use crate::geometry::{BoundingBox, Size, TransformAttr};
 use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex, StyleMap};
 use crate::TransformConfig;
 
@@ -87,6 +87,7 @@ impl From<&SvgElement> for ElementMatch {
 struct Scope {
     vars: HashMap<String, String>,
     defaults: Vec<(ElementMatch, SvgElement)>,
+    transform: Option<TransformAttr>,
 }
 
 impl Scope {
@@ -95,7 +96,12 @@ impl Scope {
         Self {
             vars,
             defaults: Vec::new(),
+            transform: None,
         }
+    }
+
+    pub fn set_transform(&mut self, transform: TransformAttr) {
+        self.transform = Some(transform);
     }
 }
 
@@ -149,8 +155,7 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
-    #[allow(unused_variables)]
-    fn set_current_element(&mut self, el: &SvgElement) {}
+    fn set_current_element(&mut self, _el: &SvgElement) {}
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
@@ -253,6 +258,19 @@ impl ElementMap for TransformerContext {
             if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);
+            }
+        }
+
+        // determine how many levels up we need to go to find common ancestor. OrderIndex is already
+        // a path from root to element, so we can use that and see where they diverge.
+        // TODO: this (probably) assumes that current is 'untransformed' relative to target;
+        // may need to apply inverse transforms on current heading up to common ancestor, then
+        // apply target transforms from there down to target?
+        if let Some(ref mut bbox) = &mut el_bbox {
+            let common_prefix = self.current_index.common_prefix(&target_el.order_index);
+            // apply any transforms beyond common ancestor
+            for xfrm in target_el.xfrm_list.iter().skip(common_prefix.depth()) {
+                *bbox = xfrm.apply(bbox);
             }
         }
 
@@ -447,7 +465,11 @@ impl TransformerContext {
     }
 
     pub fn push_element(&mut self, el: &SvgElement) {
-        let scope = Scope::from_element(el);
+        let mut scope = Scope::from_element(el);
+        if let Some(xfrm_attr) = el.get_attr("transform") {
+            let xfrm: TransformAttr = xfrm_attr.parse().unwrap_or_default();
+            scope.set_transform(xfrm);
+        }
         self.scope_stack.push(scope);
     }
 
@@ -481,6 +503,16 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
+            let mut el = el.clone();
+            // take copy of scope_stack.transform and copy to element
+            let mut xfrm_list = Vec::new();
+            for scope in self.scope_stack.iter() {
+                // must have one entry per scope level to match OrderIndex depth;
+                // used in get_element_bbox to determine which transforms to apply.
+                xfrm_list.push(scope.transform.clone().unwrap_or_default());
+            }
+
+            el.xfrm_list = xfrm_list;
             let id = eval_attr(id, self).unwrap_or(id.to_string());
             if self.elem_map.insert(id.clone(), el.clone()).is_none() {
                 self.original_map.insert(id, el.clone());

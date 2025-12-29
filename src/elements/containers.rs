@@ -73,9 +73,12 @@ impl EventGen for Container<'_> {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
+                    context.push_element(self.0);
                     let mut inner_events = inner_events.clone();
                     inner_events.rebase_under(new_el.order_index.clone());
-                    process_events(inner_events, context)?
+                    let res = process_events(inner_events, context);
+                    context.pop_element();
+                    res?
                 };
                 events.extend(evlist);
                 events.push(EventKind::End(self.0.name().to_owned()));

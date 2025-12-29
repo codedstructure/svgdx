@@ -155,6 +155,18 @@ impl OrderIndex {
         // other is shorter and all elements match
         other.0.len() < self.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
     }
+
+    pub fn common_prefix(&self, other: &Self) -> Self {
+        let mut prefix = Vec::new();
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            if a == b {
+                prefix.push(*a);
+            } else {
+                break;
+            }
+        }
+        Self(prefix)
+    }
 }
 
 impl Display for OrderIndex {
