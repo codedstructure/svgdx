@@ -106,11 +106,11 @@ impl Scope {
 }
 
 pub struct TransformerContext {
-    /// Current state of given element; may be updated as processing continues
-    elem_map: HashMap<String, SvgElement>,
+    /// Map of element `id` to corresponding OrderIndex
+    id_map: HashMap<String, OrderIndex>,
     /// Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    /// Tree of handled elements, used for previous element lookup
+    /// Tree of handled elements by OrderIndex, may be updated during processing
     index_map: BTreeMap<OrderIndex, SvgElement>,
     /// Current order index of the element being processed
     current_index: OrderIndex,
@@ -138,9 +138,9 @@ pub struct TransformerContext {
 impl Default for TransformerContext {
     fn default() -> Self {
         Self {
-            elem_map: HashMap::new(),
             original_map: HashMap::new(),
             index_map: BTreeMap::new(),
+            id_map: HashMap::new(),
             current_index: OrderIndex::new(0),
             scope_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
@@ -155,7 +155,7 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
-    fn set_current_element(&mut self, _el: &SvgElement) {}
+    fn set_current_element(&mut self, _el: &SvgElement);
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
@@ -180,13 +180,23 @@ impl ElementMap for TransformerContext {
     ///
     /// used when determining relative ElRef offsets.
     fn set_current_element(&mut self, el: &SvgElement) {
+        // take copy of scope_stack.transform and copy to element
+        let xfrm_list: Vec<_> = self
+            .scope_stack
+            .iter()
+            .map(|scope| scope.transform.clone().unwrap_or_default())
+            .collect();
+
+        let mut el = el.clone();
+        el.xfrm_list = xfrm_list;
+
         self.current_index = el.order_index.clone();
-        self.index_map.insert(el.order_index.clone(), el.clone());
+        self.index_map.insert(el.order_index.clone(), el);
     }
 
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
-            ElRef::Id(id) => self.elem_map.get(id),
+            ElRef::Id(id) => self.id_map.get(id).and_then(|oi| self.index_map.get(oi)),
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
@@ -503,18 +513,12 @@ impl TransformerContext {
 
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
-            let mut el = el.clone();
-            // take copy of scope_stack.transform and copy to element
-            let mut xfrm_list = Vec::new();
-            for scope in self.scope_stack.iter() {
-                // must have one entry per scope level to match OrderIndex depth;
-                // used in get_element_bbox to determine which transforms to apply.
-                xfrm_list.push(scope.transform.clone().unwrap_or_default());
-            }
-
-            el.xfrm_list = xfrm_list;
             let id = eval_attr(id, self).unwrap_or(id.to_string());
-            if self.elem_map.insert(id.clone(), el.clone()).is_none() {
+            if self
+                .id_map
+                .insert(id.clone(), el.order_index.clone())
+                .is_none()
+            {
                 self.original_map.insert(id, el.clone());
             }
         }

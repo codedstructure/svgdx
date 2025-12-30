@@ -1218,6 +1218,8 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
+        fn set_current_element(&mut self, _el: &SvgElement) {}
+
         fn get_element(&self, id: &ElRef) -> Option<&SvgElement> {
             if let ElRef::Id(id) = id {
                 return self.elements.get(id);
