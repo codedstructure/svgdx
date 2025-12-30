@@ -146,7 +146,7 @@ pub fn process_events(
 ) -> Result<(OutputList, Option<BoundingBox>)> {
     let input = input.into();
     if is_real_svg(&input) {
-        if context.get_top_element().is_none() {
+        if context.is_top_level() {
             // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document
             context.real_svg = true;
         }

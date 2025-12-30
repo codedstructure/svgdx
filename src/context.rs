@@ -83,25 +83,18 @@ impl From<&SvgElement> for ElementMatch {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 struct Scope {
     vars: HashMap<String, String>,
     defaults: Vec<(ElementMatch, SvgElement)>,
 }
 
 impl Scope {
-    fn with_vars<K, V>(vars: &[(K, V)]) -> Self
-    where
-        K: AsRef<str>,
-        V: AsRef<str>,
-    {
-        let vars = vars
-            .iter()
-            .map(|(k, v)| (k.as_ref().to_string(), v.as_ref().to_string()))
-            .collect();
+    fn from_element(el: &SvgElement) -> Self {
+        let vars = el.get_attrs().into_iter().collect();
         Self {
             vars,
-            ..Default::default()
+            defaults: Vec::new(),
         }
     }
 }
@@ -111,17 +104,14 @@ pub struct TransformerContext {
     elem_map: HashMap<String, SvgElement>,
     /// Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    /// Stack of elements which have been started but not yet ended
-    ///
-    /// Note empty elements are normally not pushed onto the stack,
-    /// but `<reuse>` elements are an exception during processing of
-    /// the referenced element.
-    element_stack: Vec<SvgElement>,
     /// Tree of handled elements, used for previous element lookup
     index_map: BTreeMap<OrderIndex, SvgElement>,
     /// Current order index of the element being processed
     current_index: OrderIndex,
-    /// Stack of scoped variables etc
+    /// Stack of scopes (nested elements which have been started but not yet ended)
+    ///
+    /// Note empty elements are normally not pushed onto the stack, but `<reuse>`
+    /// elements are an exception during processing of the referenced element.
     scope_stack: Vec<Scope>,
     /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
@@ -144,7 +134,6 @@ impl Default for TransformerContext {
         Self {
             elem_map: HashMap::new(),
             original_map: HashMap::new(),
-            element_stack: Vec::new(),
             index_map: BTreeMap::new(),
             current_index: OrderIndex::new(0),
             scope_stack: Vec::new(),
@@ -349,7 +338,8 @@ impl TransformerContext {
 
     fn ensure_scope(&mut self) -> &mut Scope {
         if self.scope_stack.is_empty() {
-            let scope = Scope::default();
+            // if there's no outer '<svg>' or similar, create a dummy top-level scope
+            let scope = Scope::from_element(&SvgElement::new("top-level", &[]));
             self.scope_stack.push(scope);
         }
 
@@ -457,15 +447,16 @@ impl TransformerContext {
     }
 
     pub fn push_element(&mut self, el: &SvgElement) {
-        let attrs = el.get_attrs();
-        self.element_stack.push(el.clone());
-        let scope = Scope::with_vars(&attrs);
+        let scope = Scope::from_element(el);
         self.scope_stack.push(scope);
     }
 
-    pub fn pop_element(&mut self) -> Option<SvgElement> {
+    pub fn pop_element(&mut self) {
         self.scope_stack.pop();
-        self.element_stack.pop()
+    }
+
+    pub fn is_top_level(&self) -> bool {
+        self.scope_stack.is_empty()
     }
 
     pub fn inc_depth(&mut self) -> Result<()> {
@@ -486,10 +477,6 @@ impl TransformerContext {
             return Err(Error::InternalLogic("dec_depth underflow".into()));
         }
         Ok(())
-    }
-
-    pub fn get_top_element(&self) -> Option<SvgElement> {
-        self.element_stack.last().cloned()
     }
 
     pub fn update_element(&mut self, el: &SvgElement) {
