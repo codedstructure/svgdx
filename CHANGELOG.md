@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: `dx` and `dy` attributes are respected with relpos positioning;
   previously `dxy` worked but not separate `dx` or `dy` attributes.
 
+- Fixed: stopped `d-thin` / `d-thick` and similar classes applying to text,
+  which was causing inadvertent text outlining. (Use `d-text-ol[-thin]` etc
+  to invoke text outlining correctly.)
+
 ## [0.25.0 - 2025-11-22]
 
 - Added: support for 'repeat' commands in path element data, extending the

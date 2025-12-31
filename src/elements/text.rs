@@ -224,6 +224,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         "d-dot",
         "d-dash",
         "d-dot-dash",
+        "d-thinner",
+        "d-thin",
+        "d-thick",
+        "d-thicker",
     ];
     let text_ignore_class_fns = [
         |c: &str| c.starts_with("d-flow-"),
