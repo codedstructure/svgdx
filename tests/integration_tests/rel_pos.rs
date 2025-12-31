@@ -207,6 +207,14 @@ fn test_rel_dx_dy() {
     let output = transform_str_default(rel_h_input).unwrap();
     assert_contains!(output, expected_rect);
 
+    let rel_input = r#"
+<rect xy="10" wh="20" />
+<rect id="z" xy="^|h 5" dy="-1" wh="20"/>
+"#;
+    let expected_rect = r#"<rect id="z" x="35" y="9" width="20" height="20"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected_rect);
+
     let rel_input = r##"
 <rect xy="10 20" wh="20 60" id="abc"/>
 <rect xy="98 99" wh="123 321" />

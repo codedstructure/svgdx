@@ -190,10 +190,14 @@ impl SvgElement {
             self.set_attr("d", &expand_relspec(d, ctx));
         }
 
+        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        // Need this even if dirspec used, as may have dxy
+        expand_compound_pos(self);
+
         let mut force_origin = false;
-        // Special-case xy with relpos, e.g. xy="#elem|h 2" must be
-        // resolved before expand_compound_pos().
+        // Special-case xy with relpos, e.g. xy="#elem|h 2" and xy-loc
         if let Some(relpos) = self.extract_relpos() {
+            // xy won't have been expanded in the relpos case
             if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
                 if let Some(bb) = self.content_bbox {
                     pos.translate(-bb.x1, -bb.y1);
@@ -209,9 +213,6 @@ impl SvgElement {
             // corresponding locspec point (e.g. y2 => @b)
             force_origin = true;
         }
-        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        // Need this even if xy-loc/dirspec used, as may have dxy
-        expand_compound_pos(self);
         eval_pos_attributes(self, ctx, force_origin)?;
 
         let mut p = Position::try_from(self as &SvgElement)?;
@@ -678,6 +679,12 @@ impl SvgElement {
             };
 
             let mut pos = Position::new(self.name());
+
+            // copy any dx/dy attrs from original element to Position
+            // assumes any 'dxy' compound attr has already been split
+            pos.dx = self.get_attr("dx").and_then(|v| strp(v).ok());
+            pos.dy = self.get_attr("dy").and_then(|v| strp(v).ok());
+
             if self.name() == "use" {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
@@ -979,12 +986,17 @@ fn expand_compound_size(el: &mut SvgElement) {
     }
 }
 
+/// switch from x+y to another set of position attributes based on xy-loc
+/// e.g. xy="#o@b 2 3" + xy-loc="t" -> cx="#o@b 2", y1="#o@b 3"
 fn expand_pos_from_loc(el: &mut SvgElement, xy_loc: &str) -> Result<()> {
-    let xy = el
-        .pop_attr("xy")
-        .ok_or_else(|| Error::MissingAttr("xy".into()))?;
+    let x = el
+        .pop_attr("x")
+        .ok_or_else(|| Error::MissingAttr("x".into()))?;
+    let y = el
+        .pop_attr("y")
+        .ok_or_else(|| Error::MissingAttr("y".into()))?;
     let xy_ls = LocSpec::from_str(xy_loc)?;
-    let (x, y) = split_compound_attr(&xy);
+
     use LocSpec::*;
     let (x_attr, y_attr) = match xy_ls {
         Top => ("cx", "y1"),
@@ -1010,12 +1022,16 @@ fn expand_pos_from_loc(el: &mut SvgElement, xy_loc: &str) -> Result<()> {
 // xy="#o 2" -> x="#o 2", y="#o 2"
 // xy="#o 2 4" -> x="#o 2", y="#o 4"
 fn expand_compound_pos(el: &mut SvgElement) {
-    // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
-    // before this point as xy is not considered a compound attribute in that case.
     if let Some(xy) = el.pop_attr("xy") {
-        let (x, y) = split_compound_attr(&xy);
-        el.set_default_attr("x", &x);
-        el.set_default_attr("y", &y);
+        // NOTE: relative positioning (e.g. `xy="#abc|h"`) is not compound
+        if xy.contains(RELPOS_SEP) {
+            // relpos -> re-add attribute
+            el.set_attr("xy", &xy);
+        } else {
+            let (x, y) = split_compound_attr(&xy);
+            el.set_default_attr("x", &x);
+            el.set_default_attr("y", &y);
+        }
     }
     if let Some(cxy) = el.pop_attr("cxy") {
         let (cx, cy) = split_compound_attr(&cxy);
@@ -1164,6 +1180,18 @@ mod tests {
         assert_eq!(result.unwrap(), "50");
         let result = pos_attr_helper(&element, "@c", &bbox, ScalarSpec::Miny, false);
         assert_eq!(result.unwrap(), "50");
+    }
+
+    #[test]
+    fn test_expand_pos_from_loc() {
+        let mut element = SvgElement::new("text", &[("xy".into(), "#abc@b 2 3".into())]);
+        expand_compound_pos(&mut element);
+        assert_eq!(element.get_attr("x").unwrap(), "#abc@b 2");
+        assert_eq!(element.get_attr("y").unwrap(), "#abc@b 3");
+        expand_pos_from_loc(&mut element, "t").unwrap();
+        assert_eq!(element.get_attrs().len(), 2);
+        assert_eq!(element.get_attr("cx").unwrap(), "#abc@b 2");
+        assert_eq!(element.get_attr("y1").unwrap(), "#abc@b 3");
     }
 
     #[test]

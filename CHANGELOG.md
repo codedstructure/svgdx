@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<loop>` element, and `idx-var` becomes `idx` for the `<for>` element. The
   older names may be removed in a future version.
 
+- Added: allow separate `x` and `y` attributes (rather than requiring `xy`
+  when specifying anchor point using `xy-loc`.
+
+- Fixed: `dx` and `dy` attributes are respected with relpos positioning;
+  previously `dxy` worked but not separate `dx` or `dy` attributes.
+
 ## [0.25.0 - 2025-11-22]
 
 - Added: support for 'repeat' commands in path element data, extending the
