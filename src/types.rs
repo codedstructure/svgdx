@@ -167,6 +167,15 @@ impl OrderIndex {
         }
         Self(prefix)
     }
+
+    // Given {1.2.2.4.5}, return [{1}, {1.2}, {1.2.2}, {1.2.2.4}]
+    pub fn ancestors(&self) -> Vec<Self> {
+        let mut ancestors = Vec::new();
+        for i in 1..self.0.len() {
+            ancestors.push(Self(self.0[..i].to_vec()));
+        }
+        ancestors
+    }
 }
 
 impl Display for OrderIndex {

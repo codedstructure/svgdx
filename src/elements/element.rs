@@ -129,8 +129,6 @@ pub struct SvgElement {
     pub src_line: usize,
     pub event_range: Option<(usize, usize)>,
     pub content_bbox: Option<BoundingBox>,
-    // TODO: optimize xfrm_list storage?
-    pub xfrm_list: Vec<TransformAttr>,
 }
 
 impl Display for SvgElement {
@@ -203,7 +201,6 @@ impl SvgElement {
             src_line: 0,
             event_range: None,
             content_bbox: None,
-            xfrm_list: Vec::new(),
         }
     }
 

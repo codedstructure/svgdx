@@ -154,11 +154,28 @@ pub fn is_layout_element(el: &SvgElement) -> bool {
 
 // Elements wh
 impl SvgElement {
-    pub(crate) fn extract_relpos(&mut self) -> Option<String> {
+    fn extract_relpos(&mut self) -> Option<String> {
         if self.get_attr("xy").unwrap_or_default().contains(RELPOS_SEP) {
             return Some(self.pop_attr("xy").unwrap().to_string());
         }
         None
+    }
+
+    pub fn has_pos_attrs(&self) -> bool {
+        for key in [
+            "x", "y", "cx", "cy", "x1", "y1", "x2", "y2", "xy", "cxy", "xy1", "xy2", "dxy", "dx",
+            "dy",
+        ] {
+            if self.has_attr(key) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// is this element positioned (only) by a transform attr?
+    pub fn pos_by_transform(&self) -> bool {
+        self.name() == "g"
     }
 
     pub fn resolve_position(&mut self, ctx: &mut impl ContextView) -> Result<()> {

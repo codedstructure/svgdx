@@ -87,7 +87,6 @@ impl From<&SvgElement> for ElementMatch {
 struct Scope {
     vars: HashMap<String, String>,
     defaults: Vec<(ElementMatch, SvgElement)>,
-    transform: Option<TransformAttr>,
 }
 
 impl Scope {
@@ -96,12 +95,7 @@ impl Scope {
         Self {
             vars,
             defaults: Vec::new(),
-            transform: None,
         }
-    }
-
-    pub fn set_transform(&mut self, transform: TransformAttr) {
-        self.transform = Some(transform);
     }
 }
 
@@ -180,18 +174,8 @@ impl ElementMap for TransformerContext {
     ///
     /// used when determining relative ElRef offsets.
     fn set_current_element(&mut self, el: &SvgElement) {
-        // take copy of scope_stack.transform and copy to element
-        let xfrm_list: Vec<_> = self
-            .scope_stack
-            .iter()
-            .map(|scope| scope.transform.clone().unwrap_or_default())
-            .collect();
-
-        let mut el = el.clone();
-        el.xfrm_list = xfrm_list;
-
         self.current_index = el.order_index.clone();
-        self.index_map.insert(el.order_index.clone(), el);
+        self.index_map.insert(el.order_index.clone(), el.clone());
     }
 
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
@@ -278,9 +262,29 @@ impl ElementMap for TransformerContext {
         // apply target transforms from there down to target?
         if let Some(ref mut bbox) = &mut el_bbox {
             let common_prefix = self.current_index.common_prefix(&target_el.order_index);
+            // examine each element from common parent down to target
             // apply any transforms beyond common ancestor
-            for xfrm in target_el.xfrm_list.iter().skip(common_prefix.depth()) {
-                *bbox = xfrm.apply(bbox);
+            for oi in target_el
+                .order_index
+                .ancestors()
+                .iter()
+                .skip(common_prefix.depth())
+            {
+                if let Some(el) = self.index_map.get(oi) {
+                    // any positional attrs on a group imply it hasn't yet been
+                    // processed into a transform yet.
+                    if el.pos_by_transform() && el.has_pos_attrs() {
+                        // hasn't yet been expanded -> reference error.
+                        return Err(Error::MissingBBox(format!(
+                            "Element at {} has unexpanded xy attribute",
+                            oi
+                        )));
+                    }
+                    if let Some(xfrm_attr) = el.get_attr("transform") {
+                        let xfrm: TransformAttr = xfrm_attr.parse().unwrap_or_default();
+                        *bbox = xfrm.apply(bbox);
+                    }
+                }
             }
         }
 
@@ -475,11 +479,7 @@ impl TransformerContext {
     }
 
     pub fn push_element(&mut self, el: &SvgElement) {
-        let mut scope = Scope::from_element(el);
-        if let Some(xfrm_attr) = el.get_attr("transform") {
-            let xfrm: TransformAttr = xfrm_attr.parse().unwrap_or_default();
-            scope.set_transform(xfrm);
-        }
+        let scope = Scope::from_element(el);
         self.scope_stack.push(scope);
     }
 
