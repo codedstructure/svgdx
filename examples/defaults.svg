@@ -23,28 +23,28 @@
   <rect id="box" width="50" height="30"/>
   <text x="49" y="1" class="d-text d-text-top d-text-right">NAT</text>
   <rect id="wan" x="-10" y="12.5" width="20" height="5" rx="2" class="ip d-fill-gold d-thin"/>
-  <text x="0" y="15" class="d-text ip d-fill-gold d-text-monospace d-text-small d-thin">10.1.2.3</text>
+  <text x="0" y="15" class="d-text ip d-fill-gold d-text-monospace d-text-small">10.1.2.3</text>
   <rect id="lan" x="40" y="12.5" width="20" height="5" rx="2" class="ip d-fill-green d-thin"/>
-  <text x="50" y="15" class="d-text ip d-fill-green d-text-monospace d-text-small d-thin">192.168.1.2</text>
+  <text x="50" y="15" class="d-text ip d-fill-green d-text-monospace d-text-small">192.168.1.2</text>
   <g>
    <circle id="w1" cx="20" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="20" y="6" class="d-text port d-text-small d-thin d-fill-lightgrey">1</text><line x1="10" y1="15" x2="18" y2="6" class="d-thin"/>
+    <text x="20" y="6" class="d-text port d-text-small d-fill-lightgrey">1</text><line x1="10" y1="15" x2="18" y2="6" class="d-thin"/>
     <circle id="w2" cx="20" cy="12" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="20" y="12" class="d-text port d-text-small d-thin d-fill-lightgrey">2</text><line x1="10" y1="15" x2="18" y2="12" class="d-thin"/>
+    <text x="20" y="12" class="d-text port d-text-small d-fill-lightgrey">2</text><line x1="10" y1="15" x2="18" y2="12" class="d-thin"/>
     <circle id="w3" cx="20" cy="18" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="20" y="18" class="d-text port d-text-small d-thin d-fill-lightgrey">3</text><line x1="10" y1="15" x2="18" y2="18" class="d-thin"/>
+    <text x="20" y="18" class="d-text port d-text-small d-fill-lightgrey">3</text><line x1="10" y1="15" x2="18" y2="18" class="d-thin"/>
     <circle id="w4" cx="20" cy="24" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="20" y="24" class="d-text port d-text-small d-thin d-fill-lightgrey">4</text><line x1="10" y1="15" x2="18" y2="24" class="d-thin"/>
+    <text x="20" y="24" class="d-text port d-text-small d-fill-lightgrey">4</text><line x1="10" y1="15" x2="18" y2="24" class="d-thin"/>
   </g>
   <g>
    <circle id="l1" cx="30" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="30" y="6" class="d-text port d-text-small d-thin d-fill-lightgrey">5</text><line x1="32" y1="6" x2="40" y2="15" class="d-thin"/>
+    <text x="30" y="6" class="d-text port d-text-small d-fill-lightgrey">5</text><line x1="32" y1="6" x2="40" y2="15" class="d-thin"/>
     <circle id="l2" cx="30" cy="12" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="30" y="12" class="d-text port d-text-small d-thin d-fill-lightgrey">6</text><line x1="32" y1="12" x2="40" y2="15" class="d-thin"/>
+    <text x="30" y="12" class="d-text port d-text-small d-fill-lightgrey">6</text><line x1="32" y1="12" x2="40" y2="15" class="d-thin"/>
     <circle id="l3" cx="30" cy="18" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="30" y="18" class="d-text port d-text-small d-thin d-fill-lightgrey">7</text><line x1="32" y1="18" x2="40" y2="15" class="d-thin"/>
+    <text x="30" y="18" class="d-text port d-text-small d-fill-lightgrey">7</text><line x1="32" y1="18" x2="40" y2="15" class="d-thin"/>
     <circle id="l4" cx="30" cy="24" r="2" class="port d-thin d-fill-lightgrey"/>
-    <text x="30" y="24" class="d-text port d-text-small d-thin d-fill-lightgrey">8</text><line x1="32" y1="24" x2="40" y2="15" class="d-thin"/>
+    <text x="30" y="24" class="d-text port d-text-small d-fill-lightgrey">8</text><line x1="32" y1="24" x2="40" y2="15" class="d-thin"/>
   </g>
   <line x1="22" y1="6" x2="28" y2="6" class="d-thin d-dash"/>
   <line x1="22" y1="12" x2="28" y2="12" class="d-thin d-dash"/>

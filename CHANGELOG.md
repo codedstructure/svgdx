@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0 - 2026-01-03]
+
 - Fixed: location references now respect transforms which may have moved
   the elements on the canvas. This particularly applies to `<g>` elements
   (either directly or via `<reuse>`) positioned with `xy` or similar attrs.
