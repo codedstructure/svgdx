@@ -21,6 +21,7 @@ mod point;
 mod position;
 mod rel_pos;
 mod rel_size;
+mod rel_xfrm;
 mod reuse;
 mod root_svg;
 mod rotate;

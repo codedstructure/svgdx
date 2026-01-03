@@ -2,7 +2,7 @@ use crate::document::InputEvent;
 use crate::elements::{is_layout_element, SvgElement};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
-use crate::geometry::{BoundingBox, Size};
+use crate::geometry::{BoundingBox, Size, TransformAttr};
 use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex, StyleMap};
 use crate::TransformConfig;
 
@@ -100,11 +100,11 @@ impl Scope {
 }
 
 pub struct TransformerContext {
-    /// Current state of given element; may be updated as processing continues
-    elem_map: HashMap<String, SvgElement>,
+    /// Map of element `id` to corresponding OrderIndex
+    id_map: HashMap<String, OrderIndex>,
     /// Original state of given element; used for `reuse` elements
     original_map: HashMap<String, SvgElement>,
-    /// Tree of handled elements, used for previous element lookup
+    /// Tree of handled elements by OrderIndex, may be updated during processing
     index_map: BTreeMap<OrderIndex, SvgElement>,
     /// Current order index of the element being processed
     current_index: OrderIndex,
@@ -132,9 +132,9 @@ pub struct TransformerContext {
 impl Default for TransformerContext {
     fn default() -> Self {
         Self {
-            elem_map: HashMap::new(),
             original_map: HashMap::new(),
             index_map: BTreeMap::new(),
+            id_map: HashMap::new(),
             current_index: OrderIndex::new(0),
             scope_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
@@ -149,8 +149,7 @@ impl Default for TransformerContext {
 }
 
 pub trait ElementMap {
-    #[allow(unused_variables)]
-    fn set_current_element(&mut self, el: &SvgElement) {}
+    fn set_current_element(&mut self, _el: &SvgElement);
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement>;
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>>;
     fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>>;
@@ -181,7 +180,7 @@ impl ElementMap for TransformerContext {
 
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
-            ElRef::Id(id) => self.elem_map.get(id),
+            ElRef::Id(id) => self.id_map.get(id).and_then(|oi| self.index_map.get(oi)),
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
@@ -253,6 +252,39 @@ impl ElementMap for TransformerContext {
             if let ("clipPath", Some(clip_bbox)) = (clip_el.name(), self.get_element_bbox(clip_el)?)
             {
                 el_bbox = bbox.intersect(&clip_bbox);
+            }
+        }
+
+        // determine how many levels up we need to go to find common ancestor. OrderIndex is already
+        // a path from root to element, so we can use that and see where they diverge.
+        // TODO: this (probably) assumes that current is 'untransformed' relative to target;
+        // may need to apply inverse transforms on current heading up to common ancestor, then
+        // apply target transforms from there down to target?
+        if let Some(ref mut bbox) = &mut el_bbox {
+            let common_prefix = self.current_index.common_prefix(&target_el.order_index);
+            // examine each element from common parent down to target
+            // apply any transforms beyond common ancestor
+            for oi in target_el
+                .order_index
+                .ancestors()
+                .iter()
+                .skip(common_prefix.depth())
+            {
+                if let Some(el) = self.index_map.get(oi) {
+                    // any positional attrs on a group imply it hasn't yet been
+                    // processed into a transform yet.
+                    if el.pos_by_transform() && el.has_pos_attrs() {
+                        // hasn't yet been expanded -> reference error.
+                        return Err(Error::MissingBBox(format!(
+                            "Element at {} has unexpanded xy attribute",
+                            oi
+                        )));
+                    }
+                    if let Some(xfrm_attr) = el.get_attr("transform") {
+                        let xfrm: TransformAttr = xfrm_attr.parse().unwrap_or_default();
+                        *bbox = xfrm.apply(bbox);
+                    }
+                }
             }
         }
 
@@ -482,7 +514,11 @@ impl TransformerContext {
     pub fn update_element(&mut self, el: &SvgElement) {
         if let Some(id) = el.get_attr("id") {
             let id = eval_attr(id, self).unwrap_or(id.to_string());
-            if self.elem_map.insert(id.clone(), el.clone()).is_none() {
+            if self
+                .id_map
+                .insert(id.clone(), el.order_index.clone())
+                .is_none()
+            {
                 self.original_map.insert(id, el.clone());
             }
         }

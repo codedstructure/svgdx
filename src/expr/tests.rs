@@ -40,6 +40,8 @@ impl TestContext {
 }
 
 impl ElementMap for TestContext {
+    fn set_current_element(&mut self, _el: &SvgElement) {}
+
     fn get_element(&self, _elref: &ElRef) -> Option<&SvgElement> {
         None
     }

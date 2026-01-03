@@ -1,0 +1,96 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="56mm" height="41mm" viewBox="-5 -5 56 41">
+  <style>
+    <![CDATA[
+      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+      .d-none { stroke: none; }
+      .d-fill-grey { fill: grey; }
+      .d-red { stroke: red; }
+      .d-green { stroke: green; }
+      .d-blue { stroke: blue; }
+      .d-goldenrod { stroke: goldenrod; }
+    ]]>
+  </style>
+  <g id="a" class="panel">
+      <rect width="18" height="5"/>
+      <g id="a1" transform="translate(3, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="a2" transform="translate(7, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="a3" transform="translate(11, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="a4" transform="translate(15, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+    </g>
+  <g id="b" transform="translate(28, 0)" class="panel">
+      <rect width="18" height="5"/>
+      <g id="b1" transform="translate(3, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="b2" transform="translate(7, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="b3" transform="translate(11, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="b4" transform="translate(15, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+    </g>
+  <g id="c" transform="translate(0, 20)" class="panel">
+      <rect width="18" height="5"/>
+      <g id="c1" transform="translate(3, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="c2" transform="translate(7, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="c3" transform="translate(11, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+      <g id="c4" transform="translate(15, 2.5)" class="conn">
+      <circle r="1" style="stroke-width: 0.1;"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </g>
+    </g>
+
+  <path d="M 3 2.5
+      C 3 17.5
+        39 17.5
+        39 2.5" style="stroke-width: 1;" class="d-red cable"/>
+  <path d="M 7 2.5
+      C 7 12.5
+        35 12.5
+        35 2.5" style="stroke-width: 1;" class="d-green cable"/>
+  <path d="M 11 2.5
+      C 11 14.5
+        43 14.5
+        43 2.5" style="stroke-width: 1;" class="d-blue cable"/>
+  <path d="M 15 2.5
+      C 15 7.5
+        31 7.5
+        31 2.5" style="stroke-width: 1;" class="d-goldenrod cable"/>
+  <path d="M 3 2.5
+      C 3 15.5
+        11 35.5
+        11 22.5" style="stroke-width: 1;" class="d-red cable"/>
+  <path d="M 11 2.5
+      C 11 22.5
+        3 42.5
+        3 22.5" style="stroke-width: 1;" class="d-blue cable"/>
+</svg>

@@ -73,7 +73,7 @@ impl EventGen for ReuseElement<'_> {
                     instance_element.set_attr("transform", &xfrm);
                 }
                 "xy-loc" | "xy" | "cxy" | "xy1" | "xy2" | "x" | "y" | "cx" | "cy" | "x1" | "y1"
-                | "x2" | "y2" => {
+                | "x2" | "y2" | "dx" | "dy" | "dxy" => {
                     instance_element.set_attr(&attr, &value);
                 }
                 _ => {

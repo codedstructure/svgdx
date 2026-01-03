@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: location references now respect transforms which may have moved
+  the elements on the canvas. This particularly applies to `<g>` elements
+  (either directly or via `<reuse>`) positioned with `xy` or similar attrs.
+  See the [patch-panel.xml](examples/patch-panel.xml) example.
+
 - Added: simple gradient specification. A `stops` attribute can be provided
   to `linearGradient` or `radialGradient` elements, containing semicolon
   separated `offset colour [opacity]` values. The various gradient vector

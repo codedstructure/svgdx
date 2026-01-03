@@ -155,6 +155,27 @@ impl OrderIndex {
         // other is shorter and all elements match
         other.0.len() < self.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
     }
+
+    pub fn common_prefix(&self, other: &Self) -> Self {
+        let mut prefix = Vec::new();
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            if a == b {
+                prefix.push(*a);
+            } else {
+                break;
+            }
+        }
+        Self(prefix)
+    }
+
+    // Given {1.2.2.4.5}, return [{1}, {1.2}, {1.2.2}, {1.2.2.4}]
+    pub fn ancestors(&self) -> Vec<Self> {
+        let mut ancestors = Vec::new();
+        for i in 1..self.0.len() {
+            ancestors.push(Self(self.0[..i].to_vec()));
+        }
+        ancestors
+    }
 }
 
 impl Display for OrderIndex {

@@ -122,7 +122,7 @@ impl FromStr for TransformType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TransformAttr {
     transforms: Vec<TransformType>,
 }
