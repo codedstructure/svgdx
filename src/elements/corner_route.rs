@@ -10,6 +10,9 @@ use crate::{elements::connector::Direction, geometry::BoundingBox};
 struct PathCost {
     cost: u32,
     idx: usize,
+    dir: Direction,
+    from: usize,
+    from_dir: Direction,
 }
 
 impl Ord for PathCost {
@@ -135,15 +138,14 @@ fn get_edges(
     point_set: &[(f32, f32)],
     start_el_bb: BoundingBox,
     end_el_bb: BoundingBox,
-) -> Vec<Vec<usize>> {
-    let mut edge_set = vec![vec![]; point_set.len()];
+) -> Vec<(Vec<usize>, Vec<usize>)> {
+    let mut edge_set = vec![(vec![], vec![]); point_set.len()];
 
     for i in 0..point_set.len() {
         for j in 0..point_set.len() {
             if i == j {
                 continue;
             }
-            let mut connected = false;
 
             // check if not blocked by a wall
             if point_set[i].0 == point_set[j].0
@@ -162,8 +164,10 @@ fn get_edges(
                     point_set[i].0,
                 )
             {
-                connected = true;
+                edge_set[i].1.push(j);
+                edge_set[j].1.push(i);
             }
+
             if point_set[i].1 == point_set[j].1
                 && !aals_blocked_by_bb(
                     start_el_bb,
@@ -180,11 +184,8 @@ fn get_edges(
                     point_set[i].1,
                 )
             {
-                connected = true;
-            }
-            if connected {
-                edge_set[i].push(j);
-                edge_set[j].push(i);
+                edge_set[i].0.push(j);
+                edge_set[j].0.push(i);
             }
         }
     }
@@ -195,7 +196,8 @@ fn get_edges(
 fn add_start_and_end(
     connector: &Connector,
     point_set: &mut Vec<(f32, f32)>,
-    edge_set: &mut Vec<Vec<usize>>,
+    edge_set: &mut Vec<(Vec<usize>, Vec<usize>)>,
+    abs_offsets: (f32, f32),
     start_el_bb: BoundingBox,
     end_el_bb: BoundingBox,
     start_dir: Direction,
@@ -203,47 +205,59 @@ fn add_start_and_end(
 ) -> (usize, usize) {
     let (x1, y1) = connector.start.origin;
     let (x2, y2) = connector.end.origin;
+    let (start_abs_offset, end_abs_offset) = abs_offsets;
+
+    let offset = |dir: Direction, abs_offset: f32| match dir {
+        Direction::Up => -abs_offset,
+        Direction::Down => abs_offset,
+        Direction::Left => -abs_offset,
+        Direction::Right => abs_offset,
+    };
 
     point_set.push((x1, y1)); // start
     point_set.push((x2, y2)); // end
-    edge_set.push(vec![]);
-    edge_set.push(vec![]);
+    edge_set.push((vec![], vec![]));
+    edge_set.push((vec![], vec![]));
 
     let start_ind = edge_set.len() - 2;
     let end_ind = edge_set.len() - 1;
     for i in 0..point_set.len() - 2 {
+        let y1_prime = y1 + offset(start_dir, start_abs_offset);
+        let x1_prime = x1 + offset(start_dir, start_abs_offset);
         if point_set[i].0 == x1
-            && ((point_set[i].1 < y1 && start_dir == Direction::Up)
-                || (point_set[i].1 > y1 && start_dir == Direction::Down))
-            && !aals_blocked_by_bb(end_el_bb, point_set[i].1, y1, false, x1)
+            && ((point_set[i].1 <= y1_prime && start_dir == Direction::Up)
+                || (point_set[i].1 >= y1_prime && start_dir == Direction::Down))
+            && !aals_blocked_by_bb(end_el_bb, point_set[i].1, y1_prime, false, x1)
         {
-            edge_set[i].push(start_ind);
-            edge_set[start_ind].push(i);
+            edge_set[i].1.push(start_ind);
+            edge_set[start_ind].1.push(i);
         }
         if point_set[i].1 == y1
-            && ((point_set[i].0 > x1 && start_dir == Direction::Right)
-                || (point_set[i].0 < x1 && start_dir == Direction::Left))
-            && !aals_blocked_by_bb(end_el_bb, point_set[i].0, x1, true, y1)
+            && ((point_set[i].0 >= x1_prime && start_dir == Direction::Right)
+                || (point_set[i].0 <= x1_prime && start_dir == Direction::Left))
+            && !aals_blocked_by_bb(end_el_bb, point_set[i].0, x1_prime, true, y1)
         {
-            edge_set[i].push(start_ind);
-            edge_set[start_ind].push(i);
+            edge_set[i].0.push(start_ind);
+            edge_set[start_ind].0.push(i);
         }
 
+        let y2_prime = y2 + offset(end_dir, end_abs_offset);
+        let x2_prime = x2 + offset(end_dir, end_abs_offset);
         if point_set[i].0 == x2
-            && ((point_set[i].1 < y2 && end_dir == Direction::Up)
-                || (point_set[i].1 > y2 && end_dir == Direction::Down))
-            && !aals_blocked_by_bb(start_el_bb, point_set[i].1, y2, false, x2)
+            && ((point_set[i].1 <= y2_prime && end_dir == Direction::Up)
+                || (point_set[i].1 >= y2_prime && end_dir == Direction::Down))
+            && !aals_blocked_by_bb(start_el_bb, point_set[i].1, y2_prime, false, x2)
         {
-            edge_set[i].push(end_ind);
-            edge_set[end_ind].push(i);
+            edge_set[i].1.push(end_ind);
+            edge_set[end_ind].1.push(i);
         }
         if point_set[i].1 == y2
-            && ((point_set[i].0 > x2 && end_dir == Direction::Right)
-                || (point_set[i].0 < x2 && end_dir == Direction::Left))
-            && !aals_blocked_by_bb(start_el_bb, point_set[i].0, x2, true, y2)
+            && ((point_set[i].0 >= x2_prime && end_dir == Direction::Right)
+                || (point_set[i].0 <= x2_prime && end_dir == Direction::Left))
+            && !aals_blocked_by_bb(start_el_bb, point_set[i].0, x2_prime, true, y2)
         {
-            edge_set[i].push(end_ind);
-            edge_set[end_ind].push(i);
+            edge_set[i].0.push(end_ind);
+            edge_set[end_ind].0.push(i);
         }
     }
 
@@ -252,40 +266,65 @@ fn add_start_and_end(
 
 fn cost_function(
     point_set: &[(f32, f32)],
-    edge_set: &[Vec<usize>],
+    edge_set: &[(Vec<usize>, Vec<usize>)],
     x_lines: Vec<f32>,
     y_lines: Vec<f32>,
     mid_x: usize,
     mid_y: usize,
     total_bb_size: u32,
-) -> Vec<Vec<u32>> {
+) -> Vec<(Vec<u32>, Vec<u32>)> {
     // edge cost function
 
     // needs to be comparable to or larger than total_bb_size
     let corner_cost = 1 + total_bb_size;
-    let mut edge_costs = vec![vec![]; edge_set.len()];
-    for (i, neighbors) in edge_set.iter().enumerate() {
-        let p1 = point_set[i];
+    let mut edge_costs = vec![(vec![], vec![]); edge_set.len()];
+    for i in 0..edge_set.len() {
+        // x moving edge
+        for j in 0..edge_set[i].0.len() {
+            let ind_1 = i;
+            let ind_2 = edge_set[i].0[j];
 
-        let mid_point_mul_x = if mid_x != usize::MAX && p1.0 == x_lines[mid_x] {
-            0.5
-        } else {
-            1.0
-        };
-        let mid_point_mul_y = if mid_y != usize::MAX && p1.1 == y_lines[mid_y] {
-            0.5
-        } else {
-            1.0
-        };
+            let mid_point_mul_x = if mid_x != usize::MAX && point_set[ind_1].0 == x_lines[mid_x] {
+                0.5
+            } else {
+                1.0
+            };
+            let mid_point_mul_y = if mid_y != usize::MAX && point_set[ind_1].1 == y_lines[mid_y] {
+                0.5
+            } else {
+                1.0
+            };
 
-        let costs_i = &mut edge_costs[i];
-        for &j in neighbors {
-            let p2 = point_set[j];
-            costs_i.push(
-                ((p1.0 - p2.0).abs() * mid_point_mul_y + (p1.1 - p2.1).abs() * mid_point_mul_x)
+            edge_costs[i].0.push(
+                ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
+                    + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x)
                     as u32
                     + corner_cost,
-            );
+            ); // round may cause some problems
+        }
+
+        // y moving edge
+        for j in 0..edge_set[i].1.len() {
+            let ind_1 = i;
+            let ind_2 = edge_set[i].1[j];
+
+            let mid_point_mul_x = if mid_x != usize::MAX && point_set[ind_1].0 == x_lines[mid_x] {
+                0.5
+            } else {
+                1.0
+            };
+            let mid_point_mul_y = if mid_y != usize::MAX && point_set[ind_1].1 == y_lines[mid_y] {
+                0.5
+            } else {
+                1.0
+            };
+
+            edge_costs[i].1.push(
+                ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
+                    + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x)
+                    as u32
+                    + corner_cost,
+            ); // round may cause some problems
         }
     }
 
@@ -294,72 +333,136 @@ fn cost_function(
 
 fn dijkstra_get_dists(
     point_set: &[(f32, f32)],
-    edge_set: &[Vec<usize>],
-    edge_costs: &[Vec<u32>],
+    edge_set: &[(Vec<usize>, Vec<usize>)],
+    edge_costs: &[(Vec<u32>, Vec<u32>)],
     start_ind: usize,
     end_ind: usize,
-) -> Vec<u32> {
+    start_dir: Direction,
+    end_dir: Direction,
+) -> (
+    Vec<(u32, u32)>,
+    Vec<((usize, Direction), (usize, Direction))>,
+) {
     // just needs to be bigger than 5* (corner cost  +  total bounding box size)
     let inf = u32::MAX;
-    let mut dist = vec![inf; point_set.len()];
+    let mut dists = vec![(inf, inf); point_set.len()];
+    let mut prev_point = vec![
+        (
+            (point_set.len() - 1, Direction::Left),
+            (point_set.len() - 1, Direction::Left)
+        );
+        point_set.len()
+    ];
 
     let mut queue: BinaryHeap<PathCost> = BinaryHeap::new();
-    dist[start_ind] = 0;
+    if start_dir == Direction::Left || start_dir == Direction::Right {
+        dists[start_ind].0 = 0;
+    } else {
+        dists[start_ind].1 = 0;
+    }
     queue.push(PathCost {
         cost: 0,
         idx: start_ind,
+        dir: start_dir,
+        from: start_ind,
+        from_dir: start_dir,
     });
+
+    let simplified_end_dir = match end_dir {
+        Direction::Left | Direction::Right => Direction::Left,
+        Direction::Down | Direction::Up => Direction::Down,
+    };
 
     // cant get stuck in a loop as cost for a distance either decreases or queue shrinks
     while let Some(next) = queue.pop() {
-        if next.idx == end_ind {
+        if next.idx == end_ind && simplified_end_dir == next.dir {
+            match next.dir {
+                Direction::Left | Direction::Right => {
+                    prev_point[next.idx].0 = (next.from, next.from_dir)
+                }
+                Direction::Down | Direction::Up => {
+                    prev_point[next.idx].1 = (next.from, next.from_dir)
+                }
+            };
             break;
         }
+        let dist = match next.dir {
+            Direction::Left | Direction::Right => dists[next.idx].0,
+            Direction::Down | Direction::Up => dists[next.idx].1,
+        };
 
         // the node is reached by faster means so already popped
-        if next.cost > dist[next.idx] {
+        if next.cost > dist {
             continue;
         }
 
-        for i in 0..edge_set[next.idx].len() {
-            let edge_cost = edge_costs[next.idx][i];
-            if dist[next.idx] + edge_cost < dist[edge_set[next.idx][i]] {
-                dist[edge_set[next.idx][i]] = dist[next.idx] + edge_cost;
+        match next.dir {
+            Direction::Left | Direction::Right => {
+                prev_point[next.idx].0 = (next.from, next.from_dir)
+            }
+            Direction::Down | Direction::Up => prev_point[next.idx].1 = (next.from, next.from_dir),
+        };
+
+        // x moving edge
+        for i in 0..edge_set[next.idx].0.len() {
+            let mut edge_cost = edge_costs[next.idx].0[i];
+            if next.dir == Direction::Down {
+                edge_cost *= 3;
+            }
+            let other_ind = edge_set[next.idx].0[i];
+            if dist + edge_cost < dists[other_ind].0 {
+                dists[other_ind].0 = dist + edge_cost;
                 queue.push(PathCost {
-                    cost: dist[edge_set[next.idx][i]],
-                    idx: edge_set[next.idx][i],
+                    cost: dists[other_ind].0,
+                    idx: other_ind,
+                    dir: Direction::Left,
+                    from: next.idx,
+                    from_dir: next.dir,
+                });
+            }
+        }
+
+        // y moving edge
+        for i in 0..edge_set[next.idx].1.len() {
+            let mut edge_cost = edge_costs[next.idx].1[i];
+            if next.dir == Direction::Left {
+                edge_cost *= 3;
+            }
+            let other_ind = edge_set[next.idx].1[i];
+            if dist + edge_cost < dists[edge_set[next.idx].1[i]].1 {
+                dists[other_ind].1 = dist + edge_cost;
+                queue.push(PathCost {
+                    cost: dists[other_ind].1,
+                    idx: edge_set[next.idx].1[i],
+                    dir: Direction::Down,
+                    from: next.idx,
+                    from_dir: next.dir,
                 });
             }
         }
     }
+    println!("got dists");
 
-    dist
+    (dists, prev_point)
 }
 
 fn dijkstra_get_points(
-    dist: Vec<u32>,
     point_set: &[(f32, f32)],
-    edge_set: &[Vec<usize>],
-    edge_costs: &[Vec<u32>],
+    prev_point: &[((usize, Direction), (usize, Direction))],
     start_ind: usize,
     end_ind: usize,
+    end_dir: Direction,
 ) -> Vec<(f32, f32)> {
     let mut back_points_inds = vec![end_ind];
     let mut loc = end_ind;
+    let mut dir = end_dir;
     while loc != start_ind {
-        // would get stuck in a loop if no valid solution
-        let mut quit = true;
-        for i in 0..edge_set[loc].len() {
-            if dist[edge_set[loc][i]] + edge_costs[loc][i] == dist[loc] {
-                loc = edge_set[loc][i];
-                back_points_inds.push(loc);
-                quit = false;
-                break;
-            }
-        }
-        if quit {
-            break;
-        }
+        println!("{loc} {:?}", dir);
+        match dir {
+            Direction::Left | Direction::Right => (loc, dir) = prev_point[loc].0,
+            Direction::Down | Direction::Up => (loc, dir) = prev_point[loc].1,
+        };
+        back_points_inds.push(loc);
     }
 
     let mut points = vec![];
@@ -407,6 +510,7 @@ pub fn render_match_corner(
             connector,
             &mut point_set,
             &mut edge_set,
+            (start_abs_offset, end_abs_offset),
             start_el_bb,
             end_el_bb,
             start_dir_some,
@@ -427,9 +531,17 @@ pub fn render_match_corner(
             total_bb_size,
         );
 
-        let dist = dijkstra_get_dists(&point_set, &edge_set, &edge_costs, start_ind, end_ind);
+        let (_, prev_point) = dijkstra_get_dists(
+            &point_set,
+            &edge_set,
+            &edge_costs,
+            start_ind,
+            end_ind,
+            start_dir_some,
+            end_dir_some,
+        );
 
-        points = dijkstra_get_points(dist, &point_set, &edge_set, &edge_costs, start_ind, end_ind);
+        points = dijkstra_get_points(&point_set, &prev_point, start_ind, end_ind, end_dir_some);
     } else {
         points = vec![(x1, y1), (x2, y2)];
     }
