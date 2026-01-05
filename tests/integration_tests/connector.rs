@@ -314,3 +314,15 @@ fn test_elbow_connector() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_connector_into_relpos_group() {
+    let input = r##"
+<g id="a"><rect id="a1" wh="10"/></g>
+<g id="b" xy="#a|h 20" dy="5"><rect id="b1" wh="10" /></g>
+<polyline start="#a1@r" end="#b1@l"/>
+"##;
+    let expected_line = r#"<polyline points="10 5, 20 5, 20 10, 30 10"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
