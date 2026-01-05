@@ -11,7 +11,7 @@ pub fn is_connector(el: &SvgElement) -> bool {
     el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Up,
     Right,
@@ -414,6 +414,8 @@ impl Connector {
                     }
                     if let Some(r) = offset.ratio() {
                         ratio_offset = r;
+                        start_abs_offset = 0.0001;
+                        end_abs_offset = 0.0001;
                     }
                 }
 
