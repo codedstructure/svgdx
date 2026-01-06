@@ -329,11 +329,9 @@ impl Connector {
                 // inside Connector rather than evaluating it early)
                 let midpoint =
                     if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = start_el
-                            .bbox()?
+                        let start_bb = ctx.get_element_bbox(start_el)?
                             .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
-                        let end_bb = end_el
-                            .bbox()?
+                        let end_bb = ctx.get_element_bbox(end_el)?
                             .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
                         let overlap_top = start_bb
                             .scalarspec(ScalarSpec::Miny)
@@ -422,12 +420,12 @@ impl Connector {
                 let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
                 let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
                 if let Some(el) = &self.start_el {
-                    if let Ok(Some(el_bb)) = el.bbox() {
+                    if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
                         start_el_bb = el_bb;
                     }
                 }
                 if let Some(el) = &self.end_el {
-                    if let Ok(Some(el_bb)) = el.bbox() {
+                    if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
                         end_el_bb = el_bb;
                     }
                 }
