@@ -37,14 +37,14 @@ impl PartialOrd for PathCost {
 // this allows the aals to be entirely inside
 fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f32) -> bool {
     if x_axis {
-        if axis_val < bb.y1 || axis_val > bb.y2 {
+        if axis_val <= bb.y1 || axis_val >= bb.y2 {
             return false;
         }
         if (a <= bb.x1) == (b <= bb.x1) && (a >= bb.x2) == (b >= bb.x2) {
             return false;
         }
     } else {
-        if axis_val < bb.x1 || axis_val > bb.x2 {
+        if axis_val <= bb.x1 || axis_val >= bb.x2 {
             return false;
         }
         if (a <= bb.y1) == (b <= bb.y1) && (a >= bb.y2) == (b >= bb.y2) {
