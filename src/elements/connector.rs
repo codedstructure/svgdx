@@ -412,8 +412,8 @@ impl Connector {
                     }
                     if let Some(r) = offset.ratio() {
                         ratio_offset = r;
-                        start_abs_offset = 0.0001;
-                        end_abs_offset = 0.0001;
+                        start_abs_offset = 0.0;
+                        end_abs_offset = 0.0;
                     }
                 }
 

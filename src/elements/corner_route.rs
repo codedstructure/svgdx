@@ -40,14 +40,14 @@ fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f
         if axis_val < bb.y1 || axis_val > bb.y2 {
             return false;
         }
-        if (a < bb.x1) == (b < bb.x1) && (a > bb.x2) == (b > bb.x2) {
+        if (a <= bb.x1) == (b <= bb.x1) && (a >= bb.x2) == (b >= bb.x2) {
             return false;
         }
     } else {
         if axis_val < bb.x1 || axis_val > bb.x2 {
             return false;
         }
-        if (a < bb.y1) == (b < bb.y1) && (a > bb.y2) == (b > bb.y2) {
+        if (a <= bb.y1) == (b <= bb.y1) && (a >= bb.y2) == (b >= bb.y2) {
             return false;
         }
     }
@@ -73,6 +73,7 @@ fn get_lines(
     let mut y_lines = vec![];
     let mut mid_x = usize::MAX;
     let mut mid_y = usize::MAX;
+    println!("abs offsets {:?} {:?}",start_abs_offset, end_abs_offset);
 
     x_lines.push(start_el_bb.x1 - start_abs_offset);
     x_lines.push(start_el_bb.x2 + start_abs_offset);
@@ -233,8 +234,8 @@ fn add_start_and_end(
         let y1_prime = y1 + offset(start_dir, start_abs_offset);
         let x1_prime = x1 + offset(start_dir, start_abs_offset);
         if point_set[i].0 == x1
-            && ((point_set[i].1 < y1 && start_dir == Direction::Up)
-                || (point_set[i].1 > y1 && start_dir == Direction::Down))
+            && ((point_set[i].1 <= y1 && start_dir == Direction::Up)
+                || (point_set[i].1 >= y1 && start_dir == Direction::Down))
             && !aals_blocked_by_bb(end_el_bb, point_set[i].1, y1, false, x1)
         {
             edge_set[i].1.push(start_ind);
@@ -249,8 +250,8 @@ fn add_start_and_end(
             edge_costs[start_ind].1.push(cost);
         }
         if point_set[i].1 == y1
-            && ((point_set[i].0 > x1 && start_dir == Direction::Right)
-                || (point_set[i].0 < x1 && start_dir == Direction::Left))
+            && ((point_set[i].0 >= x1 && start_dir == Direction::Right)
+                || (point_set[i].0 <= x1 && start_dir == Direction::Left))
             && !aals_blocked_by_bb(end_el_bb, point_set[i].0, x1, true, y1)
         {
             edge_set[i].0.push(start_ind);
@@ -268,8 +269,8 @@ fn add_start_and_end(
         let y2_prime = y2 + offset(end_dir, end_abs_offset);
         let x2_prime = x2 + offset(end_dir, end_abs_offset);
         if point_set[i].0 == x2
-            && ((point_set[i].1 < y2 && end_dir == Direction::Up)
-                || (point_set[i].1 > y2 && end_dir == Direction::Down))
+            && ((point_set[i].1 <= y2 && end_dir == Direction::Up)
+                || (point_set[i].1 >= y2 && end_dir == Direction::Down))
             && !aals_blocked_by_bb(start_el_bb, point_set[i].1, y2, false, x2)
         {
             edge_set[i].1.push(end_ind);
@@ -284,8 +285,8 @@ fn add_start_and_end(
             edge_costs[end_ind].1.push(cost);
         }
         if point_set[i].1 == y2
-            && ((point_set[i].0 > x2 && end_dir == Direction::Right)
-                || (point_set[i].0 < x2 && end_dir == Direction::Left))
+            && ((point_set[i].0 >= x2 && end_dir == Direction::Right)
+                || (point_set[i].0 <= x2 && end_dir == Direction::Left))
             && !aals_blocked_by_bb(start_el_bb, point_set[i].0, x2, true, y2)
         {
             edge_set[i].0.push(end_ind);
@@ -300,6 +301,18 @@ fn add_start_and_end(
             edge_costs[end_ind].0.push(cost);
         }
     }
+
+    println!("{:?} {:?}",edge_costs[start_ind], edge_costs[end_ind]);
+    println!("{:?} {:?}",edge_set[start_ind], edge_set[end_ind]);
+    for i in edge_set[start_ind].0.iter() {
+        println!("{} {:?}",*i, point_set[*i]);
+    }
+    for i in edge_set[end_ind].0.iter() {
+        println!("{} {:?}",*i, point_set[*i]);
+    }
+
+    println!("{:?} {:?}",x_lines, y_lines);
+    println!("{:?} {:?}", point_set[start_ind], point_set[end_ind]);
 
     (start_ind, end_ind)
 }
@@ -481,12 +494,6 @@ fn dijkstra_get_dists(
             }
         }
     }
-    println!("got dists");
-
-    for i in 0..dists.len() {
-        println!("{} {:?}",i,point_set[i]);
-        println!("{:?} {:?}",dists[i], prev_point[i]);
-    }
 
     (dists, prev_point)
 }
@@ -506,7 +513,6 @@ fn dijkstra_get_points(
         if loc == start_ind {
             break;
         }
-        println!("{loc} {:?}", dir);
         let new_loc;
         match dir {
             Direction::Left | Direction::Right => (new_loc, dir) = prev_point[loc].0,
@@ -518,10 +524,13 @@ fn dijkstra_get_points(
         loc = new_loc;
         back_points_inds.push(loc);
     }
+    // if no path just do line
+    if back_points_inds.len() == 1{
+        back_points_inds.push(start_ind);
+    }
 
     let mut points = vec![];
     for i in (0..back_points_inds.len()).rev() {
-        println!("{:?}", point_set[back_points_inds[i]]);
         points.push(point_set[back_points_inds[i]]);
     }
     points
@@ -529,7 +538,7 @@ fn dijkstra_get_points(
 
 pub fn render_match_corner(
     connector: &Connector,
-    ratio_offset: f32,
+    mut ratio_offset: f32,
     start_abs_offset: f32,
     end_abs_offset: f32,
     start_el_bb: BoundingBox,
@@ -543,6 +552,9 @@ pub fn render_match_corner(
 
     let points: Vec<(f32, f32)>;
     if let (Some(start_dir_some), Some(end_dir_some)) = (connector.start.dir, connector.end.dir) {
+        // clamp ratio between 0.0 and 1.0
+        ratio_offset = ratio_offset.clamp(0.0, 1.0);
+
         // x_lines have constant x vary over y
         let (x_lines, y_lines, mid_x, mid_y) = get_lines(
             connector,
