@@ -33,6 +33,19 @@ impl PartialOrd for PathCost {
     }
 }
 
+#[derive(Clone, Debug)]
+struct NodeState {
+    ind: usize,
+    dir: Direction,
+}
+
+struct LineStruct {
+    x_lines: Vec<f32>,
+    y_lines: Vec<f32>,
+    mid_x: usize,
+    mid_y: usize,
+}
+
 // checks if there a axis aligned line segment is intersected by a bounding box
 // this allows the aals to be entirely inside
 fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f32) -> bool {
@@ -62,7 +75,7 @@ fn get_lines(
     bbs: (BoundingBox, BoundingBox),
     abs_offset_set: bool,
     dirs: (Direction, Direction),
-) -> (Vec<f32>, Vec<f32>, usize, usize) {
+) -> LineStruct {
     let (x1, y1) = connector.start.origin;
     let (x2, y2) = connector.end.origin;
     let (start_el_bb, end_el_bb) = bbs;
@@ -131,7 +144,12 @@ fn get_lines(
         }
     }
 
-    (x_lines, y_lines, mid_x, mid_y)
+    LineStruct {
+        x_lines,
+        y_lines,
+        mid_x,
+        mid_y,
+    }
 }
 
 fn get_edges(
@@ -193,25 +211,26 @@ fn get_edges(
     edge_set
 }
 
+struct Graph {
+    point_set: Vec<(f32, f32)>,
+    edge_set: Vec<(Vec<usize>, Vec<usize>)>,
+    edge_costs: Vec<(Vec<u32>, Vec<u32>)>,
+}
+
 fn add_start_and_end(
     connector: &Connector,
-    point_set: &mut Vec<(f32, f32)>,
-    edge_set: &mut Vec<(Vec<usize>, Vec<usize>)>,
-    edge_costs: &mut Vec<(Vec<u32>, Vec<u32>)>,
+    graph: &mut Graph,
     abs_offsets: (f32, f32),
-    start_el_bb: BoundingBox,
-    end_el_bb: BoundingBox,
-    start_dir: Direction,
-    end_dir: Direction,
-    x_lines: &Vec<f32>,
-    y_lines: &Vec<f32>,
-    mid_x: usize,
-    mid_y: usize,
+    bbs: (BoundingBox, BoundingBox),
+    dirs: (Direction, Direction),
+    line_struct: &LineStruct,
     corner_cost: u32,
 ) -> (usize, usize) {
     let (x1, y1) = connector.start.origin;
     let (x2, y2) = connector.end.origin;
+    let (start_el_bb, end_el_bb) = bbs;
     let (start_abs_offset, end_abs_offset) = abs_offsets;
+    let (start_dir, end_dir) = dirs;
 
     let offset = |dir: Direction, abs_offset: f32| match dir {
         Direction::Up => -abs_offset,
@@ -220,84 +239,84 @@ fn add_start_and_end(
         Direction::Right => abs_offset,
     };
 
-    point_set.push((x1, y1)); // start
-    point_set.push((x2, y2)); // end
-    edge_set.push((vec![], vec![]));
-    edge_set.push((vec![], vec![]));
-    edge_costs.push((vec![], vec![]));
-    edge_costs.push((vec![], vec![]));
+    graph.point_set.push((x1, y1)); // start
+    graph.point_set.push((x2, y2)); // end
+    graph.edge_set.push((vec![], vec![]));
+    graph.edge_set.push((vec![], vec![]));
+    graph.edge_costs.push((vec![], vec![]));
+    graph.edge_costs.push((vec![], vec![]));
 
-    let start_ind = edge_set.len() - 2;
-    let end_ind = edge_set.len() - 1;
-    for i in 0..point_set.len() - 2 {
+    let start_ind = graph.edge_set.len() - 2;
+    let end_ind = graph.edge_set.len() - 1;
+    for i in 0..graph.point_set.len() - 2 {
         let y1_prime = y1 + offset(start_dir, start_abs_offset);
         let x1_prime = x1 + offset(start_dir, start_abs_offset);
-        if point_set[i].0 == x1
-            && ((point_set[i].1 <= y1 && start_dir == Direction::Up)
-                || (point_set[i].1 >= y1 && start_dir == Direction::Down))
-            && !aals_blocked_by_bb(end_el_bb, point_set[i].1, y1, false, x1)
+        if graph.point_set[i].0 == x1
+            && ((graph.point_set[i].1 <= y1 && start_dir == Direction::Up)
+                || (graph.point_set[i].1 >= y1 && start_dir == Direction::Down))
+            && !aals_blocked_by_bb(end_el_bb, graph.point_set[i].1, y1, false, x1)
         {
-            edge_set[i].1.push(start_ind);
-            edge_set[start_ind].1.push(i);
-            let mut cost = cost_function(point_set, x_lines, y_lines, mid_x, mid_y, corner_cost, i, start_ind);
-            if !((point_set[i].1 <= y1_prime && start_dir == Direction::Up)
-                || (point_set[i].1 >= y1_prime && start_dir == Direction::Down))
+            graph.edge_set[i].1.push(start_ind);
+            graph.edge_set[start_ind].1.push(i);
+            let mut cost = cost_function(&graph.point_set, line_struct, corner_cost, i, start_ind);
+            if !((graph.point_set[i].1 <= y1_prime && start_dir == Direction::Up)
+                || (graph.point_set[i].1 >= y1_prime && start_dir == Direction::Down))
             {
-                cost += start_abs_offset as u32 *2;
+                cost += start_abs_offset as u32 * 2;
             }
-            edge_costs[i].1.push(cost);
-            edge_costs[start_ind].1.push(cost);
+            graph.edge_costs[i].1.push(cost);
+            graph.edge_costs[start_ind].1.push(cost);
         }
-        if point_set[i].1 == y1
-            && ((point_set[i].0 >= x1 && start_dir == Direction::Right)
-                || (point_set[i].0 <= x1 && start_dir == Direction::Left))
-            && !aals_blocked_by_bb(end_el_bb, point_set[i].0, x1, true, y1)
+        if graph.point_set[i].1 == y1
+            && ((graph.point_set[i].0 >= x1 && start_dir == Direction::Right)
+                || (graph.point_set[i].0 <= x1 && start_dir == Direction::Left))
+            && !aals_blocked_by_bb(end_el_bb, graph.point_set[i].0, x1, true, y1)
         {
-            edge_set[i].0.push(start_ind);
-            edge_set[start_ind].0.push(i);
-            let mut cost = cost_function(point_set, x_lines, y_lines, mid_x, mid_y, corner_cost, i, start_ind);
-            if !((point_set[i].0 >= x1_prime && start_dir == Direction::Right)
-                || (point_set[i].0 <= x1_prime && start_dir == Direction::Left))
+            graph.edge_set[i].0.push(start_ind);
+            graph.edge_set[start_ind].0.push(i);
+            let mut cost = cost_function(&graph.point_set, line_struct, corner_cost, i, start_ind);
+            if !((graph.point_set[i].0 >= x1_prime && start_dir == Direction::Right)
+                || (graph.point_set[i].0 <= x1_prime && start_dir == Direction::Left))
             {
-                cost += start_abs_offset as u32 *2;
+                cost += start_abs_offset as u32 * 2;
             }
-            edge_costs[i].0.push(cost);
-            edge_costs[start_ind].0.push(cost);
+            graph.edge_costs[i].0.push(cost);
+            graph.edge_costs[start_ind].0.push(cost);
         }
 
         let y2_prime = y2 + offset(end_dir, end_abs_offset);
         let x2_prime = x2 + offset(end_dir, end_abs_offset);
-        if point_set[i].0 == x2
-            && ((point_set[i].1 <= y2 && end_dir == Direction::Up)
-                || (point_set[i].1 >= y2 && end_dir == Direction::Down))
-            && !aals_blocked_by_bb(start_el_bb, point_set[i].1, y2, false, x2)
+        if graph.point_set[i].0 == x2
+            && ((graph.point_set[i].1 <= y2 && end_dir == Direction::Up)
+                || (graph.point_set[i].1 >= y2 && end_dir == Direction::Down))
+            && !aals_blocked_by_bb(start_el_bb, graph.point_set[i].1, y2, false, x2)
         {
-            edge_set[i].1.push(end_ind);
-            edge_set[end_ind].1.push(i);
-            let mut cost = cost_function(point_set, x_lines, y_lines, mid_x, mid_y, corner_cost, i, end_ind);
-            if !((point_set[i].1 <= y2_prime && end_dir == Direction::Up)
-                || (point_set[i].1 >= y2_prime && end_dir == Direction::Down))
+            graph.edge_set[i].1.push(end_ind);
+            graph.edge_set[end_ind].1.push(i);
+            let mut cost = cost_function(&graph.point_set, line_struct, corner_cost, i, end_ind);
+            if !((graph.point_set[i].1 <= y2_prime && end_dir == Direction::Up)
+                || (graph.point_set[i].1 >= y2_prime && end_dir == Direction::Down))
             {
-                cost += end_abs_offset as u32 *2;
+                cost += end_abs_offset as u32 * 2;
             }
-            edge_costs[i].1.push(cost);
-            edge_costs[end_ind].1.push(cost);
+            graph.edge_costs[i].1.push(cost);
+            graph.edge_costs[end_ind].1.push(cost);
         }
-        if point_set[i].1 == y2
-            && ((point_set[i].0 >= x2 && end_dir == Direction::Right)
-                || (point_set[i].0 <= x2 && end_dir == Direction::Left))
-            && !aals_blocked_by_bb(start_el_bb, point_set[i].0, x2, true, y2)
+        if graph.point_set[i].1 == y2
+            && ((graph.point_set[i].0 >= x2 && end_dir == Direction::Right)
+                || (graph.point_set[i].0 <= x2 && end_dir == Direction::Left))
+            && !aals_blocked_by_bb(start_el_bb, graph.point_set[i].0, x2, true, y2)
         {
-            edge_set[i].0.push(end_ind);
-            edge_set[end_ind].0.push(i);
-            let mut cost = cost_function(point_set, x_lines, y_lines, mid_x, mid_y, corner_cost, i, end_ind);
-            if !((point_set[i].0 >= x2_prime && end_dir == Direction::Right)
-                || (point_set[i].0 <= x2_prime && end_dir == Direction::Left))
+            graph.edge_set[i].0.push(end_ind);
+            graph.edge_set[end_ind].0.push(i);
+            let mut cost = cost_function(&graph.point_set, line_struct, corner_cost, i, end_ind);
+            if !((graph.point_set[i].0 >= x2_prime && end_dir == Direction::Right)
+                || (graph.point_set[i].0 <= x2_prime && end_dir == Direction::Left))
             {
-                cost += end_abs_offset as u32 *2;
+                cost += end_abs_offset as u32 * 2;
             }
-            edge_costs[i].0.push(cost);
-            edge_costs[end_ind].0.push(cost);
+            graph.edge_costs[i].0.push(cost);
+            graph.edge_costs[end_ind].0.push(cost);
         }
     }
 
@@ -307,10 +326,7 @@ fn add_start_and_end(
 fn compute_costs(
     point_set: &[(f32, f32)],
     edge_set: &[(Vec<usize>, Vec<usize>)],
-    x_lines: &Vec<f32>,
-    y_lines: &Vec<f32>,
-    mid_x: usize,
-    mid_y: usize,
+    line_struct: &LineStruct,
     corner_cost: u32,
 ) -> Vec<(Vec<u32>, Vec<u32>)> {
     // edge cost function
@@ -322,7 +338,13 @@ fn compute_costs(
             let ind_1 = i;
             let ind_2 = *j;
 
-            edge_costs[i].0.push(cost_function(point_set, &x_lines, &y_lines, mid_x, mid_y, corner_cost, ind_1, ind_2));
+            edge_costs[i].0.push(cost_function(
+                point_set,
+                line_struct,
+                corner_cost,
+                ind_1,
+                ind_2,
+            ));
         }
 
         // y moving edge
@@ -330,7 +352,13 @@ fn compute_costs(
             let ind_1 = i;
             let ind_2 = *j;
 
-            edge_costs[i].1.push(cost_function(point_set, &x_lines, &y_lines, mid_x, mid_y, corner_cost, ind_1, ind_2));
+            edge_costs[i].1.push(cost_function(
+                point_set,
+                line_struct,
+                corner_cost,
+                ind_1,
+                ind_2,
+            ));
         }
     }
 
@@ -339,10 +367,7 @@ fn compute_costs(
 
 fn cost_function(
     point_set: &[(f32, f32)],
-    x_lines: &Vec<f32>,
-    y_lines: &Vec<f32>,
-    mid_x: usize,
-    mid_y: usize,
+    line_struct: &LineStruct,
     corner_cost: u32,
     ind_1: usize,
     ind_2: usize,
@@ -350,44 +375,52 @@ fn cost_function(
     // swapping order of ind_1 and ind_2 does nothing
 
     // ind_1 uses in mid point calcs could use ind_2 in same place no diff
-    let mid_point_mul_x = if mid_x != usize::MAX && point_set[ind_1].0 == x_lines[mid_x] {
+    let mid_point_mul_x = if line_struct.mid_x != usize::MAX
+        && point_set[ind_1].0 == line_struct.x_lines[line_struct.mid_x]
+    {
         0.5
     } else {
         1.0
     };
-    let mid_point_mul_y = if mid_y != usize::MAX && point_set[ind_1].1 == y_lines[mid_y] {
+    let mid_point_mul_y = if line_struct.mid_y != usize::MAX
+        && point_set[ind_1].1 == line_struct.y_lines[line_struct.mid_y]
+    {
         0.5
     } else {
         1.0
     };
 
-    return ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
-    + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x)
-    as u32 + corner_cost;// round may cause some problems
+    ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
+        + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x) as u32
+        + corner_cost
+    // round may cause some problems
 }
 
+type PrevPoint = Vec<(NodeState, NodeState)>;
+
 fn dijkstra_get_dists(
-    point_set: &[(f32, f32)],
-    edge_set: &[(Vec<usize>, Vec<usize>)],
-    edge_costs: &[(Vec<u32>, Vec<u32>)],
+    graph: &Graph,
     start_ind: usize,
     end_ind: usize,
-    start_dir: Direction,
-    end_dir: Direction,
+    dirs: (Direction, Direction),
     corner_cost: u32,
-) -> (
-    Vec<(u32, u32)>,
-    Vec<((usize, Direction), (usize, Direction))>,
-) {
+) -> (Vec<(u32, u32)>, PrevPoint) {
+    let (start_dir, end_dir) = dirs;
     // just needs to be bigger than 5* (corner cost  +  total bounding box size)
     let inf = u32::MAX;
-    let mut dists = vec![(inf, inf); point_set.len()];
+    let mut dists = vec![(inf, inf); graph.point_set.len()];
     let mut prev_point = vec![
         (
-            (point_set.len() - 1, Direction::Left),
-            (point_set.len() - 1, Direction::Left)
+            NodeState {
+                ind: graph.point_set.len() - 1,
+                dir: Direction::Left
+            },
+            NodeState {
+                ind: graph.point_set.len() - 1,
+                dir: Direction::Left
+            }
         );
-        point_set.len()
+        graph.point_set.len()
     ];
 
     let mut queue: BinaryHeap<PathCost> = BinaryHeap::new();
@@ -414,10 +447,16 @@ fn dijkstra_get_dists(
         if next.idx == end_ind && simplified_end_dir == next.dir {
             match next.dir {
                 Direction::Left | Direction::Right => {
-                    prev_point[next.idx].0 = (next.from, next.from_dir)
+                    prev_point[next.idx].0 = NodeState {
+                        ind: next.from,
+                        dir: next.from_dir,
+                    }
                 }
                 Direction::Down | Direction::Up => {
-                    prev_point[next.idx].1 = (next.from, next.from_dir)
+                    prev_point[next.idx].1 = NodeState {
+                        ind: next.from,
+                        dir: next.from_dir,
+                    }
                 }
             };
             break;
@@ -434,19 +473,27 @@ fn dijkstra_get_dists(
 
         match next.dir {
             Direction::Left | Direction::Right => {
-                prev_point[next.idx].0 = (next.from, next.from_dir)
+                prev_point[next.idx].0 = NodeState {
+                    ind: next.from,
+                    dir: next.from_dir,
+                }
             }
-            Direction::Down | Direction::Up => prev_point[next.idx].1 = (next.from, next.from_dir),
+            Direction::Down | Direction::Up => {
+                prev_point[next.idx].1 = NodeState {
+                    ind: next.from,
+                    dir: next.from_dir,
+                }
+            }
         };
 
         // x moving edge
-        for i in 0..edge_set[next.idx].0.len() {
-            let mut edge_cost = edge_costs[next.idx].0[i];
+        for i in 0..graph.edge_set[next.idx].0.len() {
+            let mut edge_cost = graph.edge_costs[next.idx].0[i];
             // if same direction then add 2 corners
             if next.dir == Direction::Left || next.dir == Direction::Right {
-                edge_cost += corner_cost*2;
+                edge_cost += corner_cost * 2;
             }
-            let other_ind = edge_set[next.idx].0[i];
+            let other_ind = graph.edge_set[next.idx].0[i];
             if dist + edge_cost < dists[other_ind].0 {
                 dists[other_ind].0 = dist + edge_cost;
                 queue.push(PathCost {
@@ -460,17 +507,17 @@ fn dijkstra_get_dists(
         }
 
         // y moving edge
-        for i in 0..edge_set[next.idx].1.len() {
-            let mut edge_cost = edge_costs[next.idx].1[i];
+        for i in 0..graph.edge_set[next.idx].1.len() {
+            let mut edge_cost = graph.edge_costs[next.idx].1[i];
             if next.dir == Direction::Down || next.dir == Direction::Up {
-                edge_cost += corner_cost*2;
+                edge_cost += corner_cost * 2;
             }
-            let other_ind = edge_set[next.idx].1[i];
-            if dist + edge_cost < dists[edge_set[next.idx].1[i]].1 {
+            let other_ind = graph.edge_set[next.idx].1[i];
+            if dist + edge_cost < dists[graph.edge_set[next.idx].1[i]].1 {
                 dists[other_ind].1 = dist + edge_cost;
                 queue.push(PathCost {
                     cost: dists[other_ind].1,
-                    idx: edge_set[next.idx].1[i],
+                    idx: graph.edge_set[next.idx].1[i],
                     dir: Direction::Down,
                     from: next.idx,
                     from_dir: next.dir,
@@ -484,7 +531,7 @@ fn dijkstra_get_dists(
 
 fn dijkstra_get_points(
     point_set: &[(f32, f32)],
-    prev_point: &[((usize, Direction), (usize, Direction))],
+    prev_point: &[(NodeState, NodeState)],
     start_ind: usize,
     end_ind: usize,
     end_dir: Direction,
@@ -499,8 +546,12 @@ fn dijkstra_get_points(
         }
         let new_loc;
         match dir {
-            Direction::Left | Direction::Right => (new_loc, dir) = prev_point[loc].0,
-            Direction::Down | Direction::Up => (new_loc, dir) = prev_point[loc].1,
+            Direction::Left | Direction::Right => {
+                (new_loc, dir) = (prev_point[loc].0.ind, prev_point[loc].0.dir)
+            }
+            Direction::Down | Direction::Up => {
+                (new_loc, dir) = (prev_point[loc].1.ind, prev_point[loc].1.dir)
+            }
         };
         if new_loc == loc {
             break;
@@ -509,7 +560,7 @@ fn dijkstra_get_points(
         back_points_inds.push(loc);
     }
     // if no path just do line
-    if back_points_inds.len() == 1{
+    if back_points_inds.len() == 1 {
         back_points_inds.push(start_ind);
     }
 
@@ -540,7 +591,7 @@ pub fn render_match_corner(
         ratio_offset = ratio_offset.clamp(0.0, 1.0);
 
         // x_lines have constant x vary over y
-        let (x_lines, y_lines, mid_x, mid_y) = get_lines(
+        let line_struct = get_lines(
             connector,
             ratio_offset,
             (start_abs_offset, end_abs_offset),
@@ -550,14 +601,13 @@ pub fn render_match_corner(
         );
         let mut point_set = vec![];
 
-        for x in &x_lines {
-            for y in &y_lines {
+        for x in &line_struct.x_lines {
+            for y in &line_struct.y_lines {
                 point_set.push((*x, *y));
             }
         }
 
-        let mut edge_set = get_edges(&point_set, start_el_bb, end_el_bb);
-
+        let edge_set = get_edges(&point_set, start_el_bb, end_el_bb);
 
         let total_bb = start_el_bb.combine(&end_el_bb);
         let total_bb_size =
@@ -565,45 +615,39 @@ pub fn render_match_corner(
         // needs to be comparable to or larger than total_bb_size
         let corner_cost = 1 + total_bb_size;
 
-        let mut edge_costs = compute_costs(
-            &point_set,
-            &edge_set,
-            &x_lines,
-            &y_lines,
-            mid_x,
-            mid_y,
-            corner_cost,
-        );
+        let edge_costs = compute_costs(&point_set, &edge_set, &line_struct, corner_cost);
+
+        let mut graph = Graph {
+            point_set,
+            edge_set,
+            edge_costs,
+        };
 
         let (start_ind, end_ind) = add_start_and_end(
             connector,
-            &mut point_set,
-            &mut edge_set,
-            &mut edge_costs,
+            &mut graph,
             (start_abs_offset, end_abs_offset),
-            start_el_bb,
-            end_el_bb,
-            start_dir_some,
-            end_dir_some,
-            &x_lines,
-            &y_lines,
-            mid_x,
-            mid_y,
+            (start_el_bb, end_el_bb),
+            (start_dir_some, end_dir_some),
+            &line_struct,
             corner_cost,
         );
 
         let (_, prev_point) = dijkstra_get_dists(
-            &point_set,
-            &edge_set,
-            &edge_costs,
+            &graph,
             start_ind,
             end_ind,
-            start_dir_some,
-            end_dir_some,
+            (start_dir_some, end_dir_some),
             corner_cost,
         );
 
-        points = dijkstra_get_points(&point_set, &prev_point, start_ind, end_ind, end_dir_some);
+        points = dijkstra_get_points(
+            &graph.point_set,
+            &prev_point,
+            start_ind,
+            end_ind,
+            end_dir_some,
+        );
     } else {
         points = vec![(x1, y1), (x2, y2)];
     }
