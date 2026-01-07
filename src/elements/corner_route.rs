@@ -73,7 +73,6 @@ fn get_lines(
     let mut y_lines = vec![];
     let mut mid_x = usize::MAX;
     let mut mid_y = usize::MAX;
-    println!("abs offsets {:?} {:?}",start_abs_offset, end_abs_offset);
 
     x_lines.push(start_el_bb.x1 - start_abs_offset);
     x_lines.push(start_el_bb.x2 + start_abs_offset);
@@ -302,18 +301,6 @@ fn add_start_and_end(
         }
     }
 
-    println!("{:?} {:?}",edge_costs[start_ind], edge_costs[end_ind]);
-    println!("{:?} {:?}",edge_set[start_ind], edge_set[end_ind]);
-    for i in edge_set[start_ind].0.iter() {
-        println!("{} {:?}",*i, point_set[*i]);
-    }
-    for i in edge_set[end_ind].0.iter() {
-        println!("{} {:?}",*i, point_set[*i]);
-    }
-
-    println!("{:?} {:?}",x_lines, y_lines);
-    println!("{:?} {:?}", point_set[start_ind], point_set[end_ind]);
-
     (start_ind, end_ind)
 }
 
@@ -328,7 +315,6 @@ fn compute_costs(
 ) -> Vec<(Vec<u32>, Vec<u32>)> {
     // edge cost function
 
-    println!("corner cost {}", corner_cost);
     let mut edge_costs = vec![(vec![], vec![]); edge_set.len()];
     for i in 0..edge_set.len() {
         // x moving edge
@@ -462,7 +448,6 @@ fn dijkstra_get_dists(
             }
             let other_ind = edge_set[next.idx].0[i];
             if dist + edge_cost < dists[other_ind].0 {
-                println!("improvement {}, old: {}, new {}", other_ind, dists[other_ind].0, dist + edge_cost);
                 dists[other_ind].0 = dist + edge_cost;
                 queue.push(PathCost {
                     cost: dists[other_ind].0,
@@ -482,7 +467,6 @@ fn dijkstra_get_dists(
             }
             let other_ind = edge_set[next.idx].1[i];
             if dist + edge_cost < dists[edge_set[next.idx].1[i]].1 {
-                println!("improvement {}, old: {}, new {}", other_ind, dists[other_ind].1, dist + edge_cost);
                 dists[other_ind].1 = dist + edge_cost;
                 queue.push(PathCost {
                     cost: dists[other_ind].1,
