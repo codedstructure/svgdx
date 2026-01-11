@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: multiple minor connector improvements, including better corner-offset
+  handling.
+
+- Minor change: polyline connectors with only two points are no longer
+  converted to line elements.
+
+- Minor change: intermediate collinear and repeated points in polyline
+  connectors are omitted.
+
 - Fixed: inconsistent polyline connectors with endpoints into transformed
   groups.
 

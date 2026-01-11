@@ -1,7 +1,7 @@
 use super::{
-    is_connector, process_text_attr, ConfigElement, ConnectionType, Connector, Container,
-    DefaultsElement, ForElement, GroupElement, IfElement, LinearGradient, LoopElement,
-    RadialGradient, ReuseElement, SpecsElement, VarElement,
+    is_connector, process_text_attr, ConfigElement, Connector, Container, DefaultsElement,
+    ForElement, GroupElement, IfElement, LinearGradient, LoopElement, RadialGradient, ReuseElement,
+    SpecsElement, VarElement,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList};
@@ -531,19 +531,9 @@ impl SvgElement {
         }
 
         if is_connector(self) {
-            let conn = Connector::from_element(
-                self,
-                ctx,
-                if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(e_type)
-                } else if self.name() == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            )?;
+            let conn = Connector::from_element(self, ctx)?;
             // replace with rendered connection element
-            *self = conn.render(ctx)?.without_attr("edge-type");
+            *self = conn.render(ctx)?;
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {

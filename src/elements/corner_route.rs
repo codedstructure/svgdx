@@ -539,18 +539,19 @@ fn dijkstra_get_points(
     let mut back_points_inds = vec![end_ind];
     let mut loc = end_ind;
     let mut dir = end_dir;
-    // wont use more than 10 corners garentee no loops
+    // won't use more than 10 corners; guarantee no infinite loops
     for _ in 0..10 {
         if loc == start_ind {
             break;
         }
-        let new_loc;
-        match dir {
+        let new_loc = match dir {
             Direction::Left | Direction::Right => {
-                (new_loc, dir) = (prev_point[loc].0.ind, prev_point[loc].0.dir)
+                dir = prev_point[loc].0.dir;
+                prev_point[loc].0.ind
             }
             Direction::Down | Direction::Up => {
-                (new_loc, dir) = (prev_point[loc].1.ind, prev_point[loc].1.dir)
+                dir = prev_point[loc].1.dir;
+                prev_point[loc].1.ind
             }
         };
         if new_loc == loc {

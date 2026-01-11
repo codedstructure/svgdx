@@ -32,7 +32,7 @@ impl Endpoint {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ConnectionType {
+enum ConnectionType {
     Horizontal,
     Vertical,
     Corner,
@@ -40,7 +40,7 @@ pub enum ConnectionType {
 }
 
 impl ConnectionType {
-    pub fn from_str(s: &str) -> Self {
+    fn from_str(s: &str) -> Self {
         match s {
             "h" | "horizontal" => Self::Horizontal,
             "v" | "vertical" => Self::Vertical,
@@ -198,9 +198,17 @@ impl Connector {
     pub fn from_element(
         element: &SvgElement,
         elem_map: &impl ElementMap,
-        conn_type: ConnectionType,
+        // conn_type: ConnectionType,
     ) -> Result<Self> {
         let mut element = element.clone();
+
+        let conn_type = if let Some(e_type) = element.pop_attr("edge-type") {
+            ConnectionType::from_str(&e_type)
+        } else if element.name() == "polyline" {
+            ConnectionType::Corner
+        } else {
+            ConnectionType::Straight
+        };
 
         let start_ret = Self::parse_element(&mut element, elem_map, "start")?;
         let end_ret = Self::parse_element(&mut element, elem_map, "end")?;
@@ -314,9 +322,6 @@ impl Connector {
     }
 
     pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
-        let default_ratio_offset = Length::Ratio(0.5);
-        let default_abs_offset = Length::Absolute(3.);
-
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
         // For some (e.g. u-shaped) connections we need a default *absolute* offset
@@ -398,6 +403,9 @@ impl Connector {
             )
             .with_attrs_from(&self.source_element),
             ConnectionType::Corner => {
+                let default_ratio_offset = Length::Ratio(0.5);
+                let default_abs_offset = Length::Absolute(3.);
+
                 let mut abs_offset_set = false;
                 let mut start_abs_offset = default_abs_offset
                     .absolute()
@@ -441,34 +449,117 @@ impl Connector {
                     abs_offset_set,
                 )?;
 
-                // TODO: remove repeated and collinear points.
-                if points.len() == 2 {
-                    SvgElement::new(
-                        "line",
-                        &[
-                            ("x1".to_string(), fstr(points[0].0)),
-                            ("y1".to_string(), fstr(points[0].1)),
-                            ("x2".to_string(), fstr(points[1].0)),
-                            ("y2".to_string(), fstr(points[1].1)),
-                        ],
-                    )
-                    .with_attrs_from(&self.source_element)
-                } else {
-                    SvgElement::new(
-                        "polyline",
-                        &[(
-                            "points".to_string(),
-                            points
-                                .into_iter()
-                                .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
-                                .collect::<Vec<String>>()
-                                .join(", "),
-                        )],
-                    )
-                    .with_attrs_from(&self.source_element)
-                }
+                // remove repeated points
+                let points = filter_points(points);
+                SvgElement::new(
+                    "polyline",
+                    &[(
+                        "points".to_string(),
+                        points
+                            .into_iter()
+                            .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
+                            .collect::<Vec<String>>()
+                            .join(", "),
+                    )],
+                )
+                .with_attrs_from(&self.source_element)
             }
         };
         Ok(conn_element)
+    }
+}
+
+/// Remove identical and collinear point pairs
+fn filter_points(p: Vec<(f32, f32)>) -> Vec<(f32, f32)> {
+    let mut ret = Vec::with_capacity(p.len());
+    const EPSILON: f32 = 1e-6;
+
+    for current in p {
+        // Skip exact duplicates
+        if ret.last().copied() == Some(current) {
+            continue;
+        }
+
+        // Remove middle point if three consecutive points are collinear and monotonic
+        if ret.len() >= 2 {
+            let prev2 = ret[ret.len() - 2];
+            let prev1 = ret[ret.len() - 1];
+
+            // Vector from prev2 to prev1
+            let v1 = (prev1.0 - prev2.0, prev1.1 - prev2.1);
+            // Vector from prev1 to current
+            let v2 = (current.0 - prev1.0, current.1 - prev1.1);
+
+            // Check if vectors are parallel (cross product near zero)
+            let cross = v1.0 * v2.1 - v1.1 * v2.0;
+            let collinear = cross.abs() < EPSILON;
+
+            if collinear {
+                // Check monotonicity: dot product should be non-negative
+                // (vectors point in same or opposite direction)
+                let dot = v1.0 * v2.0 + v1.1 * v2.1;
+                let monotonic = dot >= -EPSILON;
+
+                if monotonic {
+                    ret.pop();
+                }
+            }
+        }
+        ret.push(current);
+    }
+    ret
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_points() {
+        for (case, point_set, expected) in [
+            (
+                "monotonic horizontal line",
+                vec![(0., 0.), (1., 0.), (2., 0.), (3., 0.)],
+                vec![(0., 0.), (3., 0.)],
+            ),
+            (
+                "monotonic vertical line",
+                vec![(0., 0.), (0., 1.), (0., 2.), (0., 3.)],
+                vec![(0., 0.), (0., 3.)],
+            ),
+            (
+                "non-monotonic horizontal line",
+                vec![(0., 0.), (1., 0.), (2., 0.), (1., 0.), (5., 0.)],
+                vec![(0., 0.), (2., 0.), (1., 0.), (5., 0.)],
+            ),
+            (
+                "non-monotonic vertical line",
+                vec![(0., 0.), (0., 1.), (0., 2.), (0., 1.), (0., 5.)],
+                vec![(0., 0.), (0., 2.), (0., 1.), (0., 5.)],
+            ),
+            (
+                "right angle turn",
+                vec![(0., 0.), (1., 0.), (1., 1.), (1., 2.), (2., 2.)],
+                vec![(0., 0.), (1., 0.), (1., 2.), (2., 2.)],
+            ),
+            (
+                "diagonal line",
+                vec![(0., 0.), (1., 1.), (1., 1.), (2., 2.)],
+                vec![(0., 0.), (2., 2.)],
+            ),
+            (
+                "gradient 3 diagonal",
+                vec![(0., 0.), (1., 3.), (2., 6.), (3., 9.)],
+                vec![(0., 0.), (3., 9.)],
+            ),
+            (
+                "non-integer slope",
+                vec![(0., 0.25), (1., 0.5), (2., 0.75), (3., 1.0)],
+                vec![(0., 0.25), (3., 1.0)],
+            ),
+        ] {
+            let filtered = filter_points(point_set);
+            assert_eq!(filtered, expected, "{case}");
+        }
     }
 }

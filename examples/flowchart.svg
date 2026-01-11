@@ -1,4 +1,4 @@
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="113mm" height="62mm" viewBox="-5 -35 113 62">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="113mm" height="57mm" viewBox="-5 -35 113 57">
   <defs>
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
       <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
@@ -37,6 +37,6 @@
   <text x="42.321" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
   <line x1="67.32" y1="0" x2="82.32" y2="0" class="d-arrow"/>
   <text x="74.82" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
-  <polyline points="58.66 5, 58.66 22, 17.321 22, 17.321 10" class="d-arrow"/>
-  <text x="37.991" y="21" class="d-text d-text-bottom d-arrow">no</text>
+  <polyline points="58.66 5, 58.66 17, 17.321 17, 17.321 10" class="d-arrow"/>
+  <text x="37.991" y="16" class="d-text d-text-bottom d-arrow">no</text>
 </svg>
