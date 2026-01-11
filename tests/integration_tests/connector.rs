@@ -289,6 +289,35 @@ fn test_connector_corners() {
 }
 
 #[test]
+fn test_connector_close_corner_offset() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="20 -2" wh="10"/>
+<polyline id="c1" start="#a@t" end="#b@t"/>
+"##;
+    let expected = r##"id="c1" points="5 0, 5 -5, 25 -5, 25 -2""##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect xy="10 20" wh="10" text="a" id="a"/>
+<rect xy="5 35" wh="8" text="b" id="b"/>
+<rect xy="20 33" wh="5" text="c" id="c"/>
+<polyline start="#a@b" end="#b@t" corner-offset="25%"/>
+<polyline start="#a@r" end="#c@t"/>
+<polyline start="#a@l" end="#b@l" corner-offset="1.5"/>
+"##;
+    let expected1 = r##"points="15 30, 15 31.25, 9 31.25, 9 35""##;
+    let expected2 = r##"points="10 25, 3.5 25, 3.5 39, 5 39""##;
+    let expected3 = r##"points="20 25, 22.5 25, 22.5 33""##;
+    let output = transform_str_default(input).unwrap();
+
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
+
+#[test]
 fn test_elbow_connector() {
     let input = r##"
 <rect id="a" wh="10"/>

@@ -72,7 +72,7 @@
 
   <polyline points="35 38.25, 35 21.975, 12.5 21.975, 12.5 15" class="d-arrow"/>
   <polyline points="35 39.75, 35 58, 25 58" class="d-arrow"/>
-  <polyline points="49 6.75, 49 -12.5, 110.5 -12.5" class="d-arrow"/>
+  <polyline points="49 6.75, 49 -12.5, 52.75 -12.5, 110.5 -12.5" class="d-arrow"/>
   <line x1="100.5" y1="7.5" x2="110.5" y2="7.5" class="d-arrow"/>
 
   <polyline points="25 7.5, 28 7.5, 73.5 7.5" class="d-arrow"/>
