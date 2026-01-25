@@ -235,6 +235,12 @@ impl<'a> Extend<&'a InputEvent> for OutputList {
     }
 }
 
+impl Extend<InputEvent> for OutputList {
+    fn extend<T: IntoIterator<Item = InputEvent>>(&mut self, iter: T) {
+        self.events.extend(iter);
+    }
+}
+
 impl From<InputList> for OutputList {
     fn from(value: InputList) -> Self {
         Self {

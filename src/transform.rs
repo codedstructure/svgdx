@@ -6,7 +6,7 @@ use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
-use crate::{AutoStyleMode, TransformConfig};
+use crate::{AutoStyleMode, ErrorMode, TransformConfig};
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, Write};
@@ -131,13 +131,42 @@ fn process_tags(
             }
         }
         if tags.len() == remain.len() {
-            return Err(Error::Multi(element_errors));
+            // no progress made; abandon further processing
+            break;
         }
 
         mem::swap(tags, remain);
         remain.clear();
+        element_errors.clear();
+    }
+
+    if !element_errors.is_empty() {
+        handle_errors(element_errors, context, idx_output)?;
     }
     Ok(bbb.clone().build())
+}
+
+pub fn handle_errors(
+    element_errors: HashMap<OrderIndex, (SvgElement, Error)>,
+    context: &TransformerContext,
+    idx_output: &mut BTreeMap<OrderIndex, OutputList>,
+) -> Result<()> {
+    match context.config.error_mode {
+        ErrorMode::Strict => Err(Error::Multi(element_errors)),
+        ErrorMode::Warn => {
+            for (idx, (el, err)) in element_errors {
+                let mut ev_list = OutputList::from(vec![
+                    EventKind::Text("\n".to_owned()),
+                    EventKind::Comment(format!(" Warning: error processing element: {:?} ", err)),
+                ]);
+                let el_events = el.all_events(context);
+                ev_list.extend(el_events);
+                ev_list.push(EventKind::Text("\n".to_owned()));
+                idx_output.insert(idx, ev_list);
+            }
+            Ok(())
+        }
+    }
 }
 
 pub fn process_events(

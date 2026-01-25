@@ -6,7 +6,7 @@ use std::{path::Path, sync::mpsc::channel, time::Duration};
 
 use crate::errors::{Error, Result};
 use crate::style::ThemeType;
-use crate::{transform_file, AutoStyleMode, TransformConfig};
+use crate::{transform_file, AutoStyleMode, ErrorMode, TransformConfig};
 
 /// Command line arguments
 #[derive(Parser)]
@@ -101,6 +101,10 @@ struct Arguments {
     /// Optional style to apply to SVG root element
     #[arg(long)]
     svg_style: Option<String>,
+
+    /// Error handling mode
+    #[arg(long, default_value = "strict")]
+    error_mode: ErrorMode,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -174,6 +178,7 @@ impl Config {
                 font_family: args.font_family,
                 theme: args.theme,
                 svg_style: args.svg_style,
+                error_mode: args.error_mode,
             },
         })
     }
