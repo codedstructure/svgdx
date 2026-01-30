@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: new config option 'error-mode' with values 'strict' (default, as
+  previous behaviour), 'ignore' (leaves erroneous elements as provided in the
+  input) and 'warn' (inserting a comment prior to the errored element with the
+  error message).
+
 ## [0.26.1 - 2026-01-11]
 
 - Minor change: polyline connectors with only two points are no longer

@@ -100,6 +100,8 @@ pub struct TransformConfig {
     pub use_local_styles: bool,
     /// Optional style to apply to SVG root element
     pub svg_style: Option<String>,
+    /// Error handling mode
+    pub error_mode: ErrorMode,
 }
 
 impl Default for TransformConfig {
@@ -121,6 +123,35 @@ impl Default for TransformConfig {
             theme: ThemeType::default(),
             use_local_styles: false,
             svg_style: None,
+            error_mode: ErrorMode::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+pub enum ErrorMode {
+    /// Un-resolved errors prevent processing
+    #[default]
+    Strict,
+    /// Continue with error message in XML comment
+    Warn,
+    /// Continue silently ignoring errors
+    Ignore,
+}
+
+impl std::str::FromStr for ErrorMode {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "strict" => Ok(ErrorMode::Strict),
+            "warn" => Ok(ErrorMode::Warn),
+            "ignore" => Ok(ErrorMode::Ignore),
+            _ => Err(Error::InvalidValue(
+                "error-mode must be 'strict', 'warn', or 'ignore'".to_string(),
+                s.to_string(),
+            )),
         }
     }
 }

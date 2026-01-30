@@ -63,6 +63,7 @@ impl EventGen for ConfigElement<'_> {
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
                 "svg-style" => new_config.svg_style = Some(value.clone()),
+                "error-mode" => new_config.error_mode = value.parse()?,
                 _ => return Err(Error::InvalidAttr(key)),
             }
         }
