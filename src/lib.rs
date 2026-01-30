@@ -131,11 +131,13 @@ impl Default for TransformConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ErrorMode {
-    /// Stop processing on first error
+    /// Un-resolved errors prevent processing
     #[default]
     Strict,
-    /// Attempt to continue processing despite errors
+    /// Continue with error message in XML comment
     Warn,
+    /// Continue silently ignoring errors
+    Ignore,
 }
 
 impl std::str::FromStr for ErrorMode {
@@ -145,8 +147,9 @@ impl std::str::FromStr for ErrorMode {
         match s {
             "strict" => Ok(ErrorMode::Strict),
             "warn" => Ok(ErrorMode::Warn),
+            "ignore" => Ok(ErrorMode::Ignore),
             _ => Err(Error::InvalidValue(
-                "error-mode must be 'strict' or 'warn'".to_string(),
+                "error-mode must be 'strict', 'warn', or 'ignore'".to_string(),
                 s.to_string(),
             )),
         }

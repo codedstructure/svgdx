@@ -161,6 +161,19 @@ pub fn handle_errors(
                 ]);
                 let el_events = el.all_events(context);
                 ev_list.extend(el_events);
+                // TODO: should store tail in SvgElement and include here
+                // rather than just adding a newline...
+                ev_list.push(EventKind::Text("\n".to_owned()));
+                idx_output.insert(idx, ev_list);
+            }
+            Ok(())
+        }
+        ErrorMode::Ignore => {
+            for (idx, (el, _err)) in element_errors {
+                let el_events = el.all_events(context);
+                let mut ev_list = OutputList::from(el_events);
+                // TODO: should store tail in SvgElement and include here
+                // rather than just adding a newline...
                 ev_list.push(EventKind::Text("\n".to_owned()));
                 idx_output.insert(idx, ev_list);
             }
