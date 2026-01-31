@@ -1,7 +1,7 @@
 // Tabs module - handles tab switching and content management
 
 import { DEFAULT_CONTENT } from './config.js';
-import { getTabContent, setTabContent, saveState } from './storage.js';
+import { getTabInput, setTabInput, saveState } from './storage.js';
 
 /**
  * Initialize tabs functionality
@@ -28,7 +28,7 @@ export function initTabs(state, editor, onTabChange) {
             updateActiveTabUI(tabNum);
 
             // Load content for this tab
-            const content = getTabContent(state, tabNum);
+            const content = getTabInput(state, tabNum);
             editor.setValue(content);
 
             // Notify of tab change
@@ -58,6 +58,6 @@ export function getActiveTab(state) {
 /**
  * Save content to the current tab
  */
-export function saveCurrentTabContent(state, editor) {
-    setTabContent(state, state.activeTab, editor.getValue());
+export function saveCurrentTabInput(state, editor) {
+    setTabInput(state, state.activeTab, editor.getValue());
 }

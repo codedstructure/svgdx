@@ -319,6 +319,36 @@ button {
     flex-shrink: 0;
 }
 
+/* Value slider styles */
+#slider-controls {
+    gap: 6px;
+}
+
+#slider-controls label {
+    font-size: 12px;
+    font-family: monospace;
+    color: #555;
+    cursor: help;
+}
+
+#value-slider {
+    width: 200px;
+    cursor: pointer;
+}
+
+#value-slider-display {
+    font-size: 12px;
+    font-family: monospace;
+    min-width: 3em;
+    text-align: right;
+    color: #333;
+}
+
+/* Hide slider elements when 'off' */
+#slider-controls .slider-hidden {
+    display: none;
+}
+
 #tabs button {
     min-width: 28px;
     padding: 4px 6px;

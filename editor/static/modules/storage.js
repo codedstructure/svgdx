@@ -1,7 +1,7 @@
 // Storage module - handles localStorage with versioned JSON blob
 // Includes migration from legacy storage format
 
-import { STORAGE_VERSION, DEFAULT_CONTENT, VALID_LAYOUTS, DEFAULT_LAYOUT, VALID_MOBILE_LAYOUTS, DEFAULT_MOBILE_LAYOUT } from './config.js';
+import { STORAGE_VERSION, DEFAULT_CONTENT, VALID_LAYOUTS, DEFAULT_LAYOUT, VALID_MOBILE_LAYOUTS, DEFAULT_MOBILE_LAYOUT, DEFAULT_SLIDER_VALUE, DEFAULT_SLIDER_MIN, DEFAULT_SLIDER_MAX, DEFAULT_SLIDER_RANGE, DEFAULT_SLIDER_STEP } from './config.js';
 
 const STORAGE_KEY = 'svgdx-state';
 
@@ -70,11 +70,16 @@ function migrateFromLegacyStorage() {
         state.layout = layout;
     }
 
-    // Migrate tab contents
+    // Migrate tab contents to new object structure
     for (const tabNum of ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']) {
         const content = localStorage.getItem(LEGACY_KEYS.CONTENT_PREFIX + tabNum);
         if (content !== null) {
-            state.tabs[tabNum] = content;
+            state.tabs[tabNum] = {
+                input: content,
+                sliderValue: DEFAULT_SLIDER_VALUE,
+                sliderMin: DEFAULT_SLIDER_MIN,
+                sliderMax: DEFAULT_SLIDER_MAX
+            };
         }
     }
 
@@ -152,16 +157,142 @@ export function saveState(state) {
 }
 
 /**
- * Get content for a specific tab
+ * Ensure a tab exists with proper structure
  */
-export function getTabContent(state, tabNum) {
-    return state.tabs[tabNum] || DEFAULT_CONTENT;
+function ensureTab(state, tabNum) {
+    if (!state.tabs[tabNum] || typeof state.tabs[tabNum] !== 'object') {
+        state.tabs[tabNum] = {
+            input: DEFAULT_CONTENT,
+            sliderValue: DEFAULT_SLIDER_VALUE,
+            sliderMin: DEFAULT_SLIDER_MIN,
+            sliderMax: DEFAULT_SLIDER_MAX,
+            sliderRange: DEFAULT_SLIDER_RANGE,
+            sliderStep: DEFAULT_SLIDER_STEP
+        };
+    }
+    return state.tabs[tabNum];
 }
 
 /**
- * Set content for a specific tab and save state
+ * Get input content for a specific tab
  */
-export function setTabContent(state, tabNum, content) {
-    state.tabs[tabNum] = content;
+export function getTabInput(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        return tab.input || DEFAULT_CONTENT;
+    }
+    return DEFAULT_CONTENT;
+}
+
+/**
+ * Set input content for a specific tab and save state
+ */
+export function setTabInput(state, tabNum, input) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].input = input;
+    saveState(state);
+}
+
+/**
+ * Get slider value for a specific tab (clamped to min/max)
+ */
+export function getTabSliderValue(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        const min = tab.sliderMin ?? DEFAULT_SLIDER_MIN;
+        const max = tab.sliderMax ?? DEFAULT_SLIDER_MAX;
+        const value = tab.sliderValue ?? DEFAULT_SLIDER_VALUE;
+        // Clamp to current min/max bounds
+        return Math.max(min, Math.min(max, value));
+    }
+    return DEFAULT_SLIDER_VALUE;
+}
+
+/**
+ * Set slider value for a specific tab and save state
+ */
+export function setTabSliderValue(state, tabNum, value) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].sliderValue = value;
+    saveState(state);
+}
+
+/**
+ * Get slider min for a specific tab
+ */
+export function getTabSliderMin(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        return tab.sliderMin ?? DEFAULT_SLIDER_MIN;
+    }
+    return DEFAULT_SLIDER_MIN;
+}
+
+/**
+ * Get slider max for a specific tab
+ */
+export function getTabSliderMax(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        return tab.sliderMax ?? DEFAULT_SLIDER_MAX;
+    }
+    return DEFAULT_SLIDER_MAX;
+}
+
+/**
+ * Get slider range preset for a specific tab
+ */
+export function getTabSliderRange(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        return tab.sliderRange ?? DEFAULT_SLIDER_RANGE;
+    }
+    return DEFAULT_SLIDER_RANGE;
+}
+
+/**
+ * Set slider range preset for a specific tab and save state
+ */
+export function setTabSliderRange(state, tabNum, range) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].sliderRange = range;
+    saveState(state);
+}
+
+/**
+ * Get slider step for a specific tab
+ */
+export function getTabSliderStep(state, tabNum) {
+    const tab = state.tabs[tabNum];
+    if (tab && typeof tab === 'object') {
+        return tab.sliderStep ?? DEFAULT_SLIDER_STEP;
+    }
+    return DEFAULT_SLIDER_STEP;
+}
+
+/**
+ * Set slider step for a specific tab and save state
+ */
+export function setTabSliderStep(state, tabNum, step) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].sliderStep = step;
+    saveState(state);
+}
+
+/**
+ * Set slider min for a specific tab and save state
+ */
+export function setTabSliderMin(state, tabNum, min) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].sliderMin = min;
+    saveState(state);
+}
+
+/**
+ * Set slider max for a specific tab and save state
+ */
+export function setTabSliderMax(state, tabNum, max) {
+    ensureTab(state, tabNum);
+    state.tabs[tabNum].sliderMax = max;
     saveState(state);
 }

@@ -42,3 +42,20 @@ export const PNG_RESOLUTIONS = {
 export const MOBILE_BREAKPOINT = 768;
 export const VALID_MOBILE_LAYOUTS = ['svg', 'xml'];
 export const DEFAULT_MOBILE_LAYOUT = 'svg';
+
+// Slider defaults
+export const DEFAULT_SLIDER_VALUE = 0;
+export const DEFAULT_SLIDER_MIN = 0;
+export const DEFAULT_SLIDER_MAX = 1000;
+export const DEFAULT_SLIDER_RANGE = 'off';  // Default to slider hidden
+export const DEFAULT_SLIDER_STEP = 1;
+
+// Slider range presets: { min, max, step, label }
+export const SLIDER_RANGES = {
+    'off': null,  // Hide slider
+    '0-1': { min: 0, max: 1, step: 0.01, label: '0-1' },
+    '0-100': { min: 0, max: 100, step: 1, label: '0-100' },
+    '0-255': { min: 0, max: 255, step: 1, label: '0-255' },
+    '0-360': { min: 0, max: 360, step: 1, label: '0-360' },
+    '0-1000': { min: 0, max: 1000, step: 1, label: '0-1000' }
+};
