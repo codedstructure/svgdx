@@ -5,6 +5,8 @@ body {
     margin: 0;
     /* Prevent pull-to-refresh on mobile */
     overscroll-behavior: none;
+    /* Disable browser pinch-to-zoom - we handle zoom in SVG output */
+    touch-action: pan-x pan-y;
 }
 
 .container {
@@ -178,6 +180,8 @@ body {
 
 .CodeMirror {
     height: 100%;
+    /* Disable browser pinch-to-zoom within CodeMirror */
+    touch-action: pan-x pan-y;
 }
 
 svg {
