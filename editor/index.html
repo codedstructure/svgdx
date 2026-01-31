@@ -33,13 +33,20 @@
         <div id="controls">
           <div id="error-output"></div>
           <div style="display: inline-block">
-            <div id="layout-popup" class="popup-container">
+            <div id="layout-popup" class="popup-container desktop-only">
               <button id="layout" data-info="Change the editor layout">Layout</button>
               <div class="popup-buttons">
                 <button class="popup-button" id="layout-vertical">Vertical</button>
                 <button class="popup-button" id="layout-horizontal">Horizontal</button>
                 <button class="popup-button" id="layout-v-text">Vertical (SVG+text)</button>
                 <button class="popup-button" id="layout-h-text">Horizontal (SVG+text)</button>
+              </div>
+            </div>
+            <div id="mobile-layout-popup" class="popup-container mobile-only">
+              <button id="mobile-layout" data-info="Toggle output type">Layout</button>
+              <div class="popup-buttons">
+                <button class="popup-button" id="mobile-layout-svg">SVG output</button>
+                <button class="popup-button" id="mobile-layout-xml">XML output</button>
               </div>
             </div>
 

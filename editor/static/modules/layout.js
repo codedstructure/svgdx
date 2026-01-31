@@ -1,8 +1,26 @@
 // Layout module - handles editor layout modes
 
-import { VALID_LAYOUTS, DEFAULT_LAYOUT } from './config.js';
+import { VALID_LAYOUTS, DEFAULT_LAYOUT, MOBILE_BREAKPOINT, VALID_MOBILE_LAYOUTS, DEFAULT_MOBILE_LAYOUT } from './config.js';
 import { container, editorContainer, outputContainer, svgOutputContainer, textOutputContainer } from './dom.js';
 import { saveState } from './storage.js';
+
+/**
+ * Check if we're in mobile mode (either dimension < breakpoint)
+ */
+export function isMobile() {
+    return window.innerWidth < MOBILE_BREAKPOINT || window.innerHeight < MOBILE_BREAKPOINT;
+}
+
+/**
+ * Get mobile orientation based on dimensions
+ * Only meaningful when both dimensions are < breakpoint
+ */
+export function getMobileOrientation() {
+    if (window.innerHeight > window.innerWidth) {
+        return 'portrait'; // input on top, output below
+    }
+    return 'landscape'; // input on left, output on right
+}
 
 /**
  * Get the orientation (horizontal/vertical) for a layout selection
@@ -67,7 +85,7 @@ export function resetSplitter(targetContainer, otherContainer, orientation) {
 }
 
 /**
- * Update the layout based on selection
+ * Update the layout based on selection (desktop mode)
  */
 export function updateLayout(selection, onUpdate) {
     // Reset all containers to initial state
@@ -108,6 +126,60 @@ export function updateLayout(selection, onUpdate) {
 }
 
 /**
+ * Update the mobile layout (SVG or XML output)
+ */
+export function updateMobileLayout(mobileLayout, onUpdate) {
+    // Reset containers
+    for (const el of [editorContainer, outputContainer, svgOutputContainer, textOutputContainer]) {
+        el.classList.remove('maximized', 'minimized');
+        el.style.width = '';
+        el.style.minWidth = '';
+        el.style.height = '';
+        el.style.minHeight = '';
+    }
+
+    // Determine orientation
+    const orientation = getMobileOrientation();
+    container.dataset.layout = orientation === 'portrait' ? 'horizontal' : 'vertical';
+    container.dataset.mobile = 'true';
+
+    // Set editor size based on orientation
+    if (orientation === 'portrait') {
+        setDefaultHeight(editorContainer);
+    } else {
+        setDefaultWidth(editorContainer);
+    }
+
+    // Show SVG or XML based on mobile layout setting
+    if (mobileLayout === 'xml') {
+        svgOutputContainer.classList.add('minimized');
+        textOutputContainer.classList.add('maximized');
+    } else {
+        svgOutputContainer.classList.add('maximized');
+        textOutputContainer.classList.add('minimized');
+    }
+
+    // Trigger update callback
+    if (onUpdate) {
+        onUpdate();
+    }
+}
+
+/**
+ * Apply the correct layout based on current viewport
+ */
+export function applyResponsiveLayout(state, onUpdate) {
+    if (isMobile()) {
+        container.dataset.mobile = 'true';
+        updateMobileLayout(state.mobileLayout, onUpdate);
+    } else {
+        container.dataset.mobile = 'false';
+        container.dataset.layout = layoutOrientation(state.layout);
+        updateLayout(state.layout, onUpdate);
+    }
+}
+
+/**
  * Initialize layout functionality
  * @param {Object} state - Application state object
  * @param {Function} onUpdate - Callback when layout changes
@@ -117,11 +189,14 @@ export function initLayout(state, onUpdate) {
     if (!VALID_LAYOUTS.includes(state.layout)) {
         state.layout = DEFAULT_LAYOUT;
     }
+    if (!VALID_MOBILE_LAYOUTS.includes(state.mobileLayout)) {
+        state.mobileLayout = DEFAULT_MOBILE_LAYOUT;
+    }
 
-    container.dataset.layout = layoutOrientation(state.layout);
-    updateLayout(state.layout, onUpdate);
+    // Apply initial layout
+    applyResponsiveLayout(state, onUpdate);
 
-    // Set up layout button handlers
+    // Set up desktop layout button handlers
     document.querySelectorAll('#layout-popup .popup-button').forEach(el => {
         el.addEventListener('click', (e) => {
             hidePopup();
@@ -140,6 +215,36 @@ export function initLayout(state, onUpdate) {
             container.dataset.layout = layoutOrientation(selection);
             updateLayout(selection, onUpdate);
         });
+    });
+
+    // Set up mobile layout button handlers
+    document.querySelectorAll('#mobile-layout-popup .popup-button').forEach(el => {
+        el.addEventListener('click', (e) => {
+            hidePopup();
+
+            const id = e.target.id;
+            const selection = id.replace('mobile-layout-', '');
+
+            if (!VALID_MOBILE_LAYOUTS.includes(selection)) {
+                console.error(`Unknown mobile layout: ${selection}`);
+                return;
+            }
+
+            state.mobileLayout = selection;
+            saveState(state);
+
+            updateMobileLayout(selection, onUpdate);
+        });
+    });
+
+    // Listen for window resize to switch between mobile/desktop layouts
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        // Debounce resize events
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            applyResponsiveLayout(state, onUpdate);
+        }, 100);
     });
 }
 

@@ -310,74 +310,115 @@ a:focus {
     text-decoration: underline;
 }
 
-/* Mobile responsive styles */
-@media (max-width: 768px) {
-    .container {
-        flex-direction: column !important;
-        padding: 5px;
-        height: calc(100svh - 60px);
+/* Mobile/desktop visibility classes - controlled via JS data-mobile attribute */
+.container[data-mobile="true"] .desktop-only {
+    display: none !important;
+}
+
+.container[data-mobile="false"] .mobile-only {
+    display: none !important;
+}
+
+/* Default to showing desktop-only when data-mobile not set */
+.container:not([data-mobile]) .mobile-only {
+    display: none !important;
+}
+
+/* Mobile layout styles - triggered by JS when either dimension < 768px */
+.container[data-mobile="true"] {
+    padding: 5px;
+    height: calc(100svh - 60px);
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] {
+    /* Portrait mode - editor on top, output below */
+    flex-direction: column !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #editor-container {
+    min-height: 150px;
+    width: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #output-container {
+    flex-direction: column !important;
+    width: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #main-split {
+    cursor: row-resize !important;
+    background: linear-gradient(#eee, #aaa) !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] {
+    /* Landscape mode - editor on left, output on right */
+    flex-direction: row !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #editor-container {
+    min-width: 150px;
+    height: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #output-container {
+    flex-direction: column !important;
+    height: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #main-split {
+    cursor: col-resize !important;
+    background: linear-gradient(90deg, #eee, #aaa) !important;
+}
+
+/* Hide secondary splitter on mobile since only one output is shown */
+.container[data-mobile="true"] #output-split {
+    display: none;
+}
+
+/* Adjust splitter for touch on mobile */
+.container[data-mobile="true"] .splitter {
+    min-height: 16px;
+    min-width: 16px;
+}
+
+/* Larger tap targets for buttons on mobile */
+.container[data-mobile="true"] ~ header button,
+.container[data-mobile="true"] button,
+body:has(.container[data-mobile="true"]) button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 8px 12px;
+}
+
+/* Stack control buttons on mobile */
+.container[data-mobile="true"] ~ header #controls div {
+    margin: 5px;
+}
+
+/* Reduce header size on mobile */
+body:has(.container[data-mobile="true"]) header {
+    padding: 5px 10px;
+}
+
+body:has(.container[data-mobile="true"]) header h1 {
+    font-size: 20px;
+}
+
+/* Statusbar smaller on mobile */
+.container[data-mobile="true"] #statusbar {
+    font-size: 12px;
+}
+
+/* Fallback media query for initial load before JS runs */
+@media (max-width: 768px), (max-height: 768px) {
+    /* Hide desktop layout button, show mobile */
+    .desktop-only {
+        display: none !important;
     }
 
-    /* Force vertical stacking on mobile */
-    .container[data-layout="vertical"],
-    .container[data-layout="horizontal"] {
-        flex-direction: column !important;
-    }
-
-    #editor-container {
-        min-height: 200px;
-        max-height: 50vh;
-        width: 100% !important;
-    }
-
-    #output-container {
-        flex-direction: column !important;
-    }
-
-    /* Hide text output by default on mobile */
-    #text-output {
-        display: none;
-    }
-
-    /* Adjust splitter for touch */
-    .splitter {
-        min-height: 16px;
-        min-width: 16px;
-    }
-
-    #main-split {
-        cursor: row-resize !important;
-        background: linear-gradient(#eee, #aaa) !important;
-    }
-
-    /* Larger tap targets for buttons */
-    button {
-        min-height: 44px;
-        min-width: 44px;
-        padding: 8px 12px;
-    }
-
-    #tabs button {
-        padding: 8px;
-    }
-
-    /* Stack control buttons */
-    #controls div {
-        margin: 5px;
-    }
-
-    /* Reduce header size */
-    header {
-        padding: 5px 10px;
-    }
-
-    header h1 {
-        font-size: 20px;
-    }
-
-    /* Statusbar at bottom, smaller */
-    #statusbar {
-        font-size: 12px;
+    /* Only show mobile-only when not overridden by JS */
+    .container:not([data-mobile="false"]) .mobile-only {
+        display: inline-flex !important;
     }
 }
 

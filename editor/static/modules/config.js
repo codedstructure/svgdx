@@ -37,3 +37,8 @@ export const PNG_RESOLUTIONS = {
     'copy-png-small': 512,
     'copy-png-tiny': 128
 };
+
+// Mobile layout settings
+export const MOBILE_BREAKPOINT = 768;
+export const VALID_MOBILE_LAYOUTS = ['svg', 'xml'];
+export const DEFAULT_MOBILE_LAYOUT = 'svg';

@@ -1,7 +1,7 @@
 // Storage module - handles localStorage with versioned JSON blob
 // Includes migration from legacy storage format
 
-import { STORAGE_VERSION, DEFAULT_CONTENT, VALID_LAYOUTS, DEFAULT_LAYOUT } from './config.js';
+import { STORAGE_VERSION, DEFAULT_CONTENT, VALID_LAYOUTS, DEFAULT_LAYOUT, VALID_MOBILE_LAYOUTS, DEFAULT_MOBILE_LAYOUT } from './config.js';
 
 const STORAGE_KEY = 'svgdx-state';
 
@@ -22,6 +22,7 @@ function createDefaultState() {
         activeTab: '1',
         autoViewbox: true,
         layout: DEFAULT_LAYOUT,
+        mobileLayout: DEFAULT_MOBILE_LAYOUT,
         tabs: {}
     };
 }
@@ -127,6 +128,7 @@ export function loadState() {
             activeTab: state.activeTab || '1',
             autoViewbox: state.autoViewbox !== false, // default true
             layout: VALID_LAYOUTS.includes(state.layout) ? state.layout : DEFAULT_LAYOUT,
+            mobileLayout: VALID_MOBILE_LAYOUTS.includes(state.mobileLayout) ? state.mobileLayout : DEFAULT_MOBILE_LAYOUT,
             tabs: state.tabs || {}
         };
     } catch (e) {
