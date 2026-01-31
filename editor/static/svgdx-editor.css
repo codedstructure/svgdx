@@ -1,12 +1,26 @@
-body { font-family: sans-serif; margin: 0; }
+/* svgdx editor styles */
+
+body {
+    font-family: sans-serif;
+    margin: 0;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior: none;
+}
+
 .container {
     display: flex;
     flex: 1 1 auto;
     height: calc(100svh - 70px);
     padding: 10px;
 }
-.container[data-layout="vertical"] { flex-direction: row; }
-.container[data-layout="horizontal"] { flex-direction: column; }
+
+.container[data-layout="vertical"] {
+    flex-direction: row;
+}
+
+.container[data-layout="horizontal"] {
+    flex-direction: column;
+}
 
 #editor-container {
     border: 1px solid #ccc;
@@ -25,6 +39,7 @@ body { font-family: sans-serif; margin: 0; }
 .minimized {
     display: none !important;
 }
+
 .maximized {
     display: block;
 }
@@ -32,94 +47,216 @@ body { font-family: sans-serif; margin: 0; }
 .output-panel {
     border: 1px solid #ccc;
 }
+
 #output-container .CodeMirror-scroll {
     background: #f8f8f8;
 }
+
 #output-container.error .CodeMirror-scroll {
     opacity: 0.3;
 }
+
 #editor-container.error .CodeMirror-scroll {
     background-color: #fff8f8;
 }
 
-#editor-container, #svg-output, #text-output {
+#editor-container,
+#svg-output,
+#text-output {
     margin: 0;
     height: 100%;
     width: 100%;
 }
-#svg-output { overflow: hidden; }
-#text-output { overflow-y: auto; }
+
+#svg-output {
+    overflow: hidden;
+    /* Enable touch-action for pan support */
+    touch-action: none;
+}
+
+#text-output {
+    overflow-y: auto;
+}
 
 #editor-container {
     display: flex;
     flex-direction: column;
 }
+
 #editor {
     flex: 1 1 auto;
     overflow-y: auto;
     border-top: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
 }
-#controls div { margin: 10px; }
+
+#controls div {
+    margin: 10px;
+}
+
 #error-output {
     color: red;
     font-family: monospace;
     max-height: 120px;
     overflow-y: auto;
 }
-#statusbar { font-family: monospace; }
 
+#statusbar {
+    font-family: monospace;
+}
+
+/* Splitter styles */
 .splitter {
     min-width: 8px;
     min-height: 8px;
     flex: none;
     z-index: 1000;
+    /* Enable touch interaction */
+    touch-action: none;
 }
+
 .container[data-layout="horizontal"] {
-    #main-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
-    #main-split:hover { background: linear-gradient(#bbb, #888) }
-    #main-split:active { background: linear-gradient(#ccc, #eee) }
-    #output-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
-    #output-split:hover { background: linear-gradient(90deg, #bbb, #888) }
-    #output-split:active { background: linear-gradient(90deg, #ccc, #eee) }
-    #output-container { flex-direction: row; }
+    #main-split {
+        cursor: row-resize;
+        background: linear-gradient(#eee, #aaa);
+    }
+    #main-split:hover {
+        background: linear-gradient(#bbb, #888);
+    }
+    #main-split:active {
+        background: linear-gradient(#ccc, #eee);
+    }
+    #output-split {
+        cursor: col-resize;
+        background: linear-gradient(90deg, #eee, #aaa);
+    }
+    #output-split:hover {
+        background: linear-gradient(90deg, #bbb, #888);
+    }
+    #output-split:active {
+        background: linear-gradient(90deg, #ccc, #eee);
+    }
+    #output-container {
+        flex-direction: row;
+    }
 }
+
 .container[data-layout="vertical"] {
-    #main-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
-    #main-split:hover { background: linear-gradient(90deg, #bbb, #888) }
-    #main-split:active { background: linear-gradient(90deg, #ccc, #eee) }
-    #output-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
-    #output-split:hover { background: linear-gradient(#bbb, #888) }
-    #output-split:active { background: linear-gradient(#ccc, #eee) }
-    #output-container { flex-direction: column; }
+    #main-split {
+        cursor: col-resize;
+        background: linear-gradient(90deg, #eee, #aaa);
+    }
+    #main-split:hover {
+        background: linear-gradient(90deg, #bbb, #888);
+    }
+    #main-split:active {
+        background: linear-gradient(90deg, #ccc, #eee);
+    }
+    #output-split {
+        cursor: row-resize;
+        background: linear-gradient(#eee, #aaa);
+    }
+    #output-split:hover {
+        background: linear-gradient(#bbb, #888);
+    }
+    #output-split:active {
+        background: linear-gradient(#ccc, #eee);
+    }
+    #output-container {
+        flex-direction: column;
+    }
 }
 
-.CodeMirror .error-line { background-color: #ffdddd; }
-.CodeMirror .hover-line { background-color: #f0f0f0; }
-.CodeMirror { height: 100%; }
+/* CodeMirror overrides */
+.CodeMirror .error-line {
+    background-color: #ffdddd;
+}
 
-svg { width: 100%; height: 100%; }
+.CodeMirror .hover-line {
+    background-color: #f0f0f0;
+}
 
-button { background-color: #eee; border-radius: 2px; box-shadow: 2px 2px 3px #000; border: none; }
-#tabs { padding: 10px; }
-#tabs button { border-radius: 0px; margin: 3px; }
-button:hover, button:focus { box-shadow: 1px 1px 2px #000; }
-button:active { box-shadow: inset 1px 1px 2px #000; }
-button[data-checked="true"] { background-color: #ccc; box-shadow: inset 1px 1px 2px #000; }
-button[data-checked="true"]:hover, button[data-checked="true"]:focus { box-shadow: inset 2px 2px 3px #000; }
-button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
+.CodeMirror {
+    height: 100%;
+}
 
-/* outer popup container - must be relative */
-#controls div.popup-container { display: inline-flex; position: relative; margin: 0; padding: 0; }
-/* popup buttons appear immediately above the previous button */
-#controls div.popup-buttons { position: absolute; bottom: 100%; margin: 0; }
+svg {
+    width: 100%;
+    height: 100%;
+}
 
-/* hide popup buttons by default */
-#controls div .popup-button { display: none; width: 100%; }
-/* initial reveal */
-#controls div button:hover ~ .popup-buttons .popup-button { display: block; }
-/* keep shown when hovering over popup */
-#controls .popup-buttons:hover .popup-button { display: block; }
+/* Button styles */
+button {
+    background-color: #eee;
+    border-radius: 2px;
+    box-shadow: 2px 2px 3px #000;
+    border: none;
+    /* Minimum touch target size */
+    min-height: 32px;
+    min-width: 32px;
+    padding: 4px 8px;
+}
+
+#tabs {
+    padding: 10px;
+}
+
+#tabs button {
+    border-radius: 0px;
+    margin: 3px;
+}
+
+button:hover,
+button:focus {
+    box-shadow: 1px 1px 2px #000;
+}
+
+button:active {
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+button[data-checked="true"] {
+    background-color: #ccc;
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+button[data-checked="true"]:hover,
+button[data-checked="true"]:focus {
+    box-shadow: inset 2px 2px 3px #000;
+}
+
+button[data-checked="true"]:active {
+    box-shadow: inset 3px 3px 4px #000;
+}
+
+/* Popup container styles */
+#controls div.popup-container {
+    display: inline-flex;
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+#controls div.popup-buttons {
+    position: absolute;
+    bottom: 100%;
+    margin: 0;
+}
+
+/* Hide popup buttons by default */
+#controls div .popup-button {
+    display: none;
+    width: 100%;
+}
+
+/* Show on hover */
+#controls div button:hover ~ .popup-buttons .popup-button {
+    display: block;
+}
+
+#controls .popup-buttons:hover .popup-button {
+    display: block;
+}
 
 .popup-buttons button {
     display: block;
@@ -127,34 +264,128 @@ button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
     border-radius: 0;
     border: 1px solid #ccc;
 }
-/* avoid double border */
-.popup-buttons button + button { border-top: none; }
 
-/* interactive appearance for hover buttons */
-.popup-button:hover { background-color: #ddd; }
-.popup-button:active { background-color: #bbb; }
+/* Avoid double border */
+.popup-buttons button + button {
+    border-top: none;
+}
 
+.popup-button:hover {
+    background-color: #ddd;
+}
+
+.popup-button:active {
+    background-color: #bbb;
+}
+
+/* Header styles */
 header {
-    padding:10px;
+    padding: 10px;
     display: flex;
     background: #dde;
     justify-content: space-between;
 }
+
 header h1 {
     margin: 0;
     padding: 0;
     font-size: 24px;
 }
+
 header span {
     align-content: center;
 }
+
 header a {
     color: #000;
     font-size: 14px;
 }
+
 a {
     text-decoration: none;
 }
-a:hover, a:focus {
+
+a:hover,
+a:focus {
     text-decoration: underline;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column !important;
+        padding: 5px;
+        height: calc(100svh - 60px);
+    }
+
+    /* Force vertical stacking on mobile */
+    .container[data-layout="vertical"],
+    .container[data-layout="horizontal"] {
+        flex-direction: column !important;
+    }
+
+    #editor-container {
+        min-height: 200px;
+        max-height: 50vh;
+        width: 100% !important;
+    }
+
+    #output-container {
+        flex-direction: column !important;
+    }
+
+    /* Hide text output by default on mobile */
+    #text-output {
+        display: none;
+    }
+
+    /* Adjust splitter for touch */
+    .splitter {
+        min-height: 16px;
+        min-width: 16px;
+    }
+
+    #main-split {
+        cursor: row-resize !important;
+        background: linear-gradient(#eee, #aaa) !important;
+    }
+
+    /* Larger tap targets for buttons */
+    button {
+        min-height: 44px;
+        min-width: 44px;
+        padding: 8px 12px;
+    }
+
+    #tabs button {
+        padding: 8px;
+    }
+
+    /* Stack control buttons */
+    #controls div {
+        margin: 5px;
+    }
+
+    /* Reduce header size */
+    header {
+        padding: 5px 10px;
+    }
+
+    header h1 {
+        font-size: 20px;
+    }
+
+    /* Statusbar at bottom, smaller */
+    #statusbar {
+        font-size: 12px;
+    }
+}
+
+/* Touch device specific - show popups on tap */
+@media (pointer: coarse) {
+    /* On touch devices, popups need different handling */
+    /* The JS will toggle visibility on tap */
+    .popup-container.popup-open .popup-buttons .popup-button {
+        display: block;
+    }
 }
