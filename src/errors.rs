@@ -80,8 +80,11 @@ impl std::fmt::Display for Error {
             Error::Multi(errors) => {
                 let mut errs = errors.iter().collect::<Vec<_>>();
                 errs.sort_by(|a, b| a.0.cmp(b.0));
-                for (_, (el, err)) in errs {
-                    write!(f, "\n {:>4}: {}: {}", el.src_line, el.original, err)?;
+                for (idx, (_, (el, err))) in errs.iter().enumerate() {
+                    if idx != 0 {
+                        writeln!(f)?;
+                    }
+                    write!(f, "{:>4}: {}: {}", el.src_line, el.original, err)?;
                 }
                 Ok(())
             }

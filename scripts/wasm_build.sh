@@ -9,7 +9,7 @@ OUT_DIR="$(dirname $MANIFEST_PATH)/editor/pkg"
 echo "Ensuring wasm-pack is installed..."
 cargo install wasm-pack
 echo "Building WASM to ${OUT_DIR} ..."
-wasm-pack build "${PROFILE_ARG}" --out-dir "${OUT_DIR}" --target web --no-default-features --no-typescript --no-pack
+wasm-pack build "${PROFILE_ARG}" --out-dir "${OUT_DIR}" --target web --no-typescript --no-pack --no-default-features --features json
 echo
 echo "Generated files:"
 ls -l "${OUT_DIR}"

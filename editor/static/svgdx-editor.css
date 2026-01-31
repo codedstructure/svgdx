@@ -1,12 +1,32 @@
-body { font-family: sans-serif; margin: 0; }
+/* svgdx editor styles */
+
+body {
+    font-family: sans-serif;
+    margin: 0;
+    /* Prevent pull-to-refresh on mobile */
+    overscroll-behavior: none;
+    /* Disable browser pinch-to-zoom - we handle zoom in SVG output */
+    touch-action: pan-x pan-y;
+    /* Full height flex column layout */
+    height: 100svh;
+    display: flex;
+    flex-direction: column;
+}
+
 .container {
     display: flex;
     flex: 1 1 auto;
-    height: calc(100svh - 70px);
+    min-height: 0; /* Allow shrinking below content size */
     padding: 10px;
 }
-.container[data-layout="vertical"] { flex-direction: row; }
-.container[data-layout="horizontal"] { flex-direction: column; }
+
+.container[data-layout="vertical"] {
+    flex-direction: row;
+}
+
+.container[data-layout="horizontal"] {
+    flex-direction: column;
+}
 
 #editor-container {
     border: 1px solid #ccc;
@@ -25,6 +45,7 @@ body { font-family: sans-serif; margin: 0; }
 .minimized {
     display: none !important;
 }
+
 .maximized {
     display: block;
 }
@@ -32,129 +53,517 @@ body { font-family: sans-serif; margin: 0; }
 .output-panel {
     border: 1px solid #ccc;
 }
+
 #output-container .CodeMirror-scroll {
     background: #f8f8f8;
 }
+
 #output-container.error .CodeMirror-scroll {
     opacity: 0.3;
 }
+
 #editor-container.error .CodeMirror-scroll {
     background-color: #fff8f8;
 }
 
-#editor-container, #svg-output, #text-output {
+#editor-container,
+#svg-output,
+#text-output {
     margin: 0;
     height: 100%;
     width: 100%;
 }
-#svg-output { overflow: hidden; }
-#text-output { overflow-y: auto; }
+
+#svg-output {
+    overflow: hidden;
+    /* Enable touch-action for pan support */
+    touch-action: none;
+}
+
+#text-output {
+    overflow-y: auto;
+}
 
 #editor-container {
     display: flex;
     flex-direction: column;
 }
+
 #editor {
     flex: 1 1 auto;
     overflow-y: auto;
     border-top: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
 }
-#controls div { margin: 10px; }
+
+#statusbar-container {
+    flex: none;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 8px;
+    border-top: 1px solid #ccc;
+    background: #f8f8f8;
+    gap: 8px;
+}
+
+#statusbar {
+    font-family: monospace;
+    margin: 0;
+    font-size: 12px;
+    flex: 1;
+}
+
 #error-output {
+    display: none;
+    flex: none;
     color: red;
     font-family: monospace;
-    max-height: 120px;
+    font-size: 12px;
+    max-height: 6em;
     overflow-y: auto;
+    padding: 4px 8px;
+    background: #fff0f0;
+    border-top: 1px solid #fcc;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 }
-#statusbar { font-family: monospace; }
 
+#error-output:not(:empty) {
+    display: block;
+}
+
+/* Splitter styles */
 .splitter {
     min-width: 8px;
     min-height: 8px;
     flex: none;
-    z-index: 1000;
+    z-index: 50;
+    /* Enable touch interaction */
+    touch-action: none;
 }
+
 .container[data-layout="horizontal"] {
-    #main-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
-    #main-split:hover { background: linear-gradient(#bbb, #888) }
-    #main-split:active { background: linear-gradient(#ccc, #eee) }
-    #output-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
-    #output-split:hover { background: linear-gradient(90deg, #bbb, #888) }
-    #output-split:active { background: linear-gradient(90deg, #ccc, #eee) }
-    #output-container { flex-direction: row; }
+    #main-split {
+        cursor: row-resize;
+        background: linear-gradient(#eee, #aaa);
+    }
+    #main-split:hover {
+        background: linear-gradient(#bbb, #888);
+    }
+    #main-split:active {
+        background: linear-gradient(#ccc, #eee);
+    }
+    #output-split {
+        cursor: col-resize;
+        background: linear-gradient(90deg, #eee, #aaa);
+    }
+    #output-split:hover {
+        background: linear-gradient(90deg, #bbb, #888);
+    }
+    #output-split:active {
+        background: linear-gradient(90deg, #ccc, #eee);
+    }
+    #output-container {
+        flex-direction: row;
+    }
 }
+
 .container[data-layout="vertical"] {
-    #main-split { cursor: col-resize; background: linear-gradient(90deg, #eee, #aaa) }
-    #main-split:hover { background: linear-gradient(90deg, #bbb, #888) }
-    #main-split:active { background: linear-gradient(90deg, #ccc, #eee) }
-    #output-split { cursor: row-resize; background: linear-gradient(#eee, #aaa) }
-    #output-split:hover { background: linear-gradient(#bbb, #888) }
-    #output-split:active { background: linear-gradient(#ccc, #eee) }
-    #output-container { flex-direction: column; }
+    #main-split {
+        cursor: col-resize;
+        background: linear-gradient(90deg, #eee, #aaa);
+    }
+    #main-split:hover {
+        background: linear-gradient(90deg, #bbb, #888);
+    }
+    #main-split:active {
+        background: linear-gradient(90deg, #ccc, #eee);
+    }
+    #output-split {
+        cursor: row-resize;
+        background: linear-gradient(#eee, #aaa);
+    }
+    #output-split:hover {
+        background: linear-gradient(#bbb, #888);
+    }
+    #output-split:active {
+        background: linear-gradient(#ccc, #eee);
+    }
+    #output-container {
+        flex-direction: column;
+    }
 }
 
-.CodeMirror .error-line { background-color: #ffdddd; }
-.CodeMirror .hover-line { background-color: #f0f0f0; }
-.CodeMirror { height: 100%; }
+/* CodeMirror overrides */
+.CodeMirror .error-line {
+    background-color: #ffdddd;
+}
 
-svg { width: 100%; height: 100%; }
+.CodeMirror .hover-line {
+    background-color: #f0f0f0;
+}
 
-button { background-color: #eee; border-radius: 2px; box-shadow: 2px 2px 3px #000; border: none; }
-#tabs { padding: 10px; }
-#tabs button { border-radius: 0px; margin: 3px; }
-button:hover, button:focus { box-shadow: 1px 1px 2px #000; }
-button:active { box-shadow: inset 1px 1px 2px #000; }
-button[data-checked="true"] { background-color: #ccc; box-shadow: inset 1px 1px 2px #000; }
-button[data-checked="true"]:hover, button[data-checked="true"]:focus { box-shadow: inset 2px 2px 3px #000; }
-button[data-checked="true"]:active { box-shadow: inset 3px 3px 4px #000; }
+.CodeMirror {
+    height: 100%;
+    /* Disable browser pinch-to-zoom within CodeMirror */
+    touch-action: pan-x pan-y;
+}
 
-/* outer popup container - must be relative */
-#controls div.popup-container { display: inline-flex; position: relative; margin: 0; padding: 0; }
-/* popup buttons appear immediately above the previous button */
-#controls div.popup-buttons { position: absolute; bottom: 100%; margin: 0; }
+svg {
+    width: 100%;
+    height: 100%;
+}
 
-/* hide popup buttons by default */
-#controls div .popup-button { display: none; width: 100%; }
-/* initial reveal */
-#controls div button:hover ~ .popup-buttons .popup-button { display: block; }
-/* keep shown when hovering over popup */
-#controls .popup-buttons:hover .popup-button { display: block; }
+/* Button styles */
+button {
+    background-color: #eee;
+    border-radius: 2px;
+    box-shadow: 2px 2px 3px #000;
+    border: none;
+    margin: 0 2px;
+    /* Minimum touch target size */
+    min-height: 32px;
+    min-width: 32px;
+    padding: 4px 8px;
+}
+
+/* Toolbar styles */
+#toolbar {
+    flex: none;
+    display: flex;
+    background: #f4f4f4;
+    border-bottom: 1px solid #ccc;
+    position: relative;
+    z-index: 100;
+}
+
+#toolbar-scroll {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    flex: 1;
+    /* Hide scrollbar but allow scrolling */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+#toolbar-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Toolbar scroll buttons - intentionally not using regular button styles */
+.toolbar-scroll-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    min-width: 16px;
+    min-height: unset;
+    height: auto;
+    align-self: stretch;
+    background: #e8e8e8;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.toolbar-scroll-btn.scroll-left {
+    border-right: 1px solid #ccc;
+}
+
+.toolbar-scroll-btn.scroll-right {
+    border-left: 1px solid #ccc;
+}
+
+.toolbar-scroll-btn:hover {
+    background: #ddd;
+    color: #333;
+    box-shadow: none;
+}
+
+.toolbar-scroll-btn:active {
+    background: #ccc;
+    box-shadow: none;
+}
+
+/* Show scroll buttons based on scroll position */
+#toolbar.can-scroll-left .toolbar-scroll-btn.scroll-left {
+    display: flex;
+}
+
+#toolbar.can-scroll-right .toolbar-scroll-btn.scroll-right {
+    display: flex;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: #ccc;
+    margin: 0 5px;
+    flex-shrink: 0;
+}
+
+#tabs button {
+    min-width: 28px;
+    padding: 4px 6px;
+    border-radius: 2px;
+}
+
+button:hover,
+button:focus {
+    box-shadow: 1px 1px 2px #000;
+}
+
+button:active {
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+button[data-checked="true"] {
+    background-color: #ccc;
+    box-shadow: inset 1px 1px 2px #000;
+}
+
+button[data-checked="true"]:hover,
+button[data-checked="true"]:focus {
+    box-shadow: inset 2px 2px 3px #000;
+}
+
+button[data-checked="true"]:active {
+    box-shadow: inset 3px 3px 4px #000;
+}
+
+/* Popup container styles */
+.popup-container {
+    display: inline-flex;
+    position: relative;
+    margin: 0;
+    padding: 0;
+}
+
+.popup-buttons {
+    /* Use fixed positioning to escape overflow clipping */
+    position: fixed;
+    z-index: 2000;
+    margin: 0;
+    /* Will be positioned by JS */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+/* Show popup when container has show-popup class (set by JS) */
+.popup-container.show-popup .popup-buttons {
+    visibility: visible;
+    opacity: 1;
+}
+
+/* Hide popup buttons by default */
+.popup-container .popup-button {
+    display: block;
+    width: 100%;
+    white-space: nowrap;
+}
 
 .popup-buttons button {
     display: block;
     box-shadow: none;
     border-radius: 0;
     border: 1px solid #ccc;
+    background: #eee;
 }
-/* avoid double border */
-.popup-buttons button + button { border-top: none; }
 
-/* interactive appearance for hover buttons */
-.popup-button:hover { background-color: #ddd; }
-.popup-button:active { background-color: #bbb; }
+/* Avoid double border */
+.popup-buttons button + button {
+    border-top: none;
+}
 
+.popup-button:hover {
+    background-color: #ddd;
+}
+
+.popup-button:active {
+    background-color: #bbb;
+}
+
+/* Header styles */
 header {
-    padding:10px;
+    flex: none;
+    padding: 8px 12px;
     display: flex;
     background: #dde;
     justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
+
 header h1 {
     margin: 0;
     padding: 0;
     font-size: 24px;
 }
-header span {
-    align-content: center;
+
+header nav {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
+
 header a {
     color: #000;
     font-size: 14px;
 }
+
 a {
     text-decoration: none;
 }
-a:hover, a:focus {
+
+a:hover,
+a:focus {
     text-decoration: underline;
+}
+
+/* Mobile/desktop visibility classes - controlled via JS data-mobile attribute */
+/* Toolbar is outside container, so use body:has() for these */
+body:has(.container[data-mobile="true"]) .desktop-only {
+    display: none !important;
+}
+
+body:has(.container[data-mobile="false"]) .mobile-only {
+    display: none !important;
+}
+
+/* Default to showing desktop-only when data-mobile not set */
+body:has(.container:not([data-mobile])) .mobile-only {
+    display: none !important;
+}
+
+/* Mobile layout styles - triggered by JS when either dimension < 768px */
+.container[data-mobile="true"] {
+    padding: 5px;
+    /* Account for header ~45px, toolbar ~50px, statusbar ~30px */
+    height: calc(100svh - 115px);
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] {
+    /* Portrait mode - editor on top, output below */
+    flex-direction: column !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #editor-container {
+    min-height: 150px;
+    width: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #output-container {
+    flex-direction: column !important;
+    width: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="horizontal"] #main-split {
+    cursor: row-resize !important;
+    background: linear-gradient(#eee, #aaa) !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] {
+    /* Landscape mode - editor on left, output on right */
+    flex-direction: row !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #editor-container {
+    min-width: 150px;
+    height: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #output-container {
+    flex-direction: column !important;
+    height: 100% !important;
+}
+
+.container[data-mobile="true"][data-layout="vertical"] #main-split {
+    cursor: col-resize !important;
+    background: linear-gradient(90deg, #eee, #aaa) !important;
+}
+
+/* Hide secondary splitter on mobile since only one output is shown */
+.container[data-mobile="true"] #output-split {
+    display: none;
+}
+
+/* Adjust splitter for touch on mobile */
+.container[data-mobile="true"] .splitter {
+    min-height: 16px;
+    min-width: 16px;
+}
+
+/* Larger tap targets for buttons on mobile */
+.container[data-mobile="true"] button,
+body:has(.container[data-mobile="true"]) button {
+    min-height: 40px;
+    min-width: 40px;
+    padding: 6px 10px;
+}
+
+/* Toolbar adjustments for mobile */
+body:has(.container[data-mobile="true"]) #toolbar-scroll {
+    padding: 4px 6px;
+    gap: 2px;
+}
+
+body:has(.container[data-mobile="true"]) #tabs button {
+    min-width: 36px;
+    padding: 6px 8px;
+}
+
+/* Reduce header size on mobile */
+body:has(.container[data-mobile="true"]) header {
+    padding: 5px 10px;
+}
+
+body:has(.container[data-mobile="true"]) header h1 {
+    font-size: 20px;
+}
+
+/* Statusbar smaller on mobile */
+body:has(.container[data-mobile="true"]) #statusbar {
+    font-size: 11px;
+}
+
+/* Fallback media query for initial load before JS runs */
+@media (max-width: 768px), (max-height: 768px) {
+    /* Hide desktop layout button, show mobile */
+    .desktop-only {
+        display: none !important;
+    }
+
+    /* Only show mobile-only when not overridden by JS */
+    .container:not([data-mobile="false"]) .mobile-only {
+        display: inline-flex !important;
+    }
+}
+
+/* Touch device specific - show popups on tap */
+@media (pointer: coarse) {
+    /* On touch devices, popups need different handling */
+    /* The JS will toggle visibility on tap */
+    .popup-container.popup-open .popup-buttons .popup-button {
+        display: block;
+    }
 }
