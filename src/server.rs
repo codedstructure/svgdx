@@ -26,16 +26,6 @@ const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; sty
 struct RequestConfig {
     #[serde(default)]
     add_metadata: bool,
-    #[serde(default)]
-    format: ResponseFormat,
-}
-
-#[derive(Debug, Default, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-enum ResponseFormat {
-    #[default]
-    Json,
-    Raw,
 }
 
 impl From<RequestConfig> for TransformConfig {
@@ -50,11 +40,11 @@ impl From<RequestConfig> for TransformConfig {
 async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResponse {
     let Query(config) = config;
 
-    match config.format {
-        // for JSON format the config is included in the JSON request body
-        ResponseFormat::Json => transform_json_handler(input),
-        ResponseFormat::Raw => transform_raw_handler(input, config),
-    }
+    transform_raw_handler(input, config)
+}
+
+async fn transform_json(input: String) -> impl IntoResponse {
+    transform_json_handler(input)
 }
 
 fn transform_json_handler(input: String) -> Response<Body> {
@@ -236,7 +226,8 @@ pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) 
         .route("/favicon.ico", get(favicon))
         .route("/static/{*path}", get(static_file))
         .route("/svgdx-bootstrap.js", get(bootstrap))
-        .route("/api/transform", post(transform));
+        .route("/api/transform", post(transform))
+        .route("/api/transform_json", post(transform_json));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{addr}");
     if let Some(ready) = ready {

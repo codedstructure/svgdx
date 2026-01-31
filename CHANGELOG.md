@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   input) and 'warn' (inserting a comment prior to the errored element with the
   error message).
 
+- svgdx-editor: significant refactor and improved support for mobile devices
+  (small screen and touch support).
+
+- Added: svgdx-server now has an `/api/transform_json` endpoint which is used
+  in the reworked svgdx-editor.
+
 ## [0.26.1 - 2026-01-11]
 
 - Minor change: polyline connectors with only two points are no longer

@@ -77,7 +77,7 @@ async function transformViaServer(input, addMetadata) {
             }
         };
 
-        const response = await fetch('api/transform', {
+        const response = await fetch('api/transform_json', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -106,7 +106,7 @@ async function transformViaServer(input, addMetadata) {
     } catch (e) {
         statusbar.style.color = 'darkred';
         statusbar.innerText = `svgdx editor - error: ${e.message}`;
-        console.error('Error sending data to /api/transform', e);
+        console.error('Error sending data to /api/transform_json', e);
         return {
             ok: false,
             error: e.message,
