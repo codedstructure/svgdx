@@ -199,6 +199,7 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
         "modules/splitter.js" => include_js!("static/modules/splitter.js"),
         "modules/statusbar.js" => include_js!("static/modules/statusbar.js"),
         "modules/clipboard.js" => include_js!("static/modules/clipboard.js"),
+        "modules/toolbar.js" => include_js!("static/modules/toolbar.js"),
         // CodeMirror vendor files
         "vendor/cm5/codemirror.min.css" => {
             include_css!("static/vendor/cm5/codemirror.min.css")

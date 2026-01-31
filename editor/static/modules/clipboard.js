@@ -153,8 +153,8 @@ export function initClipboard(editor) {
         copyToClipboard('text/plain', getCleanSvg(editor));
     });
 
-    // Copy PNG buttons
-    document.querySelectorAll('#copy-popup .popup-button').forEach(el => {
+    // Copy PNG buttons (now in output popup)
+    document.querySelectorAll('#output-popup .popup-button[id^="copy-png"]').forEach(el => {
         el.addEventListener('click', async (e) => {
             hidePopup();
             const id = e.target.id;

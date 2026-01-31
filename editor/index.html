@@ -13,11 +13,18 @@
   <body>
     <header>
       <a href="/"><h1>svg<em>dx</em></h1></a>
-      <span><a target="_blank" href="https://github.com/codedstructure/svgdx"><strong>svg<em>dx</em></strong> on GitHub</a></span>
+      <nav>
+        <a target="_blank" href="https://www.w3.org/TR/SVG11/">SVG&nbsp;1.1</a>
+        <a target="_blank" href="https://www.w3.org/TR/SVG11/types.html#ColorKeywords">SVG Colors</a>
+        <a target="_blank" href="https://www.w3.org/TR/SVG2/">SVG&nbsp;2</a>
+        <a target="_blank" href="https://github.com/codedstructure/svgdx"> <strong>GitHub</strong></a>
+      </nav>
     </header>
-    <div class="container" data-layout="vertical">
-      <div id="editor-container">
-        <div id="tabs">
+    <div id="toolbar">
+      <button class="toolbar-scroll-btn scroll-left" aria-label="Scroll left">&lt;</button>
+      <div id="toolbar-scroll">
+        <!-- Tab selection -->
+        <div id="tabs" class="toolbar-group">
           <button data-tab-num="1">1</button>
           <button data-tab-num="2">2</button>
           <button data-tab-num="3">3</button>
@@ -29,65 +36,56 @@
           <button data-tab-num="9">9</button>
           <button data-tab-num="0">0</button>
         </div>
-        <div id="editor"></div>
-        <div id="controls">
-          <div id="error-output"></div>
-          <div style="display: inline-block">
-            <div id="layout-popup" class="popup-container desktop-only">
-              <button id="layout" data-info="Change the editor layout">Layout</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="layout-vertical">Vertical</button>
-                <button class="popup-button" id="layout-horizontal">Horizontal</button>
-                <button class="popup-button" id="layout-v-text">Vertical (SVG+text)</button>
-                <button class="popup-button" id="layout-h-text">Horizontal (SVG+text)</button>
-              </div>
-            </div>
-            <div id="mobile-layout-popup" class="popup-container mobile-only">
-              <button id="mobile-layout" data-info="Toggle output type">Layout</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="mobile-layout-svg">SVG output</button>
-                <button class="popup-button" id="mobile-layout-xml">XML output</button>
-              </div>
-            </div>
-
-            <button id="auto-viewbox" data-info="When active, auto-resize and center the SVG on update">Auto Fit</button>
-            <button id="reset-view" data-info="Resize and center the SVG">Reset View</button>
-            <div id="input-popup" class="popup-container">
-              <button id="input-copy-save" data-info="Save or copy input document">Input...</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="save-input" data-info="Download the input">Download</button>
-                <button class="popup-button" id="copy-input" data-info="Copy input to clipboard">Copy</button>
-              </div>
-            </div>
-            <div id="output-popup" class="popup-container">
-              <button id="output-copy-save" data-info="Save or copy SVG output">Output...</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="save-output" data-info="Download SVG output">Download</button>
-                <button class="popup-button" id="copy-output" data-info="Copy SVG output to clipboard">Copy</button>
-              </div>
-            </div>
-            <div id="copy-popup" class="popup-container">
-              <button id="copy-png" data-info="Copy as PNG to clipboard">Copy PNG</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="copy-png-big">Large (2048px)</button>
-                <button class="popup-button" id="copy-png-medium">Medium (1024px)</button>
-                <button class="popup-button" id="copy-png-small">Small (512px)</button>
-                <button class="popup-button" id="copy-png-tiny">Tiny (128px)</button>
-              </div>
-            </div>
-            <div id="help-popup" class="popup-container">
-              <button id="help" data-info="Show help links">Help</button>
-              <div class="popup-buttons">
-                <button class="popup-button" id="help-link-svg2"><a target="_blank" href="https://www.w3.org/TR/SVG2/">SVG&nbsp;2 Spec</a></button>
-                <button class="popup-button" id="help-link-svg"><a target="_blank" href="https://www.w3.org/TR/SVG11/">SVG&nbsp;1.1 Spec</a></button>
-                <button class="popup-button" id="help-link-svg-colors"><a target="_blank" href="https://www.w3.org/TR/SVG11/types.html#ColorKeywords">SVG&nbsp;1.1 Colors</a></button>
-              </div>
+        <div class="toolbar-separator"></div>
+        <!-- View controls -->
+        <div id="view-controls" class="toolbar-group">
+          <div id="layout-popup" class="popup-container desktop-only">
+            <button id="layout" data-info="Change the editor layout">Layout</button>
+            <div class="popup-buttons">
+              <button class="popup-button" id="layout-vertical">Vertical</button>
+              <button class="popup-button" id="layout-horizontal">Horizontal</button>
+              <button class="popup-button" id="layout-v-text">Vertical (SVG+text)</button>
+              <button class="popup-button" id="layout-h-text">Horizontal (SVG+text)</button>
             </div>
           </div>
-          <div style="position: inline-block;">
-            <pre id="statusbar">svgdx editor</pre>
+          <div id="mobile-layout-popup" class="popup-container mobile-only">
+            <button id="mobile-layout" data-info="Toggle output type">Layout</button>
+            <div class="popup-buttons">
+              <button class="popup-button" id="mobile-layout-svg">SVG output</button>
+              <button class="popup-button" id="mobile-layout-xml">XML output</button>
+            </div>
+          </div>
+          <button id="auto-viewbox" data-info="When active, auto-resize and center the SVG on update">Auto Fit</button>
+          <button id="reset-view" data-info="Resize and center the SVG">Reset View</button>
+        </div>
+        <div class="toolbar-separator"></div>
+        <!-- File I/O controls -->
+        <div id="file-controls" class="toolbar-group">
+          <div id="input-popup" class="popup-container">
+            <button id="input-copy-save" data-info="Save or copy input document">Input...</button>
+            <div class="popup-buttons">
+              <button class="popup-button" id="save-input" data-info="Download the input">Download</button>
+              <button class="popup-button" id="copy-input" data-info="Copy input to clipboard">Copy</button>
+            </div>
+          </div>
+          <div id="output-popup" class="popup-container">
+            <button id="output-copy-save" data-info="Save or copy SVG output">Output...</button>
+            <div class="popup-buttons">
+              <button class="popup-button" id="save-output" data-info="Download SVG output">Download SVG</button>
+              <button class="popup-button" id="copy-output" data-info="Copy SVG output to clipboard">Copy SVG</button>
+              <button class="popup-button" id="copy-png-big" data-info="Copy as large PNG">Copy PNG (2048px)</button>
+              <button class="popup-button" id="copy-png-medium" data-info="Copy as medium PNG">Copy PNG (1024px)</button>
+              <button class="popup-button" id="copy-png-small" data-info="Copy as small PNG">Copy PNG (512px)</button>
+              <button class="popup-button" id="copy-png-tiny" data-info="Copy as tiny PNG">Copy PNG (128px)</button>
+            </div>
           </div>
         </div>
+      </div>
+      <button class="toolbar-scroll-btn scroll-right" aria-label="Scroll right">&gt;</button>
+    </div>
+    <div class="container" data-layout="vertical">
+      <div id="editor-container">
+        <div id="editor"></div>
       </div>
       <div class="splitter" id="main-split"></div>
       <div id="output-container">
@@ -97,6 +95,10 @@
         <div class="splitter" id="output-split"></div>
         <div class="output-panel" id="text-output"></div>
       </div>
+    </div>
+    <div id="statusbar-container">
+      <div id="error-output"></div>
+      <pre id="statusbar">svgdx editor</pre>
     </div>
 
     <script src="static/vendor/cm5/codemirror.min.js"></script>

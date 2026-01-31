@@ -3,6 +3,10 @@
 import { VALID_LAYOUTS, DEFAULT_LAYOUT, MOBILE_BREAKPOINT, VALID_MOBILE_LAYOUTS, DEFAULT_MOBILE_LAYOUT } from './config.js';
 import { container, editorContainer, outputContainer, svgOutputContainer, textOutputContainer } from './dom.js';
 import { saveState } from './storage.js';
+import { hideAllPopups } from './toolbar.js';
+
+// Re-export for backward compatibility with other modules
+export { hideAllPopups as hidePopup };
 
 /**
  * Check if we're in mobile mode (either dimension < breakpoint)
@@ -199,7 +203,7 @@ export function initLayout(state, onUpdate) {
     // Set up desktop layout button handlers
     document.querySelectorAll('#layout-popup .popup-button').forEach(el => {
         el.addEventListener('click', (e) => {
-            hidePopup();
+            hideAllPopups();
 
             const id = e.target.id;
             const selection = id.replace('layout-', '');
@@ -220,7 +224,7 @@ export function initLayout(state, onUpdate) {
     // Set up mobile layout button handlers
     document.querySelectorAll('#mobile-layout-popup .popup-button').forEach(el => {
         el.addEventListener('click', (e) => {
-            hidePopup();
+            hideAllPopups();
 
             const id = e.target.id;
             const selection = id.replace('mobile-layout-', '');
@@ -246,24 +250,4 @@ export function initLayout(state, onUpdate) {
             applyResponsiveLayout(state, onUpdate);
         }, 100);
     });
-}
-
-/**
- * Hide popup menus after an action
- * This is a workaround for pure-CSS popups not having a close mechanism
- */
-export function hidePopup() {
-    setTimeout(() => {
-        // We make all the inner elements invisible, which will (should!) cause
-        // the popup to no longer be :hover, at which point it will be hidden...
-        document.querySelectorAll('.popup-buttons').forEach(e => {
-            e.style.display = 'none';
-        });
-        // but then we need to remove the display:none to allow it to be used again
-        setTimeout(() => {
-            document.querySelectorAll('.popup-buttons').forEach(e => {
-                e.style.display = null;
-            });
-        }, 200);
-    }, 200);
 }

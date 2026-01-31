@@ -10,6 +10,7 @@ import { initViewport, getCurrentViewBox } from './modules/viewport.js';
 import { initSplitters } from './modules/splitter.js';
 import { initStatusbar, setStatus } from './modules/statusbar.js';
 import { initClipboard } from './modules/clipboard.js';
+import { initToolbar } from './modules/toolbar.js';
 import {
     editorContainer,
     outputContainer,
@@ -145,6 +146,7 @@ function init() {
     const rateLimitedUpdate = rateLimited(update, window.svgdx_use_server);
 
     // Initialize all modules
+    initToolbar();
     initTabs(state, editor, () => update());
     initLayout(state, () => update());
     initViewport(state, () => update());

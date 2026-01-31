@@ -12,7 +12,8 @@ body {
 .container {
     display: flex;
     flex: 1 1 auto;
-    height: calc(100svh - 70px);
+    /* header ~50px + toolbar ~44px + statusbar ~30px + padding */
+    height: calc(100svh - 132px);
     padding: 10px;
 }
 
@@ -92,19 +93,29 @@ body {
     border-bottom: 1px solid #ccc;
 }
 
-#controls div {
-    margin: 10px;
+#statusbar-container {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    padding: 4px 8px;
+    border-top: 1px solid #ccc;
+    background: #f8f8f8;
+    gap: 8px;
+}
+
+#statusbar {
+    font-family: monospace;
+    margin: 0;
+    font-size: 12px;
+    flex: 1;
 }
 
 #error-output {
     color: red;
     font-family: monospace;
-    max-height: 120px;
+    max-height: 60px;
     overflow-y: auto;
-}
-
-#statusbar {
-    font-family: monospace;
+    font-size: 12px;
 }
 
 /* Splitter styles */
@@ -112,7 +123,7 @@ body {
     min-width: 8px;
     min-height: 8px;
     flex: none;
-    z-index: 1000;
+    z-index: 50;
     /* Enable touch interaction */
     touch-action: none;
 }
@@ -195,19 +206,107 @@ button {
     border-radius: 2px;
     box-shadow: 2px 2px 3px #000;
     border: none;
+    margin: 0 2px;
     /* Minimum touch target size */
     min-height: 32px;
     min-width: 32px;
     padding: 4px 8px;
 }
 
-#tabs {
-    padding: 10px;
+/* Toolbar styles */
+#toolbar {
+    display: flex;
+    background: #f4f4f4;
+    border-bottom: 1px solid #ccc;
+    position: relative;
+    z-index: 100;
+}
+
+#toolbar-scroll {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 4px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    flex: 1;
+    /* Hide scrollbar but allow scrolling */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+#toolbar-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+/* Toolbar scroll buttons - intentionally not using regular button styles */
+.toolbar-scroll-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    min-width: 16px;
+    min-height: unset;
+    height: auto;
+    align-self: stretch;
+    background: #e8e8e8;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #666;
+}
+
+.toolbar-scroll-btn.scroll-left {
+    border-right: 1px solid #ccc;
+}
+
+.toolbar-scroll-btn.scroll-right {
+    border-left: 1px solid #ccc;
+}
+
+.toolbar-scroll-btn:hover {
+    background: #ddd;
+    color: #333;
+    box-shadow: none;
+}
+
+.toolbar-scroll-btn:active {
+    background: #ccc;
+    box-shadow: none;
+}
+
+/* Show scroll buttons based on scroll position */
+#toolbar.can-scroll-left .toolbar-scroll-btn.scroll-left {
+    display: flex;
+}
+
+#toolbar.can-scroll-right .toolbar-scroll-btn.scroll-right {
+    display: flex;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: #ccc;
+    margin: 0 5px;
+    flex-shrink: 0;
 }
 
 #tabs button {
-    border-radius: 0px;
-    margin: 3px;
+    min-width: 28px;
+    padding: 4px 6px;
+    border-radius: 2px;
 }
 
 button:hover,
@@ -234,32 +333,35 @@ button[data-checked="true"]:active {
 }
 
 /* Popup container styles */
-#controls div.popup-container {
+.popup-container {
     display: inline-flex;
     position: relative;
     margin: 0;
     padding: 0;
 }
 
-#controls div.popup-buttons {
-    position: absolute;
-    bottom: 100%;
+.popup-buttons {
+    /* Use fixed positioning to escape overflow clipping */
+    position: fixed;
+    z-index: 2000;
     margin: 0;
+    /* Will be positioned by JS */
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+/* Show popup when container has show-popup class (set by JS) */
+.popup-container.show-popup .popup-buttons {
+    visibility: visible;
+    opacity: 1;
 }
 
 /* Hide popup buttons by default */
-#controls div .popup-button {
-    display: none;
+.popup-container .popup-button {
+    display: block;
     width: 100%;
-}
-
-/* Show on hover */
-#controls div button:hover ~ .popup-buttons .popup-button {
-    display: block;
-}
-
-#controls .popup-buttons:hover .popup-button {
-    display: block;
+    white-space: nowrap;
 }
 
 .popup-buttons button {
@@ -267,6 +369,7 @@ button[data-checked="true"]:active {
     box-shadow: none;
     border-radius: 0;
     border: 1px solid #ccc;
+    background: #eee;
 }
 
 /* Avoid double border */
@@ -284,10 +387,13 @@ button[data-checked="true"]:active {
 
 /* Header styles */
 header {
-    padding: 10px;
+    padding: 8px 12px;
     display: flex;
     background: #dde;
     justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 header h1 {
@@ -296,8 +402,11 @@ header h1 {
     font-size: 24px;
 }
 
-header span {
-    align-content: center;
+header nav {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 header a {
@@ -315,23 +424,25 @@ a:focus {
 }
 
 /* Mobile/desktop visibility classes - controlled via JS data-mobile attribute */
-.container[data-mobile="true"] .desktop-only {
+/* Toolbar is outside container, so use body:has() for these */
+body:has(.container[data-mobile="true"]) .desktop-only {
     display: none !important;
 }
 
-.container[data-mobile="false"] .mobile-only {
+body:has(.container[data-mobile="false"]) .mobile-only {
     display: none !important;
 }
 
 /* Default to showing desktop-only when data-mobile not set */
-.container:not([data-mobile]) .mobile-only {
+body:has(.container:not([data-mobile])) .mobile-only {
     display: none !important;
 }
 
 /* Mobile layout styles - triggered by JS when either dimension < 768px */
 .container[data-mobile="true"] {
     padding: 5px;
-    height: calc(100svh - 60px);
+    /* Account for header ~45px, toolbar ~50px, statusbar ~30px */
+    height: calc(100svh - 115px);
 }
 
 .container[data-mobile="true"][data-layout="horizontal"] {
@@ -386,17 +497,22 @@ a:focus {
 }
 
 /* Larger tap targets for buttons on mobile */
-.container[data-mobile="true"] ~ header button,
 .container[data-mobile="true"] button,
 body:has(.container[data-mobile="true"]) button {
-    min-height: 44px;
-    min-width: 44px;
-    padding: 8px 12px;
+    min-height: 40px;
+    min-width: 40px;
+    padding: 6px 10px;
 }
 
-/* Stack control buttons on mobile */
-.container[data-mobile="true"] ~ header #controls div {
-    margin: 5px;
+/* Toolbar adjustments for mobile */
+body:has(.container[data-mobile="true"]) #toolbar-scroll {
+    padding: 4px 6px;
+    gap: 2px;
+}
+
+body:has(.container[data-mobile="true"]) #tabs button {
+    min-width: 36px;
+    padding: 6px 8px;
 }
 
 /* Reduce header size on mobile */
@@ -409,8 +525,8 @@ body:has(.container[data-mobile="true"]) header h1 {
 }
 
 /* Statusbar smaller on mobile */
-.container[data-mobile="true"] #statusbar {
-    font-size: 12px;
+body:has(.container[data-mobile="true"]) #statusbar {
+    font-size: 11px;
 }
 
 /* Fallback media query for initial load before JS runs */
