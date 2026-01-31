@@ -26,6 +26,50 @@ let textViewer = null;
 let lastViewbox = null;
 
 /**
+ * Strip metadata attributes from SVG for clean text output
+ * Operates on a DOM element and removes attributes in-place
+ * @param {Element} element - Root element to strip metadata from
+ */
+function stripMetadata(element) {
+    // List of attributes to strip - add more here as needed
+    const attributesToStrip = ['data-src-line'];
+
+    // Process this element
+    for (const attr of attributesToStrip) {
+        element.removeAttribute(attr);
+    }
+
+    // Recursively process children
+    for (const child of element.children) {
+        stripMetadata(child);
+    }
+}
+
+/**
+ * Create a clean SVG string with metadata stripped
+ * @param {string} svgData - Raw SVG string with metadata
+ * @returns {string} - SVG string with metadata removed
+ */
+function getCleanSvgText(svgData) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(svgData, 'image/svg+xml');
+    const svg = doc.documentElement;
+
+    // Check for parse errors
+    const parseError = doc.querySelector('parsererror');
+    if (parseError) {
+        console.error('Error parsing SVG for metadata stripping');
+        return svgData; // Return original if parsing fails
+    }
+
+    stripMetadata(svg);
+
+    // Serialize back to string
+    const serializer = new XMLSerializer();
+    return serializer.serializeToString(svg);
+}
+
+/**
  * Update the SVG output display
  */
 function updateSvgOutput(svgData) {
@@ -88,7 +132,7 @@ async function update() {
         // Save to storage
         setTabContent(state, state.activeTab, input);
 
-        // Transform with metadata for display
+        // Transform with metadata
         const result = await transform(input, true);
 
         if (result.ok) {
@@ -98,15 +142,12 @@ async function update() {
                 lastViewbox = oldSvg.getAttribute('viewBox');
             }
 
+            // Display SVG with metadata (for source line highlighting etc)
             updateSvgOutput(result.svg);
 
-            // Get version without metadata for text output
-            const textResult = await transform(input, false);
-            if (textResult.ok) {
-                updateTextOutput(textResult.svg);
-            } else {
-                setStatus(`Error retrieving SVG: ${textResult.error}`, true);
-            }
+            // Strip metadata for clean text output
+            const cleanSvg = getCleanSvgText(result.svg);
+            updateTextOutput(cleanSvg);
 
             // Handle warnings (for future use)
             if (result.warnings && result.warnings.length > 0) {
@@ -152,7 +193,7 @@ function init() {
     initViewport(state, () => update());
     initSplitters();
     initStatusbar(editor);
-    initClipboard(editor);
+    initClipboard(editor, textViewer);
 
     // Load initial content
     const initialContent = getTabContent(state, state.activeTab);

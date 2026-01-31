@@ -3,7 +3,6 @@
 import { PNG_RESOLUTIONS } from './config.js';
 import { statusbar } from './dom.js';
 import { hidePopup } from './layout.js';
-import { transform } from './transform.js';
 
 /**
  * Copy data to clipboard
@@ -29,17 +28,11 @@ function copyToClipboard(mimeType, dataPromise) {
 }
 
 /**
- * Get clean SVG output (without metadata)
+ * Get clean SVG output from text viewer
+ * @param {Object} textViewer - CodeMirror text viewer instance
  */
-async function getCleanSvg(editor) {
-    const result = await transform(editor.getValue(), false);
-    if (result.ok) {
-        return cleanText(result.svg);
-    } else {
-        statusbar.style.color = 'darkred';
-        statusbar.innerText = `Error retrieving SVG: ${result.error}`;
-        throw new Error(result.error);
-    }
+function getCleanSvg(textViewer) {
+    return cleanText(textViewer.getValue());
 }
 
 /**
@@ -110,8 +103,10 @@ async function generatePng(maxDim = 2048) {
 
 /**
  * Initialize clipboard functionality
+ * @param {Object} editor - CodeMirror editor instance
+ * @param {Object} textViewer - CodeMirror text viewer instance (contains clean SVG)
  */
-export function initClipboard(editor) {
+export function initClipboard(editor, textViewer) {
     // Save input button
     document.getElementById('save-input').addEventListener('click', () => {
         hidePopup();
@@ -131,26 +126,22 @@ export function initClipboard(editor) {
     });
 
     // Save output button
-    document.getElementById('save-output').addEventListener('click', async () => {
+    document.getElementById('save-output').addEventListener('click', () => {
         hidePopup();
-        try {
-            const svg = await getCleanSvg(editor);
-            const blob = new Blob([svg], { type: 'image/svg+xml' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `svgdx-output-${getTimestamp()}.svg`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            // Error already displayed by getCleanSvg
-        }
+        const svg = getCleanSvg(textViewer);
+        const blob = new Blob([svg], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `svgdx-output-${getTimestamp()}.svg`;
+        a.click();
+        URL.revokeObjectURL(url);
     });
 
     // Copy output button
     document.getElementById('copy-output').addEventListener('click', () => {
         hidePopup();
-        copyToClipboard('text/plain', getCleanSvg(editor));
+        copyToClipboard('text/plain', Promise.resolve(getCleanSvg(textViewer)));
     });
 
     // Copy PNG buttons (now in output popup)

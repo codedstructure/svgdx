@@ -197,8 +197,9 @@ export function initLayout(state, onUpdate) {
         state.mobileLayout = DEFAULT_MOBILE_LAYOUT;
     }
 
-    // Apply initial layout
-    applyResponsiveLayout(state, onUpdate);
+    // Apply initial layout WITHOUT triggering update callback
+    // (content isn't loaded yet - caller will trigger update explicitly)
+    applyResponsiveLayout(state, null);
 
     // Set up desktop layout button handlers
     document.querySelectorAll('#layout-popup .popup-button').forEach(el => {
