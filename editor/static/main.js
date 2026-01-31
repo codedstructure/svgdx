@@ -96,7 +96,6 @@ function updateSvgOutput(svgData) {
 
     editorContainer.classList.remove('error');
     errorOutput.innerText = '';
-    errorOutput.style.display = 'none';
 }
 
 /**
@@ -121,7 +120,6 @@ async function update() {
     // Wait for bootstrap to complete
     if (!isReady()) {
         errorOutput.innerText = 'loading svgdx...';
-        errorOutput.style.display = '';
         setTimeout(update, 100);
         return;
     }
@@ -157,7 +155,6 @@ async function update() {
             outputContainer.classList.add('error');
             editorContainer.classList.add('error');
             errorOutput.innerText = result.error;
-            errorOutput.style.display = '';
             setStatus('svgdx editor');
         }
     } catch (e) {
