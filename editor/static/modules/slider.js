@@ -5,7 +5,6 @@ import { SLIDER_RANGES, DEFAULT_SLIDER_RANGE } from './config.js';
 import { hideAllPopups } from './toolbar.js';
 
 let sliderElement = null;
-let displayElement = null;
 let labelElement = null;
 let currentState = null;
 let onChangeCallback = null;
@@ -33,9 +32,6 @@ function updateSliderVisibility(range) {
     }
     if (sliderElement) {
         sliderElement.classList.toggle('slider-hidden', !isVisible);
-    }
-    if (displayElement) {
-        displayElement.classList.toggle('slider-hidden', !isVisible);
     }
 }
 
@@ -70,8 +66,8 @@ function applyRangePreset(range, tabNum) {
         sliderElement.value = value;
 
         // Update display
-        if (displayElement) {
-            displayElement.textContent = formatValue(value, preset.step);
+        if (labelElement) {
+            setValueLabel(value, preset.step);
         }
 
         // Save clamped value
@@ -86,6 +82,12 @@ function applyRangePreset(range, tabNum) {
     }
 }
 
+function setValueLabel(value, step) {
+    if (labelElement) {
+        labelElement.innerText = "$VALUE = " + formatValue(value, step);
+    }
+}
+
 /**
  * Initialize the slider functionality
  * @param {Object} state - Application state object
@@ -95,10 +97,9 @@ export function initSlider(state, callback) {
     currentState = state;
     onChangeCallback = callback;
     sliderElement = document.getElementById('value-slider');
-    displayElement = document.getElementById('value-slider-display');
     labelElement = document.querySelector('#slider-controls label');
 
-    if (!sliderElement || !displayElement) {
+    if (!sliderElement) {
         console.warn('Slider elements not found in DOM');
         return;
     }
@@ -107,7 +108,7 @@ export function initSlider(state, callback) {
     sliderElement.addEventListener('input', () => {
         const step = parseFloat(sliderElement.step) || 1;
         const value = parseFloat(sliderElement.value);
-        displayElement.textContent = formatValue(value, step);
+        setValueLabel(value, step);
 
         // Save to storage
         setTabSliderValue(state, state.activeTab, value);
@@ -146,7 +147,7 @@ export function initSlider(state, callback) {
  * @param {string} tabNum - Tab number to load settings from
  */
 export function updateSlider(state, tabNum) {
-    if (!sliderElement || !displayElement) {
+    if (!sliderElement) {
         return;
     }
 
@@ -169,7 +170,7 @@ export function updateSlider(state, tabNum) {
     value = Math.max(preset.min, Math.min(preset.max, value));
 
     sliderElement.value = value;
-    displayElement.textContent = formatValue(value, preset.step);
+    setValueLabel(value, preset.step);
 
     updateSliderVisibility(range);
 }

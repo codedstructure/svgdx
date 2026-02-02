@@ -324,24 +324,25 @@ button {
     gap: 6px;
 }
 
+#slider-surround:has(input[type="range"]:focus) {
+    outline: 1px dotted #666;
+}
+
+#slider-surround {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+}
+
 #slider-controls label {
     font-size: 12px;
     font-family: monospace;
     color: #555;
-    cursor: help;
 }
 
 #value-slider {
     width: 200px;
     cursor: pointer;
-}
-
-#value-slider-display {
-    font-size: 12px;
-    font-family: monospace;
-    min-width: 3em;
-    text-align: right;
-    color: #333;
 }
 
 /* Hide slider elements when 'off' */

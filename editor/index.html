@@ -94,9 +94,10 @@
               <button class="popup-button" id="slider-0-1000">0-1000</button>
             </div>
           </div>
-          <label for="value-slider" class="slider-hidden" title="Use $VALUE or ${VALUE} in your document to substitute this slider's value">$VALUE:</label>
-          <input type="range" id="value-slider" class="slider-hidden" min="0" max="1000" value="0">
-          <span id="value-slider-display" class="slider-hidden">0</span>
+          <div id="slider-surround">
+            <input type="range" id="value-slider" class="slider-hidden" min="0" max="1000" value="0" tabindex="0">
+            <label for="value-slider" class="slider-hidden" title="Use $VALUE or ${VALUE} in your document to substitute this slider's value"></label>
+          </div>
         </div>
       </div>
       <button class="toolbar-scroll-btn scroll-right" aria-label="Scroll right">&gt;</button>
