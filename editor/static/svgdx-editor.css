@@ -76,8 +76,6 @@ body {
 
 #svg-output {
     overflow: hidden;
-    /* Enable touch-action for pan support */
-    touch-action: none;
 }
 
 #text-output {
@@ -213,19 +211,7 @@ body {
 svg {
     width: 100%;
     height: 100%;
-}
-
-/* Button styles */
-button {
-    background-color: #eee;
-    border-radius: 2px;
-    box-shadow: 2px 2px 3px #000;
-    border: none;
-    margin: 0 2px;
-    /* Minimum touch target size */
-    min-height: 32px;
-    min-width: 32px;
-    padding: 4px 8px;
+    touch-action: none;
 }
 
 /* Toolbar styles */
@@ -319,14 +305,26 @@ button {
     flex-shrink: 0;
 }
 
+/* Button styles */
+button {
+    background-color: #ccc;
+    border-radius: 6px;
+    border: 1px solid #aaa;
+    margin: 0 2px;
+    /* Minimum touch target size */
+    min-height: 32px;
+    min-width: 32px;
+    padding: 4px 8px;
+}
+
 #tabs button {
     min-width: 28px;
-    padding: 4px 6px;
-    border-radius: 2px;
+    font-weight: bold;
 }
 
 button:hover,
 button:focus {
+    background-color: #ddd;
     box-shadow: 1px 1px 2px #000;
 }
 
@@ -341,11 +339,12 @@ button[data-checked="true"] {
 
 button[data-checked="true"]:hover,
 button[data-checked="true"]:focus {
+    background-color: #ddd;
     box-shadow: inset 2px 2px 3px #000;
 }
 
 button[data-checked="true"]:active {
-    box-shadow: inset 3px 3px 4px #000;
+    box-shadow: inset 3px 3px 5px #000;
 }
 
 /* Popup container styles */
@@ -477,11 +476,6 @@ body:has(.container:not([data-mobile])) .mobile-only {
     width: 100% !important;
 }
 
-.container[data-mobile="true"][data-layout="horizontal"] #main-split {
-    cursor: row-resize !important;
-    background: linear-gradient(#eee, #aaa) !important;
-}
-
 .container[data-mobile="true"][data-layout="vertical"] {
     /* Landscape mode - editor on left, output on right */
     flex-direction: row !important;
@@ -495,11 +489,6 @@ body:has(.container:not([data-mobile])) .mobile-only {
 .container[data-mobile="true"][data-layout="vertical"] #output-container {
     flex-direction: column !important;
     height: 100% !important;
-}
-
-.container[data-mobile="true"][data-layout="vertical"] #main-split {
-    cursor: col-resize !important;
-    background: linear-gradient(90deg, #eee, #aaa) !important;
 }
 
 /* Hide secondary splitter on mobile since only one output is shown */

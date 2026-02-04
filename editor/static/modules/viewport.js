@@ -181,6 +181,7 @@ export function initPan() {
     let isDragging = false;
     let startX, startY;
     let activePointerId = null;
+    let hasMoved = false;  // Track if pointer has actually moved
 
     // Use pointer events for unified touch + mouse support
     svgOutputContainer.addEventListener('pointerdown', (e) => {
@@ -191,14 +192,13 @@ export function initPan() {
 
         const svg = svgOutputContainer.querySelector('svg');
         if (e.target.closest('#svg-output > svg') === svg) {
-            e.preventDefault();
+            // Don't preventDefault or capture here - let click/dblclick events work
             isDragging = true;
             activePointerId = e.pointerId;
             startX = e.clientX;
             startY = e.clientY;
-            document.body.style.cursor = 'move';
-            // Capture pointer to receive events outside element
-            svgOutputContainer.setPointerCapture(e.pointerId);
+            hasMoved = false;
+            // We'll capture pointer only when actual panning starts (in pointermove)
         }
     });
 
@@ -217,6 +217,25 @@ export function initPan() {
         if (!isDragging) return;
         // Only respond to the pointer that started the drag
         if (e.pointerId !== activePointerId) return;
+
+        const dx = Math.abs(e.clientX - startX);
+        const dy = Math.abs(e.clientY - startY);
+
+        // Only start panning if moved more than a small threshold
+        // This allows clicks/double-clicks to work
+        if (dx > 3 || dy > 3) {
+            if (!hasMoved) {
+                e.preventDefault();
+                document.body.style.cursor = 'move';
+                hasMoved = true;
+                // Now that we're actually panning, capture the pointer
+                // to receive events outside the element
+                svgOutputContainer.setPointerCapture(activePointerId);
+            }
+        }
+
+        if (!hasMoved) return;
+
         e.preventDefault();
 
         const svg = svgOutputContainer.querySelector('svg');
@@ -224,11 +243,11 @@ export function initPan() {
 
         const oldPos = clientToSvg(svg, startX, startY);
         const newPos = clientToSvg(svg, e.clientX, e.clientY);
-        const dx = oldPos.x - newPos.x;
-        const dy = oldPos.y - newPos.y;
+        const dx_pan = oldPos.x - newPos.x;
+        const dy_pan = oldPos.y - newPos.y;
 
         const vb = svg.viewBox.baseVal;
-        svg.setAttribute('viewBox', `${vb.x + dx} ${vb.y + dy} ${vb.width} ${vb.height}`);
+        svg.setAttribute('viewBox', `${vb.x + dx_pan} ${vb.y + dy_pan} ${vb.width} ${vb.height}`);
 
         startX = e.clientX;
         startY = e.clientY;
@@ -248,6 +267,7 @@ export function initPan() {
             isDragging = false;
             activePointerId = null;
             document.body.style.cursor = 'default';
+            try { svgOutputContainer.releasePointerCapture(e.pointerId); } catch (_) {}
         }
     });
 }

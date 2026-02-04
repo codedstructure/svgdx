@@ -42,19 +42,19 @@ export function layoutOrientation(selection) {
 }
 
 /**
- * Set default width on an element (40%)
+ * Set default width on an element (50%)
  */
 function setDefaultWidth(target) {
-    target.style.width = '40%';
-    target.style.minWidth = '40%';
+    target.style.width = '50%';
+    target.style.minWidth = '50%';
 }
 
 /**
- * Set default height on an element (40%)
+ * Set default height on an element (50%)
  */
 function setDefaultHeight(target) {
-    target.style.height = '40%';
-    target.style.minHeight = '40%';
+    target.style.height = '50%';
+    target.style.minHeight = '50%';
 }
 
 /**
