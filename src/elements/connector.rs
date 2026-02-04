@@ -31,12 +31,13 @@ impl Endpoint {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum ConnectionType {
     Horizontal,
     Vertical,
-    Corner,
-    Straight,
+    Orthogonal, // (always either horizontal or vertical)
+    Elbow,      // implicit from polyline
+    Straight,   // TODO: consider renaming this to 'Corner', since it includes corners...
 }
 
 impl ConnectionType {
@@ -44,6 +45,8 @@ impl ConnectionType {
         match s {
             "h" | "horizontal" => Self::Horizontal,
             "v" | "vertical" => Self::Vertical,
+            // TODO: make orthogonal the default.
+            "o" | "hv" | "vh" => Self::Orthogonal,
             _ => Self::Straight,
         }
     }
@@ -53,7 +56,10 @@ fn edge_locations(ctype: ConnectionType) -> Vec<LocSpec> {
     match ctype {
         ConnectionType::Horizontal => vec![LocSpec::Left, LocSpec::Right],
         ConnectionType::Vertical => vec![LocSpec::Top, LocSpec::Bottom],
-        ConnectionType::Corner => {
+        // TODO: Orthogonal locs are determined dynamically, but that's messy...
+        // also v/h/o things don't actually use the selected locspec.
+        ConnectionType::Orthogonal => vec![],
+        ConnectionType::Elbow => {
             vec![LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left]
         }
         ConnectionType::Straight => vec![
@@ -66,6 +72,56 @@ fn edge_locations(ctype: ConnectionType) -> Vec<LocSpec> {
             LocSpec::TopRight,
             LocSpec::BottomRight,
         ],
+    }
+}
+
+fn should_use_vertical_for_orthogonal(start_bb: &BoundingBox, end_bb: &BoundingBox) -> bool {
+    // Calculate overlap amounts (positive means overlap exists)
+    let x_overlap = start_bb
+        .scalarspec(ScalarSpec::Maxx)
+        .min(end_bb.scalarspec(ScalarSpec::Maxx))
+        - start_bb
+            .scalarspec(ScalarSpec::Minx)
+            .max(end_bb.scalarspec(ScalarSpec::Minx));
+    let y_overlap = start_bb
+        .scalarspec(ScalarSpec::Maxy)
+        .min(end_bb.scalarspec(ScalarSpec::Maxy))
+        - start_bb
+            .scalarspec(ScalarSpec::Miny)
+            .max(end_bb.scalarspec(ScalarSpec::Miny));
+
+    // Calculate gap sizes (negative means overlap, positive means distance)
+    let x_gap = start_bb
+        .scalarspec(ScalarSpec::Minx)
+        .max(end_bb.scalarspec(ScalarSpec::Minx))
+        - start_bb
+            .scalarspec(ScalarSpec::Maxx)
+            .min(end_bb.scalarspec(ScalarSpec::Maxx));
+    let y_gap = start_bb
+        .scalarspec(ScalarSpec::Miny)
+        .max(end_bb.scalarspec(ScalarSpec::Miny))
+        - start_bb
+            .scalarspec(ScalarSpec::Maxy)
+            .min(end_bb.scalarspec(ScalarSpec::Maxy));
+
+    // Decision logic: choose vertical or horizontal
+    if x_overlap > 0.0 {
+        // Elements overlap horizontally → vertical line works well
+        true
+    } else if y_overlap > 0.0 {
+        // Elements overlap vertically → horizontal line works well
+        false
+    } else if x_overlap > 0.0 && y_overlap > 0.0 {
+        // Both overlap (bboxes intersect) → choose shorter line
+        let start_center = (
+            (start_bb.x1 + start_bb.x2) / 2.0,
+            (start_bb.y1 + start_bb.y2) / 2.0,
+        );
+        let end_center = ((end_bb.x1 + end_bb.x2) / 2.0, (end_bb.y1 + end_bb.y2) / 2.0);
+        (start_center.1 - end_center.1).abs() < (start_center.0 - end_center.0).abs()
+    } else {
+        // No overlap → choose direction with smaller gap (longer line)
+        x_gap < y_gap
     }
 }
 
@@ -122,17 +178,28 @@ fn shortest_link(
         .get_element_bbox(that)?
         .ok_or_else(|| Error::MissingBBox(that.to_string()))?;
 
-    for this_loc in edge_locations(conn_type) {
-        for that_loc in edge_locations(conn_type) {
-            let this_coord = this_bb.locspec(this_loc);
-            let that_coord = that_bb.locspec(that_loc);
+    // For Orthogonal, determine orientation first, then only check appropriate edges
+    let edge_locs = if conn_type == ConnectionType::Orthogonal {
+        if should_use_vertical_for_orthogonal(&this_bb, &that_bb) {
+            vec![LocSpec::Top, LocSpec::Bottom]
+        } else {
+            vec![LocSpec::Left, LocSpec::Right]
+        }
+    } else {
+        edge_locations(conn_type)
+    };
+
+    for this_loc in &edge_locs {
+        for that_loc in &edge_locs {
+            let this_coord = this_bb.locspec(*this_loc);
+            let that_coord = that_bb.locspec(*that_loc);
             // always some as edge_locations does not include LineOffset
             let ((x1, y1), (x2, y2)) = (this_coord, that_coord);
             let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
             if dist_sq < min_dist_sq {
                 min_dist_sq = dist_sq;
-                this_min_loc = this_loc;
-                that_min_loc = that_loc;
+                this_min_loc = *this_loc;
+                that_min_loc = *that_loc;
             }
         }
     }
@@ -205,7 +272,7 @@ impl Connector {
         let conn_type = if let Some(e_type) = element.pop_attr("edge-type") {
             ConnectionType::from_str(&e_type)
         } else if element.name() == "polyline" {
-            ConnectionType::Corner
+            ConnectionType::Elbow
         } else {
             ConnectionType::Straight
         };
@@ -324,148 +391,206 @@ impl Connector {
     pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
+        match self.conn_type {
+            ConnectionType::Horizontal => self.render_horizontal(ctx, x1, y1, x2, y2),
+            ConnectionType::Vertical => self.render_vertical(ctx, x1, y1, x2, y2),
+            ConnectionType::Orthogonal => self.render_orthogonal(ctx, x1, y1, x2, y2),
+            ConnectionType::Straight => self.render_straight(x1, y1, x2, y2),
+            ConnectionType::Elbow => self.render_corner(ctx, x1, y1, x2, y2),
+        }
+    }
+
+    fn render_horizontal(
+        &self,
+        ctx: &impl ElementMap,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        _y2: f32,
+    ) -> Result<SvgElement> {
+        // If we have start and end elements, use midpoint of overlapping region
+        // TODO: If start_loc is specified, should probably set midpoint
+        // to the y coord of that... (implies moving start_loc as an optional
+        // inside Connector rather than evaluating it early)
+        let midpoint = if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
+            let start_bb = ctx
+                .get_element_bbox(start_el)?
+                .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
+            let end_bb = ctx
+                .get_element_bbox(end_el)?
+                .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
+            let overlap_top = start_bb
+                .scalarspec(ScalarSpec::Miny)
+                .max(end_bb.scalarspec(ScalarSpec::Miny));
+            let overlap_bottom = start_bb
+                .scalarspec(ScalarSpec::Maxy)
+                .min(end_bb.scalarspec(ScalarSpec::Maxy));
+            (overlap_top + overlap_bottom) / 2.
+        } else {
+            y1
+        };
+        Ok(SvgElement::new(
+            "line",
+            &[
+                ("x1".to_string(), fstr(x1)),
+                ("y1".to_string(), fstr(midpoint)),
+                ("x2".to_string(), fstr(x2)),
+                ("y2".to_string(), fstr(midpoint)),
+            ],
+        )
+        .with_attrs_from(&self.source_element))
+    }
+
+    fn render_vertical(
+        &self,
+        ctx: &impl ElementMap,
+        x1: f32,
+        y1: f32,
+        _x2: f32,
+        y2: f32,
+    ) -> Result<SvgElement> {
+        // If we have start and end elements, use midpoint of overlapping region
+        let midpoint = if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
+            let start_bb = ctx
+                .get_element_bbox(start_el)?
+                .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
+            let end_bb = ctx
+                .get_element_bbox(end_el)?
+                .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
+            let overlap_left = start_bb
+                .scalarspec(ScalarSpec::Minx)
+                .max(end_bb.scalarspec(ScalarSpec::Minx));
+            let overlap_right = start_bb
+                .scalarspec(ScalarSpec::Maxx)
+                .min(end_bb.scalarspec(ScalarSpec::Maxx));
+            (overlap_left + overlap_right) / 2.
+        } else {
+            x1
+        };
+        Ok(SvgElement::new(
+            "line",
+            &[
+                ("x1".to_string(), fstr(midpoint)),
+                ("y1".to_string(), fstr(y1)),
+                ("x2".to_string(), fstr(midpoint)),
+                ("y2".to_string(), fstr(y2)),
+            ],
+        )
+        .with_attrs_from(&self.source_element))
+    }
+
+    fn render_orthogonal(
+        &self,
+        ctx: &impl ElementMap,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+    ) -> Result<SvgElement> {
+        // Get bboxes for both elements, or use point bboxes if unavailable
+        let start_bb = if let Some(start_el) = &self.start_el {
+            ctx.get_element_bbox(start_el)?
+                .unwrap_or_else(|| BoundingBox::new(x1, y1, x1, y1))
+        } else {
+            BoundingBox::new(x1, y1, x1, y1)
+        };
+        let end_bb = if let Some(end_el) = &self.end_el {
+            ctx.get_element_bbox(end_el)?
+                .unwrap_or_else(|| BoundingBox::new(x2, y2, x2, y2))
+        } else {
+            BoundingBox::new(x2, y2, x2, y2)
+        };
+
+        if should_use_vertical_for_orthogonal(&start_bb, &end_bb) {
+            self.render_vertical(ctx, x1, y1, x2, y2)
+        } else {
+            self.render_horizontal(ctx, x1, y1, x2, y2)
+        }
+    }
+
+    fn render_straight(&self, x1: f32, y1: f32, x2: f32, y2: f32) -> Result<SvgElement> {
+        Ok(SvgElement::new(
+            "line",
+            &[
+                ("x1".to_string(), fstr(x1)),
+                ("y1".to_string(), fstr(y1)),
+                ("x2".to_string(), fstr(x2)),
+                ("y2".to_string(), fstr(y2)),
+            ],
+        )
+        .with_attrs_from(&self.source_element))
+    }
+
+    fn render_corner(
+        &self,
+        ctx: &impl ElementMap,
+        x1: f32,
+        y1: f32,
+        x2: f32,
+        y2: f32,
+    ) -> Result<SvgElement> {
         // For some (e.g. u-shaped) connections we need a default *absolute* offset
         // as ratio (e.g. the overall '50%' default) don't make sense.
-        let conn_element = match self.conn_type {
-            ConnectionType::Horizontal => {
-                // If we have start and end elements, use midpoint of overlapping region
-                // TODO: If start_loc is specified, should probably set midpoint
-                // to the y coord of that... (implies moving start_loc as an optional
-                // inside Connector rather than evaluating it early)
-                let midpoint =
-                    if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = ctx
-                            .get_element_bbox(start_el)?
-                            .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
-                        let end_bb = ctx
-                            .get_element_bbox(end_el)?
-                            .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
-                        let overlap_top = start_bb
-                            .scalarspec(ScalarSpec::Miny)
-                            .max(end_bb.scalarspec(ScalarSpec::Miny));
-                        let overlap_bottom = start_bb
-                            .scalarspec(ScalarSpec::Maxy)
-                            .min(end_bb.scalarspec(ScalarSpec::Maxy));
-                        (overlap_top + overlap_bottom) / 2.
-                    } else {
-                        y1
-                    };
-                SvgElement::new(
-                    "line",
-                    &[
-                        ("x1".to_string(), fstr(x1)),
-                        ("y1".to_string(), fstr(midpoint)),
-                        ("x2".to_string(), fstr(x2)),
-                        ("y2".to_string(), fstr(midpoint)),
-                    ],
-                )
-                .with_attrs_from(&self.source_element)
-            }
-            ConnectionType::Vertical => {
-                // If we have start and end elements, use midpoint of overlapping region
-                let midpoint =
-                    if let (Some(start_el), Some(end_el)) = (&self.start_el, &self.end_el) {
-                        let start_bb = ctx
-                            .get_element_bbox(start_el)?
-                            .ok_or_else(|| Error::MissingBBox(start_el.to_string()))?;
-                        let end_bb = ctx
-                            .get_element_bbox(end_el)?
-                            .ok_or_else(|| Error::MissingBBox(end_el.to_string()))?;
-                        let overlap_left = start_bb
-                            .scalarspec(ScalarSpec::Minx)
-                            .max(end_bb.scalarspec(ScalarSpec::Minx));
-                        let overlap_right = start_bb
-                            .scalarspec(ScalarSpec::Maxx)
-                            .min(end_bb.scalarspec(ScalarSpec::Maxx));
-                        (overlap_left + overlap_right) / 2.
-                    } else {
-                        x1
-                    };
-                SvgElement::new(
-                    "line",
-                    &[
-                        ("x1".to_string(), fstr(midpoint)),
-                        ("y1".to_string(), fstr(y1)),
-                        ("x2".to_string(), fstr(midpoint)),
-                        ("y2".to_string(), fstr(y2)),
-                    ],
-                )
-                .with_attrs_from(&self.source_element)
-            }
-            ConnectionType::Straight => SvgElement::new(
-                "line",
-                &[
-                    ("x1".to_string(), fstr(x1)),
-                    ("y1".to_string(), fstr(y1)),
-                    ("x2".to_string(), fstr(x2)),
-                    ("y2".to_string(), fstr(y2)),
-                ],
-            )
-            .with_attrs_from(&self.source_element),
-            ConnectionType::Corner => {
-                let default_ratio_offset = Length::Ratio(0.5);
-                let default_abs_offset = Length::Absolute(3.);
+        let default_ratio_offset = Length::Ratio(0.5);
+        let default_abs_offset = Length::Absolute(3.);
 
-                let mut abs_offset_set = false;
-                let mut start_abs_offset = default_abs_offset
-                    .absolute()
-                    .expect("set to absolute 3 above");
-                let mut end_abs_offset = start_abs_offset;
-                let mut ratio_offset = default_ratio_offset
-                    .ratio()
-                    .expect("set to ratio 0.5 above");
-                if let Some(offset) = &self.offset {
-                    if let Some(o) = offset.absolute() {
-                        start_abs_offset = o;
-                        end_abs_offset = o;
-                        abs_offset_set = true;
-                    }
-                    if let Some(r) = offset.ratio() {
-                        ratio_offset = r;
-                        start_abs_offset = 0.0;
-                        end_abs_offset = 0.0;
-                    }
-                }
-
-                let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
-                let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
-                if let Some(el) = &self.start_el {
-                    if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
-                        start_el_bb = el_bb;
-                    }
-                }
-                if let Some(el) = &self.end_el {
-                    if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
-                        end_el_bb = el_bb;
-                    }
-                }
-                let points = render_match_corner(
-                    self,
-                    ratio_offset,
-                    start_abs_offset,
-                    end_abs_offset,
-                    start_el_bb,
-                    end_el_bb,
-                    abs_offset_set,
-                )?;
-
-                // remove repeated points
-                let points = filter_points(points);
-                SvgElement::new(
-                    "polyline",
-                    &[(
-                        "points".to_string(),
-                        points
-                            .into_iter()
-                            .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
-                            .collect::<Vec<String>>()
-                            .join(", "),
-                    )],
-                )
-                .with_attrs_from(&self.source_element)
+        let mut abs_offset_set = false;
+        let mut start_abs_offset = default_abs_offset
+            .absolute()
+            .expect("set to absolute 3 above");
+        let mut end_abs_offset = start_abs_offset;
+        let mut ratio_offset = default_ratio_offset
+            .ratio()
+            .expect("set to ratio 0.5 above");
+        if let Some(offset) = &self.offset {
+            if let Some(o) = offset.absolute() {
+                start_abs_offset = o;
+                end_abs_offset = o;
+                abs_offset_set = true;
             }
-        };
-        Ok(conn_element)
+            if let Some(r) = offset.ratio() {
+                ratio_offset = r;
+                start_abs_offset = 0.0;
+                end_abs_offset = 0.0;
+            }
+        }
+
+        let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
+        let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
+        if let Some(el) = &self.start_el {
+            if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
+                start_el_bb = el_bb;
+            }
+        }
+        if let Some(el) = &self.end_el {
+            if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
+                end_el_bb = el_bb;
+            }
+        }
+        let points = render_match_corner(
+            self,
+            ratio_offset,
+            start_abs_offset,
+            end_abs_offset,
+            start_el_bb,
+            end_el_bb,
+            abs_offset_set,
+        )?;
+
+        // remove repeated points
+        let points = filter_points(points);
+        Ok(SvgElement::new(
+            "polyline",
+            &[(
+                "points".to_string(),
+                points
+                    .into_iter()
+                    .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+            )],
+        )
+        .with_attrs_from(&self.source_element))
     }
 }
 
