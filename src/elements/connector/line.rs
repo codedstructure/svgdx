@@ -1,61 +1,9 @@
-use super::elbow_connector::ElbowConnector;
-use super::SvgElement;
+use super::{loc_to_dir, Direction, Endpoint};
 use crate::context::ElementMap;
+use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{parse_el_loc, BoundingBox, ElementLoc, LocSpec};
 use crate::types::{attr_split_cycle, fstr, strp};
-
-/// Check if an element is a connector (line or polyline with start/end attrs)
-pub fn is_connector(el: &SvgElement) -> bool {
-    el.has_attr("start") && el.has_attr("end") && (el.name() == "line" || el.name() == "polyline")
-}
-
-/// Enum wrapping both connector types for unified handling
-#[allow(clippy::large_enum_variant)]
-pub enum ConnectorType {
-    Line(LineConnector),
-    Elbow(ElbowConnector),
-}
-
-impl ConnectorType {
-    /// Factory function to create the appropriate connector type
-    pub fn from_element(element: &SvgElement, elem_map: &impl ElementMap) -> Result<Self> {
-        if element.name() == "polyline" {
-            Ok(Self::Elbow(ElbowConnector::from_element(
-                element, elem_map,
-            )?))
-        } else {
-            Ok(Self::Line(LineConnector::from_element(element, elem_map)?))
-        }
-    }
-
-    pub fn render(&self, ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
-        match self {
-            Self::Line(c) => c.render(ctx),
-            Self::Elbow(c) => c.render(ctx),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum Direction {
-    Up,
-    Right,
-    Down,
-    Left,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Endpoint {
-    pub origin: (f32, f32),
-    pub dir: Option<Direction>,
-}
-
-impl Endpoint {
-    pub(crate) const fn new(origin: (f32, f32), dir: Option<Direction>) -> Self {
-        Self { origin, dir }
-    }
-}
 
 /// Returns the midpoint of two 1D ranges if they overlap, None otherwise.
 fn range_overlap(min1: f32, max1: f32, min2: f32, max2: f32) -> Option<f32> {
@@ -263,16 +211,6 @@ struct BBoxResolution {
 }
 
 impl LineConnector {
-    pub(crate) fn loc_to_dir(loc: LocSpec) -> Option<Direction> {
-        match loc {
-            LocSpec::Top | LocSpec::TopEdge(_) => Some(Direction::Up),
-            LocSpec::Right | LocSpec::RightEdge(_) => Some(Direction::Right),
-            LocSpec::Bottom | LocSpec::BottomEdge(_) => Some(Direction::Down),
-            LocSpec::Left | LocSpec::LeftEdge(_) => Some(Direction::Left),
-            _ => None,
-        }
-    }
-
     pub(crate) fn parse_element(
         element: &mut SvgElement,
         elem_map: &impl ElementMap,
@@ -290,7 +228,7 @@ impl LineConnector {
 
             if let Some(loc) = loc {
                 let dir = if let ElementLoc::LocSpec(ls) = loc {
-                    Self::loc_to_dir(ls)
+                    loc_to_dir(ls)
                 } else {
                     None
                 };
@@ -346,7 +284,7 @@ impl LineConnector {
             (point, None, true)
         } else {
             let (loc, coord) = rel.resolve_point_to_bbox(point, bb);
-            (coord, Self::loc_to_dir(loc), false)
+            (coord, loc_to_dir(loc), false)
         }
     }
 
@@ -367,8 +305,8 @@ impl LineConnector {
             BBoxResolution {
                 start_coord,
                 end_coord,
-                start_dir: Self::loc_to_dir(start_loc),
-                end_dir: Self::loc_to_dir(end_loc),
+                start_dir: loc_to_dir(start_loc),
+                end_dir: loc_to_dir(end_loc),
                 overlapping: false,
             }
         }
