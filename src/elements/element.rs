@@ -1,5 +1,5 @@
 use super::{
-    is_connector, process_text_attr, ConfigElement, Connector, Container, DefaultsElement,
+    is_connector, process_text_attr, ConfigElement, ConnectorType, Container, DefaultsElement,
     ForElement, GroupElement, IfElement, LinearGradient, LoopElement, RadialGradient, ReuseElement,
     SpecsElement, VarElement,
 };
@@ -535,7 +535,7 @@ impl SvgElement {
         }
 
         if is_connector(self) {
-            let conn = Connector::from_element(self, ctx)?;
+            let conn = ConnectorType::from_element(self, ctx)?;
             // replace with rendered connection element, or skip if None
             if let Some(rendered) = conn.render(ctx)? {
                 *self = rendered;

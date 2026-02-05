@@ -1,11 +1,278 @@
-use crate::elements::connector::Connector;
-use crate::errors::Result;
+use super::connector::{Direction, Endpoint, LineConnector, ParsedEndpoint};
+use super::SvgElement;
+use crate::context::ElementMap;
+use crate::errors::{Error, Result};
+use crate::geometry::{strp_length, BoundingBox, Length, LocSpec};
+use crate::types::fstr;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
-use crate::{elements::connector::Direction, geometry::BoundingBox};
+/// For polyline (elbow) connectors, find the shortest link using cardinal directions only.
+fn shortest_cardinal_link(start_bb: &BoundingBox, end_bb: &BoundingBox) -> (LocSpec, LocSpec) {
+    const CARDINAL_LOCS: [LocSpec; 4] =
+        [LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left];
 
-// from the example heap docs https://doc.rust-lang.org/std/collections/binary_heap/index.html
+    let mut min_dist_sq = f32::MAX;
+    let mut start_min_loc = LocSpec::Right;
+    let mut end_min_loc = LocSpec::Left;
+
+    for start_loc in &CARDINAL_LOCS {
+        for end_loc in &CARDINAL_LOCS {
+            let start_coord = start_bb.locspec(*start_loc);
+            let end_coord = end_bb.locspec(*end_loc);
+            let (x1, y1) = start_coord;
+            let (x2, y2) = end_coord;
+            let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+            if dist_sq < min_dist_sq {
+                min_dist_sq = dist_sq;
+                start_min_loc = *start_loc;
+                end_min_loc = *end_loc;
+            }
+        }
+    }
+    (start_min_loc, end_min_loc)
+}
+
+/// Find the closest cardinal direction from a point to a bbox.
+fn closest_cardinal_loc(point: (f32, f32), bb: &BoundingBox) -> LocSpec {
+    const CARDINAL_LOCS: [LocSpec; 4] =
+        [LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left];
+
+    let mut min_dist_sq = f32::MAX;
+    let mut min_loc = LocSpec::Right;
+
+    for loc in &CARDINAL_LOCS {
+        let coord = bb.locspec(*loc);
+        let dist_sq = (coord.0 - point.0).powi(2) + (coord.1 - point.1).powi(2);
+        if dist_sq < min_dist_sq {
+            min_dist_sq = dist_sq;
+            min_loc = *loc;
+        }
+    }
+    min_loc
+}
+
+/// Result type for resolving two bboxes.
+struct BBoxResolution {
+    start_coord: (f32, f32),
+    end_coord: (f32, f32),
+    start_dir: Option<Direction>,
+    end_dir: Option<Direction>,
+}
+
+#[derive(Clone)]
+pub struct ElbowConnector {
+    source_element: SvgElement,
+    start_el: Option<SvgElement>,
+    end_el: Option<SvgElement>,
+    pub start: Endpoint,
+    pub end: Endpoint,
+    offset: Option<Length>,
+}
+
+impl ElbowConnector {
+    /// Resolve a fixed point against a bbox using cardinal direction.
+    fn resolve_point_to_bbox(
+        point: (f32, f32),
+        bb: &BoundingBox,
+    ) -> ((f32, f32), Option<Direction>) {
+        let loc = closest_cardinal_loc(point, bb);
+        (bb.locspec(loc), LineConnector::loc_to_dir(loc))
+    }
+
+    /// Resolve two bboxes using cardinal-direction shortest link.
+    fn resolve_bbox_to_bbox(start_bb: &BoundingBox, end_bb: &BoundingBox) -> BBoxResolution {
+        let (start_loc, end_loc) = shortest_cardinal_link(start_bb, end_bb);
+        BBoxResolution {
+            start_coord: start_bb.locspec(start_loc),
+            end_coord: end_bb.locspec(end_loc),
+            start_dir: LineConnector::loc_to_dir(start_loc),
+            end_dir: LineConnector::loc_to_dir(end_loc),
+        }
+    }
+
+    pub fn from_element(element: &SvgElement, elem_map: &impl ElementMap) -> Result<Self> {
+        let mut element = element.clone();
+
+        // Ignore deprecated attribute
+        let _ = element.pop_attr("edge-type");
+
+        let start_ret = LineConnector::parse_element(&mut element, elem_map, "start")?;
+        let end_ret = LineConnector::parse_element(&mut element, elem_map, "end")?;
+
+        let offset = element
+            .pop_attr("corner-offset")
+            .map(|o| strp_length(&o).map_err(|_| Error::Parse("invalid corner-offset".to_owned())))
+            .transpose()?;
+
+        let (start_fixed, start_data): ParsedEndpoint =
+            LineConnector::to_fixed_or_bbox(&start_ret, elem_map)?;
+        let (end_fixed, end_data): ParsedEndpoint =
+            LineConnector::to_fixed_or_bbox(&end_ret, elem_map)?;
+
+        let (start, end, start_el, end_el) = match (start_fixed, end_fixed) {
+            // Both resolved to fixed points
+            (Some((x1, y1, dir1)), Some((x2, y2, dir2))) => (
+                Endpoint::new((x1, y1), dir1),
+                Endpoint::new((x2, y2), dir2),
+                start_data.map(|(el, _)| el),
+                end_data.map(|(el, _)| el),
+            ),
+
+            // Start is fixed, end needs resolution
+            (Some((x1, y1, dir1)), None) => {
+                let (end_el, end_bb) = end_data.expect("end must have element if not fixed");
+                let (end_coord, end_dir) = Self::resolve_point_to_bbox((x1, y1), &end_bb);
+                (
+                    Endpoint::new((x1, y1), dir1),
+                    Endpoint::new(end_coord, end_dir),
+                    start_data.map(|(el, _)| el),
+                    Some(end_el),
+                )
+            }
+
+            // End is fixed, start needs resolution
+            (None, Some((x2, y2, dir2))) => {
+                let (start_el, start_bb) =
+                    start_data.expect("start must have element if not fixed");
+                let (start_coord, start_dir) = Self::resolve_point_to_bbox((x2, y2), &start_bb);
+                (
+                    Endpoint::new(start_coord, start_dir),
+                    Endpoint::new((x2, y2), dir2),
+                    Some(start_el),
+                    end_data.map(|(el, _)| el),
+                )
+            }
+
+            // Both need resolution
+            (None, None) => {
+                let (start_el, start_bb) = start_data.expect("start must have element");
+                let (end_el, end_bb) = end_data.expect("end must have element");
+                let res = Self::resolve_bbox_to_bbox(&start_bb, &end_bb);
+                (
+                    Endpoint::new(res.start_coord, res.start_dir),
+                    Endpoint::new(res.end_coord, res.end_dir),
+                    Some(start_el),
+                    Some(end_el),
+                )
+            }
+        };
+
+        Ok(Self {
+            source_element: element,
+            start,
+            end,
+            start_el,
+            end_el,
+            offset,
+        })
+    }
+
+    fn render_corner(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
+        let (x1, y1) = self.start.origin;
+        let (x2, y2) = self.end.origin;
+
+        let default_ratio_offset = Length::Ratio(0.5);
+        let default_abs_offset = Length::Absolute(3.);
+
+        let mut abs_offset_set = false;
+        let mut start_abs_offset = default_abs_offset
+            .absolute()
+            .expect("set to absolute 3 above");
+        let mut end_abs_offset = start_abs_offset;
+        let mut ratio_offset = default_ratio_offset
+            .ratio()
+            .expect("set to ratio 0.5 above");
+        if let Some(offset) = &self.offset {
+            if let Some(o) = offset.absolute() {
+                start_abs_offset = o;
+                end_abs_offset = o;
+                abs_offset_set = true;
+            }
+            if let Some(r) = offset.ratio() {
+                ratio_offset = r;
+                start_abs_offset = 0.0;
+                end_abs_offset = 0.0;
+            }
+        }
+
+        let mut start_el_bb = BoundingBox::new(x1, y1, x1, y1);
+        let mut end_el_bb = BoundingBox::new(x2, y2, x2, y2);
+        if let Some(el) = &self.start_el {
+            if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
+                start_el_bb = el_bb;
+            }
+        }
+        if let Some(el) = &self.end_el {
+            if let Ok(Some(el_bb)) = ctx.get_element_bbox(el) {
+                end_el_bb = el_bb;
+            }
+        }
+
+        let points = render_match_corner(
+            self,
+            ratio_offset,
+            start_abs_offset,
+            end_abs_offset,
+            start_el_bb,
+            end_el_bb,
+            abs_offset_set,
+        )?;
+
+        let points = filter_points(points);
+        Ok(SvgElement::new(
+            "polyline",
+            &[(
+                "points".to_string(),
+                points
+                    .into_iter()
+                    .map(|(px, py)| format!("{} {}", fstr(px), fstr(py)))
+                    .collect::<Vec<String>>()
+                    .join(", "),
+            )],
+        )
+        .with_attrs_from(&self.source_element))
+    }
+
+    pub fn render(&self, ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
+        self.render_corner(ctx).map(Some)
+    }
+}
+
+/// Remove identical and collinear point pairs
+fn filter_points(p: Vec<(f32, f32)>) -> Vec<(f32, f32)> {
+    let mut ret = Vec::with_capacity(p.len());
+    const EPSILON: f32 = 1e-6;
+
+    for current in p {
+        if ret.last().copied() == Some(current) {
+            continue;
+        }
+
+        if ret.len() >= 2 {
+            let prev2 = ret[ret.len() - 2];
+            let prev1 = ret[ret.len() - 1];
+
+            let v1 = (prev1.0 - prev2.0, prev1.1 - prev2.1);
+            let v2 = (current.0 - prev1.0, current.1 - prev1.1);
+
+            let cross = v1.0 * v2.1 - v1.1 * v2.0;
+            let collinear = cross.abs() < EPSILON;
+
+            if collinear {
+                let dot = v1.0 * v2.0 + v1.1 * v2.1;
+                let monotonic = dot >= -EPSILON;
+
+                if monotonic {
+                    ret.pop();
+                }
+            }
+        }
+        ret.push(current);
+    }
+    ret
+}
+
 #[derive(PartialEq, Eq)]
 struct PathCost {
     cost: u32,
@@ -17,9 +284,6 @@ struct PathCost {
 
 impl Ord for PathCost {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Notice that we flip the ordering on costs.
-        // In case of a tie we compare positions - this step is necessary
-        // to make implementations of `PartialEq` and `Ord` consistent.
         other
             .cost
             .cmp(&self.cost)
@@ -46,8 +310,6 @@ struct LineStruct {
     mid_y: usize,
 }
 
-// checks if there a axis aligned line segment is intersected by a bounding box
-// this allows the aals to be entirely inside
 fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f32) -> bool {
     if x_axis {
         if axis_val <= bb.y1 || axis_val >= bb.y2 {
@@ -69,7 +331,7 @@ fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f
 }
 
 fn get_lines(
-    connector: &Connector,
+    connector: &ElbowConnector,
     ratio_offset: f32,
     abs_offsets: (f32, f32),
     bbs: (BoundingBox, BoundingBox),
@@ -93,11 +355,9 @@ fn get_lines(
     x_lines.push(end_el_bb.x2 + end_abs_offset);
 
     if start_el_bb.x1 > end_el_bb.x2 {
-        // there is a gap
         x_lines.push(start_el_bb.x1 * (1.0 - ratio_offset) + end_el_bb.x2 * ratio_offset);
         mid_x = x_lines.len() - 1;
     } else if start_el_bb.x2 < end_el_bb.x1 {
-        // there is a gap
         x_lines.push(start_el_bb.x2 * (1.0 - ratio_offset) + end_el_bb.x1 * ratio_offset);
         mid_x = x_lines.len() - 1;
     }
@@ -108,11 +368,9 @@ fn get_lines(
     y_lines.push(end_el_bb.y2 + end_abs_offset);
 
     if start_el_bb.y1 > end_el_bb.y2 {
-        // there is a gap
         y_lines.push(start_el_bb.y1 * (1.0 - ratio_offset) + end_el_bb.y2 * ratio_offset);
         mid_y = y_lines.len() - 1;
     } else if start_el_bb.y2 < end_el_bb.y1 {
-        // there is a gap
         y_lines.push(start_el_bb.y2 * (1.0 - ratio_offset) + end_el_bb.y1 * ratio_offset);
         mid_y = y_lines.len() - 1;
     }
@@ -137,10 +395,10 @@ fn get_lines(
 
     if abs_offset_set {
         match start_dir {
-            Direction::Down => mid_y = 1,  // positive y
-            Direction::Left => mid_x = 0,  // negative x
-            Direction::Right => mid_x = 1, // positive x
-            Direction::Up => mid_y = 0,    // negative y
+            Direction::Down => mid_y = 1,
+            Direction::Left => mid_x = 0,
+            Direction::Right => mid_x = 1,
+            Direction::Up => mid_y = 0,
         }
     }
 
@@ -165,7 +423,6 @@ fn get_edges(
                 continue;
             }
 
-            // check if not blocked by a wall
             if point_set[i].0 == point_set[j].0
                 && !aals_blocked_by_bb(
                     start_el_bb,
@@ -218,7 +475,7 @@ struct Graph {
 }
 
 fn add_start_and_end(
-    connector: &Connector,
+    connector: &ElbowConnector,
     graph: &mut Graph,
     abs_offsets: (f32, f32),
     bbs: (BoundingBox, BoundingBox),
@@ -239,8 +496,8 @@ fn add_start_and_end(
         Direction::Right => abs_offset,
     };
 
-    graph.point_set.push((x1, y1)); // start
-    graph.point_set.push((x2, y2)); // end
+    graph.point_set.push((x1, y1));
+    graph.point_set.push((x2, y2));
     graph.edge_set.push((vec![], vec![]));
     graph.edge_set.push((vec![], vec![]));
     graph.edge_costs.push((vec![], vec![]));
@@ -329,15 +586,11 @@ fn compute_costs(
     line_struct: &LineStruct,
     corner_cost: u32,
 ) -> Vec<(Vec<u32>, Vec<u32>)> {
-    // edge cost function
-
     let mut edge_costs = vec![(vec![], vec![]); edge_set.len()];
     for i in 0..edge_set.len() {
-        // x moving edge
         for j in edge_set[i].0.iter() {
             let ind_1 = i;
             let ind_2 = *j;
-
             edge_costs[i].0.push(cost_function(
                 point_set,
                 line_struct,
@@ -347,11 +600,9 @@ fn compute_costs(
             ));
         }
 
-        // y moving edge
         for j in edge_set[i].1.iter() {
             let ind_1 = i;
             let ind_2 = *j;
-
             edge_costs[i].1.push(cost_function(
                 point_set,
                 line_struct,
@@ -372,9 +623,6 @@ fn cost_function(
     ind_1: usize,
     ind_2: usize,
 ) -> u32 {
-    // swapping order of ind_1 and ind_2 does nothing
-
-    // ind_1 uses in mid point calcs could use ind_2 in same place no diff
     let mid_point_mul_x = if line_struct.mid_x != usize::MAX
         && point_set[ind_1].0 == line_struct.x_lines[line_struct.mid_x]
     {
@@ -393,7 +641,6 @@ fn cost_function(
     ((point_set[ind_1].0 - point_set[ind_2].0).abs() * mid_point_mul_y
         + (point_set[ind_1].1 - point_set[ind_2].1).abs() * mid_point_mul_x) as u32
         + corner_cost
-    // round may cause some problems
 }
 
 type PrevPoint = Vec<(NodeState, NodeState)>;
@@ -406,7 +653,6 @@ fn dijkstra_get_dists(
     corner_cost: u32,
 ) -> (Vec<(u32, u32)>, PrevPoint) {
     let (start_dir, end_dir) = dirs;
-    // just needs to be bigger than 5* (corner cost  +  total bounding box size)
     let inf = u32::MAX;
     let mut dists = vec![(inf, inf); graph.point_set.len()];
     let mut prev_point = vec![
@@ -442,7 +688,6 @@ fn dijkstra_get_dists(
         Direction::Down | Direction::Up => Direction::Down,
     };
 
-    // cant get stuck in a loop as cost for a distance either decreases or queue shrinks
     while let Some(next) = queue.pop() {
         if next.idx == end_ind && simplified_end_dir == next.dir {
             match next.dir {
@@ -466,7 +711,6 @@ fn dijkstra_get_dists(
             Direction::Down | Direction::Up => dists[next.idx].1,
         };
 
-        // the node is reached by faster means so already popped
         if next.cost > dist {
             continue;
         }
@@ -486,10 +730,8 @@ fn dijkstra_get_dists(
             }
         };
 
-        // x moving edge
         for i in 0..graph.edge_set[next.idx].0.len() {
             let mut edge_cost = graph.edge_costs[next.idx].0[i];
-            // if same direction then add 2 corners
             if next.dir == Direction::Left || next.dir == Direction::Right {
                 edge_cost += corner_cost * 2;
             }
@@ -506,7 +748,6 @@ fn dijkstra_get_dists(
             }
         }
 
-        // y moving edge
         for i in 0..graph.edge_set[next.idx].1.len() {
             let mut edge_cost = graph.edge_costs[next.idx].1[i];
             if next.dir == Direction::Down || next.dir == Direction::Up {
@@ -539,7 +780,6 @@ fn dijkstra_get_points(
     let mut back_points_inds = vec![end_ind];
     let mut loc = end_ind;
     let mut dir = end_dir;
-    // won't use more than 10 corners; guarantee no infinite loops
     for _ in 0..10 {
         if loc == start_ind {
             break;
@@ -560,7 +800,6 @@ fn dijkstra_get_points(
         loc = new_loc;
         back_points_inds.push(loc);
     }
-    // if no path just do line
     if back_points_inds.len() == 1 {
         back_points_inds.push(start_ind);
     }
@@ -573,7 +812,7 @@ fn dijkstra_get_points(
 }
 
 pub fn render_match_corner(
-    connector: &Connector,
+    connector: &ElbowConnector,
     mut ratio_offset: f32,
     start_abs_offset: f32,
     end_abs_offset: f32,
@@ -584,14 +823,10 @@ pub fn render_match_corner(
     let (x1, y1) = connector.start.origin;
     let (x2, y2) = connector.end.origin;
 
-    // method generates all points it could possibly want to go through then does dijkstras on it
-
     let points: Vec<(f32, f32)>;
     if let (Some(start_dir_some), Some(end_dir_some)) = (connector.start.dir, connector.end.dir) {
-        // clamp ratio between 0.0 and 1.0
         ratio_offset = ratio_offset.clamp(0.0, 1.0);
 
-        // x_lines have constant x vary over y
         let line_struct = get_lines(
             connector,
             ratio_offset,
@@ -613,7 +848,6 @@ pub fn render_match_corner(
         let total_bb = start_el_bb.combine(&end_el_bb);
         let total_bb_size =
             (total_bb.width() + total_bb.height() + start_abs_offset + end_abs_offset) as u32;
-        // needs to be comparable to or larger than total_bb_size
         let corner_cost = 1 + total_bb_size;
 
         let edge_costs = compute_costs(&point_set, &edge_set, &line_struct, corner_cost);
@@ -654,4 +888,58 @@ pub fn render_match_corner(
     }
 
     Ok(points)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_points() {
+        for (case, point_set, expected) in [
+            (
+                "monotonic horizontal line",
+                vec![(0., 0.), (1., 0.), (2., 0.), (3., 0.)],
+                vec![(0., 0.), (3., 0.)],
+            ),
+            (
+                "monotonic vertical line",
+                vec![(0., 0.), (0., 1.), (0., 2.), (0., 3.)],
+                vec![(0., 0.), (0., 3.)],
+            ),
+            (
+                "non-monotonic horizontal line",
+                vec![(0., 0.), (1., 0.), (2., 0.), (1., 0.), (5., 0.)],
+                vec![(0., 0.), (2., 0.), (1., 0.), (5., 0.)],
+            ),
+            (
+                "non-monotonic vertical line",
+                vec![(0., 0.), (0., 1.), (0., 2.), (0., 1.), (0., 5.)],
+                vec![(0., 0.), (0., 2.), (0., 1.), (0., 5.)],
+            ),
+            (
+                "right angle turn",
+                vec![(0., 0.), (1., 0.), (1., 1.), (1., 2.), (2., 2.)],
+                vec![(0., 0.), (1., 0.), (1., 2.), (2., 2.)],
+            ),
+            (
+                "diagonal line",
+                vec![(0., 0.), (1., 1.), (1., 1.), (2., 2.)],
+                vec![(0., 0.), (2., 2.)],
+            ),
+            (
+                "gradient 3 diagonal",
+                vec![(0., 0.), (1., 3.), (2., 6.), (3., 9.)],
+                vec![(0., 0.), (3., 9.)],
+            ),
+            (
+                "non-integer slope",
+                vec![(0., 0.25), (1., 0.5), (2., 0.75), (3., 1.0)],
+                vec![(0., 0.25), (3., 1.0)],
+            ),
+        ] {
+            let filtered = filter_points(point_set);
+            assert_eq!(filtered, expected, "{case}");
+        }
+    }
 }
