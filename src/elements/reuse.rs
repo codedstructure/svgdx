@@ -46,9 +46,14 @@ impl EventGen for ReuseElement<'_> {
             .inspect_err(|_| {
                 context.pop_element();
             })?;
-        instance_element.transmute(context).inspect_err(|_| {
+        let should_include = instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
+        if !should_include {
+            // Element should be skipped (e.g. overlapping connectors)
+            context.pop_element();
+            return Ok((OutputList::new(), None));
+        }
 
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {

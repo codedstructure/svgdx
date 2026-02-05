@@ -77,7 +77,10 @@ impl EventGen for OtherElement<'_> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
         e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
-        e.transmute(context)?;
+        if !e.transmute(context)? {
+            // Element should be skipped (e.g. overlapping connectors)
+            return Ok((output, None));
+        }
 
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
@@ -516,7 +519,8 @@ impl SvgElement {
 }
 
 impl SvgElement {
-    pub fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<()> {
+    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
+    pub fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
         if self.name == "path" {
             if let Some(d) = self.get_attr("d") {
                 let mut d = d.to_string();
@@ -532,8 +536,12 @@ impl SvgElement {
 
         if is_connector(self) {
             let conn = Connector::from_element(self, ctx)?;
-            // replace with rendered connection element
-            *self = conn.render(ctx)?;
+            // replace with rendered connection element, or skip if None
+            if let Some(rendered) = conn.render(ctx)? {
+                *self = rendered;
+            } else {
+                return Ok(false);
+            }
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {
@@ -553,7 +561,7 @@ impl SvgElement {
         }
         self.handle_rotation()?;
 
-        Ok(())
+        Ok(true)
     }
 
     /// Resolve any expressions in attributes.

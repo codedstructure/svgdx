@@ -355,3 +355,15 @@ fn test_connector_into_relpos_group() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
 }
+
+#[test]
+fn test_connector_overlapping_bboxes() {
+    // When two bboxes intersect, no line should be rendered
+    let input = r##"
+<rect id="a" x="0" y="0" width="10" height="10" />
+<rect id="b" x="5" y="5" width="10" height="10" />
+<line id="conn" start="#a" end="#b" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert!(!output.contains(r#"id="conn""#));
+}

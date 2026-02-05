@@ -54,7 +54,10 @@ impl EventGen for Container<'_> {
                     // logic; should really be based on graphics vs container element
                     // rather than whether the XML element is empty or not.
                     new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
-                    new_el.transmute(context)?;
+                    if !new_el.transmute(context)? {
+                        // Element should be skipped (e.g. overlapping connectors)
+                        return Ok((OutputList::new(), None));
+                    }
                     bbox = new_el.bbox()?;
                 }
 
