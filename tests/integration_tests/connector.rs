@@ -55,7 +55,7 @@ fn test_connector_h() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="20" y="2" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="h"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="5" y1="3.5" x2="20" y2="3.5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
@@ -66,7 +66,7 @@ fn test_connector_v() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="1" y="20" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="v"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="3" y1="5" x2="3" y2="20"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
@@ -354,4 +354,16 @@ fn test_connector_into_relpos_group() {
     let expected_line = r#"<polyline points="10 5, 20 5, 20 10, 30 10"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_connector_overlapping_bboxes() {
+    // When two bboxes intersect, no line should be rendered
+    let input = r##"
+<rect id="a" x="0" y="0" width="10" height="10" />
+<rect id="b" x="5" y="5" width="10" height="10" />
+<line id="conn" start="#a" end="#b" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert!(!output.contains(r#"id="conn""#));
 }

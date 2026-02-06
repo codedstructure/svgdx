@@ -44,11 +44,11 @@
     <rect xy="5 40" wh="20 5" text="d" id="d"/>
     <rect xy="-5 15" xy-loc="tr" wh="10 30" text="e" id="e"/>
     <rect xy="-5 10" xy-loc="r" wh="10 5" text="f" id="f"/>
-    <line end="#a" start="#base" edge-type="h" marker-end="url(#arrow)"/>
-    <line end="#b" start="#base" edge-type="h" marker-end="url(#arrow)"/>
-    <line end="#c" start="#base" edge-type="h" marker-end="url(#arrow)"/>
-    <line end="#d" start="#base" edge-type="v" marker-end="url(#arrow)"/>
-    <line end="#e" start="#base" edge-type="h" marker-end="url(#arrow)"/>
-    <line end="#f" start="#base" edge-type="h" marker-end="url(#arrow)"/>
+    <line end="#a" start="#base" marker-end="url(#arrow)"/>
+    <line end="#b" start="#base" marker-end="url(#arrow)"/>
+    <line end="#c" start="#base" marker-end="url(#arrow)"/>
+    <line end="#d" start="#base" marker-end="url(#arrow)"/>
+    <line end="#e" start="#base" marker-end="url(#arrow)"/>
+    <line end="#f" start="#base" marker-end="url(#arrow)"/>
     <use href="#zero-marker" x="0" y="0"/>
 </svg>

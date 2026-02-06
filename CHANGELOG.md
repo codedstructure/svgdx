@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: `<line>` based connectors are now axis-aligned by default where
+  there is overlap in one dimension between the start and end elements. The new
+  behaviour is equivalent to the previous `edge-type="h"` (or `="v"` as
+  appropriate) in cases where the connector will meet both elements, and
+  `edge-type` is now ignored and deprecated (it is currently removed from the
+  rendered output to preserve output, but this special-casing will be removed
+  in the future). If the elements do not 'overlap' in either dimension, the
+  connection will be a straight line between the closest corners; in the event
+  that the two elements overlap in _both_ dimensions (i.e. intersect) then no
+  connecting line is rendered. This new behaviour applies only if a bare elref
+  is provided (e.g. `start="#ref"` or `="^"`); if a locspec is also given then
+  the previous behaviour remains, and no change is made to the elbow connectors
+  generated from `<polyline>` elements.
+
 - Added: new config option 'error-mode' with values 'strict' (default, as
   previous behaviour), 'ignore' (leaves erroneous elements as provided in the
   input) and 'warn' (inserting a comment prior to the errored element with the

@@ -1,6 +1,5 @@
 mod connector;
 mod containers;
-mod corner_route;
 mod element;
 mod gradient;
 mod layout;
@@ -11,7 +10,7 @@ mod reuse;
 mod special;
 mod text;
 
-use connector::{is_connector, Connector};
+use connector::{is_connector, ConnectorType};
 use containers::{Container, GroupElement};
 use gradient::{LinearGradient, RadialGradient};
 use loops::{ForElement, LoopElement};

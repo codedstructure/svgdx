@@ -60,8 +60,9 @@ fn test_loc_mixed() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
 
+    // Point (3, 7) has x within bbox's x-range [0, 5], so a vertical line at x=3
     let input = format!(r##"{RECT_SVG}<line start="3 7" end="#a" />"##);
-    let expected_line = r#"<line x1="3" y1="7" x2="2.5" y2="5"/>"#;
+    let expected_line = r#"<line x1="3" y1="7" x2="3" y2="5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
 }

@@ -171,10 +171,6 @@ Example:
 <line start="#abc" end="#pqr" />
 ```
 
-### `edge-type`
-
-TODO
-
 ### `corner-offset`
 
 TODO
