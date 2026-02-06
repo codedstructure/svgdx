@@ -317,7 +317,6 @@ impl LineConnector {
 
         // Ignore deprecated attributes
         let _ = element.pop_attr("edge-type");
-        let _ = element.pop_attr("corner-offset");
 
         let start_ret = Self::parse_element(&mut element, elem_map, "start")?;
         let end_ret = Self::parse_element(&mut element, elem_map, "end")?;

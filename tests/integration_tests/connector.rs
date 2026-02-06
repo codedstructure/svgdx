@@ -55,7 +55,7 @@ fn test_connector_h() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="20" y="2" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="h"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="5" y1="3.5" x2="20" y2="3.5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
@@ -66,7 +66,7 @@ fn test_connector_v() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="1" y="20" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="v"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="3" y1="5" x2="3" y2="20"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
