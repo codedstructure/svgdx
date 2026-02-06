@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0 - 2026-02-06]
+
 - Changed: `<line>` based connectors are now axis-aligned by default where
   there is overlap in one dimension between the start and end elements. The new
   behaviour is equivalent to the previous `edge-type="h"` (or `="v"` as
