@@ -438,7 +438,7 @@ impl SvgElement {
         let phantom = matches!(self.name(), "point" | "box");
 
         if self.has_attr("text") {
-            let (orig_elem, text_elements) = process_text_attr(self)?;
+            let (orig_elem, text_elements) = process_text_attr(self, ctx)?;
 
             if orig_elem.name != "text" && !phantom {
                 // We only care about the original element if it wasn't a text element

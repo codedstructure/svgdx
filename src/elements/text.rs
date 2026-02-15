@@ -1,6 +1,7 @@
 use super::SvgElement;
+use crate::context::ElementMap;
 use crate::geometry::LocSpec;
-use crate::types::{attr_split_cycle, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp, ElRef};
 
 use crate::errors::{Error, Result};
 
@@ -36,7 +37,10 @@ fn text_string(text_value: &str) -> String {
     result
 }
 
-fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
+fn get_text_position(
+    element: &mut SvgElement,
+    ctx: &impl ElementMap,
+) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -60,6 +64,19 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         }
     }
 
+    // If a 'rel' attribute is present on a <text> element, resolve it to
+    // determine the bounding box and element type (for inside/outside default).
+    let mut text_ref_element = element.clone();
+    if element.name() == "text" {
+        if let Some(ref_str) = element.pop_attr("rel") {
+            let elref: ElRef = ref_str.parse()?;
+            text_ref_element = ctx
+                .get_element(&elref)
+                .ok_or_else(|| Error::Reference(elref))?
+                .clone();
+        }
+    }
+
     let mut text_classes = vec!["d-text".to_owned()];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
     let text_anchor = text_loc_str.parse::<LocSpec>()?;
@@ -79,7 +96,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     } else if element.pop_class("d-text-inside") {
         false
     } else {
-        matches!(element.name(), "line" | "point" | "text")
+        matches!(text_ref_element.name(), "line" | "point" | "text")
     };
     match text_anchor {
         ls if ls.is_top() => {
@@ -140,7 +157,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = element
+    let (mut tdx, mut tdy) = text_ref_element
         .bbox()?
         .ok_or_else(|| Error::MissingBBox(element.to_string()))?
         .locspec(text_anchor);
@@ -150,7 +167,10 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 
-pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
+pub fn process_text_attr(
+    element: &SvgElement,
+    ctx: &impl ElementMap,
+) -> Result<(SvgElement, Vec<SvgElement>)> {
     // Different conversions from line count to first-line offset based on whether
     // top, center, or bottom justification.
     const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
@@ -164,7 +184,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let text_value = get_text_value(&mut orig_elem);
 
-    let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
+    let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem, ctx)?;
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);

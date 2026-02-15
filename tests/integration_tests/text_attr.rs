@@ -614,3 +614,115 @@ fn test_multiline_outside() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_text_rel_centered() {
+    // text element with rel should position text at center of referenced element
+    let input = r##"
+<rect id="r" xy="10 20" wh="100 50"/>
+<text rel="#r" text="hello"/>
+"##;
+    let expected = r##"
+<rect id="r" x="10" y="20" width="100" height="50"/>
+<text x="60" y="45" class="d-text">hello</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_rel_with_text_loc() {
+    // text-loc should position text at the top of the rect bbox;
+    // since referenced element is a rect, text defaults to 'inside'
+    let input = r##"
+<rect id="r" xy="10 20" wh="100 50"/>
+<text rel="#r" text="top" text-loc="t"/>
+"##;
+    let expected = r##"
+<rect id="r" x="10" y="20" width="100" height="50"/>
+<text x="60" y="21" class="d-text d-text-top">top</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_rel_outside() {
+    // explicit d-text-outside class should push text outside the rect
+    let input = r##"
+<rect id="r" xy="10 20" wh="100 50"/>
+<text rel="#r" text="above" text-loc="t" class="d-text-outside"/>
+"##;
+    let expected = r##"
+<rect id="r" x="10" y="20" width="100" height="50"/>
+<text x="60" y="19" class="d-text d-text-bottom">above</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_rel_line_outside_default() {
+    // relative to line element should default to 'outside'
+    let input = r##"
+<line id="l1" xy1="0 0" xy2="100 0"/>
+<text rel="#l1" text="label" text-loc="t"/>
+"##;
+    let expected = r##"
+<line id="l1" x1="0" y1="0" x2="100" y2="0"/>
+<text x="50" y="-1" class="d-text d-text-bottom">label</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_rel_prev_element() {
+    // Use ^ (previous element) as rel
+    let input = r##"
+<rect xy="10 20" wh="100 50"/>
+<text rel="^" text="prev"/>
+"##;
+    let expected = r##"
+<rect x="10" y="20" width="100" height="50"/>
+<text x="60" y="45" class="d-text">prev</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_rel_nonexistent() {
+    // reference to nonexistent element should error
+    let input = r##"
+<text rel="#nonexistent" text="fail"/>
+"##;
+    assert!(transform_str_default(input).is_err());
+}
+
+#[test]
+fn test_text_rel_bottom_right() {
+    // Test bottom-right loc on text rel (inside default)
+    let input = r##"
+<rect id="r" xy="0" wh="100 50"/>
+<text rel="#r" text="br" text-loc="br"/>
+"##;
+    let expected = r##"
+<rect id="r" x="0" y="0" width="100" height="50"/>
+<text x="99" y="49" class="d-text d-text-bottom d-text-right">br</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
