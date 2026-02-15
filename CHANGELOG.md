@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   basis for attributes such as `text-loc`. This feature makes it easier to
   position multiple text elements relative to an element.
 
+- Fixed: invalid dirspec entries (e.g. `xy="ref|h 10"` where the leading '#'
+  is missing) now error rather than silently being ignored.
+
 ## [0.27.0 - 2026-02-06]
 
 - Changed: `<line>` based connectors are now axis-aligned by default where

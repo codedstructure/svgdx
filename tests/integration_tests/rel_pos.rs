@@ -438,3 +438,12 @@ fn test_mixed_locspec_rational_delta() {
     assert_contains!(output, expected2);
     assert_contains!(output, expected3);
 }
+
+#[test]
+fn test_dirspec_broken() {
+    // missing '#' - should error.
+    let input = r##"
+<rect id="z1" wh="2"/>
+<rect id="z2" xy="z1|h" wh="2"/>"##;
+    assert!(transform_str_default(input).is_err());
+}

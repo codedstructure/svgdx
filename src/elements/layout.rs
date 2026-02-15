@@ -220,6 +220,8 @@ impl SvgElement {
                     pos.translate(-bb.x1, -bb.y1);
                 }
                 pos.set_position_attrs(self);
+            } else {
+                return Err(Error::InvalidValue("dirspec".into(), relpos));
             }
         } else if let Some(xy_loc) = self.pop_attr("xy-loc") {
             // xy + xy_loc processing
