@@ -726,3 +726,61 @@ fn test_text_rel_bottom_right() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_md() {
+    let input = r#"
+<rect xy="0" wh="10" md="m*ult*i\nline" text-loc="br" class="d-text-outside"/>
+"#;
+    let expected = r#"
+<rect x="0" y="0" width="10" height="10"/>
+<text x="11" y="11" class="d-text d-text-top d-text-left">
+<tspan x="11" dy="0em">m</tspan><tspan class="d-text-italic">ult</tspan><tspan>i</tspan><tspan x="11" dy="1.05em">line</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect id="proc" xy="0 0" wh="40 20" text="`hello`\n*m\nark* __down__" class="d-markdown"/>
+"#;
+    let expected = r#"<rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
+<text x="20" y="10" class="d-text d-markdown">
+<tspan x="20" dy="-1.05em" class="d-text-monospace">hello</tspan><tspan x="20" dy="1.05em" class="d-text-italic">m</tspan><tspan x="20" dy="1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect id="proc" xy="0 0" wh="40 20" text="`hello`\n*m\nark* __down__" class="d-markdown d-text-vertical"/>
+"#;
+    let expected = r#"
+<rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
+<text x="20" y="10" writing-mode="tb" class="d-text d-markdown d-text-vertical">
+<tspan y="10" dx="-1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em" class="d-text-italic">m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<rect id="proc" xy="0 0" wh="40 20" text="`hello`\n\*m\nark* __down__" class="d-markdown d-text-vertical"/>
+"#;
+    let expected = r#"
+<rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
+<text x="20" y="10" writing-mode="tb" class="d-text d-markdown d-text-vertical">
+<tspan y="10" dx="-1.05em">ark* </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em">*m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}

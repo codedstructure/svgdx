@@ -437,7 +437,7 @@ impl SvgElement {
         // TODO: refactor this method to handle text event gen better
         let phantom = matches!(self.name(), "point" | "box");
 
-        if self.has_attr("text") {
+        if self.has_attr("text") || self.has_attr("md") {
             let (orig_elem, text_elements) = process_text_attr(self, ctx)?;
 
             if orig_elem.name != "text" && !phantom {

@@ -3,6 +3,7 @@ use crate::context::ElementMap;
 use crate::geometry::LocSpec;
 use crate::types::{attr_split_cycle, fstr, strp, ElRef};
 
+use crate::elements::markdown::{get_md_value, MdSpan};
 use crate::errors::{Error, Result};
 
 fn get_text_value(element: &mut SvgElement) -> String {
@@ -182,22 +183,101 @@ pub fn process_text_attr(
 
     let mut orig_elem = element.clone();
 
-    let text_value = get_text_value(&mut orig_elem);
+    let spans;
+    if let (Some(_), Some(_)) = (orig_elem.get_attr("text"), orig_elem.get_attr("md")) {
+        return Err(Error::Parse(
+            "has both attributes of text and md".to_owned(),
+        ));
+    } else if orig_elem.get_attr("text").is_some() {
+        if orig_elem.has_class("d-markdown") {
+            // as to call must have one of them
+            spans = get_md_value(&mut orig_elem);
+        } else {
+            spans = vec![MdSpan {
+                code: false,
+                bold: false,
+                italic: false,
+                text: get_text_value(&mut orig_elem),
+            }];
+        }
+    } else {
+        // as to call must have one of them
+        spans = get_md_value(&mut orig_elem);
+    }
+    let full_text_parsed_string = spans
+        .iter()
+        .map(|s| s.text.clone())
+        .collect::<Vec<_>>()
+        .join("");
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem, ctx)?;
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);
     let mut text_elements = Vec::new();
-    let mut lines: Vec<_> = text_value.lines().collect();
+    // lines is a vec of (line)s
+    // a line is a vec of spans
+    // it starts with a single empty line
+    let mut lines = vec![vec![]];
+    for span in spans.iter() {
+        let mut segments = span.text.lines();
+        if let Some(first) = segments.next() {
+            if !first.is_empty() {
+                lines
+                    .last_mut()
+                    .expect("added item not removed")
+                    .push(MdSpan {
+                        code: span.code,
+                        bold: span.bold,
+                        italic: span.italic,
+                        text: first.to_string(),
+                    });
+            }
+        }
+
+        for s in segments {
+            lines.push(vec![MdSpan {
+                code: span.code,
+                bold: span.bold,
+                italic: span.italic,
+                text: s.to_string(),
+            }]);
+        }
+
+        if let Some(last_char) = span.text.chars().last() {
+            if last_char == '\n' {
+                lines.push(vec![]);
+            }
+        }
+    }
+    // if last char is newline dont do the new line
+    if let Some(last_span) = spans.last() {
+        if let Some(last_char) = last_span.text.chars().last() {
+            if last_char == '\n' {
+                lines.pop();
+            }
+        }
+    }
+
+    // fill empty lines with empty strings
+    for l in &mut lines {
+        if l.is_empty() {
+            l.push(MdSpan {
+                code: false,
+                bold: false,
+                italic: false,
+                text: String::new(),
+            });
+        }
+    }
     let line_count = lines.len();
 
-    let multiline = line_count > 1;
+    let multielement = line_count > 1 || spans.len() > 1;
     let vertical = orig_elem.has_class("d-text-vertical");
     // Whether text is pre-formatted (i.e. spaces are not collapsed)
     let text_pre = orig_elem.has_class("d-text-pre");
 
-    // There will always be a text element; if not multiline this is the only element.
+    // There will always be a text element; if not multielement this is the only element.
     let mut text_elem = if orig_elem.name() == "text" {
         orig_elem.clone()
     } else {
@@ -268,6 +348,18 @@ pub fn process_text_attr(
             text_classes.push(class);
         }
     }
+
+    if !multielement {
+        if lines[0][0].code {
+            text_classes.push("d-text-monospace".to_string());
+        }
+        if lines[0][0].bold {
+            text_classes.push("d-text-bold".to_string());
+        }
+        if lines[0][0].italic {
+            text_classes.push("d-text-italic".to_string());
+        }
+    }
     text_elem.src_line = orig_elem.src_line;
     text_elem.set_classes(&text_classes);
 
@@ -300,9 +392,9 @@ pub fn process_text_attr(
             text_elem.set_attr(text_attr, &attr);
         }
     }
-    text_elem.text_content = Some(text_value.clone());
+    text_elem.text_content = Some(full_text_parsed_string.clone());
     text_elements.push(text_elem);
-    if multiline {
+    if multielement {
         // Determine position of first text line; others follow this based on line spacing
         let first_line_offset = match (outside, vertical, text_loc) {
             // shapes - text 'inside'
@@ -324,40 +416,61 @@ pub fn process_text_attr(
         }
         tspan_elem.src_line = orig_elem.src_line;
         if vertical {
-            tspan_elem.set_attr("y", &y_str);
             lines = lines.into_iter().rev().collect();
-        } else {
-            tspan_elem.set_attr("x", &x_str);
         }
-        for (idx, text_fragment) in lines.into_iter().enumerate() {
-            let mut text_fragment = text_fragment.to_string();
-            let mut tspan = tspan_elem.clone();
-            let line_offset = if idx == 0 {
-                first_line_offset(line_count, line_spacing)
-            } else {
-                line_spacing
-            };
 
-            if text_pre {
-                // Replace spaces with non-breaking spaces so they aren't collapsed
-                // by XML processing. This allows pre-formatted multi-line text (e.g. for
-                // code listings)
-                text_fragment = text_fragment.replace(' ', NBSP);
+        for (idx, line) in lines.into_iter().enumerate() {
+            for (idn, md_span) in line.into_iter().enumerate() {
+                let mut text_fragment = md_span.text;
+                let mut tspan = tspan_elem.clone();
+                if idn == 0 {
+                    if vertical {
+                        tspan.set_attr("y", &y_str);
+                    } else {
+                        tspan.set_attr("x", &x_str);
+                    }
+                }
+
+                if md_span.code {
+                    tspan.add_class("d-text-monospace");
+                }
+                if md_span.bold {
+                    tspan.add_class("d-text-bold");
+                }
+                if md_span.italic {
+                    tspan.add_class("d-text-italic");
+                }
+
+                let line_offset = if idx == 0 {
+                    first_line_offset(line_count, line_spacing)
+                } else {
+                    line_spacing
+                };
+
+                if text_pre {
+                    // Replace spaces with non-breaking spaces so they aren't collapsed
+                    // by XML processing. This allows pre-formatted multi-line text (e.g. for
+                    // code listings)
+                    text_fragment = text_fragment.replace(' ', NBSP);
+                }
+
+                if idn == 0 {
+                    tspan.set_attr(
+                        if vertical { "dx" } else { "dy" },
+                        &format!("{}em", fstr(line_offset)),
+                    );
+                }
+
+                tspan.text_content = Some(if text_fragment.is_empty() {
+                    // Empty tspans don't take up vertical space, so use a zero-width space.
+                    // Without this "a\n\nb" would render three tspans, but it would appear
+                    // to have 'b' immediately below 'a' without a blank line between them.
+                    ZWSP.to_string()
+                } else {
+                    text_fragment.to_string()
+                });
+                text_elements.push(tspan);
             }
-
-            tspan.set_attr(
-                if vertical { "dx" } else { "dy" },
-                &format!("{}em", fstr(line_offset)),
-            );
-            tspan.text_content = Some(if text_fragment.is_empty() {
-                // Empty tspans don't take up vertical space, so use a zero-width space.
-                // Without this "a\n\nb" would render three tspans, but it would appear
-                // to have 'b' immediately below 'a' without a blank line between them.
-                ZWSP.to_string()
-            } else {
-                text_fragment.to_string()
-            });
-            text_elements.push(tspan);
         }
     }
     Ok((orig_elem, text_elements))

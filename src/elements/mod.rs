@@ -5,6 +5,7 @@ mod gradient;
 mod layout;
 mod line_offset;
 mod loops;
+mod markdown;
 mod path;
 mod reuse;
 mod special;
