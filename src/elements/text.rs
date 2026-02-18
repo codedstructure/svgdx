@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use super::SvgElement;
 use crate::context::ElementMap;
 use crate::geometry::LocSpec;
@@ -206,7 +204,11 @@ pub fn process_text_attr(
         // as to call must have one of them
         spans = get_md_value(&mut orig_elem);
     }
-    let full_text_parsed_string = spans.iter().map(|s| s.text.clone()).join("");
+    let full_text_parsed_string = spans
+        .iter()
+        .map(|s| s.text.clone())
+        .collect::<Vec<_>>()
+        .join("");
 
     let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem, ctx)?;
 
