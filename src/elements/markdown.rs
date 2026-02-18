@@ -263,7 +263,7 @@ fn md_parse_code_blocks(
                         }
                         // adding a new span
                         if !current_span.is_empty() {
-                            removed_spans -= 1;
+                            removed_spans = removed_spans.saturating_sub(1);
                             new_result.push(current_span);
                             current_span = String::new();
                         }
@@ -344,7 +344,7 @@ fn md_parse_escapes(
                                 // escapes if adjacent should merge and null is only first
                                 _ => panic!("\\ => should merge"),
                             }
-                        } else {
+                        } else if delimiters[del_ind].ind < result.len() {
                             // letter specific values
                             match result[delimiters[del_ind].ind].chars().next() {
                                 Some('n') => {
@@ -361,6 +361,9 @@ fn md_parse_escapes(
                                     delimiters[del_ind].num_delimiters -= 1;
                                 }
                             }
+                        } else {
+                            // trailing backslash with nothing after it, just add the backslash
+                            current_span.push(delimiters[del_ind].char_type.to_char());
                         }
                     }
                 }

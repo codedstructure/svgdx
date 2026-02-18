@@ -784,3 +784,82 @@ fn test_md() {
         expected.trim()
     );
 }
+
+#[test]
+fn test_md_parser_safety() {
+    for input in [
+        // Mixed and interleaved delimiters
+        r#"<rect xy="0" wh="10" md="***nested***"/>"#,
+        r#"<rect xy="0" wh="10" md="*a_b*c_d"/>"#,
+        // Adjacent backticks with no content between them
+        r#"<rect xy="0" wh="10" md="``"/>"#,
+        // Two backtick pairs with nothing in between
+        r#"<rect xy="0" wh="10" md="````"/>"#,
+        // Single backtick (unmatched)
+        r#"<rect xy="0" wh="10" md="`"/>"#,
+        // Code block containing only spaces
+        r#"<rect xy="0" wh="10" md="`  `"/>"#,
+        r#"<rect xy="0" wh="10" md="` `"/>"#,
+        // Multi-byte char at start and end of code block (after spaces)
+        r#"<rect xy="0" wh="10" md="` é `"/>"#,
+        // Multi-byte chars directly adjacent to backticks
+        r#"<rect xy="0" wh="10" md="`café`"/>"#,
+        // Code block with only multi-byte chars and spaces
+        r#"<rect xy="0" wh="10" md="` ñ ñ `"/>"#,
+        // CJK characters in code block
+        r#"<rect xy="0" wh="10" md="` 你好 `"/>"#,
+        // Emoji in code block (4-byte UTF-8)
+        r#"<rect xy="0" wh="10" md="` 🦀 `"/>"#,
+        // \n followed by multi-byte character
+        r#"<rect xy="0" wh="10" md="hello\né"/>"#,
+        // \n followed by CJK
+        r#"<rect xy="0" wh="10" md="line1\n你好"/>"#,
+        // \n followed by emoji
+        r#"<rect xy="0" wh="10" md="line1\n🦀world"/>"#,
+        // Multiple \n in sequence
+        r#"<rect xy="0" wh="10" md="a\n\n\nb"/>"#,
+        // Trailing single backslash
+        r#"<rect xy="0" wh="10" md="hello\"/>"#,
+        // Trailing double backslash
+        r#"<rect xy="0" wh="10" md="hello\\"/>"#,
+        // Trailing triple backslash
+        r#"<rect xy="0" wh="10" md="hello\\\"/>"#,
+        // Only a backslash
+        r#"<rect xy="0" wh="10" md="\"/>"#,
+        // Backslash before delimiter at end
+        r#"<rect xy="0" wh="10" md="hello\*"/>"#,
+        // Backslash at end after code block
+        r#"<rect xy="0" wh="10" md="`code`\"/>"#,
+        // Escaped backtick inside code block
+        r#"<rect xy="0" wh="10" md="`\``"/>"#,
+        // Deeply nested emphasis
+        r#"<rect xy="0" wh="10" md="***a]b**c*d"/>"#,
+        // All delimiter types in one string
+        r#"<rect xy="0" wh="10" md="`code` *italic* **bold** _also_ __also__"/>"#,
+        // Empty input
+        r#"<rect xy="0" wh="10" md=""/>"#,
+        // Only delimiters, no text
+        r#"<rect xy="0" wh="10" md="***___```\\\"/>"#,
+        // Very long delimiter run
+        r#"<rect xy="0" wh="10" md="**********hello**********"/>"#,
+        // Interleaved newlines and emphasis
+        r#"<rect xy="0" wh="10" md="*line1\nline2*"/>"#,
+        // Backslash before every special character
+        r#"<rect xy="0" wh="10" md="\*\*\`\\_"/>"#,
+        // Delimiter immediately after punctuation, before alphanumeric
+        r#"<rect xy="0" wh="10" md="(*foo*)"/>"#,
+        // Delimiter between two punctuation marks
+        r#"<rect xy="0" wh="10" md="!*!*!"/>"#,
+        // Underscore emphasis next to punctuation (stricter rules per CommonMark)
+        r#"<rect xy="0" wh="10" md="(_foo_)"/>"#,
+        // Mixed punctuation and emphasis
+        r#"<rect xy="0" wh="10" md="**foo**bar**baz**"/>"#,
+        // Emphasis starting/ending at punctuation boundaries
+        r#"<rect xy="0" wh="10" md="a]]*b[*c"/>"#,
+    ] {
+        assert!(
+            transform_str_default(input).is_ok(),
+            "Markdown parser failed on input: {input}"
+        );
+    }
+}
