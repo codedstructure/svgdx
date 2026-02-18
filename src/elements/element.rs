@@ -1,12 +1,12 @@
 use super::{
-    is_connector, process_path_bearing, process_text_attr, ConfigElement, ConnectionType,
-    Connector, Container, DefaultsElement, ForElement, GroupElement, IfElement, LoopElement,
-    ReuseElement, SpecsElement, VarElement,
+    is_connector, process_text_attr, ConfigElement, ConnectorType, Container, DefaultsElement,
+    ForElement, GroupElement, IfElement, LinearGradient, LoopElement, RadialGradient, ReuseElement,
+    SpecsElement, VarElement,
 };
-use crate::context::{ContextView, ElementMap, TransformerContext};
-use crate::elements::path::points_to_path;
-use crate::errors::{Result, SvgdxError};
-use crate::events::{InputList, OutputEvent, OutputList};
+use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
+use crate::document::{EventKind, InputList, OutputList};
+use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
+use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
@@ -24,20 +24,22 @@ impl EventGen for SvgElement {
         // early update: may be updated further during processing
         context.update_element(self);
         let res = match self.name() {
-            "loop" => LoopElement(self.clone()).generate_events(context),
-            "config" => ConfigElement(self.clone()).generate_events(context),
-            "reuse" => ReuseElement(self.clone()).generate_events(context),
-            "specs" => SpecsElement(self.clone()).generate_events(context),
-            "var" => VarElement(self.clone()).generate_events(context),
-            "if" => IfElement(self.clone()).generate_events(context),
-            "defaults" => DefaultsElement(self.clone()).generate_events(context),
-            "for" => ForElement(self.clone()).generate_events(context),
-            "g" | "symbol" => GroupElement(self.clone()).generate_events(context),
+            "loop" => LoopElement(self).generate_events(context),
+            "config" => ConfigElement(self).generate_events(context),
+            "reuse" => ReuseElement(self).generate_events(context),
+            "specs" => SpecsElement(self).generate_events(context),
+            "var" => VarElement(self).generate_events(context),
+            "if" => IfElement(self).generate_events(context),
+            "defaults" => DefaultsElement(self).generate_events(context),
+            "for" => ForElement(self).generate_events(context),
+            "g" | "symbol" => GroupElement(self).generate_events(context),
+            "linearGradient" => LinearGradient(self).generate_events(context),
+            "radialGradient" => RadialGradient(self).generate_events(context),
             _ => match self.event_range {
                 Some((start, end)) if start != end => {
-                    return Container(self.clone()).generate_events(context);
+                    return Container(self).generate_events(context);
                 }
-                _ => OtherElement(self.clone()).generate_events(context),
+                _ => OtherElement(self).generate_events(context),
             },
         };
         context.dec_depth()?;
@@ -49,7 +51,7 @@ impl EventGen for SvgElement {
         {
             let clip_el = context
                 .get_element(&clip_id)
-                .ok_or(SvgdxError::ReferenceError(clip_id))?;
+                .ok_or_else(|| Error::Reference(clip_id))?;
             if let ("clipPath", Some(clip_bbox)) =
                 (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
             {
@@ -65,9 +67,9 @@ impl EventGen for SvgElement {
 }
 
 #[derive(Debug, Clone)]
-struct OtherElement(pub SvgElement);
+struct OtherElement<'a>(pub &'a SvgElement);
 
-impl EventGen for OtherElement {
+impl EventGen for OtherElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -75,41 +77,31 @@ impl EventGen for OtherElement {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
         e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
-        e.transmute(context)?;
+        if !e.transmute(context)? {
+            // Element should be skipped (e.g. overlapping connectors)
+            return Ok((output, None));
+        }
 
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
         let events = e.element_events(context)?;
         for svg_ev in events {
-            let is_empty = matches!(svg_ev, OutputEvent::Empty(_));
-            let adapted = if let OutputEvent::Empty(e) | OutputEvent::Start(e) = svg_ev {
-                let mut new_el = SvgElement::new(&e.name, &[]);
-                // Collect pass-through attributes
-                for (k, v) in e.attrs {
-                    if k != "class" && k != "data-src-line" && k != "_" && k != "__" {
-                        new_el.set_attr(&k, &v);
-                    }
-                }
+            let is_empty = matches!(svg_ev, EventKind::Empty(_));
+            let adapted = if let EventKind::Empty(mut raw) | EventKind::Start(mut raw) = svg_ev {
+                let attrs = raw.get_attrs_mut();
+                attrs.retain(|(k, _v)| k != "data-src-line" && k != "_" && k != "__");
 
                 // TODO: have a range of debug options to include/exclude
-                // new_el.set_attr("_oi", &e.order_index.to_string());
+                // attrs.push(("_oi".into(), e.order_index.to_string()));
 
-                // Any 'class' attribute values are stored separately as a HashSet;
-                // collect those into the BytesStart object
-                if !e.classes.is_empty() {
-                    new_el.add_classes(&e.classes);
-                }
-                if !e.styles.is_empty() {
-                    new_el.set_style_from(&e.styles.to_string());
-                }
                 // Add 'data-src-line' for all elements generated by input `element`
                 if context.config.add_metadata {
-                    new_el.set_attr("data-src-line", &e.src_line.to_string());
+                    attrs.push(("data-src-line".into(), e.src_line.to_string()));
                 }
                 if is_empty {
-                    OutputEvent::Empty(new_el)
+                    EventKind::Empty(raw)
                 } else {
-                    OutputEvent::Start(new_el)
+                    EventKind::Start(raw)
                 }
             } else {
                 svg_ev
@@ -375,6 +367,18 @@ impl SvgElement {
     pub fn get_attrs(&self) -> Vec<(String, String)> {
         self.attrs.to_vec()
     }
+
+    /// get attrs including styles and classes
+    pub fn get_full_attrs(&self) -> Vec<(String, String)> {
+        let mut all_attrs = self.attrs.to_vec();
+        if !self.styles.is_empty() {
+            all_attrs.push(("style".to_string(), self.styles.to_string()));
+        }
+        if !self.classes.is_empty() {
+            all_attrs.push(("class".to_string(), self.get_classes().join(" ")));
+        }
+        all_attrs
+    }
 }
 
 impl SvgElement {
@@ -398,34 +402,34 @@ impl SvgElement {
 
     /// Process a given `SvgElement` into a list of `SvgEvent`s
     // TODO: would be nice to make this infallible and have any potential errors handled earlier.
-    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<Vec<OutputEvent>> {
-        let mut events = vec![];
+    pub fn element_events(&self, ctx: &mut TransformerContext) -> Result<OutputList> {
+        let mut events = OutputList::new(); //vec![];
 
         if ctx.config.debug {
             // Prefix replaced element(s) with a representation of the original element
             //
             // Replace double quote with backtick to avoid messy XML entity conversion
             // (i.e. &quot; or &apos; if single quotes were used)
-            events.push(OutputEvent::Comment(
+            events.push(EventKind::Comment(
                 format!(" {} ", self.original)
                     .replace('"', "`")
                     .replace(['<', '>'], ""),
             ));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // Standard comment: expressions & variables are evaluated.
         if let Some(comment) = self.get_attr("_") {
             // Expressions in comments are evaluated
             let value = eval_attr(comment, ctx)?;
-            events.push(OutputEvent::Comment(format!(" {value} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(EventKind::Comment(format!(" {value} ")));
+            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // 'Raw' comment: no evaluation of expressions occurs here
         if let Some(comment) = self.get_attr("__") {
-            events.push(OutputEvent::Comment(format!(" {comment} ")));
-            events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(EventKind::Comment(format!(" {comment} ")));
+            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
         }
 
         // Some elements don't generate text themselves, but can have
@@ -434,55 +438,55 @@ impl SvgElement {
         let phantom = matches!(self.name(), "point" | "box");
 
         if self.has_attr("text") || self.has_attr("md") {
-            let (orig_elem, text_elements) = process_text_attr(self)?;
+            let (orig_elem, text_elements) = process_text_attr(self, ctx)?;
 
             if orig_elem.name != "text" && !phantom {
                 // We only care about the original element if it wasn't a text element
                 // (otherwise we generate a useless empty text element for the original)
-                events.push(OutputEvent::Empty(orig_elem));
-                events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                events.push(EventKind::Empty(orig_elem.into()));
+                events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
             }
             match text_elements.as_slice() {
                 [] => {}
                 [elem] => {
-                    events.push(OutputEvent::Start(elem.clone()));
+                    events.push(EventKind::Start(elem.clone().into()));
                     if let Some(value) = &elem.text_content {
-                        events.push(OutputEvent::Text(value.clone()));
+                        events.push(EventKind::Text(value.clone()));
                     } else {
-                        return Err(SvgdxError::InvalidData(
-                            "Text element should have content".to_owned(),
+                        return Err(Error::InternalLogic(
+                            "text element should have content".to_owned(),
                         ));
                     }
-                    events.push(OutputEvent::End("text".to_string()));
+                    events.push(EventKind::End("text".to_string()));
                 }
                 _ => {
                     // Multiple text spans
                     let text_elem = &text_elements[0];
-                    events.push(OutputEvent::Start(text_elem.clone()));
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(EventKind::Start(text_elem.clone().into()));
+                    events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
                     for elem in &text_elements[1..] {
                         // Note: we can't insert a newline/last_indent here as whitespace
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
-                        events.push(OutputEvent::Start(elem.clone()));
+                        events.push(EventKind::Start(elem.clone().into()));
                         if let Some(value) = &elem.text_content {
-                            events.push(OutputEvent::Text(value.clone()));
+                            events.push(EventKind::Text(value.clone()));
                         } else {
-                            return Err(SvgdxError::InvalidData(
-                                "Text element should have content".to_owned(),
+                            return Err(Error::InternalLogic(
+                                "text element should have content".to_owned(),
                             ));
                         }
-                        events.push(OutputEvent::End("tspan".to_string()));
+                        events.push(EventKind::End("tspan".to_string()));
                     }
-                    events.push(OutputEvent::Text(format!("\n{}", " ".repeat(self.indent))));
-                    events.push(OutputEvent::End("text".to_string()));
+                    events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(EventKind::End("text".to_string()));
                 }
             }
         } else if !phantom {
             if self.is_empty_element() {
-                events.push(OutputEvent::Empty(self.clone()));
+                events.push(EventKind::Empty(self.clone().into()));
             } else {
-                events.push(OutputEvent::Start(self.clone()));
+                events.push(EventKind::Start(self.clone().into()));
             }
         }
 
@@ -515,33 +519,28 @@ impl SvgElement {
 }
 
 impl SvgElement {
-    pub fn transmute(&mut self, ctx: &impl ContextView) -> Result<()> {
+    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
+    pub fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
         if self.name == "path" {
             if let Some(d) = self.get_attr("d") {
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    self.set_attr("d", &process_path_bearing(d)?)
+                let mut d = d.to_string();
+                if d.chars().any(|c| c == 'r' || c == 'R') {
+                    d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
                 }
+                if d.chars().any(|c| c == 'b' || c == 'B') {
+                    d = process_path_bearing(&d)?;
+                }
+                self.set_attr("d", &d);
             }
         }
 
         if is_connector(self) {
-            if let Ok(conn) = Connector::from_element(
-                self,
-                ctx,
-                if let Some(e_type) = self.get_attr("edge-type") {
-                    ConnectionType::from_str(e_type)
-                } else if self.name() == "polyline" {
-                    ConnectionType::Corner
-                } else {
-                    ConnectionType::Straight
-                },
-            ) {
-                // replace with rendered connection element
-                *self = conn.render(ctx)?.without_attr("edge-type");
+            let conn = ConnectorType::from_element(self, ctx)?;
+            // replace with rendered connection element, or skip if None
+            if let Some(rendered) = conn.render(ctx)? {
+                *self = rendered;
             } else {
-                return Err(SvgdxError::InvalidData(
-                    "Cannot create connector".to_owned(),
-                ));
+                return Ok(false);
             }
         }
 
@@ -562,7 +561,7 @@ impl SvgElement {
         }
         self.handle_rotation()?;
 
-        Ok(())
+        Ok(true)
     }
 
     /// Resolve any expressions in attributes.

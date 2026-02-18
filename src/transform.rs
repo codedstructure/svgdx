@@ -1,11 +1,12 @@
 use crate::context::TransformerContext;
+use crate::document::tag::{tagify_events, Tag};
+use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList};
 use crate::elements::SvgElement;
-use crate::errors::{Result, SvgdxError};
-use crate::events::{tagify_events, InputList, OutputEvent, OutputList, Tag};
+use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
 use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
-use crate::{AutoStyleMode, TransformConfig};
+use crate::{AutoStyleMode, ErrorMode, TransformConfig};
 
 use std::collections::{BTreeMap, HashMap};
 use std::io::{BufRead, Write};
@@ -59,7 +60,7 @@ impl EventGen for Tag {
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(OutputEvent::Text(tail.to_owned()));
+                    events.push(EventKind::Text(tail.to_owned()));
                 }
                 // NOTE: el.content_bbox may be set (e.g. if symbol) while bb is None here.
             }
@@ -69,20 +70,20 @@ impl EventGen for Tag {
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(OutputEvent::Text(tail.to_owned()));
+                    events.push(EventKind::Text(tail.to_owned()));
                 }
             }
             Tag::Comment(_, c, tail) => {
-                events.push(OutputEvent::Comment(c.clone()));
+                events.push(EventKind::Comment(c.clone()));
                 if let Some(tail) = tail {
-                    events.push(OutputEvent::Text(tail.to_owned()));
+                    events.push(EventKind::Text(tail.to_owned()));
                 }
             }
             Tag::Text(_, t) => {
-                events.push(OutputEvent::Text(t.clone()));
+                events.push(EventKind::Text(t.clone()));
             }
             Tag::CData(_, c) => {
-                events.push(OutputEvent::CData(c.clone()));
+                events.push(EventKind::CData(c.clone()));
             }
         }
         Ok((events, bbox))
@@ -95,7 +96,7 @@ fn process_tags(
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
     bbb: &mut BoundingBoxBuilder,
 ) -> Result<Option<BoundingBox>> {
-    let mut element_errors: HashMap<OrderIndex, (SvgElement, SvgdxError)> = HashMap::new();
+    let mut element_errors: HashMap<OrderIndex, (SvgElement, Error)> = HashMap::new();
     let remain = &mut Vec::new();
 
     while !tags.is_empty() && remain.len() != tags.len() {
@@ -117,7 +118,7 @@ fn process_tags(
                     }
                 } else {
                     if let (Some(el), Err(err)) = (el, gen_result) {
-                        if let SvgdxError::MultiError(err_list) = err {
+                        if let Error::Multi(err_list) = err {
                             for (idx, (el, err)) in err_list {
                                 element_errors.insert(idx, (el, err));
                             }
@@ -130,13 +131,55 @@ fn process_tags(
             }
         }
         if tags.len() == remain.len() {
-            return Err(SvgdxError::MultiError(element_errors));
+            // no progress made; abandon further processing
+            break;
         }
 
         mem::swap(tags, remain);
         remain.clear();
+        element_errors.clear();
+    }
+
+    if !element_errors.is_empty() {
+        handle_errors(element_errors, context, idx_output)?;
     }
     Ok(bbb.clone().build())
+}
+
+pub fn handle_errors(
+    element_errors: HashMap<OrderIndex, (SvgElement, Error)>,
+    context: &TransformerContext,
+    idx_output: &mut BTreeMap<OrderIndex, OutputList>,
+) -> Result<()> {
+    match context.config.error_mode {
+        ErrorMode::Strict => Err(Error::Multi(element_errors)),
+        ErrorMode::Warn => {
+            for (idx, (el, err)) in element_errors {
+                let mut ev_list = OutputList::from(vec![
+                    EventKind::Text("\n".to_owned()),
+                    EventKind::Comment(format!(" Warning: error processing element: {:?} ", err)),
+                ]);
+                let el_events = el.all_events(context);
+                ev_list.extend(el_events);
+                // TODO: should store tail in SvgElement and include here
+                // rather than just adding a newline...
+                ev_list.push(EventKind::Text("\n".to_owned()));
+                idx_output.insert(idx, ev_list);
+            }
+            Ok(())
+        }
+        ErrorMode::Ignore => {
+            for (idx, (el, _err)) in element_errors {
+                let el_events = el.all_events(context);
+                let mut ev_list = OutputList::from(el_events);
+                // TODO: should store tail in SvgElement and include here
+                // rather than just adding a newline...
+                ev_list.push(EventKind::Text("\n".to_owned()));
+                idx_output.insert(idx, ev_list);
+            }
+            Ok(())
+        }
+    }
 }
 
 pub fn process_events(
@@ -145,7 +188,7 @@ pub fn process_events(
 ) -> Result<(OutputList, Option<BoundingBox>)> {
     let input = input.into();
     if is_real_svg(&input) {
-        if context.get_top_element().is_none() {
+        if context.is_top_level() {
             // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document
             context.real_svg = true;
         }
@@ -183,22 +226,20 @@ impl Transformer {
         self.postprocess(output, writer)
     }
 
-    fn make_root_svg(
-        &self,
-        first_svg: OutputEvent,
-        bbox: Option<BoundingBox>,
-    ) -> Result<SvgElement> {
+    fn make_root_svg(&self, first_svg: EventKind, bbox: Option<BoundingBox>) -> Result<SvgElement> {
         let mut new_svg_attrs = AttrMap::new();
-        let mut orig_svg_attrs = HashMap::new();
+        let mut orig_svg_attrs: HashMap<String, String> = HashMap::new();
         let mut orig_svg_class = None;
         let mut orig_svg_style = None;
-        if let OutputEvent::Start(orig_svg) = first_svg {
+        if let EventKind::Start(orig_svg) = first_svg {
             for (k, v) in orig_svg.get_attrs() {
                 new_svg_attrs.insert(k, v);
             }
-            orig_svg_attrs = orig_svg.get_attrs().into_iter().collect();
-            orig_svg_class = Some(orig_svg.get_classes());
-            orig_svg_style = Some(orig_svg.get_styles().clone());
+
+            let el = SvgElement::new(orig_svg.name(), &new_svg_attrs.to_vec());
+            orig_svg_attrs = orig_svg.get_attrs().iter().cloned().collect();
+            orig_svg_class = Some(el.get_classes());
+            orig_svg_style = Some(el.get_styles().clone());
         }
         if !orig_svg_attrs.contains_key("version") {
             new_svg_attrs.insert("version", "1.1");
@@ -281,22 +322,25 @@ impl Transformer {
             AutoStyleMode::Inline => {
                 let mut elements: Vec<_> = events
                     .iter_mut()
-                    .filter_map(|output_ev| match output_ev {
-                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
-                        _ => None,
-                    })
+                    .filter_map(|output_ev| EventStyleWrapper::from_event(&mut output_ev.event))
                     .collect();
-                registry.process_inline(&mut elements);
+                let mut element_refs: Vec<_> = elements.iter_mut().collect();
+                registry.process_inline(&mut element_refs);
             }
             AutoStyleMode::Css => {
+                // TODO: use similar EventStyleWrapper approach here?
                 let elements: Vec<_> = events
                     .iter()
-                    .filter_map(|output_ev| match output_ev {
-                        OutputEvent::Start(e) | OutputEvent::Empty(e) => Some(e),
+                    .filter_map(|output_ev| match &output_ev.event {
+                        EventKind::Start(e) | EventKind::Empty(e) => {
+                            let e = SvgElement::new(e.name(), e.get_attrs());
+                            Some(e)
+                        }
                         _ => None,
                     })
                     .collect();
-                registry.process_css(&elements);
+                let element_refs: Vec<_> = elements.iter().collect();
+                registry.process_css(&element_refs);
             }
         }
         registry.get_state()
@@ -308,21 +352,21 @@ impl Transformer {
 
         if !auto_defs.is_empty() {
             let mut defs_events = vec![
-                OutputEvent::Text(indent_line(indent)),
-                OutputEvent::Start(SvgElement::new("defs", &[])),
+                EventKind::Text(indent_line(indent)),
+                EventKind::Start(SvgElement::new("defs", &[]).into()),
             ];
             if self.context.config.debug {
                 defs_events.extend([
-                    OutputEvent::Text(indent_line(indent + 2)),
-                    OutputEvent::Comment(" svgdx-generated auto-style defs ".to_owned()),
+                    EventKind::Text(indent_line(indent + 2)),
+                    EventKind::Comment(" svgdx-generated auto-style defs ".to_owned()),
                 ]);
             }
-            defs_events.push(OutputEvent::Text("\n".to_owned()));
+            defs_events.push(EventKind::Text("\n".to_owned()));
             let eee = InputList::from_str(&indent_all(auto_defs, indent + 2).join("\n"))?;
             defs_events.extend(OutputList::from(eee));
             defs_events.extend(vec![
-                OutputEvent::Text(indent_line(indent)),
-                OutputEvent::End("defs".to_owned()),
+                EventKind::Text(indent_line(indent)),
+                EventKind::End("defs".to_owned()),
             ]);
             Ok(OutputList::from(defs_events))
         } else {
@@ -336,24 +380,24 @@ impl Transformer {
 
         if !auto_styles.is_empty() {
             let mut style_events = vec![
-                OutputEvent::Text(indent_line(indent)),
-                OutputEvent::Start(SvgElement::new("style", &[])),
+                EventKind::Text(indent_line(indent)),
+                EventKind::Start(SvgElement::new("style", &[]).into()),
             ];
             if self.context.config.debug {
                 style_events.extend([
-                    OutputEvent::Text(indent_line(indent + 2)),
-                    OutputEvent::Comment(" svgdx-generated auto-style CSS ".to_owned()),
+                    EventKind::Text(indent_line(indent + 2)),
+                    EventKind::Comment(" svgdx-generated auto-style CSS ".to_owned()),
                 ]);
             }
             style_events.extend(vec![
-                OutputEvent::Text(indent_line(indent + 2)),
-                OutputEvent::CData(format!(
+                EventKind::Text(indent_line(indent + 2)),
+                EventKind::CData(format!(
                     "\n{}\n{}",
                     indent_all(auto_styles, indent + 4).join("\n"),
                     " ".repeat(indent + 2)
                 )),
-                OutputEvent::Text(indent_line(indent)),
-                OutputEvent::End("style".to_owned()),
+                EventKind::Text(indent_line(indent)),
+                EventKind::End("style".to_owned()),
             ]);
             Ok(OutputList::from(style_events))
         } else {
@@ -378,8 +422,8 @@ impl Transformer {
         let mut has_svg_element = false;
         if let (pre_svg, Some(first_svg), remain) = events.partition("svg") {
             output_events.extend(pre_svg);
-            let root_svg = self.make_root_svg(first_svg, bbox)?;
-            output_events.push(OutputEvent::Start(root_svg));
+            let root_svg = self.make_root_svg(first_svg.event, bbox)?;
+            output_events.push(EventKind::Start(root_svg.into()));
             events = remain;
             has_svg_element = true;
         }
@@ -387,22 +431,21 @@ impl Transformer {
         if self.context.config.debug {
             let indent = "\n  ".to_owned();
 
-            output_events.extend(
-                vec![
-                    OutputEvent::Text(indent.clone()),
-                    OutputEvent::Comment(format!(
-                        " Generated by {} v{} ",
-                        env!("CARGO_PKG_NAME"),
-                        env!("CARGO_PKG_VERSION")
-                    )),
-                    OutputEvent::Text(indent),
-                    OutputEvent::Comment(format!(" Config: {:?} ", self.context.config)),
-                ]
-                .as_slice(),
-            )
+            output_events.extend(vec![
+                EventKind::Text(indent.clone()),
+                EventKind::Comment(format!(
+                    " Generated by {} v{} ",
+                    env!("CARGO_PKG_NAME"),
+                    env!("CARGO_PKG_VERSION")
+                )),
+                EventKind::Text(indent),
+                EventKind::Comment(format!(" Config: {:?} ", self.context.config)),
+            ])
         }
 
-        output_events.push(OutputEvent::Empty(SvgElement::new("style_sentinel", &[])));
+        output_events.push(EventKind::Empty(
+            SvgElement::new("style_sentinel", &[]).into(),
+        ));
         output_events.extend(events);
 
         // Default behaviour: include auto defs/styles iff we have an SVG element,

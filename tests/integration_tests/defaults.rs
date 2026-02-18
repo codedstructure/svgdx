@@ -14,7 +14,7 @@ fn test_defaults_simple() {
 
 #[test]
 fn test_defaults_empty() {
-    for input in vec![
+    for input in [
         r##"<defaults wh="37"/><defaults xy="10"/><rect />"##,
         r##"<defaults wh="37" xy="10"/><rect />"##,
         r##"<defaults wh="37"><_ xy="10"/></defaults><rect />"##,

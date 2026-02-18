@@ -55,7 +55,7 @@ fn test_connector_h() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="20" y="2" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="h"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="5" y1="3.5" x2="20" y2="3.5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
@@ -66,7 +66,7 @@ fn test_connector_v() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />
 <rect x="1" y="20" width="5" height="5" id="b" />
-<line start="#a" end="#b" edge-type="v"/>"##;
+<line start="#a" end="#b"/>"##;
     let expected_line = r#"<line x1="3" y1="5" x2="3" y2="20"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
@@ -286,4 +286,84 @@ fn test_connector_corners() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_connector_close_corner_offset() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="20 -2" wh="10"/>
+<polyline id="c1" start="#a@t" end="#b@t"/>
+"##;
+    let expected = r##"id="c1" points="5 0, 5 -5, 25 -5, 25 -2""##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r##"
+<rect xy="10 20" wh="10" text="a" id="a"/>
+<rect xy="5 35" wh="8" text="b" id="b"/>
+<rect xy="20 33" wh="5" text="c" id="c"/>
+<polyline start="#a@b" end="#b@t" corner-offset="25%"/>
+<polyline start="#a@r" end="#c@t"/>
+<polyline start="#a@l" end="#b@l" corner-offset="1.5"/>
+"##;
+    let expected1 = r##"points="15 30, 15 31.25, 9 31.25, 9 35""##;
+    let expected2 = r##"points="10 25, 3.5 25, 3.5 39, 5 39""##;
+    let expected3 = r##"points="20 25, 22.5 25, 22.5 33""##;
+    let output = transform_str_default(input).unwrap();
+
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
+
+#[test]
+fn test_elbow_connector() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" wh="10" xy="30 15"/>
+<polyline id="z1" start="#a@r:40%" end="#b@l:40%" corner-offset="55%"/>
+<polyline id="z2" start="#b@l:60%" end="#a@r:60%" corner-offset="55%"/>
+"##;
+    let expected1 = r##"<polyline id="z1" points="10 4, 21 4, 21 19, 30 19"/>"##;
+    let expected2 = r##"<polyline id="z2" points="30 21, 19 21, 19 6, 10 6"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" wh="10" xy="15 30"/>
+<polyline id="z1" start="#a@b:40%" end="#b@t:40%" corner-offset="55%"/>
+<polyline id="z2" start="#b@t:60%" end="#a@b:60%" corner-offset="55%"/>
+"##;
+    let expected1 = r##"<polyline id="z1" points="4 10, 4 21, 19 21, 19 30"/>"##;
+    let expected2 = r##"<polyline id="z2" points="21 30, 21 19, 6 19, 6 10"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_connector_into_relpos_group() {
+    let input = r##"
+<g id="a"><rect id="a1" wh="10"/></g>
+<g id="b" xy="#a|h 20" dy="5"><rect id="b1" wh="10" /></g>
+<polyline start="#a1@r" end="#b1@l"/>
+"##;
+    let expected_line = r#"<polyline points="10 5, 20 5, 20 10, 30 10"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_connector_overlapping_bboxes() {
+    // When two bboxes intersect, no line should be rendered
+    let input = r##"
+<rect id="a" x="0" y="0" width="10" height="10" />
+<rect id="b" x="5" y="5" width="10" height="10" />
+<line id="conn" start="#a" end="#b" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert!(!output.contains(r#"id="conn""#));
 }

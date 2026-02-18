@@ -7,11 +7,11 @@
   <var size="30, 8" gap="3"/>
 
   <var weekday="2" _="Corresponds to 1st January being a Monday"/>
-  <for data="{{splitw($monthdata)}}" var="month" idx-var="idx">
+  <for data="{{splitw($monthdata)}}" var="month" idx="idx">
     <var name="{{_(select(0, split(':', '$month')))}}"/>
     <var days="{{_(select(1, split(':', '$month')))}}"/>
     <rect xy="{{$idx * (head($size) + $gap)}} 0" wh="$size" text="$name" class="d-fill-lightblue d-text-large"/>
-    <loop count="$days" loop-var="date" start="1">
+    <loop count="$days" var="date" start="1">
       <var day_class="$dayclass{{if(lt($weekday % 7, 2), 1, 0)}}"/>
       <rect xy="^|v" wh="^" text="$date" text-loc="tl" class="$day_class"/>
       <var weekday="{{$weekday + 1}}"/>

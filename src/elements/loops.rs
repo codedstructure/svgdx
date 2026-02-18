@@ -1,7 +1,7 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
-use crate::events::OutputList;
+use crate::document::OutputList;
+use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::{process_events, EventGen};
@@ -20,15 +20,19 @@ struct LoopDef {
 }
 
 impl TryFrom<&SvgElement> for LoopDef {
-    type Error = SvgdxError;
+    type Error = Error;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         if element.name() != "loop" {
-            return Err(SvgdxError::InvalidData(
+            return Err(Error::InternalLogic(
                 "LoopType can only be created from a loop element".to_string(),
             ));
         }
-        let loop_spec = if let Some(loop_var) = element.get_attr("loop-var") {
+        let loop_spec = if let Some(loop_var) = element
+            .get_attr("var")
+            // loop-var is deprecated and may be removed in future
+            .or_else(|| element.get_attr("loop-var"))
+        {
             // Note we don't parse attributes here as they might be expressions,
             // and we don't have access to a context to evaluate them
             let start = element.get_attr("start").unwrap_or("0");
@@ -45,9 +49,7 @@ impl TryFrom<&SvgElement> for LoopDef {
         } else if let Some(until_expr) = element.get_attr("until") {
             loop_type = LoopType::Until(until_expr.to_string());
         } else {
-            return Err(SvgdxError::MissingAttribute(
-                "count | while | until".to_string(),
-            ));
+            return Err(Error::MissingAttr("count | while | until".to_string()));
         }
         Ok(Self {
             loop_type,
@@ -57,14 +59,14 @@ impl TryFrom<&SvgElement> for LoopDef {
 }
 
 #[derive(Debug, Clone)]
-pub struct LoopElement(pub SvgElement);
+pub struct LoopElement<'a>(pub &'a SvgElement);
 
-impl EventGen for LoopElement {
+impl EventGen for LoopElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = &self.0;
+        let event_element = self.0;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         if let (Ok(loop_def), Some(inner_events)) = (
@@ -119,10 +121,7 @@ impl EventGen for LoopElement {
                 iteration += 1;
                 loop_var_value += loop_step;
                 if iteration > context.config.loop_limit {
-                    return Err(SvgdxError::LoopLimitError(
-                        iteration,
-                        context.config.loop_limit,
-                    ));
+                    return Err(Error::LoopLimit(iteration, context.config.loop_limit));
                 }
             }
         }
@@ -137,16 +136,19 @@ struct ForDef {
 }
 
 impl TryFrom<&SvgElement> for ForDef {
-    type Error = SvgdxError;
+    type Error = Error;
 
     fn try_from(element: &SvgElement) -> Result<Self> {
         let var_name = element
             .get_attr("var")
-            .ok_or_else(|| SvgdxError::MissingAttribute("var".to_string()))?;
-        let idx_name = element.get_attr("idx-var");
+            .ok_or_else(|| Error::MissingAttr("var".to_string()))?;
+        let idx_name = element
+            .get_attr("idx")
+            // idx-var is deprecated and may be removed in future
+            .or_else(|| element.get_attr("idx-var"));
         let data = element
             .get_attr("data")
-            .ok_or_else(|| SvgdxError::MissingAttribute("data".to_string()))?;
+            .ok_or_else(|| Error::MissingAttr("data".to_string()))?;
         Ok(Self {
             var_name: var_name.to_string(),
             idx_name: idx_name.map(|s| s.to_string()),
@@ -156,21 +158,19 @@ impl TryFrom<&SvgElement> for ForDef {
 }
 
 #[derive(Debug, Clone)]
-pub struct ForElement(pub SvgElement);
+pub struct ForElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ForElement {
+impl EventGen for ForElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = &self.0;
+        let event_element = self.0;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         let mut idx = 0;
-        if let (Ok(for_def), Some(inner_events)) = (
-            ForDef::try_from(event_element),
-            event_element.inner_events(context),
-        ) {
+        let for_def = ForDef::try_from(event_element)?;
+        if let Some(inner_events) = event_element.inner_events(context) {
             let data_list: Vec<_> = eval_list(&for_def.data, context)?;
             let idx_name = for_def.idx_name.clone();
 
@@ -191,12 +191,13 @@ impl EventGen for ForElement {
                 }
                 idx += 1;
                 if idx > context.config.loop_limit {
-                    return Err(SvgdxError::LoopLimitError(idx, context.config.loop_limit));
+                    return Err(Error::LoopLimit(idx, context.config.loop_limit));
                 }
             }
             Ok((gen_events, bbox.build()))
         } else {
-            Err(SvgdxError::InvalidData("Invalid <for> element".to_string()))
+            // empty for loop element
+            Ok((gen_events, None))
         }
     }
 }

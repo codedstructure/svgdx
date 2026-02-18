@@ -1,15 +1,15 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
-use crate::events::{InputEvent, InputList, OutputEvent, OutputList};
+use crate::document::{EventKind, InputEvent, InputList, OutputList};
+use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 use crate::types::{fstr, strp, ElRef};
 
 #[derive(Debug, Clone)]
-pub struct ReuseElement(pub SvgElement);
+pub struct ReuseElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ReuseElement {
+impl EventGen for ReuseElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -24,7 +24,7 @@ impl EventGen for ReuseElement {
         context.push_element(&reuse_element);
         let elref = reuse_element
             .get_attr("href")
-            .ok_or_else(|| SvgdxError::MissingAttribute("href".to_owned()))
+            .ok_or_else(|| Error::MissingAttr("href".to_owned()))
             .inspect_err(|_| {
                 context.pop_element();
             })?;
@@ -35,7 +35,7 @@ impl EventGen for ReuseElement {
         let mut instance_element = context
             .get_original_element(&elref)
             .cloned()
-            .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))
+            .ok_or_else(|| Error::Reference(elref.clone()))
             .inspect_err(|_| {
                 context.pop_element();
             })?;
@@ -46,9 +46,14 @@ impl EventGen for ReuseElement {
             .inspect_err(|_| {
                 context.pop_element();
             })?;
-        instance_element.transmute(context).inspect_err(|_| {
+        let should_include = instance_element.transmute(context).inspect_err(|_| {
             context.pop_element();
         })?;
+        if !should_include {
+            // Element should be skipped (e.g. overlapping connectors)
+            context.pop_element();
+            return Ok((OutputList::new(), None));
+        }
 
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {
@@ -73,7 +78,7 @@ impl EventGen for ReuseElement {
                     instance_element.set_attr("transform", &xfrm);
                 }
                 "xy-loc" | "xy" | "cxy" | "xy1" | "xy2" | "x" | "y" | "cx" | "cy" | "x1" | "y1"
-                | "x2" | "y2" => {
+                | "x2" | "y2" | "dx" | "dy" | "dxy" => {
                     instance_element.set_attr(&attr, &value);
                 }
                 _ => {
@@ -122,17 +127,21 @@ impl EventGen for ReuseElement {
             let mut new_events = InputList::new();
             let tag_name = instance_element.name().to_owned();
             let inner_events = instance_element.inner_events(context);
-            let mut start_ev = InputEvent::from(OutputEvent::Start(instance_element));
-            start_ev.index = start;
-            start_ev.alt_idx = Some(end);
+            let mut start_ev = InputEvent {
+                event: EventKind::Start(instance_element.into()),
+                meta: Default::default(),
+            };
+            start_ev.set_span(start, end);
             new_events.push(start_ev);
             if let Some(inner_events) = inner_events {
                 // need to clone as we may be reusing the same element multiple times
                 new_events.extend(&inner_events);
             }
-            let mut end_ev = InputEvent::from(OutputEvent::End(tag_name));
-            end_ev.index = end;
-            end_ev.alt_idx = Some(start);
+            let mut end_ev = InputEvent {
+                event: EventKind::End(tag_name),
+                meta: Default::default(),
+            };
+            end_ev.set_span(end, start); // note param order for End event
             new_events.push(end_ev);
             new_events.rebase_index(reuse_element.order_index);
             process_events(new_events, context)

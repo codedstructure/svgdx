@@ -9,7 +9,8 @@ use axum::{
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::Sender;
 
-use crate::errors::SvgdxError;
+use crate::errors::Error;
+use crate::json_api::{TransformRequest, TransformResponse, JSON_API_VERSION};
 use crate::{transform_str, TransformConfig};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
@@ -38,11 +39,58 @@ impl From<RequestConfig> for TransformConfig {
 
 async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResponse {
     let Query(config) = config;
+
+    transform_raw_handler(input, config)
+}
+
+async fn transform_json(input: String) -> impl IntoResponse {
+    transform_json_handler(input)
+}
+
+fn transform_json_handler(input: String) -> Response<Body> {
+    let response: TransformResponse = match serde_json::from_str::<TransformRequest>(&input) {
+        Ok(request) => {
+            if request.version != JSON_API_VERSION {
+                TransformResponse::error(format!(
+                    "Unsupported API version: {} (expected {})",
+                    request.version, JSON_API_VERSION
+                ))
+            } else {
+                let config: TransformConfig = request.config.into();
+                match transform_str(request.input, &config) {
+                    Ok(svg) => {
+                        if svg.is_empty() {
+                            TransformResponse::error("empty response".to_string())
+                        } else {
+                            TransformResponse::success(svg)
+                        }
+                    }
+                    Err(e) => TransformResponse::error(e.to_string()),
+                }
+            }
+        }
+        Err(e) => TransformResponse::error(format!("Invalid JSON request: {e}")),
+    };
+
+    let is_error = response.error.is_some();
+    let body = serde_json::to_string(&response).expect("Failed to serialize response");
+
+    let mut builder = Response::builder()
+        .header("Content-Type", "application/json")
+        .header("Content-Security-Policy", CSP);
+
+    if is_error {
+        builder = builder.status(400);
+    }
+
+    builder.body(Body::from(body)).unwrap()
+}
+
+fn transform_raw_handler(input: String, config: RequestConfig) -> Response<Body> {
     transform_str(input, &config.into())
         .and_then(|output| {
             if output.is_empty() {
-                // Can't build a valid image/svg+xml response from empty string.
-                Err(SvgdxError::from("Empty response"))
+                Err(Error::Document("empty response".into()))
             } else {
                 Ok(output)
             }
@@ -54,7 +102,7 @@ async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResp
                 .body(Body::from(output))
                 .unwrap()
         })
-        .map_err(|e| {
+        .unwrap_or_else(|e| {
             // TODO: make the error more informative, e.g. by returning a JSON object
             // including line number(s) of failed elements.
             Response::builder()
@@ -126,12 +174,23 @@ async fn bootstrap() -> impl IntoResponse {
 
 async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
     match path.as_str() {
-        "svgdx-editor.js" => {
-            include_js!("static/svgdx-editor.js")
-        }
-        "svgdx-editor.css" => {
-            include_css!("static/svgdx-editor.css")
-        }
+        // Main editor files
+        "main.js" => include_js!("static/main.js"),
+        "svgdx-editor.css" => include_css!("static/svgdx-editor.css"),
+        // Modules
+        "modules/config.js" => include_js!("static/modules/config.js"),
+        "modules/storage.js" => include_js!("static/modules/storage.js"),
+        "modules/dom.js" => include_js!("static/modules/dom.js"),
+        "modules/editor-adapter.js" => include_js!("static/modules/editor-adapter.js"),
+        "modules/transform.js" => include_js!("static/modules/transform.js"),
+        "modules/tabs.js" => include_js!("static/modules/tabs.js"),
+        "modules/layout.js" => include_js!("static/modules/layout.js"),
+        "modules/viewport.js" => include_js!("static/modules/viewport.js"),
+        "modules/splitter.js" => include_js!("static/modules/splitter.js"),
+        "modules/statusbar.js" => include_js!("static/modules/statusbar.js"),
+        "modules/clipboard.js" => include_js!("static/modules/clipboard.js"),
+        "modules/toolbar.js" => include_js!("static/modules/toolbar.js"),
+        // CodeMirror vendor files
         "vendor/cm5/codemirror.min.css" => {
             include_css!("static/vendor/cm5/codemirror.min.css")
         }
@@ -167,7 +226,8 @@ pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) 
         .route("/favicon.ico", get(favicon))
         .route("/static/{*path}", get(static_file))
         .route("/svgdx-bootstrap.js", get(bootstrap))
-        .route("/api/transform", post(transform));
+        .route("/api/transform", post(transform))
+        .route("/api/transform_json", post(transform_json));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{addr}");
     if let Some(ready) = ready {

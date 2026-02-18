@@ -1,0 +1,37 @@
+<svg>
+  <specs>
+    <symbol id="conn">
+      <circle r="1" style="stroke-width:0.1"/>
+      <circle r="0.8" class="d-fill-grey d-none"/>
+    </symbol>
+
+    <g id="panel">
+      <rect wh="18 5"/>
+      <reuse id="${id}1" cy="^" x="^ 2" href="#conn"/>
+      <reuse id="${id}2" xy="^|h 2" href="#conn"/>
+      <reuse id="${id}3" xy="^|h 2" href="#conn"/>
+      <reuse id="${id}4" xy="^|h 2" href="#conn"/>
+    </g>
+
+    <!--
+    the 'C' below can be removed and it still makes sense; coordinates
+    following the initial M are considered as L command values per SVG spec
+    -->
+    <path id="cable" d="M $start@c
+      C $start~cx {{$start~cy + $slack}}
+        $end~cx {{$end~cy + $slack}}
+        $end@c"
+      style="stroke-width: 1"/>
+  </specs>
+
+  <reuse id="a" href="#panel"/>
+  <reuse id="b" xy="#a|h 10" href="#panel"/>
+  <reuse id="c" xy="#a|v 15" href="#panel"/>
+
+  <reuse href="#cable" start="#a1" end="#b3" slack="15" class="d-red"/>
+  <reuse href="#cable" start="#a2" end="#b2" slack="10" class="d-green"/>
+  <reuse href="#cable" start="#a3" end="#b4" slack="12" class="d-blue"/>
+  <reuse href="#cable" start="#a4" end="#b1" slack="5" class="d-goldenrod"/>
+  <reuse href="#cable" start="#a1" end="#c3" slack="13" class="d-red"/>
+  <reuse href="#cable" start="#a3" end="#c1" slack="20" class="d-blue"/>
+</svg>

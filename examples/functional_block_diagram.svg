@@ -75,11 +75,11 @@
   <polyline points="49 6.75, 49 -12.5, 110.5 -12.5" class="d-arrow"/>
   <line x1="100.5" y1="7.5" x2="110.5" y2="7.5" class="d-arrow"/>
 
-  <polyline points="25 7.5, 49.25 7.5, 49.25 7.5, 73.5 7.5" class="d-arrow"/>
+  <polyline points="25 7.5, 73.5 7.5" class="d-arrow"/>
   <text x="39.25" y="7.7" class="d-text d-arrow">
   <tspan x="39.25" dy="-0.65em">JET FIRING</tspan><tspan x="39.25" dy="1.3em">COMMANDS</tspan>
   </text>
-  <polyline points="76 39, 50.5 39, 50.5 39, 25 39" class="d-arrow"/>
+  <polyline points="76 39, 25 39" class="d-arrow"/>
   <text x="50.5" y="37" class="d-text d-arrow">26V, 400~</text>
 
   <polyline points="-16 -12.5, 12.5 -12.5, 12.5 0" class="d-arrow"/>

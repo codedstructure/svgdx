@@ -161,8 +161,8 @@ fn test_loop_nested_deep() {
 #[test]
 fn test_loop_count_loop_var() {
     let input = r#"
-<loop count="2" loop-var="i">
-<loop count="3" loop-var="j">
+<loop count="2" var="i">
+<loop count="3" var="j">
 <rect wh="1" xy="{{3 * $j, 3 * $i}}"/>
 </loop>
 </loop>
@@ -189,7 +189,7 @@ fn test_loop_count_loop_var() {
 #[test]
 fn test_loop_count_loop_start_step() {
     let input = r#"
-<loop count="3" loop-var="i" start="-4.5" step="1.5">
+<loop count="3" var="i" start="-4.5" step="1.5">
 <rect wh="1" xy="{{$i}} 10"/>
 </loop>
 "#;
@@ -248,7 +248,7 @@ fn test_for_loop() {
     assert_contains!(output, expected3);
 
     let input = r#"
-<for data="'a', 'b', 'c'" var="d" idx-var="idx">
+<for data="'a', 'b', 'c'" var="d" idx="idx">
 <rect id="$d" wh="1" xy="$idx"/>
 </for>
 "#;

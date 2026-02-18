@@ -16,7 +16,7 @@ fn test_if_simple() {
 #[test]
 fn test_if_loop() {
     let input = r#"
-<loop count="4" loop-var="i">
+<loop count="4" var="i">
 <if test="eq($i % 2, 0)">
 <rect x="{{$i * 10}}" wh="5"/>
 </if></loop>

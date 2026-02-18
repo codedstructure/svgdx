@@ -40,6 +40,13 @@ fn test_expand_rect_xy_loc() {
 }
 
 #[test]
+fn test_separate_x_y_xy_loc() {
+    let input = r#"<rect x="10" y="20" wh="5" xy-loc="c"/>"#;
+    let expected = r#"<rect x="7.5" y="17.5" width="5" height="5"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
 fn test_expand_cycle() {
     let input = r#"<rect xy="5.5" wh="2"/>"#;
     let expected = r#"<rect x="5.5" y="5.5" width="2" height="2"/>"#;

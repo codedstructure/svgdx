@@ -17,7 +17,7 @@
 
   <polyline start="#prgp@l" end="#ace@l:75%" corner-offset="8" text="p,q,r" text-loc="br" class="d-arrow"/>
   <polyline start="#srgp@l" end="#ace@l:50%" corner-offset="14" text="p,q,r" text-loc="br" class="d-arrow"/>
-  <line start="#as" end="#ace" edge-type="h" class="d-arrow"/>
+  <line start="#as" end="#ace" class="d-arrow"/>
 
   <polyline start="#ppi@t" end="#ace@b" corner-offset="70%" class="d-arrow"/>
   <polyline start="#ppi" end="#srgp@r" class="d-arrow"/>

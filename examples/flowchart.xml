@@ -2,7 +2,7 @@
   <!-- you probably want something other than svgdx for flowcharts... -->
   <defaults>
     <line text-loc="t" class="d-arrow"/>
-    <polyline class="d-arrow" corner-offset="7"/>
+    <polyline class="d-arrow" corner-offset="12"/>
     <rect wh="20 10" rx="5"/>
   </defaults>
 

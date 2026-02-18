@@ -1,23 +1,23 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
-use crate::events::OutputList;
+use crate::document::OutputList;
+use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 use crate::AutoStyleMode;
 
 #[derive(Debug, Clone)]
-pub struct DefaultsElement(pub SvgElement);
+pub struct DefaultsElement<'a>(pub &'a SvgElement);
 
-impl EventGen for DefaultsElement {
+impl EventGen for DefaultsElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         // both the `defaults` element itself and any inner elements
         // are used to set default attr values.
-        context.set_element_default(&self.0);
+        context.set_element_default(self.0);
         for ev in self.0.inner_events(context).unwrap_or_default() {
             // we only care about Element-generating (i.e. start/empty) events
             if let Ok(el) = SvgElement::try_from(ev.clone()) {
@@ -29,9 +29,9 @@ impl EventGen for DefaultsElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct ConfigElement(pub SvgElement);
+pub struct ConfigElement<'a>(pub &'a SvgElement);
 
-impl EventGen for ConfigElement {
+impl EventGen for ConfigElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -57,16 +57,14 @@ impl EventGen for ConfigElement {
                 "loop-limit" => new_config.loop_limit = value.parse()?,
                 "var-limit" => new_config.var_limit = value.parse()?,
                 "depth-limit" => new_config.depth_limit = value.parse()?,
+                "path-repeat-limit" => new_config.path_repeat_limit = value.parse()?,
                 "font-size" => new_config.font_size = value.parse()?,
                 "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,
                 "svg-style" => new_config.svg_style = Some(value.clone()),
-                _ => {
-                    return Err(SvgdxError::InvalidData(format!(
-                        "Unknown config setting {key}"
-                    )))
-                }
+                "error-mode" => new_config.error_mode = value.parse()?,
+                _ => return Err(Error::InvalidAttr(key)),
             }
         }
         context.set_config(new_config);
@@ -75,16 +73,16 @@ impl EventGen for ConfigElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct SpecsElement(pub SvgElement);
+pub struct SpecsElement<'a>(pub &'a SvgElement);
 
-impl EventGen for SpecsElement {
+impl EventGen for SpecsElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if context.in_specs {
-            return Err(SvgdxError::DocumentError(
-                "Nested <specs> elements are not allowed".to_string(),
+            return Err(Error::Document(
+                "nested <specs> elements are not allowed".to_string(),
             ));
         }
         if let Some(inner_events) = self.0.inner_events(context) {
@@ -97,9 +95,9 @@ impl EventGen for SpecsElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct VarElement(pub SvgElement);
+pub struct VarElement<'a>(pub &'a SvgElement);
 
-impl EventGen for VarElement {
+impl EventGen for VarElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -115,7 +113,7 @@ impl EventGen for VarElement {
                 let value = eval_attr(&value, context)?;
                 // Detect / prevent uncontrolled expansion of variable values
                 if value.len() > context.config.var_limit as usize {
-                    return Err(SvgdxError::VarLimitError(
+                    return Err(Error::VarLimit(
                         key.clone(),
                         value.len(),
                         context.config.var_limit,
@@ -132,9 +130,9 @@ impl EventGen for VarElement {
 }
 
 #[derive(Debug, Clone)]
-pub struct IfElement(pub SvgElement);
+pub struct IfElement<'a>(pub &'a SvgElement);
 
-impl EventGen for IfElement {
+impl EventGen for IfElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -142,11 +140,13 @@ impl EventGen for IfElement {
         let test = self
             .0
             .get_attr("test")
-            .ok_or_else(|| SvgdxError::MissingAttribute("test".to_owned()))?;
-        if let Some(inner_events) = self.0.inner_events(context) {
-            if eval_condition(test, context)? {
-                // opening if element is not included in the processed inner events to avoid
-                // infinite recursion...
+            .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
+        if eval_condition(test, context)? {
+            if let Some(inner_events) = self.0.inner_events(context) {
+                // must rebase inner events under this element's order index
+                // for group transform processing to work
+                let mut inner_events = inner_events.clone();
+                inner_events.rebase_under(self.0.order_index.clone());
                 return process_events(inner_events.clone(), context);
             }
         }

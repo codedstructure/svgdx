@@ -9,12 +9,12 @@ use crate::constants::{
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_type_el;
 use crate::elements::path::path_bbox;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 use crate::geometry::{
     strp_length, BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size,
     TransformAttr, TrblLength,
 };
-use crate::types::{attr_split, attr_split_cycle, extract_elref, fstr, split_compound_attr, strp};
+use crate::types::{attr_split, extract_elref, fstr, split_compound_attr, strp};
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -117,7 +117,7 @@ fn split_relspec<'a, 'b>(
             // with whitespace, that is significant.
             Ok((Some(el), remain))
         } else {
-            Err(SvgdxError::ReferenceError(elref))
+            Err(Error::Reference(elref))
         }
     } else {
         Ok((None, input))
@@ -154,11 +154,28 @@ pub fn is_layout_element(el: &SvgElement) -> bool {
 
 // Elements wh
 impl SvgElement {
-    pub(crate) fn extract_relpos(&mut self) -> Option<String> {
+    fn extract_relpos(&mut self) -> Option<String> {
         if self.get_attr("xy").unwrap_or_default().contains(RELPOS_SEP) {
             return Some(self.pop_attr("xy").unwrap().to_string());
         }
         None
+    }
+
+    pub fn has_pos_attrs(&self) -> bool {
+        for key in [
+            "x", "y", "cx", "cy", "x1", "y1", "x2", "y2", "xy", "cxy", "xy1", "xy2", "dxy", "dx",
+            "dy",
+        ] {
+            if self.has_attr(key) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// is this element positioned (only) by a transform attr?
+    pub fn pos_by_transform(&self) -> bool {
+        self.name() == "g"
     }
 
     pub fn resolve_position(&mut self, ctx: &mut impl ContextView) -> Result<()> {
@@ -175,7 +192,7 @@ impl SvgElement {
 
         // Need size before can evaluate relative position
         expand_compound_size(self);
-        eval_rel_attributes(self, ctx)?;
+        eval_size_attributes(self, ctx)?;
         resolve_size_delta(self);
 
         // ensure relatively-positioned text elements have appropriate anchors
@@ -190,20 +207,32 @@ impl SvgElement {
             self.set_attr("d", &expand_relspec(d, ctx));
         }
 
-        // TODO: issue is that this could fail with a reference error
-        // which would be resolved by expand_relspec, though that requires
-        // eval_rel_attributes to be called first...
+        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
+        // Need this even if dirspec used, as may have dxy
+        expand_compound_pos(self);
+
+        let mut force_origin = false;
+        // Special-case xy with relpos, e.g. xy="#elem|h 2" and xy-loc
         if let Some(relpos) = self.extract_relpos() {
+            // xy won't have been expanded in the relpos case
             if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
                 if let Some(bb) = self.content_bbox {
                     pos.translate(-bb.x1, -bb.y1);
                 }
                 pos.set_position_attrs(self);
+            } else {
+                return Err(Error::InvalidValue("dirspec".into(), relpos));
             }
+        } else if let Some(xy_loc) = self.pop_attr("xy-loc") {
+            // xy + xy_loc processing
+            expand_pos_from_loc(self, &xy_loc)?;
+            // This is a hack to indicate the element was positioned via xy, so
+            // that when evaluating position attributes (e.g. cx, y2) we eval
+            // deltas relative to origin of referenced element, rather than
+            // corresponding locspec point (e.g. y2 => @b)
+            force_origin = true;
         }
-        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        expand_compound_pos(self);
-        eval_rel_attributes(self, ctx)?;
+        eval_pos_attributes(self, ctx, force_origin)?;
 
         let mut p = Position::try_from(self as &SvgElement)?;
         if self.name() == "g" {
@@ -236,7 +265,7 @@ impl SvgElement {
             ElementLoc::LineOffset(l) => get_point_along_linelike_type_el(self, l),
             ElementLoc::LocSpec(spec) => Ok(elem_map
                 .get_element_bbox(self)?
-                .ok_or_else(|| SvgdxError::MissingBoundingBox(self.to_string()))?
+                .ok_or_else(|| Error::MissingBBox(self.to_string()))?
                 .locspec(spec)),
         }
     }
@@ -245,8 +274,8 @@ impl SvgElement {
         let (surround, inside) = (self.get_attr("surround"), self.get_attr("inside"));
 
         if surround.is_some() && inside.is_some() {
-            return Err(SvgdxError::InvalidData(
-                "Cannot have 'surround' and 'inside' on an element".to_owned(),
+            return Err(Error::InvalidAttr(
+                "cannot have 'surround' and 'inside' on an element".to_owned(),
             ));
         }
         if surround.is_none() && inside.is_none() {
@@ -263,7 +292,7 @@ impl SvgElement {
             let elref = elref.parse()?;
             let el = ctx
                 .get_element(&elref)
-                .ok_or_else(|| SvgdxError::ReferenceError(elref.clone()))?;
+                .ok_or_else(|| Error::Reference(elref.clone()))?;
             {
                 let bb = if is_surround {
                     ctx.get_element_bbox(el)
@@ -277,7 +306,7 @@ impl SvgElement {
                 if let Ok(Some(el_bb)) = bb {
                     bbox_list.push(el_bb);
                 } else {
-                    return Err(SvgdxError::MissingBoundingBox(el.to_string()));
+                    return Err(Error::MissingBBox(el.to_string()));
                 }
             }
         }
@@ -433,7 +462,7 @@ impl SvgElement {
         if !self.has_attr("clip-path") {
             for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
                 if self.has_attr(key) {
-                    return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                    return Err(Error::MissingBBox(key.to_owned()));
                 }
             }
             if self.name() == "g" {
@@ -441,7 +470,7 @@ impl SvgElement {
                 // hasn't yet been resolved.
                 for key in ["x", "y", "cx", "cy", "x1", "y1", "x2", "y2"] {
                     if self.has_attr(key) {
-                        return Err(SvgdxError::MissingBoundingBox(key.to_owned()));
+                        return Err(Error::MissingBBox(key.to_owned()));
                     }
                 }
             }
@@ -669,6 +698,12 @@ impl SvgElement {
             };
 
             let mut pos = Position::new(self.name());
+
+            // copy any dx/dy attrs from original element to Position
+            // assumes any 'dxy' compound attr has already been split
+            pos.dx = self.get_attr("dx").and_then(|v| strp(v).ok());
+            pos.dy = self.get_attr("dy").and_then(|v| strp(v).ok());
+
             if self.name() == "use" {
                 // Need to determine top-left corner of the target bbox which
                 // may not be (0, 0), and offset by the equivalent amount.
@@ -685,7 +720,7 @@ impl SvgElement {
             }
             Ok(Some(pos))
         } else {
-            Err(SvgdxError::MissingBoundingBox(format!("No bbox: {input}")))
+            Err(Error::MissingBBox(format!("no bbox: {input}")))
         }
     }
 }
@@ -793,11 +828,12 @@ fn eval_pos_attr(
     name: &str,
     value: &str,
     ctx: &impl ElementMap,
+    force_origin: bool,
 ) -> Result<String> {
     if let Ok(attr_ss) = ScalarSpec::from_str(name) {
         if let (Some(el), remain) = split_relspec(value, ctx)? {
             if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                return pos_attr_helper(element, remain, &bbox, attr_ss);
+                return pos_attr_helper(element, remain, &bbox, attr_ss, force_origin);
             }
         }
     }
@@ -809,16 +845,20 @@ fn pos_attr_helper(
     remain: &str,
     bbox: &BoundingBox,
     attr_ss: ScalarSpec,
+    force_origin: bool,
 ) -> Result<String> {
+    // NOTE: at this point assumed that the delta (if any) is a single value,
+    // i.e. that split_compound_attr has already been applied.
+
     // default value - same 'type' as attr name, e.g. y2 => ymax
     let mut v = bbox.scalarspec(attr_ss);
 
     // 'position' attribute, e.g. x/y/cx...
-    let (loc_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+    let (loc_str, delta) = remain.split_once(' ').unwrap_or((remain, ""));
     if let Some(ss) = loc_str.strip_prefix(SCALARSPEC_SEP) {
         // "[~scalarspec][ delta]"
         v = bbox.scalarspec(ss.parse()?);
-        if let Ok(len) = strp_length(dxy) {
+        if let Ok(len) = strp_length(delta) {
             v = len.adjust(v);
         }
     } else {
@@ -826,26 +866,35 @@ fn pos_attr_helper(
             // text elements (currently) have no size, and default
             // to center of the referenced element
             LocSpec::from_str(element.get_attr("text-loc").unwrap_or("c"))?
+        } else if force_origin {
+            // if xy-loc was used, attr_ss may have changed to
+            // reflect the new origin, but still want deltas
+            // relative to top-left of referenced element
+            LocSpec::TopLeft
         } else {
             // otherwise anchor on the same side as the attribute, e.g. x2="#abc"
             // will set x2 to the 'x2' (i.e. right edge) of #abc
             attr_ss.into()
         };
-        // "[@loc][ dx dy]"
+        // "[@loc][ delta]"
         if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
             loc = ls.parse()?;
         } else if !loc_str.is_empty() {
-            return Err(SvgdxError::ParseError(format!(
-                "Could not parse '{loc_str}' in this context",
+            return Err(Error::Parse(format!(
+                "could not parse '{loc_str}' in this context",
             )));
         }
         let (x, y) = bbox.locspec(loc);
-        let (dx, dy) = extract_dx_dy(dxy)?;
         use ScalarSpec::*;
-        v = match attr_ss {
-            Minx | Maxx | Cx => x + dx,
-            Miny | Maxy | Cy => y + dy,
-            _ => v,
+        let (base, dim) = match attr_ss {
+            Minx | Maxx | Cx => (x, bbox.width()),
+            Miny | Maxy | Cy => (y, bbox.height()),
+            _ => (v, 0.0),
+        };
+        v = if !delta.is_empty() {
+            base + strp_length(delta)?.evaluate(dim)
+        } else {
+            base
         };
     }
     Ok(fstr(v).to_string())
@@ -861,15 +910,26 @@ fn is_size_attr(element: &SvgElement, name: &str) -> bool {
     size_attr
 }
 
-fn eval_rel_attributes(element: &mut SvgElement, ctx: &impl ElementMap) -> Result<()> {
+fn eval_size_attributes(element: &mut SvgElement, ctx: &impl ElementMap) -> Result<()> {
     for (key, value) in element.get_attrs() {
         if is_size_attr(element, &key) {
             let computed = eval_size_attr(&key, &value, ctx)?;
             if strp(&computed).is_ok() {
                 element.set_attr(&key, &computed);
             }
-        } else if is_pos_attr(&key) {
-            let computed = eval_pos_attr(element, &key, &value, ctx)?;
+        }
+    }
+    Ok(())
+}
+
+fn eval_pos_attributes(
+    element: &mut SvgElement,
+    ctx: &impl ElementMap,
+    force_origin: bool,
+) -> Result<()> {
+    for (key, value) in element.get_attrs() {
+        if is_pos_attr(&key) {
+            let computed = eval_pos_attr(element, &key, &value, ctx, force_origin)?;
             if strp(&computed).is_ok() {
                 element.set_attr(&key, &computed);
             }
@@ -910,9 +970,7 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
                     LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
                 }
             } else {
-                return Err(SvgdxError::InvalidData(format!(
-                    "Could not derive text anchor: '{loc}'"
-                )));
+                return Err(Error::InvalidValue("text-loc".into(), loc.into()));
             }
         }
     }
@@ -922,14 +980,6 @@ fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<
 fn is_pos_attr(name: &str) -> bool {
     // Position attributes are identical for all element types
     matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
-}
-
-/// Extract dx/dy from a string such as '10 20' or '10' (in which case both are 10)
-fn extract_dx_dy(input: &str) -> Result<(f32, f32)> {
-    let mut parts = attr_split_cycle(input);
-    let dx = strp(&parts.next().unwrap_or("0".to_string()))?;
-    let dy = strp(&parts.next().unwrap_or("0".to_string()))?;
-    Ok((dx, dy))
 }
 
 fn expand_compound_size(el: &mut SvgElement) {
@@ -955,33 +1005,51 @@ fn expand_compound_size(el: &mut SvgElement) {
     }
 }
 
+/// switch from x+y to another set of position attributes based on xy-loc
+/// e.g. xy="#o@b 2 3" + xy-loc="t" -> cx="#o@b 2", y1="#o@b 3"
+fn expand_pos_from_loc(el: &mut SvgElement, xy_loc: &str) -> Result<()> {
+    let x = el
+        .pop_attr("x")
+        .ok_or_else(|| Error::MissingAttr("x".into()))?;
+    let y = el
+        .pop_attr("y")
+        .ok_or_else(|| Error::MissingAttr("y".into()))?;
+    let xy_ls = LocSpec::from_str(xy_loc)?;
+
+    use LocSpec::*;
+    let (x_attr, y_attr) = match xy_ls {
+        Top => ("cx", "y1"),
+        TopRight => ("x2", "y1"),
+        Right => ("x2", "cy"),
+        BottomRight => ("x2", "y2"),
+        Bottom => ("cx", "y2"),
+        BottomLeft => ("x1", "y2"),
+        Left => ("x1", "cy"),
+        Center => ("cx", "cy"),
+        TopLeft => ("x", "y"),
+        _ => {
+            return Err(Error::InvalidValue("xy-loc".into(), xy_loc.into()));
+        }
+    };
+    el.set_default_attr(x_attr, &x);
+    el.set_default_attr(y_attr, &y);
+    Ok(())
+}
+
 // Compound attributes, e.g.
 // xy="#o" -> x="#o", y="#o"
 // xy="#o 2" -> x="#o 2", y="#o 2"
 // xy="#o 2 4" -> x="#o 2", y="#o 4"
 fn expand_compound_pos(el: &mut SvgElement) {
-    // NOTE: must have already done any relative positioning (e.g. `xy="#abc|h"`)
-    // before this point as xy is not considered a compound attribute in that case.
     if let Some(xy) = el.pop_attr("xy") {
+        // NOTE: relative positioning (e.g. `xy="#abc|h"`) is not compound
         if xy.contains(RELPOS_SEP) {
-            // xy is a relative position spec, e.g. `xy="#abc|h 5 10"`
-            // which is not a compound attribute, so restore it.
+            // relpos -> re-add attribute
             el.set_attr("xy", &xy);
         } else {
             let (x, y) = split_compound_attr(&xy);
-            let (x_attr, y_attr) = match el.pop_attr("xy-loc").as_deref() {
-                Some("t") => ("cx", "y1"),
-                Some("tr") => ("x2", "y1"),
-                Some("r") => ("x2", "cy"),
-                Some("br") => ("x2", "y2"),
-                Some("b") => ("cx", "y2"),
-                Some("bl") => ("x1", "y2"),
-                Some("l") => ("x1", "cy"),
-                Some("c") => ("cx", "cy"),
-                _ => ("x", "y"),
-            };
-            el.set_default_attr(x_attr, &x);
-            el.set_default_attr(y_attr, &y);
+            el.set_default_attr("x", &x);
+            el.set_default_attr("y", &y);
         }
     }
     if let Some(cxy) = el.pop_attr("cxy") {
@@ -1080,33 +1148,33 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with edge positioning
-        let result = pos_attr_helper(&element, "@t:25%", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@t:25%", &bbox, ScalarSpec::Minx, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "25");
 
-        let result = pos_attr_helper(&element, "@t:25% -4", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@t:25% -4", &bbox, ScalarSpec::Minx, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "21");
 
-        let result = pos_attr_helper(&element, "@r:200%", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@r:200%", &bbox, ScalarSpec::Minx, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "100");
-        let result = pos_attr_helper(&element, "@r:200%", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@r:200%", &bbox, ScalarSpec::Miny, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "200");
 
-        let result = pos_attr_helper(&element, "@l:-1", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@l:-1", &bbox, ScalarSpec::Miny, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "99");
 
-        let result = pos_attr_helper(&element, "@l:37", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@l:37", &bbox, ScalarSpec::Miny, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "37");
 
-        let result = pos_attr_helper(&element, "@l:37 3 5", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@l:37 3", &bbox, ScalarSpec::Minx, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "3");
-        let result = pos_attr_helper(&element, "@l:37 3 5", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@l:37 5", &bbox, ScalarSpec::Miny, false);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "42");
     }
@@ -1117,20 +1185,56 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // Test with location positioning
-        let result = pos_attr_helper(&element, "@tr", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@tr", &bbox, ScalarSpec::Minx, false);
         assert_eq!(result.unwrap(), "100");
-        let result = pos_attr_helper(&element, "@tr", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@tr", &bbox, ScalarSpec::Miny, false);
         assert_eq!(result.unwrap(), "0");
 
-        let result = pos_attr_helper(&element, "@bl", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@bl", &bbox, ScalarSpec::Minx, false);
         assert_eq!(result.unwrap(), "0");
-        let result = pos_attr_helper(&element, "@bl", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@bl", &bbox, ScalarSpec::Miny, false);
         assert_eq!(result.unwrap(), "100");
 
-        let result = pos_attr_helper(&element, "@c", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "@c", &bbox, ScalarSpec::Minx, false);
         assert_eq!(result.unwrap(), "50");
-        let result = pos_attr_helper(&element, "@c", &bbox, ScalarSpec::Miny);
+        let result = pos_attr_helper(&element, "@c", &bbox, ScalarSpec::Miny, false);
         assert_eq!(result.unwrap(), "50");
+    }
+
+    #[test]
+    fn test_expand_pos_from_loc() {
+        let mut element = SvgElement::new("text", &[("xy".into(), "#abc@b 2 3".into())]);
+        expand_compound_pos(&mut element);
+        assert_eq!(element.get_attr("x").unwrap(), "#abc@b 2");
+        assert_eq!(element.get_attr("y").unwrap(), "#abc@b 3");
+        expand_pos_from_loc(&mut element, "t").unwrap();
+        assert_eq!(element.get_attrs().len(), 2);
+        assert_eq!(element.get_attr("cx").unwrap(), "#abc@b 2");
+        assert_eq!(element.get_attr("y1").unwrap(), "#abc@b 3");
+    }
+
+    #[test]
+    fn test_force_origin() {
+        let element = SvgElement::new("rect", &[]);
+        let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
+
+        let result = pos_attr_helper(&element, " 7", &bbox, ScalarSpec::Cx, false);
+        assert_eq!(result.unwrap(), "57");
+        let result = pos_attr_helper(&element, " 7", &bbox, ScalarSpec::Maxy, false);
+        assert_eq!(result.unwrap(), "107");
+        let result = pos_attr_helper(&element, " 7", &bbox, ScalarSpec::Cx, true);
+        assert_eq!(result.unwrap(), "7");
+        let result = pos_attr_helper(&element, " 7", &bbox, ScalarSpec::Maxy, true);
+        assert_eq!(result.unwrap(), "7");
+
+        let result = pos_attr_helper(&element, " 2/10", &bbox, ScalarSpec::Cx, false);
+        assert_eq!(result.unwrap(), "70");
+        let result = pos_attr_helper(&element, " 2/10", &bbox, ScalarSpec::Maxy, false);
+        assert_eq!(result.unwrap(), "120");
+        let result = pos_attr_helper(&element, " 2/10", &bbox, ScalarSpec::Cx, true);
+        assert_eq!(result.unwrap(), "20");
+        let result = pos_attr_helper(&element, " 2/10", &bbox, ScalarSpec::Maxy, true);
+        assert_eq!(result.unwrap(), "20");
     }
 
     #[test]
@@ -1139,19 +1243,20 @@ mod tests {
         let bbox = BoundingBox::new(0.0, 0.0, 100.0, 100.0);
 
         // empty should be fine
-        let result = pos_attr_helper(&element, "", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "", &bbox, ScalarSpec::Minx, false);
         assert_eq!(result.unwrap(), "0");
 
         // Test with invalid input
-        let result = pos_attr_helper(&element, "invalid", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "invalid", &bbox, ScalarSpec::Minx, false);
+        assert!(result.is_err());
+
+        // compound deltas should have been split up already
+        let result = pos_attr_helper(&element, " 30 20", &bbox, ScalarSpec::Minx, false);
         assert!(result.is_err());
 
         // Scalar-spec isn't valid for pos_attr_helper
-        let result = pos_attr_helper(&element, "~w", &bbox, ScalarSpec::Minx);
+        let result = pos_attr_helper(&element, "~w", &bbox, ScalarSpec::Minx, false);
         assert_eq!(result.unwrap(), "100");
-
-        let result = pos_attr_helper(&element, " 30 20", &bbox, ScalarSpec::Minx);
-        assert_eq!(result.unwrap(), "30");
     }
 
     #[derive(Default)]
@@ -1160,6 +1265,8 @@ mod tests {
     }
 
     impl ElementMap for TestContext {
+        fn set_current_element(&mut self, _el: &SvgElement) {}
+
         fn get_element(&self, id: &ElRef) -> Option<&SvgElement> {
             if let ElRef::Id(id) = id {
                 return self.elements.get(id);

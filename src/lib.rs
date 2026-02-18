@@ -43,9 +43,9 @@ use tempfile::NamedTempFile;
 pub mod cli;
 mod constants;
 mod context;
+mod document;
 mod elements;
 mod errors;
-mod events;
 mod expr;
 mod geometry;
 #[cfg(feature = "server")]
@@ -54,7 +54,7 @@ mod style;
 mod transform;
 mod types;
 
-pub use errors::Result;
+pub use errors::{Error, Result};
 pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 
@@ -86,6 +86,8 @@ pub struct TransformConfig {
     pub var_limit: u32,
     /// Maximum depth of recursion
     pub depth_limit: u32,
+    /// Maximum path repeat expansion (`r` command)
+    pub path_repeat_limit: u32,
     /// Add source metadata to output
     pub add_metadata: bool,
     /// Default font-size (in user-units)
@@ -98,6 +100,8 @@ pub struct TransformConfig {
     pub use_local_styles: bool,
     /// Optional style to apply to SVG root element
     pub svg_style: Option<String>,
+    /// Error handling mode
+    pub error_mode: ErrorMode,
 }
 
 impl Default for TransformConfig {
@@ -112,12 +116,42 @@ impl Default for TransformConfig {
             loop_limit: 1000,
             var_limit: 1024,
             depth_limit: 100,
+            path_repeat_limit: 10000,
             add_metadata: false,
             font_size: 3.0,
             font_family: "sans-serif".to_owned(),
             theme: ThemeType::default(),
             use_local_styles: false,
             svg_style: None,
+            error_mode: ErrorMode::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
+pub enum ErrorMode {
+    /// Un-resolved errors prevent processing
+    #[default]
+    Strict,
+    /// Continue with error message in XML comment
+    Warn,
+    /// Continue silently ignoring errors
+    Ignore,
+}
+
+impl std::str::FromStr for ErrorMode {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "strict" => Ok(ErrorMode::Strict),
+            "warn" => Ok(ErrorMode::Warn),
+            "ignore" => Ok(ErrorMode::Ignore),
+            _ => Err(Error::InvalidValue(
+                "error-mode must be 'strict', 'warn', or 'ignore'".to_string(),
+                s.to_string(),
+            )),
         }
     }
 }
@@ -159,18 +193,18 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
             Box::new(stdin) as Box<dyn BufRead>
         }
     } else {
-        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
+        Box::new(BufReader::new(File::open(input).map_err(Error::Io)?)) as Box<dyn BufRead>
     };
 
     if output == "-" {
         transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
     } else {
-        let mut out_temp = NamedTempFile::new()?;
+        let mut out_temp = NamedTempFile::new().map_err(Error::Io)?;
         transform_stream(&mut in_reader, &mut out_temp, cfg)?;
         // Copy content rather than rename (by .persist()) since this
         // could cross filesystems; some apps (e.g. eog) also fail to
         // react to 'moved-over' files.
-        fs::copy(out_temp.path(), output)?;
+        fs::copy(out_temp.path(), output).map_err(Error::Io)?;
     }
 
     Ok(())
@@ -204,4 +238,157 @@ pub fn transform_str<T: Into<String>>(input: T, cfg: &TransformConfig) -> Result
 /// Uses default `TransformConfig` settings.
 pub fn transform_str_default<T: Into<String>>(input: T) -> Result<String> {
     transform_str(input, &TransformConfig::default())
+}
+
+// JSON API for editor/WASM use
+#[cfg(feature = "json")]
+pub mod json_api {
+    use super::{transform_str, TransformConfig};
+    use serde_derive::{Deserialize, Serialize};
+
+    pub const JSON_API_VERSION: u32 = 1;
+
+    #[derive(Debug, Deserialize)]
+    pub struct TransformRequest {
+        pub version: u32,
+        pub input: String,
+        #[serde(default)]
+        pub config: RequestConfig,
+    }
+
+    #[derive(Debug, Default, Deserialize)]
+    pub struct RequestConfig {
+        #[serde(default)]
+        pub add_metadata: bool,
+    }
+
+    impl From<RequestConfig> for TransformConfig {
+        fn from(config: RequestConfig) -> Self {
+            TransformConfig {
+                add_metadata: config.add_metadata,
+                ..Default::default()
+            }
+        }
+    }
+
+    #[derive(Debug, Serialize)]
+    pub struct TransformResponse {
+        pub version: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub svg: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        pub error: Option<String>,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        pub warnings: Vec<String>,
+    }
+
+    impl TransformResponse {
+        pub fn success(svg: String) -> Self {
+            Self {
+                version: JSON_API_VERSION,
+                svg: Some(svg),
+                error: None,
+                warnings: vec![],
+            }
+        }
+
+        pub fn error(message: String) -> Self {
+            Self {
+                version: JSON_API_VERSION,
+                svg: None,
+                error: Some(message),
+                warnings: vec![],
+            }
+        }
+    }
+
+    /// Transform input using JSON request/response format.
+    ///
+    /// Takes a JSON string containing `TransformRequest`, returns JSON string
+    /// containing `TransformResponse`.
+    pub fn transform_json_impl(input: &str) -> String {
+        let result: TransformResponse = match serde_json::from_str::<TransformRequest>(input) {
+            Ok(request) => {
+                if request.version != JSON_API_VERSION {
+                    TransformResponse::error(format!(
+                        "Unsupported API version: {} (expected {})",
+                        request.version, JSON_API_VERSION
+                    ))
+                } else {
+                    let config: TransformConfig = request.config.into();
+                    match transform_str(request.input, &config) {
+                        Ok(svg) => TransformResponse::success(svg),
+                        Err(e) => TransformResponse::error(e.to_string()),
+                    }
+                }
+            }
+            Err(e) => TransformResponse::error(format!("Invalid JSON request: {e}")),
+        };
+        serde_json::to_string(&result).expect("Failed to serialize response")
+    }
+}
+
+/// Transform input using JSON request/response format (WASM entry point).
+///
+/// Takes a JSON string containing a request object, returns JSON string response.
+/// Request format: `{"version": 1, "input": "...", "config": {"add_metadata": bool}}`
+/// Success response: `{"version": 1, "svg": "...", "warnings": []}`
+/// Error response: `{"version": 1, "error": "..."}`
+#[cfg(all(feature = "json", target_arch = "wasm32"))]
+#[wasm_bindgen]
+pub fn transform_json(input: String) -> String {
+    json_api::transform_json_impl(&input)
+}
+
+#[cfg(all(test, feature = "json"))]
+mod json_tests {
+    use super::json_api::*;
+
+    #[test]
+    fn test_json_transform_success() {
+        let request = r#"{"version": 1, "input": "<svg><rect wh=\"10\"/></svg>", "config": {}}"#;
+        let response = transform_json_impl(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["svg"].as_str().unwrap().contains("<svg"));
+        assert!(parsed["error"].is_null());
+    }
+
+    #[test]
+    fn test_json_transform_error() {
+        let request = r#"{"version": 1, "input": "<svg><invalid", "config": {}}"#;
+        let response = transform_json_impl(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["svg"].is_null());
+        assert!(parsed["error"].as_str().is_some());
+    }
+
+    #[test]
+    fn test_json_invalid_version() {
+        let request = r#"{"version": 999, "input": "<svg/>", "config": {}}"#;
+        let response = transform_json_impl(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["error"]
+            .as_str()
+            .unwrap()
+            .contains("Unsupported API version"));
+    }
+
+    #[test]
+    fn test_json_invalid_request() {
+        let request = r#"not valid json"#;
+        let response = transform_json_impl(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["error"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid JSON request"));
+    }
 }

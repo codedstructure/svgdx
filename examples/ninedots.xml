@@ -1,6 +1,6 @@
 <svg>
-  <loop count="3" loop-var="i">
-   <loop count="3" loop-var="j">
+  <loop count="3" var="i">
+   <loop count="3" var="j">
      <circle id="dot$i$j" cx="{{$i * 10}}" cy="{{$j * 10}}" r="1" class="d-fill-black"/>
    </loop>
   </loop>

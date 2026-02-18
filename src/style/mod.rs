@@ -10,7 +10,7 @@ mod rules;
 mod themes;
 mod types;
 
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 pub use crate::style::types::{Selectable, Stylable};
 
 use autostyle::StyleProvider;
@@ -39,16 +39,14 @@ pub enum AutoStyleMode {
 }
 
 impl std::str::FromStr for AutoStyleMode {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
             "none" => Ok(AutoStyleMode::None),
             "inline" => Ok(AutoStyleMode::Inline),
             "css" => Ok(AutoStyleMode::Css),
-            _ => Err(SvgdxError::ParseError(format!(
-                "Unknown auto-styles mode: {s}"
-            ))),
+            _ => Err(Error::InvalidValue("auto-style-mode".into(), s.into())),
         }
     }
 }

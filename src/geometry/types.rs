@@ -1,8 +1,10 @@
+use std::fmt::Display;
+use std::num::NonZeroU32;
 use std::str::FromStr;
 
-use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP, SCALARSPEC_SEP};
-use crate::errors::{Result, SvgdxError};
-use crate::types::{attr_split, extract_elref, strp, ElRef};
+use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
+use crate::errors::{Error, Result};
+use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
@@ -28,6 +30,7 @@ impl Size {
 pub enum Length {
     Absolute(f32),
     Ratio(f32),
+    Rational(i32, NonZeroU32), // numerator, denominator
 }
 
 impl Default for Length {
@@ -39,10 +42,10 @@ impl Default for Length {
 impl Length {
     #[allow(dead_code)]
     pub const fn ratio(&self) -> Option<f32> {
-        if let Self::Ratio(result) = self {
-            Some(*result)
-        } else {
-            None
+        match self {
+            Self::Ratio(result) => Some(*result),
+            Self::Rational(numer, denom) => Some(*numer as f32 / denom.get() as f32),
+            _ => None,
         }
     }
 
@@ -60,6 +63,7 @@ impl Length {
         match self {
             Self::Absolute(abs) => *abs,
             Self::Ratio(ratio) => base * ratio,
+            Self::Rational(numer, denom) => base * (*numer as f32 / denom.get() as f32),
         }
     }
 
@@ -69,6 +73,7 @@ impl Length {
         match self {
             Self::Absolute(abs) => value + abs,
             Self::Ratio(ratio) => value * ratio,
+            Self::Rational(numer, denom) => value * (*numer as f32 / denom.get() as f32),
         }
     }
 
@@ -89,6 +94,9 @@ impl Length {
                 }
             }
             Self::Ratio(ratio) => start + (end - start) * ratio,
+            Self::Rational(numer, denom) => {
+                start + (end - start) * (*numer as f32 / denom.get() as f32)
+            }
         }
     }
 }
@@ -98,7 +106,7 @@ pub fn strp_length(s: &str) -> Result<Length> {
 }
 
 impl FromStr for Length {
-    type Err = SvgdxError;
+    type Err = Error;
 
     /// Parse a ratio (float or %age) to an f32
     /// Note this deliberately does not clamp to 0..1
@@ -106,8 +114,29 @@ impl FromStr for Length {
         let value = value.trim();
         if let Some(pc) = value.strip_suffix('%') {
             Ok(Length::Ratio(strp(pc)? * 0.01))
+        } else if let Some((numer, denom)) = value.split_once('/') {
+            let numer = numer
+                .parse()
+                .map_err(|_| Error::Parse(format!("expected an integer numerator: '{value}'")))?;
+            let denom = denom.parse().map_err(|_| {
+                Error::Parse(format!("expected an integer denominator >= 1: '{value}'"))
+            })?;
+            Ok(Length::Rational(numer, denom))
         } else {
             Ok(Length::Absolute(strp(value)?))
+        }
+    }
+}
+
+// Convert to SVG-friendly string (e.g. Rational => %age)
+impl Display for Length {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Absolute(v) => write!(f, "{v}"),
+            Self::Ratio(v) => write!(f, "{}%", fstr(v * 100.)),
+            Self::Rational(numer, denom) => {
+                write!(f, "{}%", fstr((*numer as f32 / denom.get() as f32) * 100.))
+            }
         }
     }
 }
@@ -179,7 +208,7 @@ impl LocSpec {
 }
 
 impl FromStr for ElementLoc {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         if let Ok(ls) = LocSpec::from_str(value) {
@@ -188,20 +217,16 @@ impl FromStr for ElementLoc {
             let len = len.parse::<Length>()?;
             match edge {
                 "" => Ok(ElementLoc::LineOffset(len)),
-                _ => Err(SvgdxError::InvalidData(format!(
-                    "Invalid LocSpec format {value}"
-                ))),
+                _ => Err(Error::Parse(format!("invalid LocSpec format {value}"))),
             }
         } else {
-            Err(SvgdxError::InvalidData(format!(
-                "Invalid LocSpec format {value}"
-            )))
+            Err(Error::Parse(format!("invalid LocSpec format {value}")))
         }
     }
 }
 
 impl FromStr for LocSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         match value {
@@ -222,14 +247,10 @@ impl FromStr for LocSpec {
                         "r" => Ok(Self::RightEdge(len)),
                         "b" => Ok(Self::BottomEdge(len)),
                         "l" => Ok(Self::LeftEdge(len)),
-                        _ => Err(SvgdxError::InvalidData(format!(
-                            "Invalid LocSpec format {value}"
-                        ))),
+                        _ => Err(Error::Parse(format!("invalid LocSpec format {value}"))),
                     }
                 } else {
-                    Err(SvgdxError::InvalidData(format!(
-                        "Invalid LocSpec format {value}"
-                    )))
+                    Err(Error::Parse(format!("invalid LocSpec format {value}")))
                 }
             }
         }
@@ -281,7 +302,7 @@ impl ScalarSpec {
 }
 
 impl FromStr for ScalarSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         // TODO: consider x1/x2/y1/y2: note that for e.g. a line it is
@@ -299,9 +320,7 @@ impl FromStr for ScalarSpec {
             "rx" => Ok(Self::Rx),
             "h" | "height" => Ok(Self::Height),
             "ry" => Ok(Self::Ry),
-            _ => Err(SvgdxError::InvalidData(format!(
-                "Invalid ScalarSpec format {value}"
-            ))),
+            _ => Err(Error::Parse(format!("Invalid ScalarSpec format {value}"))),
         }
     }
 }
@@ -326,7 +345,7 @@ impl TrblLength {
 }
 
 impl FromStr for TrblLength {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(value: &str) -> Result<Self> {
         // convert parts to Length, fail if any conversion fails.
         let parts: Result<Vec<_>> = attr_split(value).map(|v| strp_length(&v)).collect();
@@ -337,9 +356,7 @@ impl FromStr for TrblLength {
             2 => TrblLength::new(parts[0], parts[1], parts[0], parts[1]),
             3 => TrblLength::new(parts[0], parts[1], parts[2], parts[1]),
             4 => TrblLength::new(parts[0], parts[1], parts[2], parts[3]),
-            _ => Err(SvgdxError::InvalidData(
-                "Incorrect number of values".to_owned(),
-            ))?,
+            _ => Err(Error::Arity("TrblLength requires 1-4 values".to_owned()))?,
         })
     }
 }
@@ -354,7 +371,7 @@ pub enum DirSpec {
 }
 
 impl FromStr for DirSpec {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
         match value {
@@ -362,9 +379,7 @@ impl FromStr for DirSpec {
             "H" => Ok(Self::Behind),
             "v" => Ok(Self::Below),
             "V" => Ok(Self::Above),
-            _ => Err(SvgdxError::InvalidData(format!(
-                "Invalid DirSpec format {value}"
-            ))),
+            _ => Err(Error::Parse(format!("invalid DirSpec format {value}"))),
         }
     }
 }
@@ -377,37 +392,16 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     }
     let remain = remain
         .strip_prefix(LOCSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))?;
+        .ok_or_else(|| Error::Parse(format!("invalid locspec: '{s}'")))?;
     let mut chars = remain.chars();
     let mut loc = String::new();
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid locspec: '{s}'")))
+                return Err(Error::Parse(format!("invalid locspec: '{s}'")))
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),
-        }
-    }
-}
-
-pub fn parse_el_scalar(s: &str) -> Result<(ElRef, Option<ScalarSpec>)> {
-    let (elref, remain) = extract_elref(s)?;
-    if remain.is_empty() {
-        return Ok((elref, None));
-    }
-    let remain = remain
-        .strip_prefix(SCALARSPEC_SEP)
-        .ok_or(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))?;
-    let mut chars = remain.chars();
-    let mut scalar = String::new();
-    loop {
-        match chars.next() {
-            Some(c) if c.is_whitespace() => {
-                return Err(SvgdxError::ParseError(format!("Invalid scalarspec: '{s}'")))
-            }
-            Some(c) => scalar.push(c),
-            None => return Ok((elref, Some(scalar.parse()?))),
         }
     }
 }
@@ -455,6 +449,14 @@ mod test {
         assert_eq!(strp_length("-0.0123").ok(), Some(Length::Absolute(-0.0123)));
         assert_eq!(strp_length("0.5%").ok(), Some(Length::Ratio(0.005)));
         assert_eq!(strp_length("150%").ok(), Some(Length::Ratio(1.5)));
+        assert_eq!(
+            strp_length("1/5").ok(),
+            Some(Length::Rational(1, NonZeroU32::new(5).unwrap()))
+        );
+        assert_eq!(
+            strp_length("-2/37").ok(),
+            Some(Length::Rational(-2, NonZeroU32::new(37).unwrap()))
+        );
         assert_eq!(strp_length("1.2.3").ok(), None);
         assert_eq!(strp_length("a").ok(), None);
         assert_eq!(strp_length("a%").ok(), None);
@@ -475,6 +477,11 @@ mod test {
         assert_eq!(ratio_len.absolute(), None);
         assert_eq!(ratio_len.ratio(), Some(0.75));
         assert_eq!(ratio_len.adjust(3.125), 0.75 * 3.125);
+
+        let rat_len = Length::Rational(3, NonZeroU32::new(4).unwrap());
+        assert_eq!(rat_len.absolute(), None);
+        assert_eq!(rat_len.ratio(), Some(0.75));
+        assert_eq!(rat_len.adjust(3.125), 0.75 * 3.125);
     }
 
     #[test]

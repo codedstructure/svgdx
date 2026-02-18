@@ -7,7 +7,7 @@
   <g clip-path="url(#thing)">
     <circle r="100" class="d-fill-skyblue"/>
     <circle r="6" class="d-none d-fill-gold"/>
-    <loop count="36" step="10" loop-var="theta">
+    <loop count="36" step="10" var="theta">
       <line xy1="{{p2r(7, $theta)}}" xy2="{{p2r(10, $theta)}}" class="d-gold d-thick"/>
     </loop>
     <circle r="170" cxy="50 165" class="d-fill-khaki"/>

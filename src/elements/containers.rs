@@ -1,16 +1,16 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
+use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
-use crate::events::{OutputEvent, OutputList};
 use crate::geometry::BoundingBox;
 use crate::transform::{process_events, EventGen};
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
 #[derive(Debug, Clone)]
-pub struct Container(pub SvgElement);
+pub struct Container<'a>(pub &'a SvgElement);
 
-impl EventGen for Container {
+impl EventGen for Container<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -38,7 +38,7 @@ impl EventGen for Container {
                     el.event_range = Some((start, start)); // emulate an Empty element
                 }
             }
-            if let (true, Some(text)) = (is_graphics_element(&self.0), &inner_text) {
+            if let (true, Some(text)) = (is_graphics_element(self.0), &inner_text) {
                 let mut el = self.0.clone();
                 el.set_attr("text", text);
                 if let Some((start, _end)) = self.0.event_range {
@@ -54,7 +54,10 @@ impl EventGen for Container {
                     // logic; should really be based on graphics vs container element
                     // rather than whether the XML element is empty or not.
                     new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
-                    new_el.transmute(context)?;
+                    if !new_el.transmute(context)? {
+                        // Element should be skipped (e.g. overlapping connectors)
+                        return Ok((OutputList::new(), None));
+                    }
                     bbox = new_el.bbox()?;
                 }
 
@@ -68,17 +71,20 @@ impl EventGen for Container {
                     new_el.set_attr("data-src-line", &self.0.src_line.to_string());
                 }
                 let mut events = OutputList::new();
-                events.push(OutputEvent::Start(new_el.clone()));
+                events.push(EventKind::Start(new_el.clone().into()));
                 let (evlist, inner_bbox) = if inner_text.is_some() {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
+                    context.push_element(self.0);
                     let mut inner_events = inner_events.clone();
                     inner_events.rebase_under(new_el.order_index.clone());
-                    process_events(inner_events, context)?
+                    let res = process_events(inner_events, context);
+                    context.pop_element();
+                    res?
                 };
                 events.extend(evlist);
-                events.push(OutputEvent::End(self.0.name().to_owned()));
+                events.push(EventKind::End(self.0.name().to_owned()));
 
                 if is_container_element(&new_el) {
                     bbox = inner_bbox;
@@ -100,9 +106,9 @@ impl EventGen for Container {
 }
 
 #[derive(Debug, Clone)]
-pub struct GroupElement(pub SvgElement);
+pub struct GroupElement<'a>(pub &'a SvgElement);
 
-impl EventGen for GroupElement {
+impl EventGen for GroupElement<'_> {
     fn generate_events(
         &self,
         context: &mut TransformerContext,
@@ -113,7 +119,7 @@ impl EventGen for GroupElement {
         new_el.eval_attributes(context)?;
 
         // push variables onto the stack
-        context.push_element(&self.0);
+        context.push_element(self.0);
 
         let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
             // get the inner events / bbox first, as some outer element attrs
@@ -137,12 +143,12 @@ impl EventGen for GroupElement {
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() {
-            events.push(OutputEvent::Empty(new_el.clone()));
+            events.push(EventKind::Empty(new_el.clone().into()));
         } else {
             let el_name = new_el.name().to_owned();
-            events.push(OutputEvent::Start(new_el.clone()));
+            events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
-            events.push(OutputEvent::End(el_name));
+            events.push(EventKind::End(el_name));
         }
 
         context.update_element(&new_el);

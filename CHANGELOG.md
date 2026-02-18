@@ -7,6 +7,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `<text>` elements can now have a `rel` attribute pointing to another
+  element which provides the bounding box for the new text element, and as the
+  basis for attributes such as `text-loc`. This feature makes it easier to
+  position multiple text elements relative to an element.
+
+- Fixed: invalid dirspec entries (e.g. `xy="ref|h 10"` where the leading '#'
+  is missing) now error rather than silently being ignored.
+
+## [0.27.0 - 2026-02-06]
+
+- Changed: `<line>` based connectors are now axis-aligned by default where
+  there is overlap in one dimension between the start and end elements. The new
+  behaviour is equivalent to the previous `edge-type="h"` (or `="v"` as
+  appropriate) in cases where the connector will meet both elements, and
+  `edge-type` is now ignored and deprecated (it is currently removed from the
+  rendered output to preserve output, but this special-casing will be removed
+  in the future). If the elements do not 'overlap' in either dimension, the
+  connection will be a straight line between the closest corners; in the event
+  that the two elements overlap in _both_ dimensions (i.e. intersect) then no
+  connecting line is rendered. This new behaviour applies only if a bare elref
+  is provided (e.g. `start="#ref"` or `="^"`); if a locspec is also given then
+  the previous behaviour remains, and no change is made to the elbow connectors
+  generated from `<polyline>` elements.
+
+- Added: new config option 'error-mode' with values 'strict' (default, as
+  previous behaviour), 'ignore' (leaves erroneous elements as provided in the
+  input) and 'warn' (inserting a comment prior to the errored element with the
+  error message).
+
+- svgdx-editor: significant refactor and improved support for mobile devices
+  (small screen and touch support).
+
+- Added: svgdx-server now has an `/api/transform_json` endpoint which is used
+  in the reworked svgdx-editor.
+
+## [0.26.1 - 2026-01-11]
+
+- Minor change: polyline connectors with only two points are no longer
+  converted to line elements.
+
+- Minor change: intermediate collinear and repeated points in polyline
+  connectors are omitted.
+
+- Fixed: multiple minor connector improvements, including better corner-offset
+  handling.
+
+- Fixed: inconsistent polyline connectors with endpoints into transformed
+  groups.
+
+## [0.26.0 - 2026-01-03]
+
+- Fixed: location references now respect transforms which may have moved
+  the elements on the canvas. This particularly applies to `<g>` elements
+  (either directly or via `<reuse>`) positioned with `xy` or similar attrs.
+  See the [patch-panel.xml](examples/patch-panel.xml) example.
+
+- Added: simple gradient specification. A `stops` attribute can be provided
+  to `linearGradient` or `radialGradient` elements, containing semicolon
+  separated `offset colour [opacity]` values. The various gradient vector
+  attributes (x1, y1, x2, y2 for linear; cx, cy, fx, fy for radial) may be
+  given in compound form, e.g. `xy1="50%"`, and the gradient vector for
+  `linearGradient` may be further specified by `dir` angle and `length`
+  attributes if zero or one of `xy1`, `xy2` are given.
+  Example: `<linearGradient id="g1" dir="90" stops="0 red; 1 blue"/>` defines
+  a gradient from red at the top to blue at the bottom.
+
+- Added: more concise loop attribute names: `loop-var` becomes `var` for the
+  `<loop>` element, and `idx-var` becomes `idx` for the `<for>` element. The
+  older names may be removed in a future version.
+
+- Added: allow separate `x` and `y` attributes (rather than requiring `xy`
+  when specifying anchor point using `xy-loc`.
+
+- Fixed: `dx` and `dy` attributes are respected with relpos positioning;
+  previously `dxy` worked but not separate `dx` or `dy` attributes.
+
+- Fixed: stopped `d-thin` / `d-thick` and similar classes applying to text,
+  which was causing inadvertent text outlining. (Use `d-text-ol[-thin]` etc
+  to invoke text outlining correctly.)
+
+## [0.25.0 - 2025-11-22]
+
+- Added: support for 'repeat' commands in path element data, extending the
+  turtle graphics support. Example: `d="m0 0 r 4 [h 10 b 90]"` will draw
+  a square, repeating ('r' or 'R' command, both identical) '4' times the
+  content of the `[ ... ]` block. Repeated blocks may be nested.
+
+- A new config value `path-repeat-limit` setting a limit to the total number
+  of repeat expansions (including multiply by nested repeats) using the new
+  `r` path command, defaulting to 1000.
+
+- Improved: path bounding box evaluation now handles curves (quadratic and
+  cubic beziers, elliptical arcs) properly, as well as various fixes to path
+  data comprising multiple subpaths. Together, these changes make using SVGs
+  from other sources (often little more than lumps of complex path data) in
+  svgdx much more practical.
+
+## [0.24.0 - 2025-10-19]
+
+- Breaking change: rationalised error handling, including a rename of
+  `SvgdxError` to simply `svgdx::Error`. Several variants of this type have also
+  been renamed or otherwise changed; clients consuming errors from svgdx will
+  need updating.
+
+- Added: support for more complex connector routing for polylines involving more
+  than 2 corners. Note the `corner-offset` value interpretation may be different
+  in some cases.
+
+- Added: elref-based functions in expressions, including `mid()`, `surround()`,
+  `inside()`,  and `loc()` as well as various scalar functions (`x1()`,
+  `width()`, etc).
+
+- Added: "raw tokens" in expressions (internally: 'delimited atoms'). These
+  allow expression fragments which would otherwise be tokenized badly to be
+  delimited using '[...]' (or more generally, any number of '[' chars closed
+  with the same number of ']' chars). Two use-cases for this: strings containing
+  quote characters (which no longer require escaping), and ElRef::Next
+  (starting with '+') which would otherwise break expression parsing.
+
+- Added: new 'rational' length type, available as position and size deltas
+  similar to the existing 'percentage' ratio type. Rational values are given
+  as 'p/q', e.g. '3/10', where both numerator and denominator are integers
+  and the denominator is >= 1. This approach is useful for aligning to a grid
+  layout, e.g. with `<rect xy="#ref 2/10 5/10" xy2="#ref@tl 8/10 9/10"/>`.
+  Note the `@tl` on the `xy2` case, to avoid positioning from the `br` loc
+  of #ref as is default for `xy2` - this approach may change in future.
+
 - Added: default attrs can now be specified directly on a `<defaults>` element,
   as well as any inner elements. Given attributes are equivalent to being
   present on an additional `<_ ...>` first child of a `<defaults>` block.

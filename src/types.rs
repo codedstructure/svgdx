@@ -1,6 +1,5 @@
 use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
-use crate::errors::{Result, SvgdxError};
-use itertools::Itertools;
+use crate::errors::{Error, Result};
 use std::fmt::{self, Display};
 use std::num::NonZeroU8;
 use std::ops::{Deref, DerefMut};
@@ -26,7 +25,7 @@ pub fn fstr(x: f32) -> String {
 pub fn strp(s: &str) -> Result<f32> {
     s.trim()
         .parse::<f32>()
-        .map_err(|_| SvgdxError::ParseError(format!("Expected a number: '{s}'")))
+        .map_err(|_| Error::Parse(format!("expected a number: '{s}'")))
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
@@ -37,14 +36,14 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
     for ch in s.trim().chars() {
         if ch.is_ascii_digit() || ch == '.' || ch == '-' {
             if got_value {
-                return Err(SvgdxError::ParseError(format!(
-                    "Invalid character in numeric value: '{ch}'"
+                return Err(Error::Parse(format!(
+                    "invalid character in numeric value: '{ch}'"
                 )));
             }
             value.push(ch);
         } else {
             if value.is_empty() {
-                return Err(SvgdxError::ParseError(format!(
+                return Err(Error::Parse(format!(
                     "'{s}' does not start with numeric value"
                 )));
             }
@@ -75,9 +74,17 @@ pub fn split_compound_attr(value: &str) -> (String, String) {
         let prefix = parts.next().expect("nonempty");
         if let Some(remain) = parts.next() {
             let mut parts = attr_split_cycle(remain);
-            let x_suffix = parts.next().unwrap_or_default();
-            let y_suffix = parts.next().unwrap_or_default();
-            ([prefix, &x_suffix].join(" "), [prefix, &y_suffix].join(" "))
+            let x = if let Some(dx) = parts.next() {
+                format!("{prefix} {dx}")
+            } else {
+                prefix.to_string()
+            };
+            let y = if let Some(dy) = parts.next() {
+                format!("{prefix} {dy}")
+            } else {
+                prefix.to_string()
+            };
+            (x, y)
         } else {
             (value.to_owned(), value.to_owned())
         }
@@ -148,11 +155,39 @@ impl OrderIndex {
         // other is shorter and all elements match
         other.0.len() < self.0.len() && self.0.iter().zip(other.0.iter()).all(|(a, b)| a == b)
     }
+
+    pub fn common_prefix(&self, other: &Self) -> Self {
+        let mut prefix = Vec::new();
+        for (a, b) in self.0.iter().zip(other.0.iter()) {
+            if a == b {
+                prefix.push(*a);
+            } else {
+                break;
+            }
+        }
+        Self(prefix)
+    }
+
+    // Given {1.2.2.4.5}, return [{1}, {1.2}, {1.2.2}, {1.2.2.4}]
+    pub fn ancestors(&self) -> Vec<Self> {
+        let mut ancestors = Vec::new();
+        for i in 1..self.0.len() {
+            ancestors.push(Self(self.0[..i].to_vec()));
+        }
+        ancestors
+    }
 }
 
 impl Display for OrderIndex {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{{{}}}", self.0.iter().map(|i| i.to_string()).join("."))
+        write!(f, "{{")?;
+        for (i, v) in self.0.iter().enumerate() {
+            if i > 0 {
+                write!(f, ".")?;
+            }
+            write!(f, "{v}")?;
+        }
+        write!(f, "}}")
     }
 }
 
@@ -394,7 +429,7 @@ impl Display for StyleMap {
 }
 
 impl FromStr for StyleMap {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         let mut styles = Self::new();
@@ -577,15 +612,13 @@ pub enum ElRef {
 }
 
 impl FromStr for ElRef {
-    type Err = SvgdxError;
+    type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
         let (elref, remain) = extract_elref(s)?;
         if remain.is_empty() {
             Ok(elref)
         } else {
-            Err(SvgdxError::ParseError(format!(
-                "Invalid elref format '{s}'"
-            )))
+            Err(Error::Parse(format!("invalid elref format '{s}'")))
         }
     }
 }
@@ -638,9 +671,7 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         return Ok((elref, new_s));
     }
 
-    Err(SvgdxError::ParseError(format!(
-        "Invalid elref format '{s}'"
-    )))
+    Err(Error::Parse(format!("invalid elref format '{s}'")))
 }
 
 #[cfg(test)]

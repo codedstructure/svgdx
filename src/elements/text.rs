@@ -1,11 +1,12 @@
 use itertools::Itertools;
 
 use super::SvgElement;
+use crate::context::ElementMap;
 use crate::geometry::LocSpec;
-use crate::types::{attr_split_cycle, fstr, strp};
+use crate::types::{attr_split_cycle, fstr, strp, ElRef};
 
 use crate::elements::markdown::{get_md_value, MdSpan};
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 
 fn get_text_value(element: &mut SvgElement) -> String {
     let text_value = element
@@ -39,7 +40,10 @@ fn text_string(text_value: &str) -> String {
     result
 }
 
-fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
+fn get_text_position(
+    element: &mut SvgElement,
+    ctx: &impl ElementMap,
+) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -47,19 +51,32 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
         let dy = element.pop_attr("text-dy");
         let dxy = element.pop_attr("text-dxy");
         if let Some(dxy) = dxy {
-            let mut parts = attr_split_cycle(&dxy).map_while(|v| strp(&v).ok());
-            t_dx = parts.next().ok_or_else(|| {
-                SvgdxError::ParseError("dx from text-dxy should be numeric".to_owned())
-            })?;
-            t_dy = parts.next().ok_or_else(|| {
-                SvgdxError::ParseError("dy from text-dxy should be numeric".to_owned())
-            })?;
+            let mut parts = attr_split_cycle(&dxy);
+            if let Some(pdx) = parts.next() {
+                t_dx = strp(&pdx)?;
+            }
+            if let Some(pdy) = parts.next() {
+                t_dy = strp(&pdy)?;
+            }
         }
         if let Some(dx) = dx {
             t_dx = strp(&dx)?;
         }
         if let Some(dy) = dy {
             t_dy = strp(&dy)?;
+        }
+    }
+
+    // If a 'rel' attribute is present on a <text> element, resolve it to
+    // determine the bounding box and element type (for inside/outside default).
+    let mut text_ref_element = element.clone();
+    if element.name() == "text" {
+        if let Some(ref_str) = element.pop_attr("rel") {
+            let elref: ElRef = ref_str.parse()?;
+            text_ref_element = ctx
+                .get_element(&elref)
+                .ok_or_else(|| Error::Reference(elref))?
+                .clone();
         }
     }
 
@@ -82,7 +99,7 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     } else if element.pop_class("d-text-inside") {
         false
     } else {
-        matches!(element.name(), "line" | "point" | "text")
+        matches!(text_ref_element.name(), "line" | "point" | "text")
     };
     match text_anchor {
         ls if ls.is_top() => {
@@ -143,9 +160,9 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = element
+    let (mut tdx, mut tdy) = text_ref_element
         .bbox()?
-        .ok_or_else(|| SvgdxError::MissingBoundingBox(element.to_string()))?
+        .ok_or_else(|| Error::MissingBBox(element.to_string()))?
         .locspec(text_anchor);
 
     tdx += t_dx;
@@ -153,7 +170,10 @@ fn get_text_position(element: &mut SvgElement) -> Result<(f32, f32, bool, LocSpe
     Ok((tdx, tdy, outside, text_anchor, text_classes))
 }
 
-pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgElement>)> {
+pub fn process_text_attr(
+    element: &SvgElement,
+    ctx: &impl ElementMap,
+) -> Result<(SvgElement, Vec<SvgElement>)> {
     // Different conversions from line count to first-line offset based on whether
     // top, center, or bottom justification.
     const WRAP_DOWN: fn(usize, f32) -> f32 = |_count, _spacing| 0.;
@@ -167,7 +187,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
 
     let spans;
     if let (Some(_), Some(_)) = (orig_elem.get_attr("text"), orig_elem.get_attr("md")) {
-        return Err(SvgdxError::ParseError(
+        return Err(Error::Parse(
             "has both attributes of text and md".to_owned(),
         ));
     } else if orig_elem.get_attr("text").is_some() {
@@ -188,7 +208,7 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
     }
     let full_text_parsed_string = spans.iter().map(|s| s.text.clone()).join("");
 
-    let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem)?;
+    let (tdx, tdy, outside, text_loc, mut text_classes) = get_text_position(&mut orig_elem, ctx)?;
 
     let x_str = fstr(tdx);
     let y_str = fstr(tdy);
@@ -302,6 +322,10 @@ pub fn process_text_attr(element: &SvgElement) -> Result<(SvgElement, Vec<SvgEle
         "d-dot",
         "d-dash",
         "d-dot-dash",
+        "d-thinner",
+        "d-thin",
+        "d-thick",
+        "d-thicker",
     ];
     let text_ignore_class_fns = [
         |c: &str| c.starts_with("d-flow-"),

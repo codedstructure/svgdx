@@ -3,7 +3,7 @@
 use std::rc::Rc;
 
 use crate::context::TransformerContext;
-use crate::errors::{Result, SvgdxError};
+use crate::errors::{Error, Result};
 
 /// Auto-style themes for svgdx.
 #[derive(Default, Debug, Clone)]
@@ -25,7 +25,7 @@ pub enum ThemeType {
 }
 
 impl std::str::FromStr for ThemeType {
-    type Err = SvgdxError;
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
@@ -35,9 +35,10 @@ impl std::str::FromStr for ThemeType {
             "glass" => Ok(Self::Glass),
             "light" => Ok(Self::Light),
             "dark" => Ok(Self::Dark),
-            _ => Err(SvgdxError::InvalidData(format!(
-                "Unknown theme '{s}' (available themes: default, bold, fine, glass, light, dark)",
-            ))),
+            _ => Err(Error::InvalidValue(
+                "theme (default, bold, fine, glass, light, dark)".into(),
+                s.into(),
+            )),
         }
     }
 }
