@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: initial support for basic markdown formatting. Provide markdown
+  directly via the `md` attribute, or signal that text (whether element content
+  or the `text` attribute) should be handled as markdown with either an empty
+  `md=""` attribute or the `d-markdown` class. Currently only inline styles for
+  bold, italic, and monospace are handled.
+
 - Added: `<text>` elements can now have a `rel` attribute pointing to another
   element which provides the bounding box for the new text element, and as the
   basis for attributes such as `text-loc`. This feature makes it easier to

@@ -1,16 +1,14 @@
-use super::SvgElement;
+#[derive(Debug, Clone, PartialEq)]
+pub struct MdSpan {
+    pub code: bool,
+    pub bold: bool,
+    pub italic: bool,
+    pub text: String,
+}
 
-pub fn get_md_value(element: &mut SvgElement) -> Vec<MdSpan> {
-    let text_value = if let Some(tv) = element.pop_attr("md") {
-        tv
-    } else if let Some(tv) = element.pop_attr("text") {
-        tv
-    } else {
-        return vec![];
-    };
-
+pub fn get_md_value(text_value: &str) -> Vec<MdSpan> {
     // parse into spans and data about style
-    let (spans, span_data) = md_parse(&text_value);
+    let (spans, span_data) = md_parse(text_value);
 
     let mut md_spans: Vec<MdSpan> = spans
         .iter()
@@ -40,10 +38,8 @@ pub fn get_md_value(element: &mut SvgElement) -> Vec<MdSpan> {
         result.push(first.clone());
     }
     for span in md_span_iter {
-        if result[result.len() - 1].bold != span.bold
-            || result[result.len() - 1].code != span.code
-            || result[result.len() - 1].italic != span.italic
-        {
+        let last = result.last().expect("inside loop => at least 1 span");
+        if last.bold != span.bold || last.code != span.code || last.italic != span.italic {
             result.push(MdSpan {
                 code: span.code,
                 bold: span.bold,
@@ -51,19 +47,13 @@ pub fn get_md_value(element: &mut SvgElement) -> Vec<MdSpan> {
                 text: String::new(),
             });
         }
-        let last_ind = result.len() - 1;
-        result[last_ind].text += &span.text;
+        result
+            .last_mut()
+            .expect("inside loop => at least 1 span")
+            .text += &span.text;
     }
 
     result
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MdSpan {
-    pub code: bool,
-    pub bold: bool,
-    pub italic: bool,
-    pub text: String,
 }
 
 #[derive(Debug, PartialEq)]
@@ -206,7 +196,7 @@ fn md_parse_code_blocks(
                         delimiters[del_ind].num_delimiters = 0;
                         delimiters[closer_ind].num_delimiters = 0;
 
-                        // readd escaped tick
+                        // re-add escaped tick
                         if escaped {
                             delimiters[del_ind - 1].num_delimiters -= 1;
                             current_span.push(delimiters[del_ind].char_type.to_char());
@@ -228,7 +218,7 @@ fn md_parse_code_blocks(
                                 // if there is a delimiter it will not be a space
                                 has_none_space |= delimiters[del_ind].num_delimiters != 0;
 
-                                // readd delimiter literal
+                                // re-add delimiter literal
                                 current_span += &delimiters[del_ind]
                                     .char_type
                                     .to_char()
@@ -321,14 +311,14 @@ fn md_parse_escapes(
                         current_span = String::new();
                     }
 
-                    // readd 1 '\' for every 2 rounded down
+                    // read 1 '\' for every 2 rounded down
                     current_span += &delimiters[del_ind]
                         .char_type
                         .to_char()
                         .to_string()
                         .repeat(delimiters[del_ind].num_delimiters / 2);
 
-                    // if escapes dont all cancel out
+                    // if escapes don't all cancel out
                     if delimiters[del_ind].num_delimiters % 2 != 0 {
                         if del_ind != delimiters.len() - 1
                             && delimiters[del_ind + 1].ind == delimiters[del_ind].ind
@@ -342,7 +332,7 @@ fn md_parse_escapes(
                                     delimiters[del_ind + 1].num_delimiters -= 1;
                                 }
                                 // escapes if adjacent should merge and null is only first
-                                _ => panic!("\\ => should merge"),
+                                _ => unreachable!("\\ => should merge"),
                             }
                         } else if delimiters[del_ind].ind < result.len() {
                             // letter specific values
@@ -368,7 +358,7 @@ fn md_parse_escapes(
                     }
                 }
                 DelimiterType::Tick => {
-                    // unused from previous stage readd to string
+                    // unused from previous stage re-add to string
                     current_span += &delimiters[del_ind]
                         .char_type
                         .to_char()
@@ -435,9 +425,9 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
                 .expect("no 0 len spans");
         }
 
-        // if prev is whitespace cant end
-        // if next is whitespace cant start
-        // if neither whitespace but is underscore then cant either
+        // if prev is whitespace can't end
+        // if next is whitespace can't start
+        // if neither whitespace but is underscore then can't either
         match (prev_char.is_whitespace(), next_char.is_whitespace()) {
             (false, false) => {
                 if delimiters[i].char_type == DelimiterType::UnderScore {
@@ -457,15 +447,17 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
             }
         }
 
-        // if next is punctuation and prev is alphanumeric then cant start
-        // oposite for end
+        // if next is punctuation and prev is alphanumeric then can't start
+        // opposite for end
         if next_char.is_ascii_punctuation()
-            && (!prev_char.is_whitespace() || !prev_char.is_ascii_punctuation())
+            && !prev_char.is_whitespace()
+            && !prev_char.is_ascii_punctuation()
         {
             delimiters[i].could_open = false;
         }
         if prev_char.is_ascii_punctuation()
-            && (!next_char.is_whitespace() || !next_char.is_ascii_punctuation())
+            && !next_char.is_whitespace()
+            && !next_char.is_ascii_punctuation()
         {
             delimiters[i].could_close = false;
         }
@@ -494,7 +486,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
         let opener_min = match delimiters[current_position].char_type {
             DelimiterType::Asterisk => &mut opener_a,
             DelimiterType::UnderScore => &mut opener_d,
-            _ => panic!("this cant happen as current_position starts at 0 and all remaining delimiters are of above types"),
+            _ => unreachable!("this can't happen as current_position starts at 0 and all remaining delimiters are of above types"),
         };
 
         // min is the value upto which has already been checked for this type
@@ -508,7 +500,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
                 && delimiters[opener_ind].could_open
                 && delimiters[opener_ind].char_type == delimiters[current_position].char_type
                 // see spec
-                // if one of them could open and close then sum cant be multiple of 3 unless both are
+                // if one of them could open and close then sum can't be multiple of 3 unless both are
                 && !((delimiters[opener_ind].could_close
                     || delimiters[current_position].could_open)
                     && delimiters[opener_ind].num_delimiters % 3
@@ -526,7 +518,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
             opener_min[delimiters[current_position].num_delimiters % 3] = current_position - 1;
             current_position += 1;
         } else {
-            // a delimiter cant both open and close
+            // a delimiter can't both open and close
             delimiters[current_position].could_open = false;
             delimiters[opener_ind].could_close = false;
 
@@ -556,7 +548,7 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
                 current_position += 1;
             }
 
-            // deactiveate all delimiters inside the new style span
+            // deactivate all delimiters inside the new style span
             for d in &mut delimiters[(opener_ind + 1)..current_position] {
                 d.is_active = false;
             }
@@ -701,37 +693,22 @@ mod tests {
             }
         }
 
-        let mut el = SvgElement::new("text", &[]);
-        let text = r"foo";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(0, "foo")]);
+        assert_eq!(get_md_value("foo"), [tc(0, "foo")]);
 
-        let text = r"**(**foo)";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(0, "**(**foo)")]);
+        assert_eq!(get_md_value(r"**(**foo)"), [tc(0, "**(**foo)")]);
 
-        let text = r"*foo *bar**";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(4, "foo bar")]);
+        assert_eq!(get_md_value("*foo *bar**"), [tc(4, "foo bar")]);
 
-        let text = r"*foo**bar**baz*";
-        el.set_attr("md", text);
         assert_eq!(
-            get_md_value(&mut el),
+            get_md_value("*foo**bar**baz*"),
             [tc(4, "foo"), tc(6, "bar"), tc(4, "baz")]
         );
 
-        let text = r"`foo*`";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(1, "foo*")]);
+        assert_eq!(get_md_value("`foo*`"), [tc(1, "foo*")]);
 
         // if first and last chars in code block are space remove them unless all empty
-        let text = r"` `` `";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(1, "``")]);
+        assert_eq!(get_md_value("` `` `"), [tc(1, "``")]);
 
-        let text = r"`  `";
-        el.set_attr("md", text);
-        assert_eq!(get_md_value(&mut el), [tc(1, "  ")]);
+        assert_eq!(get_md_value("`  `"), [tc(1, "  ")]);
     }
 }

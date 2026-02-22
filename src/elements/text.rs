@@ -6,15 +6,8 @@ use crate::types::{attr_split_cycle, fstr, strp, ElRef};
 use crate::elements::markdown::{get_md_value, MdSpan};
 use crate::errors::{Error, Result};
 
-fn get_text_value(element: &mut SvgElement) -> String {
-    let text_value = element
-        .pop_attr("text")
-        .expect("no text attr in process_text_attr");
-    text_string(&text_value)
-}
-
 /// Convert unescaped r"\n" into newline characters for multi-line text
-fn text_string(text_value: &str) -> String {
+fn get_text_value(text_value: &str) -> String {
     let mut result = String::new();
     let mut remain = text_value;
     while !remain.is_empty() {
@@ -183,27 +176,30 @@ pub fn process_text_attr(
 
     let mut orig_elem = element.clone();
 
-    let spans;
-    if let (Some(_), Some(_)) = (orig_elem.get_attr("text"), orig_elem.get_attr("md")) {
-        return Err(Error::Parse(
-            "has both attributes of text and md".to_owned(),
-        ));
-    } else if orig_elem.get_attr("text").is_some() {
-        if orig_elem.has_class("d-markdown") {
-            // as to call must have one of them
-            spans = get_md_value(&mut orig_elem);
-        } else {
-            spans = vec![MdSpan {
+    let spans = match (orig_elem.pop_attr("text"), orig_elem.pop_attr("md")) {
+        (None, Some(md)) => get_md_value(&md),
+        (Some(t), Some(md)) if md.is_empty() => get_md_value(&t),
+        (Some(t), None) if orig_elem.has_class("d-markdown") => get_md_value(&t),
+        (Some(t), None) => {
+            vec![MdSpan {
                 code: false,
                 bold: false,
                 italic: false,
-                text: get_text_value(&mut orig_elem),
-            }];
+                text: get_text_value(&t),
+            }]
         }
-    } else {
-        // as to call must have one of them
-        spans = get_md_value(&mut orig_elem);
-    }
+        (Some(_), Some(_)) => {
+            return Err(Error::InvalidAttr(
+                "'md' attribute must be empty if text content or 'text' attribute present".into(),
+            ))
+        }
+        (None, None) => {
+            return Err(Error::InternalLogic(
+                "process_text_attr expects text/md values".into(),
+            ))
+        }
+    };
+
     let full_text_parsed_string = spans
         .iter()
         .map(|s| s.text.clone())
@@ -250,7 +246,7 @@ pub fn process_text_attr(
             }
         }
     }
-    // if last char is newline dont do the new line
+    // if last char is newline don't do the new line
     if let Some(last_span) = spans.last() {
         if let Some(last_char) = last_span.text.chars().last() {
             if last_char == '\n' {
@@ -482,15 +478,12 @@ mod tests {
 
     #[test]
     fn test_text_string() {
-        let text = r"Hello, \nworld!";
-        assert_eq!(text_string(text), "Hello, \nworld!");
+        assert_eq!(get_text_value(r"Hello, \nworld!"), "Hello, \nworld!");
 
         // when not part of a '\n', '\' is not special
-        let text = r"Hello, world! \1";
-        assert_eq!(text_string(text), "Hello, world! \\1");
+        assert_eq!(get_text_value(r"Hello, world! \1"), "Hello, world! \\1");
 
         // when precedes '\n', '\' escapes it.
-        let text = r"Hello, \\nworld!";
-        assert_eq!(text_string(text), r"Hello, \nworld!");
+        assert_eq!(get_text_value(r"Hello, \\nworld!"), r"Hello, \nworld!");
     }
 }
