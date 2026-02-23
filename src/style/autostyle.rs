@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use crate::types::StyleMap;
 
 use super::types::{InsertOrderMap, Rule, Selectable, Selected, Stylable};
-use super::{rules, ContextTheme};
+use super::{ContextTheme, rules};
 
 pub(super) trait StyleProvider {
     fn new(theme: &ContextTheme) -> Self

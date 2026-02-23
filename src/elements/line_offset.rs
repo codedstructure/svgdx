@@ -329,7 +329,7 @@ mod tests {
     use assertables::assert_abs_diff_le_x;
 
     use crate::{
-        elements::{line_offset::get_point_along_linelike_type_el, SvgElement},
+        elements::{SvgElement, line_offset::get_point_along_linelike_type_el},
         geometry::Length,
     };
 

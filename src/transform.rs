@@ -1,11 +1,11 @@
 use crate::context::TransformerContext;
-use crate::document::tag::{tagify_events, Tag};
+use crate::document::tag::{Tag, tagify_events};
 use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList};
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
-use crate::types::{fstr, split_unit, AttrMap, OrderIndex};
+use crate::types::{AttrMap, OrderIndex, fstr, split_unit};
 use crate::{AutoStyleMode, ErrorMode, TransformConfig};
 
 use std::collections::{BTreeMap, HashMap};

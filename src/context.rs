@@ -1,10 +1,10 @@
+use crate::TransformConfig;
 use crate::document::InputEvent;
-use crate::elements::{is_layout_element, SvgElement};
+use crate::elements::{SvgElement, is_layout_element};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size, TransformAttr};
-use crate::types::{attr_split, extract_urlref, strp, AttrMap, ElRef, OrderIndex, StyleMap};
-use crate::TransformConfig;
+use crate::types::{AttrMap, ElRef, OrderIndex, StyleMap, attr_split, extract_urlref, strp};
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
@@ -231,7 +231,7 @@ impl ElementMap for TransformerContext {
             let translate_x = el.get_attr("x");
             let translate_y = el.get_attr("y");
             if translate_x.is_some() || translate_y.is_some() {
-                if let Some(ref mut bbox) = &mut el_bbox {
+                if let Some(bbox) = &mut el_bbox {
                     el_bbox = Some(bbox.translated(
                         translate_x.map(strp).unwrap_or(Ok(0.))?,
                         translate_y.map(strp).unwrap_or(Ok(0.))?,
@@ -243,7 +243,7 @@ impl ElementMap for TransformerContext {
         // TODO: this logic is duplicated in `impl EventGen for SvgElement` so
         // it works in both '^' contexts and root SVG bbox generation context.
         // Can't just move this to SvgElement::bbox() as it needs ElementMap.
-        if let (Some(clip_path), Some(ref mut bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
+        if let (Some(clip_path), Some(bbox)) = (el.get_attr("clip-path"), &mut el_bbox) {
             let clip_id = extract_urlref(clip_path)
                 .ok_or_else(|| Error::InvalidValue("clip-path".into(), clip_path.into()))?;
             let clip_el = self
@@ -260,7 +260,7 @@ impl ElementMap for TransformerContext {
         // TODO: this (probably) assumes that current is 'untransformed' relative to target;
         // may need to apply inverse transforms on current heading up to common ancestor, then
         // apply target transforms from there down to target?
-        if let Some(ref mut bbox) = &mut el_bbox {
+        if let Some(bbox) = &mut el_bbox {
             let common_prefix = self.current_index.common_prefix(&target_el.order_index);
             // examine each element from common parent down to target
             // apply any transforms beyond common ancestor
@@ -424,7 +424,7 @@ impl TransformerContext {
             for (default, default_el) in &scope.defaults {
                 if default.matches(el) {
                     let mut default_el = default_el.clone();
-                    for (a_name, ref mut a_list, _, f) in &mut *augment_types {
+                    for (a_name, a_list, _, f) in &mut *augment_types {
                         if let Some(local) = default_el.pop_attr(a_name) {
                             a_list.push(f(local));
                         }
@@ -460,7 +460,7 @@ impl TransformerContext {
         }
 
         // join style/transform attributes with the most local last
-        for (a_name, ref mut a_list, sep, f) in augment_types {
+        for (a_name, a_list, sep, f) in augment_types {
             if !a_list.is_empty() {
                 if let Some(local) = el.pop_attr(a_name) {
                     a_list.push(local);

@@ -77,7 +77,7 @@ pub trait PathSyntax {
                 return Err(Error::InvalidValue(
                     "flag".to_string(),
                     self.current().unwrap().to_string(),
-                ))
+                ));
             }
         };
         self.advance();

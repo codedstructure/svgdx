@@ -23,13 +23,13 @@
 //! specified explicitly.
 
 use super::SvgElement;
+use crate::Error;
 use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
-use crate::geometry::{strp_length, BoundingBox, Length};
-use crate::transform::{process_events, EventGen};
+use crate::geometry::{BoundingBox, Length, strp_length};
+use crate::transform::{EventGen, process_events};
 use crate::types::{attr_split, fstr, split_compound_attr, strp};
-use crate::Error;
 
 #[derive(Debug, PartialEq)]
 struct GradStop {
@@ -180,11 +180,7 @@ impl EventGen for LinearGradient<'_> {
                     // normalize angle to 0-360 range
                     strp(&dir).map(|a| {
                         let a = a % 360.0;
-                        if a < 0.0 {
-                            a + 360.0
-                        } else {
-                            a
-                        }
+                        if a < 0.0 { a + 360.0 } else { a }
                     })
                 }
                 .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))

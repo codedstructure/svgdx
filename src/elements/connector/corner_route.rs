@@ -3,8 +3,8 @@
 //! This module implements a graph-based pathfinding algorithm to find optimal
 //! orthogonal routes between two endpoints while avoiding obstacles.
 
-use super::elbow::ElbowConnector;
 use super::Direction;
+use super::elbow::ElbowConnector;
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
 use std::cmp::Ordering;

@@ -353,11 +353,7 @@ pub fn eval_function(
             // Can't just use signum since it returns +1 for
             // input of (positive) zero.
             let e = args.one_number()?;
-            if e == 0. {
-                0.
-            } else {
-                e.signum()
-            }
+            if e == 0. { 0. } else { e.signum() }
         }
         Function::DivMod => {
             let (x, n) = args.number_pair()?;
@@ -431,51 +427,27 @@ pub fn eval_function(
         }
         Function::Equal => {
             let (a, b) = args.pair()?;
-            if a == b {
-                1.
-            } else {
-                0.
-            }
+            if a == b { 1. } else { 0. }
         }
         Function::NotEqual => {
             let (a, b) = args.pair()?;
-            if a != b {
-                1.
-            } else {
-                0.
-            }
+            if a != b { 1. } else { 0. }
         }
         Function::LessThan => {
             let (a, b) = args.number_pair()?;
-            if a < b {
-                1.
-            } else {
-                0.
-            }
+            if a < b { 1. } else { 0. }
         }
         Function::LessThanEqual => {
             let (a, b) = args.number_pair()?;
-            if a <= b {
-                1.
-            } else {
-                0.
-            }
+            if a <= b { 1. } else { 0. }
         }
         Function::GreaterThan => {
             let (a, b) = args.number_pair()?;
-            if a > b {
-                1.
-            } else {
-                0.
-            }
+            if a > b { 1. } else { 0. }
         }
         Function::GreaterThanEqual => {
             let (a, b) = args.number_pair()?;
-            if a >= b {
-                1.
-            } else {
-                0.
-            }
+            if a >= b { 1. } else { 0. }
         }
         Function::If => {
             if let [cond, a, b] = &args.flatten()[..] {
@@ -496,27 +468,15 @@ pub fn eval_function(
         }
         Function::And => {
             let (a, b) = args.number_pair()?;
-            if a != 0. && b != 0. {
-                1.
-            } else {
-                0.
-            }
+            if a != 0. && b != 0. { 1. } else { 0. }
         }
         Function::Or => {
             let (a, b) = args.number_pair()?;
-            if a != 0. || b != 0. {
-                1.
-            } else {
-                0.
-            }
+            if a != 0. || b != 0. { 1. } else { 0. }
         }
         Function::Xor => {
             let (a, b) = args.number_pair()?;
-            if (a != 0.) ^ (b != 0.) {
-                1.
-            } else {
-                0.
-            }
+            if (a != 0.) ^ (b != 0.) { 1. } else { 0. }
         }
         Function::Split => {
             let (sep, a) = args.string_pair()?;

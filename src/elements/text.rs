@@ -1,9 +1,9 @@
 use super::SvgElement;
 use crate::context::ElementMap;
 use crate::geometry::LocSpec;
-use crate::types::{attr_split_cycle, fstr, strp, ElRef};
+use crate::types::{ElRef, attr_split_cycle, fstr, strp};
 
-use crate::elements::markdown::{get_md_value, MdSpan};
+use crate::elements::markdown::{MdSpan, get_md_value};
 use crate::errors::{Error, Result};
 
 /// Convert unescaped r"\n" into newline characters for multi-line text
@@ -191,12 +191,12 @@ pub fn process_text_attr(
         (Some(_), Some(_)) => {
             return Err(Error::InvalidAttr(
                 "'md' attribute must be empty if text content or 'text' attribute present".into(),
-            ))
+            ));
         }
         (None, None) => {
             return Err(Error::InternalLogic(
                 "process_text_attr expects text/md values".into(),
-            ))
+            ));
         }
     };
 

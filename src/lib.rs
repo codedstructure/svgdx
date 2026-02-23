@@ -243,7 +243,7 @@ pub fn transform_str_default<T: Into<String>>(input: T) -> Result<String> {
 // JSON API for editor/WASM use
 #[cfg(feature = "json")]
 pub mod json_api {
-    use super::{transform_str, TransformConfig};
+    use super::{TransformConfig, transform_str};
     use serde_derive::{Deserialize, Serialize};
 
     pub const JSON_API_VERSION: u32 = 1;
@@ -373,10 +373,12 @@ mod json_tests {
         let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
 
         assert_eq!(parsed["version"], 1);
-        assert!(parsed["error"]
-            .as_str()
-            .unwrap()
-            .contains("Unsupported API version"));
+        assert!(
+            parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("Unsupported API version")
+        );
     }
 
     #[test]
@@ -386,9 +388,11 @@ mod json_tests {
         let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
 
         assert_eq!(parsed["version"], 1);
-        assert!(parsed["error"]
-            .as_str()
-            .unwrap()
-            .contains("Invalid JSON request"));
+        assert!(
+            parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("Invalid JSON request")
+        );
     }
 }

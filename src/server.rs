@@ -1,17 +1,17 @@
 use axum::{
+    Router,
     body::Body,
     extract::{Path, Query},
     http::Response,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::Sender;
 
 use crate::errors::Error;
-use crate::json_api::{TransformRequest, TransformResponse, JSON_API_VERSION};
-use crate::{transform_str, TransformConfig};
+use crate::json_api::{JSON_API_VERSION, TransformRequest, TransformResponse};
+use crate::{TransformConfig, transform_str};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
 // but otherwise restrict to same-origin resources.
@@ -134,27 +134,19 @@ macro_rules! include_or_read {
 }
 
 macro_rules! include_js {
-    ($path:expr) => {{
-        include_or_read!($path, "application/javascript")
-    }};
+    ($path:expr) => {{ include_or_read!($path, "application/javascript") }};
 }
 
 macro_rules! include_css {
-    ($path:expr) => {{
-        include_or_read!($path, "text/css")
-    }};
+    ($path:expr) => {{ include_or_read!($path, "text/css") }};
 }
 
 macro_rules! include_html {
-    ($path:expr) => {{
-        include_or_read!($path, "text/html")
-    }};
+    ($path:expr) => {{ include_or_read!($path, "text/html") }};
 }
 
 macro_rules! include_ico {
-    ($path:expr) => {{
-        include_or_read!($path, "image/x-icon")
-    }};
+    ($path:expr) => {{ include_or_read!($path, "image/x-icon") }};
 }
 
 async fn index() -> impl IntoResponse {

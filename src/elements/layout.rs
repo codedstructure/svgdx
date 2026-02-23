@@ -11,8 +11,8 @@ use crate::elements::line_offset::get_point_along_linelike_type_el;
 use crate::elements::path::path_bbox;
 use crate::errors::{Error, Result};
 use crate::geometry::{
-    strp_length, BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size,
-    TransformAttr, TrblLength,
+    BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size, TransformAttr,
+    TrblLength, strp_length,
 };
 use crate::types::{attr_split, extract_elref, fstr, split_compound_attr, strp};
 
@@ -483,7 +483,7 @@ impl SvgElement {
             self.bbox_raw()?
         };
         // apply any `transform` attr transformations to the bbox
-        if let (Some(transform), Some(ref mut bbox)) = (self.get_attr("transform"), &mut el_bbox) {
+        if let (Some(transform), Some(bbox)) = (self.get_attr("transform"), &mut el_bbox) {
             let transform: TransformAttr = transform.parse()?;
             el_bbox = Some(transform.apply(bbox));
         }

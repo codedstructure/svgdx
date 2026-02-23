@@ -3,8 +3,8 @@ use crate::context::TransformerContext;
 use crate::document::{EventKind, InputEvent, InputList, OutputList};
 use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events, EventGen};
-use crate::types::{fstr, strp, ElRef};
+use crate::transform::{EventGen, process_events};
+use crate::types::{ElRef, fstr, strp};
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement<'a>(pub &'a SvgElement);

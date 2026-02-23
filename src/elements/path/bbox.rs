@@ -396,11 +396,7 @@ fn quadratic_extrema(start: (f32, f32), cp: (f32, f32), end: (f32, f32)) -> Vec<
             None
         } else {
             let t = (p0 - p1) / denom;
-            if t > 0.0 && t < 1.0 {
-                Some(t)
-            } else {
-                None
-            }
+            if t > 0.0 && t < 1.0 { Some(t) } else { None }
         }
     }
 

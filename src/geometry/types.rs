@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
 use crate::errors::{Error, Result};
-use crate::types::{attr_split, extract_elref, fstr, strp, ElRef};
+use crate::types::{ElRef, attr_split, extract_elref, fstr, strp};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
@@ -398,7 +398,7 @@ pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
     loop {
         match chars.next() {
             Some(c) if c.is_whitespace() => {
-                return Err(Error::Parse(format!("invalid locspec: '{s}'")))
+                return Err(Error::Parse(format!("invalid locspec: '{s}'")));
             }
             Some(c) => loc.push(c),
             None => return Ok((elref, Some(loc.parse()?))),

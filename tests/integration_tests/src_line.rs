@@ -1,4 +1,4 @@
-use svgdx::{transform_str, TransformConfig};
+use svgdx::{TransformConfig, transform_str};
 
 fn meta_config() -> TransformConfig {
     TransformConfig {

@@ -6,10 +6,10 @@ authors = ["Ben Bass <benbass@codedstructure.net>"]
 repository = "https://github.com/codedstructure/svgdx"
 keywords = ["svg", "diagrams"]
 license = "MIT"
-edition = "2021"
+edition = "2024"
 default-run = "svgdx"
 exclude = ["/examples", "/docs"]
-rust-version = "1.82"
+rust-version = "1.85"
 
 [features]
 default = ["cli", "server"]

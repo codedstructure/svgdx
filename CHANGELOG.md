@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: migrated codebase to Rust 2024 edition and bumped MSRV to 1.85.
+
 - Added: initial support for basic markdown formatting. Provide markdown
   directly via the `md` attribute, or signal that text (whether element content
   or the `text` attribute) should be handled as markdown with either an empty

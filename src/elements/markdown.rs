@@ -486,7 +486,9 @@ fn md_parse_eval_spans(delimiters: &mut [DelimiterData]) -> Vec<SpanData> {
         let opener_min = match delimiters[current_position].char_type {
             DelimiterType::Asterisk => &mut opener_a,
             DelimiterType::UnderScore => &mut opener_d,
-            _ => unreachable!("this can't happen as current_position starts at 0 and all remaining delimiters are of above types"),
+            _ => unreachable!(
+                "this can't happen as current_position starts at 0 and all remaining delimiters are of above types"
+            ),
         };
 
         // min is the value upto which has already been checked for this type

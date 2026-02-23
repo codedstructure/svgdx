@@ -1,8 +1,8 @@
-use super::{loc_to_dir, Direction, Endpoint};
+use super::{Direction, Endpoint, loc_to_dir};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
-use crate::geometry::{parse_el_loc, BoundingBox, ElementLoc, LocSpec};
+use crate::geometry::{BoundingBox, ElementLoc, LocSpec, parse_el_loc};
 use crate::types::{attr_split_cycle, fstr, strp};
 
 /// Returns the midpoint of two 1D ranges if they overlap, None otherwise.

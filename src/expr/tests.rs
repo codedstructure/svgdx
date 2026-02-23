@@ -6,8 +6,8 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 
 use super::expression::{
-    eval_attr, eval_condition, eval_expr, eval_vars, expr, tokenize, valid_symbol, EvalState,
-    ExprValue, Token,
+    EvalState, ExprValue, Token, eval_attr, eval_condition, eval_expr, eval_vars, expr, tokenize,
+    valid_symbol,
 };
 use crate::context::{ContextView, ElementMap, VariableMap};
 use crate::elements::SvgElement;

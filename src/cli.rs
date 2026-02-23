@@ -6,7 +6,7 @@ use std::{path::Path, sync::mpsc::channel, time::Duration};
 
 use crate::errors::{Error, Result};
 use crate::style::ThemeType;
-use crate::{transform_file, AutoStyleMode, ErrorMode, TransformConfig};
+use crate::{AutoStyleMode, ErrorMode, TransformConfig, transform_file};
 
 /// Command line arguments
 #[derive(Parser)]

@@ -11,7 +11,7 @@ mod reuse;
 mod special;
 mod text;
 
-use connector::{is_connector, ConnectorType};
+use connector::{ConnectorType, is_connector};
 use containers::{Container, GroupElement};
 use gradient::{LinearGradient, RadialGradient};
 use loops::{ForElement, LoopElement};

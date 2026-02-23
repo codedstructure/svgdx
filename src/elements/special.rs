@@ -1,11 +1,11 @@
 use super::SvgElement;
+use crate::AutoStyleMode;
 use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events, EventGen};
-use crate::AutoStyleMode;
+use crate::transform::{EventGen, process_events};
 
 #[derive(Debug, Clone)]
 pub struct DefaultsElement<'a>(pub &'a SvgElement);

@@ -1,4 +1,4 @@
-use assert_cmd::{cargo, pkg_name, Command};
+use assert_cmd::{Command, cargo, pkg_name};
 use assertables::assert_contains;
 use std::io::Write;
 use svgdx::cli::Config;

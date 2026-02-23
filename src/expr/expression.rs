@@ -3,7 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::repeat_n;
 use std::str::FromStr;
 
-use super::functions::{eval_function, Function};
+use super::functions::{Function, eval_function};
 use crate::constants::{
     ELREF_ID_PREFIX, EXPR_END, EXPR_START, LOCSPEC_SEP, SCALARSPEC_SEP, VAR_END_BRACE,
     VAR_OPEN_BRACE, VAR_PREFIX,

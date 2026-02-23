@@ -1,10 +1,10 @@
 use super::corner_route::render_match_corner;
 use super::line::{LineConnector, ParsedEndpoint};
-use super::{loc_to_dir, Direction, Endpoint};
+use super::{Direction, Endpoint, loc_to_dir};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
-use crate::geometry::{strp_length, BoundingBox, Length, LocSpec};
+use crate::geometry::{BoundingBox, Length, LocSpec, strp_length};
 use crate::types::fstr;
 
 /// For polyline (elbow) connectors, find the shortest link using cardinal directions only.

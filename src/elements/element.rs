@@ -1,7 +1,7 @@
 use super::{
-    is_connector, process_text_attr, ConfigElement, ConnectorType, Container, DefaultsElement,
-    ForElement, GroupElement, IfElement, LinearGradient, LoopElement, RadialGradient, ReuseElement,
-    SpecsElement, VarElement,
+    ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
+    LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarElement,
+    is_connector, process_text_attr,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList};
@@ -11,7 +11,7 @@ use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
 use crate::transform::EventGen;
-use crate::types::{extract_urlref, strp, AttrMap, ClassList, OrderIndex, StyleMap};
+use crate::types::{AttrMap, ClassList, OrderIndex, StyleMap, extract_urlref, strp};
 
 use core::fmt::Display;
 

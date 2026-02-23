@@ -4,7 +4,7 @@ use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
-use crate::transform::{process_events, EventGen};
+use crate::transform::{EventGen, process_events};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {

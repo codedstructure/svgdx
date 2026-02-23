@@ -3,7 +3,7 @@ use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
-use crate::transform::{process_events, EventGen};
+use crate::transform::{EventGen, process_events};
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
