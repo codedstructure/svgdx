@@ -1,10 +1,10 @@
-use super::SvgElement;
 use crate::context::ElementMap;
+use crate::elements::SvgElement;
+use crate::errors::{Error, Result};
 use crate::geometry::LocSpec;
 use crate::types::{ElRef, attr_split_cycle, fstr, strp};
 
-use crate::elements::markdown::{MdSpan, get_md_value};
-use crate::errors::{Error, Result};
+use super::markdown::{MdSpan, get_md_value};
 
 /// Convert unescaped r"\n" into newline characters for multi-line text
 fn get_text_value(text_value: &str) -> String {
