@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Changed: migrated codebase to Rust 2024 edition and bumped MSRV to 1.85.
 
+- Added: support for `rotate` attribute on gradients as alternative to `dir`,
+  mapping to `gradientTransform` rather than generating a gradient vector.
+
 - Added: initial support for basic markdown formatting. Provide markdown
   directly via the `md` attribute, or signal that text (whether element content
   or the `text` attribute) should be handled as markdown with either an empty

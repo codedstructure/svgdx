@@ -21,6 +21,9 @@
 //! if dir and/or length are provided, either (x1,y1) or (x2,y2) may be omitted,
 //! and will be computed accordingly; if both are provided, both points must be
 //! specified explicitly.
+//!
+//! Both linearGradient and radialGradient also support `rotate`, which expands to
+//! a centred objectBoundingBox rotation via `gradientTransform`.
 
 use super::SvgElement;
 use crate::Error;
@@ -118,6 +121,23 @@ fn stop_elements(stops: &str) -> Result<Vec<SvgElement>> {
     Ok(new_inner)
 }
 
+fn apply_gradient_rotation(el: &mut SvgElement) -> Result<()> {
+    let Some(angle) = el.pop_attr("rotate") else {
+        return Ok(());
+    };
+    let angle = strp(&angle)
+        .map_err(|e| Error::InvalidValue(format!("invalid rotate: {e}"), angle.clone()))?;
+    // objectBoundingBox (assumed) gradients are normalised to 0..1, so rotate around 0.5,0.5
+    let rot = format!("rotate({}, 0.5, 0.5)", fstr(angle));
+    if let Some(xfrm) = el.pop_attr("gradientTransform") {
+        // Keep rotation outermost by prepending, matching element transform behavior.
+        el.set_attr("gradientTransform", &format!("{rot} {xfrm}"));
+    } else {
+        el.set_attr("gradientTransform", &rot);
+    }
+    Ok(())
+}
+
 pub struct LinearGradient<'a>(pub &'a SvgElement);
 
 impl EventGen for LinearGradient<'_> {
@@ -127,6 +147,7 @@ impl EventGen for LinearGradient<'_> {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
+        apply_gradient_rotation(&mut new_el)?;
 
         let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
             stop_elements(&stops)?
@@ -321,6 +342,7 @@ impl EventGen for RadialGradient<'_> {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
+        apply_gradient_rotation(&mut new_el)?;
 
         let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
             stop_elements(&stops)?

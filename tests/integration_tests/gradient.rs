@@ -156,3 +156,21 @@ fn test_gradient_single_point() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_gradient_rotate_attr() {
+    let input = r#"<linearGradient id="grad" rotate="90" stops="0% red; 100% blue"/>"#;
+    let expected = r#"<linearGradient id="grad" gradientTransform="rotate(90, 0.5, 0.5)"><stop offset="0%" stop-color="red"/><stop offset="100%" stop-color="blue"/></linearGradient>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"<radialGradient id="grad" rotate="-30" stops="0% white; 100% black"/>"#;
+    let expected = r#"<radialGradient id="grad" gradientTransform="rotate(-30, 0.5, 0.5)"><stop offset="0%" stop-color="white"/><stop offset="100%" stop-color="black"/></radialGradient>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    let input = r#"<linearGradient id="grad" rotate="45" gradientTransform="scale(0.5)" stops="0% red; 100% blue"/>"#;
+    let expected = r#"gradientTransform="rotate(45, 0.5, 0.5) scale(0.5)""#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
