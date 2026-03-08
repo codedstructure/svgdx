@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fixed: make `<defaults>` apply to non-empty SVG elements (previously only
+  applied to empty elements).
+
 ## [0.28.0 - 2026-03-07]
 
 - Changed: migrated codebase to Rust 2024 edition and bumped MSRV to 1.85.

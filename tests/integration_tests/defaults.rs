@@ -298,3 +298,16 @@ fn test_defaults_transform() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_defaults_nonempty() {
+    let input = r##"
+<defaults><rect wh="20"/></defaults>
+<rect>thing</rect>
+"##;
+    let expected1 = r#"<rect width="20" height="20""#;
+    let expected2 = r#">thing</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

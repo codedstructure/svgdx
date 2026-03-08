@@ -57,6 +57,8 @@ impl EventGen for Tag {
         let mut bbox = None;
         match self {
             Tag::Compound(el, tail) => {
+                let mut el = el.clone();
+                context.apply_defaults(&mut el);
                 let (ev, bb) = el.generate_events(context)?;
                 (events, bbox) = (ev, bb);
                 if let (Some(tail), false) = (tail, events.is_empty()) {
