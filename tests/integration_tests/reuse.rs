@@ -765,3 +765,143 @@ fn test_reuse_orderindex_5() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_specs_element_simple() {
+    // Single-element custom definition: <r> maps to <rect>
+    let input = r##"
+<specs element="r">
+  <rect wh="$w $h" text="$t"/>
+</specs>
+<r w="10" h="5" t="hello" xy="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"width="10""#);
+    assert_contains!(output, r#"height="5""#);
+    assert_contains!(output, "hello</text>");
+    // The usage site's element name becomes a class on the output group
+    assert_contains!(output, r#"class="r""#);
+}
+
+#[test]
+fn test_specs_element_multi_child() {
+    // Multi-element body: badge with rect + text
+    let input = r##"
+<specs element="badge">
+  <rect wh="$w $h" rx="3"/>
+  <text xy="2 {{$h * 0.7}}">$label</text>
+</specs>
+<badge w="60" h="20" label="Hello" xy="10 10"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"translate(10, 10)"#);
+    assert_contains!(output, r#"width="60""#);
+    assert_contains!(output, r#"height="20""#);
+    assert_contains!(output, r#"rx="3""#);
+    assert_contains!(output, "Hello</text>");
+}
+
+#[test]
+fn test_specs_element_position_forwarding() {
+    // xy on usage site becomes a translate on the wrapping <g>
+    let input = r##"
+<specs element="box">
+  <rect wh="20 10"/>
+</specs>
+<box xy="5 15"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"translate(5, 15)"#);
+    assert_contains!(output, r#"width="20""#);
+}
+
+#[test]
+fn test_specs_element_expression_in_body() {
+    // Expressions using $vars from usage site
+    let input = r##"
+<specs element="die">
+  <rect wh="$s $s"/>
+  <text cxy="{{$s / 2}} {{$s / 2}}">d$s</text>
+</specs>
+<die s="6" xy="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"width="6""#);
+    assert_contains!(output, r#"height="6""#);
+    assert_contains!(output, "d6");
+}
+
+#[test]
+fn test_specs_element_multiple_instances() {
+    // Same custom element used multiple times with different attrs
+    let input = r##"
+<specs element="dot">
+  <circle r="$r"/>
+</specs>
+<dot r="5" xy="10 10"/>
+<dot r="3" xy="20 20"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"r="5""#);
+    assert_contains!(output, r#"r="3""#);
+    // Both instances should produce a <g> with a translate
+    let g_count = output.matches("translate(").count();
+    assert_eq!(g_count, 2);
+}
+
+#[test]
+fn test_specs_element_with_class() {
+    // Classes on usage site are propagated
+    let input = r##"
+<specs element="box">
+  <rect wh="10 10"/>
+</specs>
+<box xy="0" class="d-fill-red"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, "d-fill-red");
+}
+
+#[test]
+fn test_specs_element_reserved_name_error() {
+    // Using a reserved svgdx element name should fail
+    let input = r##"<specs element="loop"><rect wh="1"/></specs>"##;
+    let result = transform_str_default(input);
+    assert!(result.is_err());
+    let err = result.unwrap_err().to_string();
+    assert_contains!(err, "'loop' invalid");
+}
+
+#[test]
+fn test_specs_element_alongside_regular_specs() {
+    // Named specs can coexist with regular specs in the same document
+    let input = r##"
+<specs>
+  <rect id="base" wh="20 10"/>
+</specs>
+<specs element="dot">
+  <circle r="$r"/>
+</specs>
+<reuse href="#base" xy="0"/>
+<dot r="5" xy="30 0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    // regular reuse still works
+    assert_contains!(output, r#"width="20""#);
+    // named element also works
+    assert_contains!(output, r#"r="5""#);
+    assert_contains!(output, r#"class="dot""#);
+}
+
+#[test]
+fn test_specs_element_with_id_on_usage() {
+    // id on usage site is preserved on the output group
+    let input = r##"
+<specs element="box">
+  <rect wh="10 10"/>
+</specs>
+<box id="mybox" xy="0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"id="mybox""#);
+}

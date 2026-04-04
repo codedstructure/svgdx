@@ -24,6 +24,12 @@ impl EventGen for SvgElement {
         // early update: may be updated further during processing
         context.update_element(self);
         let res = match self.name() {
+            _ if context.is_named_spec(self.name()) => {
+                let reuse_el =
+                    SvgElement::new("reuse", &[("href".into(), format!("#{}", self.name()))])
+                        .with_attrs_from(self);
+                ReuseElement(&reuse_el).generate_events(context)
+            }
             "loop" => LoopElement(self).generate_events(context),
             "config" => ConfigElement(self).generate_events(context),
             "reuse" => ReuseElement(self).generate_events(context),

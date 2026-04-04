@@ -7,7 +7,7 @@ use crate::geometry::{BoundingBox, Size, TransformAttr};
 use crate::types::{AttrMap, ElRef, OrderIndex, StyleMap, attr_split, extract_urlref, strp};
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
@@ -127,6 +127,8 @@ pub struct TransformerContext {
     pub local_style_id: Option<String>,
     /// Config of transformer processing; updated by `<config>` elements
     pub config: TransformConfig,
+    /// Set of custom element names registered via `<specs element="...">`
+    named_spec_map: HashSet<String>,
 }
 
 impl Default for TransformerContext {
@@ -144,6 +146,7 @@ impl Default for TransformerContext {
             in_specs: false,
             events: Vec::new(),
             config: TransformConfig::default(),
+            named_spec_map: HashSet::new(),
         }
     }
 }
@@ -362,6 +365,15 @@ impl TransformerContext {
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
+    }
+
+    pub fn register_named_spec(&mut self, name: String, el: SvgElement) {
+        self.original_map.entry(name.clone()).or_insert(el);
+        self.named_spec_map.insert(name);
+    }
+
+    pub fn is_named_spec(&self, name: &str) -> bool {
+        self.named_spec_map.contains(name)
     }
 
     pub fn seed_rng(&mut self, seed: u64) {

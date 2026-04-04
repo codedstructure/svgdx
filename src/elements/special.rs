@@ -75,6 +75,11 @@ impl EventGen for ConfigElement<'_> {
 #[derive(Debug, Clone)]
 pub struct SpecsElement<'a>(pub &'a SvgElement);
 
+/// Element names reserved by svgdx that cannot be used as custom element names.
+const SPECS_RESERVED_ELEMENT_NAMES: &[&str] = &[
+    "loop", "config", "reuse", "specs", "var", "if", "defaults", "for",
+];
+
 impl EventGen for SpecsElement<'_> {
     fn generate_events(
         &self,
@@ -84,6 +89,23 @@ impl EventGen for SpecsElement<'_> {
             return Err(Error::Document(
                 "nested <specs> elements are not allowed".to_string(),
             ));
+        }
+        // support '<specs element="thing">...</specs>' as a shortcut for defining
+        // reuse triggered by an element name rather than an href to an id.
+        if let Some(element_name) = self.0.get_attr("element") {
+            let element_name = eval_attr(element_name, context)?;
+            if SPECS_RESERVED_ELEMENT_NAMES.contains(&element_name.as_str()) {
+                return Err(Error::InvalidValue(
+                    "reserved specs 'element' value".into(),
+                    element_name.clone(),
+                ));
+            }
+            // Create a synthetic <symbol id="element_name"> wrapping the inner events,
+            // and register it for reuse lookup.
+            let symbol = SvgElement::new("symbol", &[("id".into(), element_name.clone())])
+                .with_attrs_from(self.0)
+                .without_attr("element");
+            context.register_named_spec(element_name, symbol);
         }
         if let Some(inner_events) = self.0.inner_events(context) {
             context.in_specs = true;

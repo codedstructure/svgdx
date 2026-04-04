@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for custom elements via `<specs element="thing">...</specs>`,
+  translated into a `<symbol id="thing">` with subsequent `<thing .../>`
+  elements becoming the equivalent of `<reuse href="#thing" .../>`
+
 - Fixed: make `<defaults>` apply to non-empty SVG elements (previously only
   applied to empty elements).
 
