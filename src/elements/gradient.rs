@@ -251,18 +251,18 @@ impl EventGen for LinearGradient<'_> {
                 // Set the appropriate missing coordinate pair(s)
                 if origin.is_none() && endpoint.is_none() {
                     // No coordinates provided - set all four
-                    new_el.set_default_attr("x1", &fstr(x_fixed));
-                    new_el.set_default_attr("y1", &fstr(y_fixed));
-                    new_el.set_default_attr("x2", &fstr(x_calc));
-                    new_el.set_default_attr("y2", &fstr(y_calc));
+                    new_el.set_default_num_attr("x1", x_fixed);
+                    new_el.set_default_num_attr("y1", y_fixed);
+                    new_el.set_default_num_attr("x2", x_calc);
+                    new_el.set_default_num_attr("y2", y_calc);
                 } else if endpoint.is_none() {
                     // Have origin, set endpoint
-                    new_el.set_default_attr("x2", &fstr(x_calc));
-                    new_el.set_default_attr("y2", &fstr(y_calc));
+                    new_el.set_default_num_attr("x2", x_calc);
+                    new_el.set_default_num_attr("y2", y_calc);
                 } else {
                     // Have endpoint, set origin
-                    new_el.set_default_attr("x1", &fstr(x_calc));
-                    new_el.set_default_attr("y1", &fstr(y_calc));
+                    new_el.set_default_num_attr("x1", x_calc);
+                    new_el.set_default_num_attr("y1", y_calc);
                 }
             }
             (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {

@@ -1,7 +1,6 @@
 use crate::elements::SvgElement;
 use crate::errors::Error;
 use crate::geometry::{BoundingBox, Size};
-use crate::types::{fstr, strp};
 
 #[derive(Clone, Default)]
 pub struct Position {
@@ -194,10 +193,10 @@ impl Position {
                 // TODO: should `length` be set to Some(0.) for these shape types
                 // so extent() works and e.g. a 'cxy="5"` works on a `<point>`?
                 if self.has_x_position() {
-                    element.set_attr("x", &fstr(self.x() + self.dx.unwrap_or(0.)));
+                    element.set_num_attr("x", self.x() + self.dx.unwrap_or(0.));
                 }
                 if self.has_y_position() {
-                    element.set_attr("y", &fstr(self.y() + self.dy.unwrap_or(0.)));
+                    element.set_num_attr("y", self.y() + self.dy.unwrap_or(0.));
                 }
                 element.remove_attrs(&["dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r"]);
                 if element.name() != "use" {
@@ -212,13 +211,13 @@ impl Position {
                 let height = bbox.height();
                 let (x1, y1) = bbox.xy1();
                 if self.has_x_position() {
-                    element.set_attr("x", &fstr(x1 + self.dx.unwrap_or(0.)));
+                    element.set_num_attr("x", x1 + self.dx.unwrap_or(0.));
                 }
                 if self.has_y_position() {
-                    element.set_attr("y", &fstr(y1 + self.dy.unwrap_or(0.)));
+                    element.set_num_attr("y", y1 + self.dy.unwrap_or(0.));
                 }
-                element.set_attr("width", &fstr(width));
-                element.set_attr("height", &fstr(height));
+                element.set_num_attr("width", width);
+                element.set_num_attr("height", height);
                 element.remove_attrs(&[
                     "dx", "dy", "dw", "dh", "x1", "y1", "x2", "y2", "cx", "cy", "r",
                 ]);
@@ -227,12 +226,12 @@ impl Position {
                 let (cx, cy) = bbox.center();
                 let r = bbox.width() / 2.0;
                 if self.has_x_position() {
-                    element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
+                    element.set_num_attr("cx", cx + self.dx.unwrap_or(0.));
                 }
                 if self.has_y_position() {
-                    element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
+                    element.set_num_attr("cy", cy + self.dy.unwrap_or(0.));
                 }
-                element.set_attr("r", &fstr(r));
+                element.set_num_attr("r", r);
                 element.remove_attrs(&[
                     "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "rx", "ry", "width",
                     "height",
@@ -243,13 +242,13 @@ impl Position {
                 let rx = bbox.width() / 2.0;
                 let ry = bbox.height() / 2.0;
                 if self.has_x_position() {
-                    element.set_attr("cx", &fstr(cx + self.dx.unwrap_or(0.)));
+                    element.set_num_attr("cx", cx + self.dx.unwrap_or(0.));
                 }
                 if self.has_y_position() {
-                    element.set_attr("cy", &fstr(cy + self.dy.unwrap_or(0.)));
+                    element.set_num_attr("cy", cy + self.dy.unwrap_or(0.));
                 }
-                element.set_attr("rx", &fstr(rx));
-                element.set_attr("ry", &fstr(ry));
+                element.set_num_attr("rx", rx);
+                element.set_num_attr("ry", ry);
                 element.remove_attrs(&[
                     "dx", "dy", "dw", "dh", "x", "y", "x1", "y1", "x2", "y2", "r", "width",
                     "height",
@@ -258,36 +257,36 @@ impl Position {
             ("line", Some(bbox)) => {
                 // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
                 // if they're already set, but we do need to add dx/dy to any existing attrs.
-                let zstr = "0";
                 let (x1, y1) = bbox.xy1();
-                if element.get_attr("x1").is_none() {
-                    element.set_attr("x1", &fstr(x1 + self.dx.unwrap_or(0.)));
-                } else if let Some(dx) = self.dx {
-                    if let Ok(x1) = strp(element.get_attr("x1").unwrap_or(zstr)) {
-                        element.set_attr("x1", &fstr(x1 + dx));
+                match (element.get_num_attr("x1"), self.dx) {
+                    (Ok(None), dx) => element.set_num_attr("x1", x1 + dx.unwrap_or(0.)),
+                    (Ok(Some(x1)), Some(dx)) => {
+                        element.set_num_attr("x1", x1 + dx);
                     }
+                    _ => {}
                 }
-                if element.get_attr("y1").is_none() {
-                    element.set_attr("y1", &fstr(y1 + self.dy.unwrap_or(0.)));
-                } else if let Some(dy) = self.dy {
-                    if let Ok(y1) = strp(element.get_attr("y1").unwrap_or(zstr)) {
-                        element.set_attr("y1", &fstr(y1 + dy));
+                match (element.get_num_attr("y1"), self.dy) {
+                    (Ok(None), dy) => element.set_num_attr("y1", y1 + dy.unwrap_or(0.)),
+                    (Ok(Some(y1)), Some(dy)) => {
+                        element.set_num_attr("y1", y1 + dy);
                     }
+                    _ => {}
                 }
+
                 let (x2, y2) = bbox.xy2();
-                if element.get_attr("x2").is_none() {
-                    element.set_attr("x2", &fstr(x2 + self.dx.unwrap_or(0.)));
-                } else if let Some(dx) = self.dx {
-                    if let Ok(x2) = strp(element.get_attr("x2").unwrap_or(zstr)) {
-                        element.set_attr("x2", &fstr(x2 + dx));
+                match (element.get_num_attr("x2"), self.dx) {
+                    (Ok(None), dx) => element.set_num_attr("x2", x2 + dx.unwrap_or(0.)),
+                    (Ok(Some(x2)), Some(dx)) => {
+                        element.set_num_attr("x2", x2 + dx);
                     }
+                    _ => {}
                 }
-                if element.get_attr("y2").is_none() {
-                    element.set_attr("y2", &fstr(y2 + self.dy.unwrap_or(0.)));
-                } else if let Some(dy) = self.dy {
-                    if let Ok(y2) = strp(element.get_attr("y2").unwrap_or(zstr)) {
-                        element.set_attr("y2", &fstr(y2 + dy));
+                match (element.get_num_attr("y2"), self.dy) {
+                    (Ok(None), dy) => element.set_num_attr("y2", y2 + dy.unwrap_or(0.)),
+                    (Ok(Some(y2)), Some(dy)) => {
+                        element.set_num_attr("y2", y2 + dy);
                     }
+                    _ => {}
                 }
                 element.remove_attrs(&[
                     "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
@@ -333,33 +332,33 @@ impl TryFrom<&SvgElement> for Position {
         // some elements have a special meaning for dx/dx; we don't
         // do anything in that case.
         if !matches!(value.name(), "text" | "tspan" | "feOffset") {
-            if let Some(dx) = value.get_attr("dx") {
-                p.dx = Some(strp(dx)?);
+            if let Some(dx) = value.get_num_attr("dx")? {
+                p.dx = Some(dx);
             }
-            if let Some(dy) = value.get_attr("dy") {
-                p.dy = Some(strp(dy)?);
+            if let Some(dy) = value.get_num_attr("dy")? {
+                p.dy = Some(dy);
             }
         }
 
-        if let Some(x) = value.get_attr("x1").or(value.get_attr("x")) {
-            p.xmin = Some(strp(x)?);
+        if let Some(x) = value.get_num_attr("x1")?.or(value.get_num_attr("x")?) {
+            p.xmin = Some(x);
         }
-        if let Some(y) = value.get_attr("y1").or(value.get_attr("y")) {
-            p.ymin = Some(strp(y)?);
-        }
-
-        if let Some(x2) = value.get_attr("x2") {
-            p.xmax = Some(strp(x2)?);
-        }
-        if let Some(y2) = value.get_attr("y2") {
-            p.ymax = Some(strp(y2)?);
+        if let Some(y) = value.get_num_attr("y1")?.or(value.get_num_attr("y")?) {
+            p.ymin = Some(y);
         }
 
-        if let Some(cx) = value.get_attr("cx") {
-            p.cx = Some(strp(cx)?);
+        if let Some(x2) = value.get_num_attr("x2")? {
+            p.xmax = Some(x2);
         }
-        if let Some(cy) = value.get_attr("cy") {
-            p.cy = Some(strp(cy)?);
+        if let Some(y2) = value.get_num_attr("y2")? {
+            p.ymax = Some(y2);
+        }
+
+        if let Some(cx) = value.get_num_attr("cx")? {
+            p.cx = Some(cx);
+        }
+        if let Some(cy) = value.get_num_attr("cy")? {
+            p.cy = Some(cy);
         }
 
         // In theory `<use>` elements can have width/height attrs, but only if
@@ -368,11 +367,11 @@ impl TryFrom<&SvgElement> for Position {
         // width/height to be used as context variables.
         // See https://www.w3.org/TR/SVG2/struct.html#UseElement
         if !matches!(p.shape.as_str(), "reuse" | "use") {
-            if let Some(w) = value.get_attr("width") {
-                p.width = Some(strp(w)?);
+            if let Some(w) = value.get_num_attr("width")? {
+                p.width = Some(w);
             }
-            if let Some(h) = value.get_attr("height") {
-                p.height = Some(strp(h)?);
+            if let Some(h) = value.get_num_attr("height")? {
+                p.height = Some(h);
             }
         }
 
@@ -382,11 +381,11 @@ impl TryFrom<&SvgElement> for Position {
         // cannot use r/rx/ry. This is due to rx/ry having different meaning in
         // the context of rect elements.
         if let "circle" | "ellipse" = value.name() {
-            if let Some(rx) = value.get_attr("rx").or(value.get_attr("r")) {
-                p.width = Some(strp(rx)? * 2.);
+            if let Some(rx) = value.get_num_attr("rx")?.or(value.get_num_attr("r")?) {
+                p.width = Some(rx * 2.);
             }
-            if let Some(ry) = value.get_attr("ry").or(value.get_attr("r")) {
-                p.height = Some(strp(ry)? * 2.);
+            if let Some(ry) = value.get_num_attr("ry")?.or(value.get_num_attr("r")?) {
+                p.height = Some(ry * 2.);
             }
         }
 

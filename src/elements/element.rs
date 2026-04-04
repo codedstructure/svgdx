@@ -11,7 +11,7 @@ use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
 use crate::transform::EventGen;
-use crate::types::{AttrMap, ClassList, OrderIndex, StyleMap, extract_urlref, strp};
+use crate::types::{AttrMap, ClassList, OrderIndex, StyleMap, extract_urlref, fstr, strp};
 
 use core::fmt::Display;
 
@@ -363,6 +363,28 @@ impl SvgElement {
         }
     }
 
+    /// Get a numeric attribute, returning None if absent, Err if not a valid number.
+    pub fn get_num_attr(&self, key: &str) -> Result<Option<f32>> {
+        self.get_attr(key).map(strp).transpose()
+    }
+
+    /// Set an attribute to a formatted numeric value.
+    pub fn set_num_attr(&mut self, key: &str, value: f32) {
+        self.set_attr(key, &fstr(value));
+    }
+
+    /// Set a default attribute to a formatted numeric value (only if key is absent).
+    pub fn set_default_num_attr(&mut self, key: &str, value: f32) {
+        if !self.has_attr(key) {
+            self.set_num_attr(key, value);
+        }
+    }
+
+    /// Pop an attribute and parse as numeric, returning None if absent, Err if not a valid number.
+    pub fn pop_num_attr(&mut self, key: &str) -> Result<Option<f32>> {
+        self.pop_attr(key).map(|v| strp(&v)).transpose()
+    }
+
     /// order-preserving attribute list
     pub fn get_attrs(&self) -> Vec<(String, String)> {
         self.attrs.to_vec()
@@ -592,7 +614,7 @@ impl SvgElement {
     }
 
     pub fn handle_rotation(&mut self) -> Result<()> {
-        let angle = self.pop_attr("rotate");
+        let angle = self.pop_num_attr("rotate")?;
         // determine center of rotation; default center of bbox
         let rot_loc = self
             .pop_attr("rotate-loc")
@@ -602,7 +624,6 @@ impl SvgElement {
             return Ok(());
         }
         let angle = angle.unwrap();
-        let angle = strp(&angle)?;
         if let Some((cx, cy)) = self.bbox()?.map(|bb| bb.locspec(rot_loc)) {
             let mut rot_xfrm = TransformAttr::new();
             rot_xfrm.rotate_around(angle, cx, cy);

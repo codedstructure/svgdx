@@ -78,7 +78,7 @@ fn get_text_position(
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without offset text squishes to the edge and can be unreadable
     // Any specified dx/dy override this behaviour.
-    let text_offset = strp(&element.pop_attr("text-offset").unwrap_or("1".to_string()))?;
+    let text_offset = element.pop_num_attr("text-offset")?.unwrap_or(1.);
 
     let vertical = element.has_class("d-text-vertical");
     // text associated with a line, point or text element is pushed 'outside';
@@ -291,7 +291,7 @@ pub fn process_text_attr(
     }
 
     // line spacing (in 'em').
-    let line_spacing = strp(&orig_elem.pop_attr("text-lsp").unwrap_or("1.05".to_owned()))?;
+    let line_spacing = orig_elem.pop_num_attr("text-lsp")?.unwrap_or(1.05);
     // Extract style and class(es) from original element. Note we use
     // `text-style` for styling text rather than copying `style` to both outer
     // element and generated text, as is likely there will be conflicts with

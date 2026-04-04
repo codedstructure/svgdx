@@ -410,14 +410,14 @@ impl SvgElement {
                 height = Some(0.);
             }
             "circle" => {
-                if let Some(r) = self.get_attr("r").map(strp).transpose()? {
+                if let Some(r) = self.get_num_attr("r")? {
                     width = Some(r * 2.0);
                     height = Some(r * 2.0);
                 }
             }
             "ellipse" => {
-                let rx = self.get_attr("rx").map(strp).transpose()?;
-                let ry = self.get_attr("ry").map(strp).transpose()?;
+                let rx = self.get_num_attr("rx")?;
+                let ry = self.get_num_attr("ry")?;
                 if let Some(rx) = rx {
                     width = Some(rx * 2.0);
                 }
@@ -426,13 +426,13 @@ impl SvgElement {
                 }
             }
             "line" => {
-                let x1 = self.get_attr("x1").map(strp).transpose()?;
-                let x2 = self.get_attr("x2").map(strp).transpose()?;
+                let x1 = self.get_num_attr("x1")?;
+                let x2 = self.get_num_attr("x2")?;
                 if let (Some(x1), Some(x2)) = (x1, x2) {
                     width = Some((x2 - x1).abs());
                 }
-                let y1 = self.get_attr("y1").map(strp).transpose()?;
-                let y2 = self.get_attr("y2").map(strp).transpose()?;
+                let y1 = self.get_num_attr("y1")?;
+                let y2 = self.get_num_attr("y2")?;
                 if let (Some(y1), Some(y2)) = (y1, y2) {
                     height = Some((y2 - y1).abs());
                 }
@@ -636,10 +636,10 @@ impl SvgElement {
         for (key, value) in self.get_attrs() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    new_elem.set_attr(&key, &fstr(strp(&value)? + dx));
+                    new_elem.set_num_attr(&key, strp(&value)? + dx);
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    new_elem.set_attr(&key, &fstr(strp(&value)? + dy));
+                    new_elem.set_num_attr(&key, strp(&value)? + dy);
                 }
                 _ => (),
             }
@@ -701,8 +701,8 @@ impl SvgElement {
 
             // copy any dx/dy attrs from original element to Position
             // assumes any 'dxy' compound attr has already been split
-            pos.dx = self.get_attr("dx").and_then(|v| strp(v).ok());
-            pos.dy = self.get_attr("dy").and_then(|v| strp(v).ok());
+            pos.dx = self.get_num_attr("dx").unwrap_or(None);
+            pos.dy = self.get_num_attr("dy").unwrap_or(None);
 
             if self.name() == "use" {
                 // Need to determine top-left corner of the target bbox which
@@ -732,24 +732,24 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
     let (x1, y1) = bb.locspec(LocSpec::TopLeft);
     match element.name() {
         "rect" | "box" => {
-            element.set_attr("x", &fstr(x1));
-            element.set_attr("y", &fstr(y1));
-            element.set_attr("width", &fstr(width));
-            element.set_attr("height", &fstr(height));
+            element.set_num_attr("x", x1);
+            element.set_num_attr("y", y1);
+            element.set_num_attr("width", width);
+            element.set_num_attr("height", height);
         }
         "circle" => {
-            element.set_attr("cx", &fstr(cx));
-            element.set_attr("cy", &fstr(cy));
+            element.set_num_attr("cx", cx);
+            element.set_num_attr("cy", cy);
             let r = if inscribe {
                 0.5 * width.min(height)
             } else {
                 0.5 * width.max(height) * SQRT_2
             };
-            element.set_attr("r", &fstr(r));
+            element.set_num_attr("r", r);
         }
         "ellipse" => {
-            element.set_attr("cx", &fstr(cx));
-            element.set_attr("cy", &fstr(cy));
+            element.set_num_attr("cx", cx);
+            element.set_num_attr("cy", cy);
             let rx = if inscribe {
                 0.5 * width
             } else {
@@ -760,8 +760,8 @@ fn position_from_bbox(element: &mut SvgElement, bb: &BoundingBox, inscribe: bool
             } else {
                 0.5 * height * SQRT_2
             };
-            element.set_attr("rx", &fstr(rx));
-            element.set_attr("ry", &fstr(ry));
+            element.set_num_attr("rx", rx);
+            element.set_num_attr("ry", ry);
         }
         _ => {}
     }
@@ -771,33 +771,27 @@ fn resolve_size_delta(element: &mut SvgElement) {
     // assumes "width"/"height"/"r"/"rx"/"ry" are numeric if present
     let (w, h) = match element.name() {
         "circle" => {
-            let diam = element.get_attr("r").map(|r| 2. * strp(r).unwrap_or(0.));
+            let diam = element.get_num_attr("r").ok().flatten().map(|r| 2. * r);
             (diam, diam)
         }
         "ellipse" => (
-            element
-                .get_attr("rx")
-                .and_then(|rx| strp(rx).ok())
-                .map(|x| x * 2.),
-            element
-                .get_attr("ry")
-                .and_then(|ry| strp(ry).ok())
-                .map(|x| x * 2.),
+            element.get_num_attr("rx").ok().flatten().map(|x| x * 2.),
+            element.get_num_attr("ry").ok().flatten().map(|x| x * 2.),
         ),
         _ => (
-            element.get_attr("width").and_then(|w| strp(w).ok()),
-            element.get_attr("height").and_then(|h| strp(h).ok()),
+            element.get_num_attr("width").ok().flatten(),
+            element.get_num_attr("height").ok().flatten(),
         ),
     };
 
     if let Some(dw) = element.pop_attr("dw") {
         if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
-            element.set_attr("width", &fstr(new_w));
+            element.set_num_attr("width", new_w);
         }
     }
     if let Some(dh) = element.pop_attr("dh") {
         if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
-            element.set_attr("height", &fstr(new_h));
+            element.set_num_attr("height", new_h);
         }
     }
 }
