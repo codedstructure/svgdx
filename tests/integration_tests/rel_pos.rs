@@ -447,3 +447,25 @@ fn test_dirspec_broken() {
 <rect id="z2" xy="z1|h" wh="2"/>"##;
     assert!(transform_str_default(input).is_err());
 }
+
+#[test]
+fn test_elref_prev_next_delta() {
+    let rel_input = r##"
+<point xy="200"/>
+<rect id="z" wh="100" xy="+ -10 20"/>
+<rect wh="100" xy="300"/>
+"##;
+    let expected1 = r#"<rect id="z" x="290" y="320" width="100" height="100"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected1);
+
+    // Same but elref_prev
+    let rel_input = r##"
+<point xy="200"/>
+<rect id="z" wh="100" xy="^ -10 20"/>
+<rect wh="100" xy="300"/>
+"##;
+    let expected1 = r#"<rect id="z" x="190" y="220" width="100" height="100"/>"#;
+    let output = transform_str_default(rel_input).unwrap();
+    assert_contains!(output, expected1);
+}

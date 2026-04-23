@@ -69,7 +69,17 @@ pub fn split_compound_attr(value: &str) -> (String, String) {
     // wh="#thing" -> width="#thing", height="#thing"
     // wh="#thing 50%" -> width="#thing 50%", height="#thing 50%"
     // wh="#thing 10 20" -> width="#thing 10", height="#thing 20"
-    if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) {
+    // TODO: because ELREF_NEXT is (currently) '+' and SVG numbers
+    // may start with a '+', we need to ensure we don't inadvertently
+    // consider '+10' as an elref.
+    // "starts with '+' and second char is not digit or doesn't exist"
+    let is_elref_next = value.starts_with(ELREF_NEXT)
+        && value
+            .chars()
+            .nth(1)
+            .map(|c| !c.is_ascii_digit())
+            .unwrap_or(true);
+    if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) || is_elref_next {
         let mut parts = value.splitn(2, char::is_whitespace);
         let prefix = parts.next().expect("nonempty");
         if let Some(remain) = parts.next() {
