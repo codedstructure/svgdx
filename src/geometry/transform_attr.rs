@@ -7,21 +7,21 @@ use crate::types::{fstr, strp};
 impl BoundingBox {
     pub fn xfrm_scale(&self, sx: f32, sy: f32) -> Self {
         // scale about (0, 0) - not the center of the bbox
-        Self {
-            x1: self.x1 * sx,
-            y1: self.y1 * sy,
-            x2: self.x2 * sx,
-            y2: self.y2 * sy,
-        }
+        Self::new(
+            self.x1() * sx,
+            self.y1() * sy,
+            self.x2() * sx,
+            self.y2() * sy,
+        )
     }
 
     pub fn xfrm_translate(&self, dx: f32, dy: f32) -> Self {
-        Self {
-            x1: self.x1 + dx,
-            y1: self.y1 + dy,
-            x2: self.x2 + dx,
-            y2: self.y2 + dy,
-        }
+        Self::new(
+            self.x1() + dx,
+            self.y1() + dy,
+            self.x2() + dx,
+            self.y2() + dy,
+        )
     }
 }
 
@@ -205,10 +205,10 @@ impl TransformAttr {
                     let sin_a = angle.sin();
                     let cos_a = angle.cos();
                     let (x1, y1, x2, y2) = (
-                        result.x1 as f64,
-                        result.y1 as f64,
-                        result.x2 as f64,
-                        result.y2 as f64,
+                        result.x1() as f64,
+                        result.y1() as f64,
+                        result.x2() as f64,
+                        result.y2() as f64,
                     );
                     // TODO: ideally we'd get the convex hull of the shape (or simply a set
                     // of points on the shape boundary, even internal) and rotate each point

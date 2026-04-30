@@ -18,13 +18,8 @@ fn range_overlap(min1: f32, max1: f32, min2: f32, max2: f32) -> Option<f32> {
 
 /// Select appropriate corner LocSpecs for connecting two bboxes with no overlap.
 fn select_corners(start_bb: &BoundingBox, end_bb: &BoundingBox) -> (LocSpec, LocSpec) {
-    let start_cx = (start_bb.x1 + start_bb.x2) / 2.0;
-    let start_cy = (start_bb.y1 + start_bb.y2) / 2.0;
-    let end_cx = (end_bb.x1 + end_bb.x2) / 2.0;
-    let end_cy = (end_bb.y1 + end_bb.y2) / 2.0;
-
-    let end_is_right = end_cx > start_cx;
-    let end_is_below = end_cy > start_cy;
+    let end_is_right = end_bb.cx() > start_bb.cx();
+    let end_is_below = end_bb.cy() > start_bb.cy();
 
     match (end_is_right, end_is_below) {
         (true, true) => (LocSpec::BottomRight, LocSpec::TopLeft),
@@ -36,11 +31,8 @@ fn select_corners(start_bb: &BoundingBox, end_bb: &BoundingBox) -> (LocSpec, Loc
 
 /// Select appropriate corner LocSpec for connecting a point to a bbox with no overlap.
 fn select_corner_for_point(point: (f32, f32), bb: &BoundingBox) -> LocSpec {
-    let bb_cx = (bb.x1 + bb.x2) / 2.0;
-    let bb_cy = (bb.y1 + bb.y2) / 2.0;
-
-    let point_is_right = point.0 > bb_cx;
-    let point_is_below = point.1 > bb_cy;
+    let point_is_right = point.0 > bb.cx();
+    let point_is_below = point.1 > bb.cy();
 
     match (point_is_right, point_is_below) {
         (true, true) => LocSpec::BottomRight,
@@ -84,8 +76,8 @@ struct BBoxRelation {
 impl BBoxRelation {
     fn new(bb1: &BoundingBox, bb2: &BoundingBox) -> Self {
         Self {
-            x_axis: AxisOverlap::from_ranges(bb1.x1, bb1.x2, bb2.x1, bb2.x2),
-            y_axis: AxisOverlap::from_ranges(bb1.y1, bb1.y2, bb2.y1, bb2.y2),
+            x_axis: AxisOverlap::from_ranges(bb1.x1(), bb1.x2(), bb2.x1(), bb2.x2()),
+            y_axis: AxisOverlap::from_ranges(bb1.y1(), bb1.y2(), bb2.y1(), bb2.y2()),
         }
     }
 

@@ -679,7 +679,7 @@ impl<'a> EvalState<'a> {
             .get_element_bbox(elem)?
             .ok_or_else(|| Error::MissingBBox(elem.to_string()))?;
         if remain.is_empty() {
-            return Ok([bb.x1, bb.y1, bb.x2, bb.y2].into());
+            return Ok([bb.x1(), bb.y1(), bb.x2(), bb.y2()].into());
         } else if let Some(ss) = remain.strip_prefix(SCALARSPEC_SEP) {
             return Ok(bb.scalarspec(ScalarSpec::from_str(ss)?).into());
         } else if let Some(ls) = remain.strip_prefix(LOCSPEC_SEP) {

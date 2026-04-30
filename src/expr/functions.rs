@@ -526,10 +526,10 @@ pub fn eval_function(
             // Safety: union only returns None if the input list is empty, checked above
             let surround = BoundingBox::union(bbox_list).unwrap();
             return Ok(ExprValue::List(vec![
-                ExprValue::Number(surround.x1),
-                ExprValue::Number(surround.y1),
-                ExprValue::Number(surround.x2),
-                ExprValue::Number(surround.y2),
+                ExprValue::Number(surround.x1()),
+                ExprValue::Number(surround.y1()),
+                ExprValue::Number(surround.x2()),
+                ExprValue::Number(surround.y2()),
             ]));
         }
         Function::Inside => {
@@ -554,10 +554,10 @@ pub fn eval_function(
             // For each dimension, if the intervals are separated take the gap between them,
             // otherwise take their intersection. This yields the smallest rect "between"
             // the two boxes that uses existing coordinates.
-            let x_low = a.x1.max(b.x1);
-            let x_high = a.x2.min(b.x2);
-            let y_low = a.y1.max(b.y1);
-            let y_high = a.y2.min(b.y2);
+            let x_low = a.x1().max(b.x1());
+            let x_high = a.x2().min(b.x2());
+            let y_low = a.y1().max(b.y1());
+            let y_high = a.y2().min(b.y2());
 
             return Ok(ExprValue::List(vec![
                 ExprValue::Number(x_low.min(x_high)),
@@ -584,10 +584,10 @@ pub fn eval_function(
                     // midpoint of two bboxes
                     let a = BoundingBox::new(args[0], args[1], args[2], args[3]);
                     let b = BoundingBox::new(args[4], args[5], args[6], args[7]);
-                    let xmin = a.x1.min(b.x1);
-                    let ymin = a.y1.min(b.y1);
-                    let xmax = a.x2.max(b.x2);
-                    let ymax = a.y2.max(b.y2);
+                    let xmin = a.x1().min(b.x1());
+                    let ymin = a.y1().min(b.y1());
+                    let xmax = a.x2().max(b.x2());
+                    let ymax = a.y2().max(b.y2());
                     return Ok(ExprValue::List(vec![
                         ExprValue::Number((xmin + xmax) / 2.),
                         ExprValue::Number((ymin + ymax) / 2.),
@@ -603,8 +603,8 @@ pub fn eval_function(
         Function::Xy => {
             let bb = args.one_bbox()?;
             return Ok(ExprValue::List(vec![
-                ExprValue::Number(bb.x1),
-                ExprValue::Number(bb.y1),
+                ExprValue::Number(bb.x1()),
+                ExprValue::Number(bb.y1()),
             ]));
         }
         Function::Size => {
@@ -631,19 +631,19 @@ pub fn eval_function(
         }
         Function::X1 => {
             let bb = args.one_bbox()?;
-            bb.x1
+            bb.x1()
         }
         Function::Y1 => {
             let bb = args.one_bbox()?;
-            bb.y1
+            bb.y1()
         }
         Function::X2 => {
             let bb = args.one_bbox()?;
-            bb.x2
+            bb.x2()
         }
         Function::Y2 => {
             let bb = args.one_bbox()?;
-            bb.y2
+            bb.y2()
         }
         Function::Cx => {
             let bb = args.one_bbox()?;

@@ -341,3 +341,40 @@ fn test_surround_next() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_line_intersect() {
+    // given two lines, check the bounding box of their intersection is correct,
+    // even with one line in 'backwards' direction.
+    let input = r##"
+<line id="a" x1="0" y1="0" x2="10" y2="10" />
+<line id="b" x1="20" y1="6" x2="5" y2="4" />
+<rect id="r" inside="#a #b" />
+"##;
+    let expected = r#"<rect id="r" x="5" y="4" width="5" height="2" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_no_intersect() {
+    // non-overlapping rectangle & circle
+    let input = r##"
+<rect id="a" xy="0" wh="10" />
+<circle id="b" cxy="20 20" r="5" />
+<rect id="r" inside="#a #b" />
+"##;
+    let expected = r#"<rect id="r" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // non-overlapping lines
+    let input = r##"
+<line id="a" x1="0" y1="0" x2="10" y2="10" />
+<line id="b" x1="200" y1="60" x2="50" y2="40" />
+<rect id="r" inside="#a #b" />
+"##;
+    let expected = r#"<rect id="r" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

@@ -83,17 +83,17 @@ struct LineStruct {
 
 fn aals_blocked_by_bb(bb: BoundingBox, a: f32, b: f32, x_axis: bool, axis_val: f32) -> bool {
     if x_axis {
-        if axis_val <= bb.y1 || axis_val >= bb.y2 {
+        if axis_val <= bb.y1() || axis_val >= bb.y2() {
             return false;
         }
-        if (a <= bb.x1) == (b <= bb.x1) && (a >= bb.x2) == (b >= bb.x2) {
+        if (a <= bb.x1()) == (b <= bb.x1()) && (a >= bb.x2()) == (b >= bb.x2()) {
             return false;
         }
     } else {
-        if axis_val <= bb.x1 || axis_val >= bb.x2 {
+        if axis_val <= bb.x1() || axis_val >= bb.x2() {
             return false;
         }
-        if (a <= bb.y1) == (b <= bb.y1) && (a >= bb.y2) == (b >= bb.y2) {
+        if (a <= bb.y1()) == (b <= bb.y1()) && (a >= bb.y2()) == (b >= bb.y2()) {
             return false;
         }
     }
@@ -120,29 +120,29 @@ fn get_lines(
     let mut mid_x = usize::MAX;
     let mut mid_y = usize::MAX;
 
-    x_lines.push(start_el_bb.x1 - start_abs_offset);
-    x_lines.push(start_el_bb.x2 + start_abs_offset);
-    x_lines.push(end_el_bb.x1 - end_abs_offset);
-    x_lines.push(end_el_bb.x2 + end_abs_offset);
+    x_lines.push(start_el_bb.x1() - start_abs_offset);
+    x_lines.push(start_el_bb.x2() + start_abs_offset);
+    x_lines.push(end_el_bb.x1() - end_abs_offset);
+    x_lines.push(end_el_bb.x2() + end_abs_offset);
 
-    if start_el_bb.x1 > end_el_bb.x2 {
-        x_lines.push(start_el_bb.x1 * (1.0 - ratio_offset) + end_el_bb.x2 * ratio_offset);
+    if start_el_bb.x1() > end_el_bb.x2() {
+        x_lines.push(start_el_bb.x1() * (1.0 - ratio_offset) + end_el_bb.x2() * ratio_offset);
         mid_x = x_lines.len() - 1;
-    } else if start_el_bb.x2 < end_el_bb.x1 {
-        x_lines.push(start_el_bb.x2 * (1.0 - ratio_offset) + end_el_bb.x1 * ratio_offset);
+    } else if start_el_bb.x2() < end_el_bb.x1() {
+        x_lines.push(start_el_bb.x2() * (1.0 - ratio_offset) + end_el_bb.x1() * ratio_offset);
         mid_x = x_lines.len() - 1;
     }
 
-    y_lines.push(start_el_bb.y1 - start_abs_offset);
-    y_lines.push(start_el_bb.y2 + start_abs_offset);
-    y_lines.push(end_el_bb.y1 - end_abs_offset);
-    y_lines.push(end_el_bb.y2 + end_abs_offset);
+    y_lines.push(start_el_bb.y1() - start_abs_offset);
+    y_lines.push(start_el_bb.y2() + start_abs_offset);
+    y_lines.push(end_el_bb.y1() - end_abs_offset);
+    y_lines.push(end_el_bb.y2() + end_abs_offset);
 
-    if start_el_bb.y1 > end_el_bb.y2 {
-        y_lines.push(start_el_bb.y1 * (1.0 - ratio_offset) + end_el_bb.y2 * ratio_offset);
+    if start_el_bb.y1() > end_el_bb.y2() {
+        y_lines.push(start_el_bb.y1() * (1.0 - ratio_offset) + end_el_bb.y2() * ratio_offset);
         mid_y = y_lines.len() - 1;
-    } else if start_el_bb.y2 < end_el_bb.y1 {
-        y_lines.push(start_el_bb.y2 * (1.0 - ratio_offset) + end_el_bb.y1 * ratio_offset);
+    } else if start_el_bb.y2() < end_el_bb.y1() {
+        y_lines.push(start_el_bb.y2() * (1.0 - ratio_offset) + end_el_bb.y1() * ratio_offset);
         mid_y = y_lines.len() - 1;
     }
 

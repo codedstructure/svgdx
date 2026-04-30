@@ -8,10 +8,11 @@ use crate::geometry::{LocSpec, ScalarSpec, TrblLength};
 /// element.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BoundingBox {
-    pub x1: f32,
-    pub y1: f32,
-    pub x2: f32,
-    pub y2: f32,
+    // invariant: x1 <= x2, y1 <= y2
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -41,7 +42,30 @@ impl BoundingBoxBuilder {
 
 impl BoundingBox {
     pub fn new(x1: f32, y1: f32, x2: f32, y2: f32) -> Self {
-        Self { x1, y1, x2, y2 }
+        Self {
+            x1: x1.min(x2),
+            y1: y1.min(y2),
+            x2: x1.max(x2),
+            y2: y1.max(y2),
+        }
+    }
+    pub fn x1(&self) -> f32 {
+        self.x1
+    }
+    pub fn x2(&self) -> f32 {
+        self.x2
+    }
+    pub fn y1(&self) -> f32 {
+        self.y1
+    }
+    pub fn y2(&self) -> f32 {
+        self.y2
+    }
+    pub fn cx(&self) -> f32 {
+        (self.x1 + self.x2) / 2.
+    }
+    pub fn cy(&self) -> f32 {
+        (self.y1 + self.y2) / 2.
     }
 
     pub fn locspec(&self, ls: LocSpec) -> (f32, f32) {
@@ -82,16 +106,16 @@ impl BoundingBox {
             ScalarSpec::Maxx => self.x2,
             ScalarSpec::Miny => self.y1,
             ScalarSpec::Maxy => self.y2,
-            ScalarSpec::Width => (self.x2 - self.x1).abs(),
-            ScalarSpec::Height => (self.y2 - self.y1).abs(),
+            ScalarSpec::Width => self.width(),
+            ScalarSpec::Height => self.height(),
             ScalarSpec::Cx => (self.x1 + self.x2) / 2.,
             ScalarSpec::Cy => (self.y1 + self.y2) / 2.,
             // By convention, radius is maximum of rx/ry
             ScalarSpec::Radius => self
                 .scalarspec(ScalarSpec::Rx)
                 .max(self.scalarspec(ScalarSpec::Ry)),
-            ScalarSpec::Rx => (self.x2 - self.x1).abs() / 2.,
-            ScalarSpec::Ry => (self.y2 - self.y1).abs() / 2.,
+            ScalarSpec::Rx => self.width() / 2.,
+            ScalarSpec::Ry => self.height() / 2.,
         }
     }
 
@@ -110,14 +134,12 @@ impl BoundingBox {
     }
 
     pub fn intersect(&self, other: &Self) -> Option<Self> {
-        let result = Self::new(
-            self.x1.max(other.x1),
-            self.y1.max(other.y1),
-            self.x2.min(other.x2),
-            self.y2.min(other.y2),
-        );
-        if result.width() >= 0. && result.height() >= 0. {
-            Some(result)
+        let x1 = self.x1.max(other.x1);
+        let y1 = self.y1.max(other.y1);
+        let x2 = self.x2.min(other.x2);
+        let y2 = self.y2.min(other.y2);
+        if x2 >= x1 && y2 >= y1 {
+            Some(Self::new(x1, y1, x2, y2))
         } else {
             None
         }
@@ -209,17 +231,13 @@ impl BoundingBox {
     }
 
     pub fn center(&self) -> (f32, f32) {
-        (
-            self.x1 + (self.x2 - self.x1) / 2.,
-            self.y1 + (self.y2 - self.y1) / 2.,
-        )
+        (self.cx(), self.cy())
     }
 
     /// Scale the bounding box by the given amount with origin at the center
-    #[allow(dead_code)]
     pub fn scale(&mut self, amount: f32) -> &Self {
-        let width = self.x2 - self.x1;
-        let height = self.y2 - self.y1;
+        let width = self.width();
+        let height = self.height();
         let dx_by_2 = (width * amount - width) / 2.;
         let dy_by_2 = (height * amount - height) / 2.;
         *self = Self {

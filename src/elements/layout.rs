@@ -217,7 +217,7 @@ impl SvgElement {
             // xy won't have been expanded in the relpos case
             if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
                 if let Some(bb) = self.content_bbox {
-                    pos.translate(-bb.x1, -bb.y1);
+                    pos.translate(-bb.x1(), -bb.y1());
                 }
                 pos.set_position_attrs(self);
             } else {
@@ -238,7 +238,7 @@ impl SvgElement {
         if self.name() == "g" {
             if let Some(bb) = self.content_bbox {
                 p.update_size(&Size::new(bb.width(), bb.height()));
-                p.translate(-bb.x1, -bb.y1);
+                p.translate(-bb.x1(), -bb.y1());
             }
         } else if self.name() == "use" {
             let el = ctx.get_target_element(self)?;
@@ -709,14 +709,14 @@ impl SvgElement {
                 // may not be (0, 0), and offset by the equivalent amount.
                 if let Some(bbox) = ctx.get_target_element(self)?.bbox()? {
                     let (tx, ty) = bbox.locspec(LocSpec::TopLeft);
-                    pos.xmin = Some(x + dx - tx);
-                    pos.ymin = Some(y + dy - ty);
+                    pos.x_start = Some(x + dx - tx);
+                    pos.y_start = Some(y + dy - ty);
                 }
             } else {
-                pos.xmin = Some(x + dx);
-                pos.xmax = Some(x + dx + this_width);
-                pos.ymin = Some(y + dy);
-                pos.ymax = Some(y + dy + this_height);
+                pos.x_start = Some(x + dx);
+                pos.x_end = Some(x + dx + this_width);
+                pos.y_start = Some(y + dy);
+                pos.y_end = Some(y + dy + this_height);
             }
             Ok(Some(pos))
         } else {

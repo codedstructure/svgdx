@@ -165,6 +165,13 @@ fn test_position_inferred_line() {
     let input = r#"<line cy="10" x1="0" x2="4"/>"#;
     let expected = r#"<line x1="0" y1="10" x2="4" y2="10"/>"#;
     assert_eq!(transform_str_default(input).unwrap(), expected);
+}
+
+#[test]
+fn test_lines_maintain_direction() {
+    let input = r#"<line xy1="10 11" xy2="3 2"/>"#;
+    let expected = r#"<line x1="10" y1="11" x2="3" y2="2"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
 
     let input = r#"<line x2="3" cx="10" cy="10" y2="20"/>"#;
     let expected = r#"<line x1="17" y1="0" x2="3" y2="20"/>"#;

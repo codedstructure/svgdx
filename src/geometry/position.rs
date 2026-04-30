@@ -4,10 +4,10 @@ use crate::geometry::{BoundingBox, Size};
 
 #[derive(Clone, Default)]
 pub struct Position {
-    pub xmin: Option<f32>,
-    pub ymin: Option<f32>,
-    pub xmax: Option<f32>,
-    pub ymax: Option<f32>,
+    pub x_start: Option<f32>,
+    pub y_start: Option<f32>,
+    pub x_end: Option<f32>,
+    pub y_end: Option<f32>,
     pub cx: Option<f32>,
     pub cy: Option<f32>,
     pub width: Option<f32>,
@@ -33,6 +33,8 @@ impl Position {
         middle: Option<f32>,
         length: Option<f32>,
     ) -> Option<(f32, f32)> {
+        // TODO: check for overconstrained / invalid combinations
+        // e.g. !(start <= middle <= end), length < 0, start + length != end, etc.
         match (start, end, middle, length) {
             (Some(s), Some(e), _, _) => Some((s, e)),
             (Some(s), _, Some(m), _) => Some((s, s + (m - s) * 2.0)),
@@ -72,11 +74,11 @@ impl Position {
     }
 
     fn x_def(&self) -> Option<(f32, f32)> {
-        self.extent(self.xmin, self.xmax, self.cx, self.width)
+        self.extent(self.x_start, self.x_end, self.cx, self.width)
     }
 
     fn y_def(&self) -> Option<(f32, f32)> {
-        self.extent(self.ymin, self.ymax, self.cy, self.height)
+        self.extent(self.y_start, self.y_end, self.cy, self.height)
     }
 
     pub fn to_bbox(&self) -> Option<BoundingBox> {
@@ -86,8 +88,8 @@ impl Position {
             Some(BoundingBox::new(x1, y1, x2, y2))
         } else if self.shape == "point" {
             // For points, we don't need extent at all, just at least one x and at least one y
-            let px = self.xmin.or(self.xmax.or(self.cx));
-            let py = self.ymin.or(self.ymax.or(self.cy));
+            let px = self.x_start.or(self.x_end.or(self.cx));
+            let py = self.y_start.or(self.y_end.or(self.cy));
             if let (Some(x), Some(y)) = (px, py) {
                 Some(BoundingBox::new(x, y, x, y))
             } else {
@@ -98,14 +100,16 @@ impl Position {
             // other value to define the circle. The same logic would apply for squares,
             // but that's not an SVG primitive.
             if let Some((x1, x2)) = x_ext {
-                if let Some((y1, y2)) = self.three_point(x2 - x1, self.ymin, self.cy, self.ymax) {
+                if let Some((y1, y2)) = self.three_point(x2 - x1, self.y_start, self.cy, self.y_end)
+                {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
                     let radius = (x2 - x1) / 2.;
                     Some(BoundingBox::new(x1, -radius, x2, radius))
                 }
             } else if let Some((y1, y2)) = y_ext {
-                if let Some((x1, x2)) = self.three_point(y2 - y1, self.xmin, self.cx, self.xmax) {
+                if let Some((x1, x2)) = self.three_point(y2 - y1, self.x_start, self.cx, self.x_end)
+                {
                     Some(BoundingBox::new(x1, y1, x2, y2))
                 } else {
                     let radius = (y2 - y1) / 2.;
@@ -135,11 +139,11 @@ impl Position {
     }
 
     fn has_x_position(&self) -> bool {
-        self.xmin.is_some() || self.xmax.is_some() || self.cx.is_some() || self.dx.is_some()
+        self.x_start.is_some() || self.x_end.is_some() || self.cx.is_some() || self.dx.is_some()
     }
 
     fn has_y_position(&self) -> bool {
-        self.ymin.is_some() || self.ymax.is_some() || self.cy.is_some() || self.dy.is_some()
+        self.y_start.is_some() || self.y_end.is_some() || self.cy.is_some() || self.dy.is_some()
     }
 
     pub fn update_size(&mut self, sz: &Size) {
@@ -158,7 +162,7 @@ impl Position {
         if let Some((x1, _)) = self.x_def() {
             x1
         } else {
-            self.xmin.unwrap_or(0.)
+            self.x_start.unwrap_or(0.)
         }
     }
 
@@ -168,16 +172,16 @@ impl Position {
         if let Some((y1, _)) = self.y_def() {
             y1
         } else {
-            self.ymin.unwrap_or(0.)
+            self.y_start.unwrap_or(0.)
         }
     }
 
     pub fn translate(&mut self, dx: f32, dy: f32) {
-        self.xmin = self.xmin.map(|x| x + dx);
-        self.xmax = self.xmax.map(|x| x + dx);
+        self.x_start = self.x_start.map(|x| x + dx);
+        self.x_end = self.x_end.map(|x| x + dx);
         self.cx = self.cx.map(|x| x + dx);
-        self.ymin = self.ymin.map(|y| y + dy);
-        self.ymax = self.ymax.map(|y| y + dy);
+        self.y_start = self.y_start.map(|y| y + dy);
+        self.y_end = self.y_end.map(|y| y + dy);
         self.cy = self.cy.map(|y| y + dy);
     }
 
@@ -254,40 +258,18 @@ impl Position {
                     "height",
                 ]);
             }
-            ("line", Some(bbox)) => {
+            ("line", Some(_)) => {
                 // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
-                // if they're already set, but we do need to add dx/dy to any existing attrs.
-                let (x1, y1) = bbox.xy1();
-                match (element.get_num_attr("x1"), self.dx) {
-                    (Ok(None), dx) => element.set_num_attr("x1", x1 + dx.unwrap_or(0.)),
-                    (Ok(Some(x1)), Some(dx)) => {
-                        element.set_num_attr("x1", x1 + dx);
-                    }
-                    _ => {}
-                }
-                match (element.get_num_attr("y1"), self.dy) {
-                    (Ok(None), dy) => element.set_num_attr("y1", y1 + dy.unwrap_or(0.)),
-                    (Ok(Some(y1)), Some(dy)) => {
-                        element.set_num_attr("y1", y1 + dy);
-                    }
-                    _ => {}
-                }
+                // (which is directionless). Use the signed x_def() / y_def() instead; these
+                // must exist since bbox.is_some().
 
-                let (x2, y2) = bbox.xy2();
-                match (element.get_num_attr("x2"), self.dx) {
-                    (Ok(None), dx) => element.set_num_attr("x2", x2 + dx.unwrap_or(0.)),
-                    (Ok(Some(x2)), Some(dx)) => {
-                        element.set_num_attr("x2", x2 + dx);
-                    }
-                    _ => {}
-                }
-                match (element.get_num_attr("y2"), self.dy) {
-                    (Ok(None), dy) => element.set_num_attr("y2", y2 + dy.unwrap_or(0.)),
-                    (Ok(Some(y2)), Some(dy)) => {
-                        element.set_num_attr("y2", y2 + dy);
-                    }
-                    _ => {}
-                }
+                let (x1, x2) = self.x_def().expect("bbox.is_some() => x_def().is_some()");
+                let (y1, y2) = self.y_def().expect("bbox.is_some() => y_def().is_some()");
+                element.set_num_attr("x1", x1 + self.dx.unwrap_or(0.));
+                element.set_num_attr("x2", x2 + self.dx.unwrap_or(0.));
+                element.set_num_attr("y1", y1 + self.dy.unwrap_or(0.));
+                element.set_num_attr("y2", y2 + self.dy.unwrap_or(0.));
+
                 element.remove_attrs(&[
                     "dx", "dy", "dw", "dh", "x", "y", "cx", "cy", "rx", "ry", "r", "width",
                     "height",
@@ -341,17 +323,17 @@ impl TryFrom<&SvgElement> for Position {
         }
 
         if let Some(x) = value.get_num_attr("x1")?.or(value.get_num_attr("x")?) {
-            p.xmin = Some(x);
+            p.x_start = Some(x);
         }
         if let Some(y) = value.get_num_attr("y1")?.or(value.get_num_attr("y")?) {
-            p.ymin = Some(y);
+            p.y_start = Some(y);
         }
 
         if let Some(x2) = value.get_num_attr("x2")? {
-            p.xmax = Some(x2);
+            p.x_end = Some(x2);
         }
         if let Some(y2) = value.get_num_attr("y2")? {
-            p.ymax = Some(y2);
+            p.y_end = Some(y2);
         }
 
         if let Some(cx) = value.get_num_attr("cx")? {
@@ -396,16 +378,16 @@ impl TryFrom<&SvgElement> for Position {
 impl std::fmt::Debug for Position {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_struct("Position");
-        if let Some(xmin) = self.xmin {
+        if let Some(xmin) = self.x_start {
             f.field("xmin", &xmin);
         }
-        if let Some(ymin) = self.ymin {
+        if let Some(ymin) = self.y_start {
             f.field("ymin", &ymin);
         }
-        if let Some(xmax) = self.xmax {
+        if let Some(xmax) = self.x_end {
             f.field("xmax", &xmax);
         }
-        if let Some(ymax) = self.ymax {
+        if let Some(ymax) = self.y_end {
             f.field("ymax", &ymax);
         }
         if let Some(cx) = self.cx {
@@ -437,86 +419,86 @@ mod tests {
     #[test]
     fn test_x1_y1_w_h() {
         let pos = Position {
-            xmin: Some(15.0),
+            x_start: Some(15.0),
             width: Some(5.0),
-            ymin: Some(15.0),
+            y_start: Some(15.0),
             height: Some(5.0),
             ..Default::default()
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 
     #[test]
     fn test_x1_y1_x2_y2() {
         let pos = Position {
-            xmin: Some(15.0),
-            xmax: Some(20.0),
-            ymin: Some(15.0),
-            ymax: Some(20.0),
+            x_start: Some(15.0),
+            x_end: Some(20.0),
+            y_start: Some(15.0),
+            y_end: Some(20.0),
             ..Default::default()
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 
     #[test]
     fn test_x2_y2_w_h() {
         let pos = Position {
-            xmax: Some(20.0),
+            x_end: Some(20.0),
             width: Some(5.0),
-            ymax: Some(20.0),
+            y_end: Some(20.0),
             height: Some(5.0),
             ..Default::default()
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 
     #[test]
     fn test_x1_y1_cx_cy() {
         let pos = Position {
-            xmin: Some(15.0),
-            ymin: Some(15.0),
+            x_start: Some(15.0),
+            y_start: Some(15.0),
             cx: Some(17.5),
             cy: Some(17.5),
             ..Default::default()
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 
     #[test]
     fn test_x2_y2_cx_cy() {
         let pos = Position {
-            xmax: Some(20.0),
-            ymax: Some(20.0),
+            x_end: Some(20.0),
+            y_end: Some(20.0),
             cx: Some(17.5),
             cy: Some(17.5),
             ..Default::default()
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 
     #[test]
@@ -530,9 +512,9 @@ mod tests {
         };
 
         let bbox = pos.to_bbox().unwrap();
-        assert_eq!(bbox.x1, 15.0);
-        assert_eq!(bbox.x2, 20.0);
-        assert_eq!(bbox.y1, 15.0);
-        assert_eq!(bbox.y2, 20.0);
+        assert_eq!(bbox.x1(), 15.0);
+        assert_eq!(bbox.x2(), 20.0);
+        assert_eq!(bbox.y1(), 15.0);
+        assert_eq!(bbox.y2(), 20.0);
     }
 }
