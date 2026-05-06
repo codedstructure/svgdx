@@ -408,6 +408,25 @@ fn test_line_width_height() {
 }
 
 #[test]
+fn test_line_width_height_inferred() {
+    // Fix width, height only
+    let input1 = r#"<line wh="20"/>"#;
+    // x2 vs x1 shouldn't matter
+    let expected = r#"<line x1="0" y1="0" x2="20" y2="20"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+
+    // Fix width, xy2
+    let input1 = r#"<line xy2="0" width="20"/>"#;
+    let expected = r#"<line x1="-20" y1="0" x2="0" y2="0"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+
+    // Fix width, height, xy1
+    let input1 = r#"<line xy1="0" wh="20"/>"#;
+    let expected = r#"<line x1="0" y1="0" x2="20" y2="20"/>"#;
+    assert_eq!(transform_str_default(input1).unwrap(), expected);
+}
+
+#[test]
 fn test_non_rect_scalar() {
     let input = r##"<circle id="a" r="3"/><circle id="b" r="#a~r"/>"##;
     assert_contains!(

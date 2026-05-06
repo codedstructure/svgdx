@@ -82,24 +82,25 @@ impl Position {
     }
 
     pub fn to_bbox(&self) -> Option<BoundingBox> {
-        let x_ext = self.x_def();
-        let y_ext = self.y_def();
-        if let (Some((x1, x2)), Some((y1, y2))) = (x_ext, y_ext) {
-            Some(BoundingBox::new(x1, y1, x2, y2))
-        } else if self.shape == "point" {
-            // For points, we don't need extent at all, just at least one x and at least one y
-            let px = self.x_start.or(self.x_end.or(self.cx));
-            let py = self.y_start.or(self.y_end.or(self.cy));
-            if let (Some(x), Some(y)) = (px, py) {
-                Some(BoundingBox::new(x, y, x, y))
-            } else {
-                None
+        match (
+            self.shape.as_str(),
+            self.x_def(),
+            self.y_def(),
+            self.width,
+            self.height,
+        ) {
+            // Fully specified bbox already.
+            (_, Some((x1, x2)), Some((y1, y2)), _, _) => Some(BoundingBox::new(x1, y1, x2, y2)),
+            // For points, we don't need extent at all, just at least one x and at least one y.
+            ("point", _, _, _, _) => {
+                let px = self.x_start.or(self.x_end.or(self.cx));
+                let py = self.y_start.or(self.y_end.or(self.cy));
+                px.zip(py).map(|(x, y)| BoundingBox::new(x, y, x, y))
             }
-        } else if self.shape == "circle" {
             // For circles, width and height are the same, so we only need one plus a single
             // other value to define the circle. The same logic would apply for squares,
             // but that's not an SVG primitive.
-            if let Some((x1, x2)) = x_ext {
+            ("circle", Some((x1, x2)), _, _, _) => {
                 if let Some((y1, y2)) = self.three_point(x2 - x1, self.y_start, self.cy, self.y_end)
                 {
                     Some(BoundingBox::new(x1, y1, x2, y2))
@@ -107,7 +108,8 @@ impl Position {
                     let radius = (x2 - x1) / 2.;
                     Some(BoundingBox::new(x1, -radius, x2, radius))
                 }
-            } else if let Some((y1, y2)) = y_ext {
+            }
+            ("circle", _, Some((y1, y2)), _, _) => {
                 if let Some((x1, x2)) = self.three_point(y2 - y1, self.x_start, self.cx, self.x_end)
                 {
                     Some(BoundingBox::new(x1, y1, x2, y2))
@@ -115,26 +117,18 @@ impl Position {
                     let radius = (y2 - y1) / 2.;
                     Some(BoundingBox::new(-radius, y1, radius, y2))
                 }
-            } else {
+            }
+            ("circle", _, _, Some(diameter), _) | ("circle", _, _, _, Some(diameter)) => {
                 // if cx/cy (etc) are absent, SVG says they are treated as zero.
-                if let Some(diameter) = self.width.or(self.height) {
-                    let r = diameter / 2.;
-                    Some(BoundingBox::new(-r, -r, r, r))
-                } else {
-                    None
-                }
+                let r = diameter / 2.;
+                Some(BoundingBox::new(-r, -r, r, r))
             }
-        } else if let (Some(w), Some(h)) = (self.width, self.height) {
-            if let Some((x1, x2)) = x_ext {
-                Some(BoundingBox::new(x1, 0., x2, h))
-            } else if let Some((y1, y2)) = y_ext {
-                Some(BoundingBox::new(0., y1, w, y2))
-            } else {
-                // if x/y (etc) are absent, SVG says they are treated as zero.
-                Some(BoundingBox::new(0., 0., w, h))
+            (_, x_ext, y_ext, Some(w), Some(h)) => {
+                let (x1, x2) = x_ext.unwrap_or((0., w));
+                let (y1, y2) = y_ext.unwrap_or((0., h));
+                Some(BoundingBox::new(x1, y1, x2, y2))
             }
-        } else {
-            None
+            _ => None,
         }
     }
 
@@ -258,13 +252,11 @@ impl Position {
                     "height",
                 ]);
             }
-            ("line", Some(_)) => {
+            ("line", Some(bbox)) => {
                 // NOTE: lines are directional, so we don't want to set x1/y1 from the bbox
-                // (which is directionless). Use the signed x_def() / y_def() instead; these
-                // must exist since bbox.is_some().
-
-                let (x1, x2) = self.x_def().expect("bbox.is_some() => x_def().is_some()");
-                let (y1, y2) = self.y_def().expect("bbox.is_some() => y_def().is_some()");
+                // (which is directionless). Use the signed x_def() / y_def() instead.
+                let (x1, x2) = self.x_def().unwrap_or((0., bbox.width()));
+                let (y1, y2) = self.y_def().unwrap_or((0., bbox.height()));
                 element.set_num_attr("x1", x1 + self.dx.unwrap_or(0.));
                 element.set_num_attr("x2", x2 + self.dx.unwrap_or(0.));
                 element.set_num_attr("y1", y1 + self.dy.unwrap_or(0.));
