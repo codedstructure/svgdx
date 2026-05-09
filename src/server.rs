@@ -10,7 +10,7 @@ use serde_derive::Deserialize;
 use tokio::sync::mpsc::Sender;
 
 use crate::errors::Error;
-use crate::json_api::{JSON_API_VERSION, TransformRequest, TransformResponse};
+use crate::json_api::{TransformResponse, transform_json_impl};
 use crate::{TransformConfig, transform_str};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
@@ -48,29 +48,7 @@ async fn transform_json(input: String) -> impl IntoResponse {
 }
 
 fn transform_json_handler(input: String) -> Response<Body> {
-    let response: TransformResponse = match serde_json::from_str::<TransformRequest>(&input) {
-        Ok(request) => {
-            if request.version != JSON_API_VERSION {
-                TransformResponse::error(format!(
-                    "Unsupported API version: {} (expected {})",
-                    request.version, JSON_API_VERSION
-                ))
-            } else {
-                let config: TransformConfig = request.config.into();
-                match transform_str(request.input, &config) {
-                    Ok(svg) => {
-                        if svg.is_empty() {
-                            TransformResponse::error("empty response".to_string())
-                        } else {
-                            TransformResponse::success(svg)
-                        }
-                    }
-                    Err(e) => TransformResponse::error(e.to_string()),
-                }
-            }
-        }
-        Err(e) => TransformResponse::error(format!("Invalid JSON request: {e}")),
-    };
+    let response: TransformResponse = transform_json_impl(&input);
 
     let is_error = response.error.is_some();
     let body = serde_json::to_string(&response).expect("Failed to serialize response");

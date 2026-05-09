@@ -352,6 +352,9 @@ impl TransformerContext {
         } else {
             self.local_style_id = None;
         }
+        for (k, v) in &config.vars {
+            self.set_var(k.as_str(), v.as_str());
+        }
         self.config = config;
     }
 

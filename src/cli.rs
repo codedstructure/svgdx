@@ -2,11 +2,39 @@ use clap::Parser;
 
 use notify::RecursiveMode;
 use notify_debouncer_mini::new_debouncer;
-use std::{path::Path, sync::mpsc::channel, time::Duration};
+use std::path::Path;
+use std::str::FromStr;
+use std::sync::mpsc::channel;
+use std::time::Duration;
 
 use crate::errors::{Error, Result};
 use crate::style::ThemeType;
+use crate::types::VarName;
 use crate::{AutoStyleMode, ErrorMode, TransformConfig, transform_file};
+
+/// key=value variable pairs
+#[derive(Clone, Debug)]
+struct VarSpec {
+    pub key: VarName,
+    pub value: String,
+}
+
+impl FromStr for VarSpec {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let (key, value) = s
+            .split_once('=')
+            .ok_or_else(|| Error::Cli(format!("Missing '=' in '--var {s}'")))?;
+
+        let key = key.parse()?;
+
+        Ok(VarSpec {
+            key,
+            value: value.to_string(),
+        })
+    }
+}
 
 /// Command line arguments
 #[derive(Parser)]
@@ -105,6 +133,10 @@ struct Arguments {
     /// Error handling mode
     #[arg(long, default_value = "strict")]
     error_mode: ErrorMode,
+
+    /// Variable key=value pairs (may be repeated)
+    #[arg(long, short = 'D', value_name = "KEY=VALUE")]
+    var: Vec<String>,
 }
 
 /// Top-level configuration used by the `svgdx` command-line process.
@@ -149,6 +181,11 @@ impl Config {
                 ));
             }
         }
+        let vars = args
+            .var
+            .iter()
+            .map(|s| s.parse())
+            .collect::<Result<Vec<VarSpec>>>()?;
         Ok(Self {
             input_path: args.file,
             output_path: args.output,
@@ -179,6 +216,7 @@ impl Config {
                 theme: args.theme,
                 svg_style: args.svg_style,
                 error_mode: args.error_mode,
+                vars: vars.into_iter().map(|v| (v.key, v.value)).collect(),
             },
         })
     }

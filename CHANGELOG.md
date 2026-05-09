@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for key-value pairs in `TransformConfig` to be used as initial
+  variable definitions. May be provided to CLI via `--var key=value` parameters
+  (`-D` as short-form alternative), or addition of `.config.vars` object to JSON
+  entrypoint `transform_json`.
+
 - Added: support for custom elements via `<specs element="thing">...</specs>`,
   translated into a `<symbol id="thing">` with subsequent `<thing .../>`
   elements becoming the equivalent of `<reuse href="#thing" .../>`

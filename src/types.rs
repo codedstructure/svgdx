@@ -684,6 +684,38 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
     Err(Error::Parse(format!("invalid elref format '{s}'")))
 }
 
+/// A valid variable name: a non-empty string starting with a letter or underscore,
+/// followed by letters, digits, or underscores.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct VarName(String);
+
+impl std::str::FromStr for VarName {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        let first_char = s
+            .chars()
+            .next()
+            .ok_or_else(|| Error::Parse(format!("Empty variable name: '{s}'")))?;
+        let valid = s.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+            && (first_char.is_ascii_alphabetic() || first_char == '_');
+        if !valid {
+            return Err(Error::Parse(format!(
+                "Invalid variable name '{s}' (format: '[a-zA-Z_][a-zA-Z0-9_]*')'"
+            )));
+        }
+        Ok(VarName(s.to_string()))
+    }
+}
+
+impl Deref for VarName {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -945,5 +977,23 @@ mod test {
         assert_eq!(extract_elref("++++").unwrap(), (ElRef::Next(nz(4)), ""));
         assert_eq!(extract_elref("++3+").unwrap(), (ElRef::Next(nz(2)), "3+"));
         assert!(extract_elref("id").is_err());
+    }
+
+    #[test]
+    fn test_varname() {
+        for (s, exp) in [
+            ("abc", Some("abc")),
+            ("Var_123", Some("Var_123")),
+            ("_var123_", Some("_var123_")),
+            ("123abc", None),
+            ("var-1", None),
+            ("var 1", None),
+            ("", None),
+        ] {
+            assert_eq!(
+                s.parse::<VarName>().ok().map(|v| v.0),
+                exp.map(|e| e.to_string())
+            );
+        }
     }
 }

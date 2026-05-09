@@ -11,7 +11,7 @@ use crate::constants::{
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, LocSpec, ScalarSpec};
-use crate::types::{extract_elref, fstr};
+use crate::types::{VarName, extract_elref, fstr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {
@@ -340,7 +340,7 @@ pub(super) enum Token {
     /// A numeric literal
     Number(f32),
     /// A variable reference, beginning with '$'
-    Var(String),
+    Var(VarName),
     /// Reference to an element-derived value
     ElementRef(String),
     /// String surrounded by single or double quotes
@@ -373,19 +373,6 @@ pub(super) enum Token {
     Other,
 }
 
-fn valid_variable_name(var: &str) -> Result<&str> {
-    if !var.starts_with(|c: char| c.is_ascii_alphabetic()) {
-        return Err(Error::Parse(format!("invalid variable name '{var}'")));
-    }
-    if !var[1..]
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
-        return Err(Error::Parse(format!("invalid variable name '{var}'")));
-    }
-    Ok(var)
-}
-
 pub(super) fn valid_symbol(s: &str) -> bool {
     s.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
         && s.chars()
@@ -414,7 +401,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
             Some(input)
         };
         if let Some(var) = var_name {
-            valid_variable_name(var).map(|v| Token::Var(v.to_string()))
+            var.parse().map(Token::Var)
         } else {
             Err(Error::Parse(format!("missing closing brace in '{input}'")))
         }
