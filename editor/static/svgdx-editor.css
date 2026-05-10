@@ -305,6 +305,28 @@ svg {
     flex-shrink: 0;
 }
 
+/* Value slider styles */
+#slider-controls:has(input[type="range"]:focus) {
+    outline: 1px dotted #888;
+}
+
+#slider-controls {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+}
+
+#slider-controls label {
+    font-size: 12px;
+    font-family: monospace;
+    color: #555;
+}
+
+#value-slider {
+    min-width: 200px;
+    cursor: pointer;
+}
+
 /* Button styles */
 button {
     background-color: #ccc;

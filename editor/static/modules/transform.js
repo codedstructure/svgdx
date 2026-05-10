@@ -65,16 +65,14 @@ export function rateLimited(target, useServer) {
  * Transform input via server API
  * Returns { ok: boolean, svg?: string, error?: string, warnings: string[] }
  */
-async function transformViaServer(input, addMetadata) {
+async function transformViaServer(input, config) {
     try {
         statusbar.style.opacity = '0.3';
 
         const request = {
             version: JSON_API_VERSION,
             input: input,
-            config: {
-                add_metadata: addMetadata
-            }
+            config: config
         };
 
         const response = await fetch('api/transform_json', {
@@ -119,7 +117,7 @@ async function transformViaServer(input, addMetadata) {
  * Transform input via local WASM
  * Returns { ok: boolean, svg?: string, error?: string, warnings: string[] }
  */
-function transformViaWasm(input, addMetadata) {
+function transformViaWasm(input, config) {
     try {
         if (!window.svgdx_transform_json) {
             return {
@@ -132,9 +130,7 @@ function transformViaWasm(input, addMetadata) {
         const request = {
             version: JSON_API_VERSION,
             input: input,
-            config: {
-                add_metadata: addMetadata
-            }
+            config: config
         };
 
         const resultJson = window.svgdx_transform_json(JSON.stringify(request));
@@ -167,11 +163,11 @@ function transformViaWasm(input, addMetadata) {
  * Automatically routes to server or WASM based on svgdx_use_server flag
  * Returns { ok: boolean, svg?: string, error?: string, warnings: string[] }
  */
-export async function transform(input, addMetadata) {
+export async function transform(input, config) {
     if (window.svgdx_use_server) {
-        return await transformViaServer(input, addMetadata);
+        return await transformViaServer(input, config);
     } else {
-        return transformViaWasm(input, addMetadata);
+        return transformViaWasm(input, config);
     }
 }
 

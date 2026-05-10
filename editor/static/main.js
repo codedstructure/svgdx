@@ -1,7 +1,7 @@
 // svgdx editor - main entry point
 // Initializes all modules and wires them together
 
-import { loadState, saveState, getTabContent, setTabContent } from './modules/storage.js';
+import { loadState, saveState, getTabContent, setTabContent, getTabSliderValue, setTabSliderValue } from './modules/storage.js';
 import { createCodeMirror5Editor } from './modules/editor-adapter.js';
 import { transform, rateLimited, isReady } from './modules/transform.js';
 import { initTabs, saveCurrentTabContent } from './modules/tabs.js';
@@ -11,6 +11,7 @@ import { initSplitters } from './modules/splitter.js';
 import { initStatusbar, setStatus } from './modules/statusbar.js';
 import { initClipboard } from './modules/clipboard.js';
 import { initToolbar } from './modules/toolbar.js';
+import { initSlider, updateSlider } from './modules/slider.js';
 import {
     editorContainer,
     outputContainer,
@@ -130,8 +131,16 @@ async function update() {
         // Save to storage
         setTabContent(state, state.activeTab, input);
 
+        // metadata provides line numbers for source highlighting on hover
+        let config = { add_metadata: true };
+        const sliderValue = getTabSliderValue(state, state.activeTab);
+
+        if (sliderValue !== null) {
+            config.vars = { VALUE: getTabSliderValue(state, state.activeTab).toString() };
+        }
+
         // Transform with metadata
-        const result = await transform(input, true);
+        const result = await transform(input, config);
 
         if (result.ok) {
             // Save current viewBox before updating
@@ -185,16 +194,23 @@ function init() {
 
     // Initialize all modules
     initToolbar();
-    initTabs(state, editor, () => update());
+    initTabs(state, editor, (tabNum) => {
+        updateSlider(state, tabNum);
+        update();
+    });
     initLayout(state, () => update());
     initViewport(state, () => update());
     initSplitters();
     initStatusbar(editor);
     initClipboard(editor, textViewer);
+    initSlider(state, rateLimitedUpdate);
 
     // Load initial content
     const initialContent = getTabContent(state, state.activeTab);
     editor.setValue(initialContent);
+
+    // Initialize slider for current tab
+    updateSlider(state, state.activeTab);
 
     // Set up change handler
     editor.onChange(rateLimitedUpdate);

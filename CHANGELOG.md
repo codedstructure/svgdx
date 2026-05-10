@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed: make `<defaults>` apply to non-empty SVG elements (previously only
   applied to empty elements).
 
+- Editor: add a range slider providing an external variable named `$VALUE`
+  between 0 and 1 in 0.01 increments.
+
 ## [0.28.0 - 2026-03-07]
 
 - Changed: migrated codebase to Rust 2024 edition and bumped MSRV to 1.85.

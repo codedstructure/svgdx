@@ -42,3 +42,9 @@ export const PNG_RESOLUTIONS = {
 export const MOBILE_BREAKPOINT = 768;
 export const VALID_MOBILE_LAYOUTS = ['svg', 'xml'];
 export const DEFAULT_MOBILE_LAYOUT = 'svg';
+
+// Slider defaults
+export const DEFAULT_SLIDER_VALUE = 0.5;
+export const SLIDER_STEP = 0.01;
+export const SLIDER_MIN = 0;
+export const SLIDER_MAX = 1;
