@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`-D` as short-form alternative), or addition of `.config.vars` object to JSON
   entrypoint `transform_json`.
 
+- Added: `<varDefault>` element, equivalent to `<var>`, but only setting
+  variables which have not already been set. Useful for documents expecting
+  externally-provided variables but run in a context without them.
+
 - Added: support for custom elements via `<specs element="thing">...</specs>`,
   translated into a `<symbol id="thing">` with subsequent `<thing .../>`
   elements becoming the equivalent of `<reuse href="#thing" .../>`

@@ -1,7 +1,7 @@
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
-    LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarElement,
-    is_connector, process_text_attr,
+    LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
+    VarElement, is_connector, process_text_attr,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList};
@@ -35,6 +35,7 @@ impl EventGen for SvgElement {
             "reuse" => ReuseElement(self).generate_events(context),
             "specs" => SpecsElement(self).generate_events(context),
             "var" => VarElement(self).generate_events(context),
+            "varDefault" => VarDefaultElement(self).generate_events(context),
             "if" => IfElement(self).generate_events(context),
             "defaults" => DefaultsElement(self).generate_events(context),
             "for" => ForElement(self).generate_events(context),

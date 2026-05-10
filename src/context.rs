@@ -493,6 +493,13 @@ impl TransformerContext {
         scope.vars.insert(name.into(), value.into());
     }
 
+    pub fn set_var_default(&mut self, name: &str, value: &str) {
+        // need a full 'get_var' search through scopes to check if already set.
+        if self.get_var(name).is_none() {
+            self.set_var(name, value);
+        }
+    }
+
     pub fn push_element(&mut self, el: &SvgElement) {
         let scope = Scope::from_element(el);
         self.scope_stack.push(scope);

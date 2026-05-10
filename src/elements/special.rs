@@ -116,6 +116,40 @@ impl EventGen for SpecsElement<'_> {
     }
 }
 
+fn process_var_attrs<F>(
+    element: &SvgElement,
+    context: &mut TransformerContext,
+    set_fn: F,
+) -> Result<(OutputList, Option<BoundingBox>)>
+where
+    F: Fn(&mut TransformerContext, &str, &str),
+{
+    // variables are updated 'in parallel' rather than one-by-one,
+    // allowing e.g. swap in a single `<var>` element:
+    // `<var a="$b" b="$a" />`
+    let mut new_vars = Vec::new();
+    for (key, value) in element.get_attrs() {
+        // Note comments in `var` elements are permitted (and encouraged!)
+        // in the input, but not propagated to the output.
+        if key != "_" && key != "__" {
+            let value = eval_attr(&value, context)?;
+            // Detect / prevent uncontrolled expansion of variable values
+            if value.len() > context.config.var_limit as usize {
+                return Err(Error::VarLimit(
+                    key.clone(),
+                    value.len(),
+                    context.config.var_limit,
+                ));
+            }
+            new_vars.push((key, value));
+        }
+    }
+    for (k, v) in new_vars.into_iter() {
+        set_fn(context, &k, &v);
+    }
+    Ok((OutputList::new(), None))
+}
+
 #[derive(Debug, Clone)]
 pub struct VarElement<'a>(pub &'a SvgElement);
 
@@ -124,30 +158,19 @@ impl EventGen for VarElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        // variables are updated 'in parallel' rather than one-by-one,
-        // allowing e.g. swap in a single `<var>` element:
-        // `<var a="$b" b="$a" />`
-        let mut new_vars = Vec::new();
-        for (key, value) in self.0.get_attrs() {
-            // Note comments in `var` elements are permitted (and encouraged!)
-            // in the input, but not propagated to the output.
-            if key != "_" && key != "__" {
-                let value = eval_attr(&value, context)?;
-                // Detect / prevent uncontrolled expansion of variable values
-                if value.len() > context.config.var_limit as usize {
-                    return Err(Error::VarLimit(
-                        key.clone(),
-                        value.len(),
-                        context.config.var_limit,
-                    ));
-                }
-                new_vars.push((key, value));
-            }
-        }
-        for (k, v) in new_vars.into_iter() {
-            context.set_var(&k, &v);
-        }
-        Ok((OutputList::new(), None))
+        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var(k, v))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VarDefaultElement<'a>(pub &'a SvgElement);
+
+impl EventGen for VarDefaultElement<'_> {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var_default(k, v))
     }
 }
 

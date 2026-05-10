@@ -278,3 +278,15 @@ fn test_var_closure() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_var_default() {
+    let input = r##"
+<var a="1" b="2"/>
+<varDefault a="3" c="4"/>
+<rect wh="10" text="$a-$b-$c"/>
+"##;
+    let expected = r#">1-2-4</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
