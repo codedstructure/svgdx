@@ -26,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Editor: add a range slider providing an external variable named `$VALUE`
   between 0 and 1 in 0.01 increments.
 
+- Docs: docs build using mdbook-svgdx now uses the current state of the svgdx
+  library via the MDBOOK_SVGDX_BIN environment variable supported since
+  mdbook-svgdx v0.16.0. A new top-level `make mdbook` target has been added
+  for easier editing of svgdx's project documentation.
+
 ## [0.28.0 - 2026-03-07]
 
 - Changed: migrated codebase to Rust 2024 edition and bumped MSRV to 1.85.

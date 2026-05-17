@@ -8,42 +8,30 @@ At present it is a work-in-progress...
 
 As well as [mdbook](https://rust-lang.github.io/mdBook/) itself, these docs use the [mdbook-svgdx](https://github.com/codedstructure/mdbook-svgdx) preprocessor to render embedded `svgdx` fragments.
 
-Embedded svgdx fragments in these docs assume the latest version of svgdx (i.e. the `main` branch of this repo), and may not build correctly after a simple `cargo install mdbook-svgdx`.
-To build against the latest svgdx, the mdbook-svgdx
-repository should be cloned and built (`cargo build --release`) after making a change analogous to the following in its Cargo.toml:
-
-```diff
---- a/Cargo.toml
-+++ b/Cargo.toml
-@@ -16,7 +16,7 @@ pulldown-cmark = "0.10"
- pulldown-cmark-to-cmark = "14.0"
- semver = "1.0"
- serde_json = "1.0"
--svgdx = { version = "0.16.0", default-features = false }
-+svgdx = { path = "../svgdx", default-features = false }
-
- [dev-dependencies]
- assertables = "9.5.0"
-```
-
-(assuming that `mdbook-svgdx` and `svgdx` repositories are both checked out at the same level within the filesystem.)
-
-The generated `mdbook-svgdx` executable should be available in the system PATH.
+The preprocessor supports an `MDBOOK_SVGDX_BIN` environment variable pointing at the `svgdx` CLI binary to use for rendering embedded diagrams.
+That allows the book to be built against the current checkout's release binary, rather than the `svgdx` library version bundled into the installed `mdbook-svgdx` crate.
 
 ## Building and updating the docs
 
-Install mdbook with `cargo install mdbook`, and the `mdbook-svgdx` pre-processor as in the previous section.
+Install mdbook with `cargo install mdbook`, and install the `mdbook-svgdx` pre-processor without its default bundled `svgdx` dependency:
+
+```shell
+cargo install mdbook-svgdx --no-default-features
+```
+
+From the repository root, build the current release `svgdx` binary and launch mdBook with `MDBOOK_SVGDX_BIN` pointing at `target/release/svgdx`.
 
 Build the documentation using:
 
 ```shell
-mdbook build
+cargo build --release --bin svgdx
+MDBOOK_SVGDX_BIN="$PWD/target/release/svgdx" mdbook build docs/mdbook
 ```
 
 When editing the documentation, the following is often more helpful:
 
 ```shell
-mdbook serve --open
+make mdbook
 ```
 
 See the [mdbook documentation](https://rust-lang.github.io/mdBook/) for more information.

@@ -40,8 +40,13 @@ jobs:
       - name: Install mdbook
         run: cargo install mdbook
       - name: Install mdbook-svgdx preprocessor
-        run: cargo install mdbook-svgdx
+        # support for external svgdx binary was added in mdbook-svgdx v0.16.0
+        run: cargo install mdbook-svgdx --no-default-features
+      - name: Build svgdx CLI
+        run: cargo build --release --bin svgdx
       - name: Build docs
+        env:
+          MDBOOK_SVGDX_BIN: ${{ github.workspace }}/target/release/svgdx
         run: mdbook build docs/mdbook
       - name: Move docs to editor
         run: mv docs/mdbook/book editor/docs
