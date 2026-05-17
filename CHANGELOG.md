@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0 - 2026-05-17]
+
 - Added: support for key-value pairs in `TransformConfig` to be used as initial
   variable definitions. May be provided to CLI via `--var key=value` parameters
   (`-D` as short-form alternative), or addition of `.config.vars` object to JSON

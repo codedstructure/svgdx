@@ -4,7 +4,7 @@ use super::{EventKind, EventMeta, InputEvent, InputList, OutputList, RawElement}
 use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
 
-use quick_xml::escape::partial_escape;
+use quick_xml::escape::{partial_escape, unescape};
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event as XmlEvent};
 use quick_xml::{Reader, Writer};
@@ -76,7 +76,8 @@ impl TryFrom<BytesStart<'_>> for RawElement {
             .map(move |a| {
                 let aa = a.map_err(Error::from_err)?;
                 let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let value = aa.unescape_value().map_err(Error::from_err)?.into_owned();
+                let raw_value = std::str::from_utf8(aa.value.as_ref()).map_err(Error::from_err)?;
+                let value = unescape(raw_value).map_err(Error::from_err)?.into_owned();
                 Ok((key, value))
             })
             .collect();
@@ -281,6 +282,42 @@ mod tests {
     #[test]
     fn test_outputlist_write_to() {
         let input = r#"<svg><rect width="100" height="100"/></svg>"#;
+        let mut buf_input = Cursor::new(input);
+        let input_list = InputList::from_reader(&mut buf_input).unwrap();
+        let output_list: OutputList = input_list.into();
+
+        let mut cursor = Cursor::new(Vec::new());
+        output_list.write_to(&mut cursor).unwrap();
+
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_multiline_attribute_value() {
+        // Check parser doesn't squish whitespace in multiline attributes,
+        // which XML parsers could reasonably do.
+        let input = r#"<svg><path d="
+    M 10 10
+    L 20 20
+"/></svg>"#;
+        let mut buf_input = Cursor::new(input);
+        let input_list = InputList::from_reader(&mut buf_input).unwrap();
+
+        assert_eq!(input_list.events.len(), 3);
+        assert_eq!(
+            input_list.events[1].event,
+            EventKind::Empty(RawElement(
+                "path".into(),
+                vec![("d".into(), "\n    M 10 10\n    L 20 20\n".into())]
+            ))
+        );
+    }
+
+    #[test]
+    fn test_multiline_text_content() {
+        // Check parser doesn't squish whitespace in multiline text content
+        let input = "<svg><text>\n    first line\n    second line\n</text></svg>";
         let mut buf_input = Cursor::new(input);
         let input_list = InputList::from_reader(&mut buf_input).unwrap();
         let output_list: OutputList = input_list.into();

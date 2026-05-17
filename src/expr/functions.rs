@@ -2,7 +2,7 @@ use super::expression::{EvalState, ExprValue};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, LocSpec};
 
-use rand::Rng;
+use rand::prelude::*;
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -2,7 +2,7 @@
 
 ROOT=$(dirname $(cargo locate-project --message-format plain))
 
-cargo build --release
+cargo build --release --bin svgdx
 
 echo -n "Updating examples"
 for INPUT in *.xml; do
