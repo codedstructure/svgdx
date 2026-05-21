@@ -104,14 +104,10 @@ After installation, two binaries are available:
 
 ### svgdx
 
-    svgdx [INPUT] [-o OUTPUT] [-w]
+    svgdx [INPUT] [-o OUTPUT]
 
 By default, `svgdx` reads from stdin and writes to standard output, so if run without any
 arguments it simply waits for input.
-
-The `-w` argument (which requires a non-stdin input file) 'watches' the input,
-regenerating the output whenever it changes. This is particularly useful alongside
-an SVG viewer / preview which also refreshes the view when the underlying file changes.
 
 ### svgdx-server & editor
 

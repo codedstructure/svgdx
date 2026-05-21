@@ -8,7 +8,6 @@
 
 # Target Feature List
 * Given a basic `<svg>` element, derive reasonable attributes in the output including automatic `viewport`, derived from the bounding box of the contained elements.
-* Ability to "watch" files and re-compile them on change, including at directory level.
 * Relative positioning of 'sized' elements, including ability to 'distribute' elements linearly over a range.
 * 'Hidden' elements, used for geometry reference, but not part of the output.
 * "Geometric" scaling of symbols / groups.

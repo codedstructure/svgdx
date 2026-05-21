@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Removed: support for -w / --watch argument in the CLI. Use an external tool
+  such as [watchexec](https://github.com/watchexec/watchexec) instead.
+
 ## [0.29.0 - 2026-05-17]
 
 - Added: support for key-value pairs in `TransformConfig` to be used as initial

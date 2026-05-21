@@ -7,8 +7,7 @@ use tempfile::NamedTempFile;
 #[test]
 fn test_cmdline_bad_args() {
     let mut cmd = Command::new(cargo::cargo_bin!());
-    // -w without an input file should fail
-    cmd.arg("-w").assert().failure().code(2);
+    cmd.arg("-zyx").assert().failure().code(2);
 }
 
 #[test]

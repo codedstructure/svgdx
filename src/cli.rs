@@ -1,11 +1,7 @@
 use clap::Parser;
 
-use notify::RecursiveMode;
-use notify_debouncer_mini::new_debouncer;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::mpsc::channel;
-use std::time::Duration;
 
 use crate::errors::{Error, Result};
 use crate::style::ThemeType;
@@ -47,10 +43,6 @@ struct Arguments {
     /// Target output file ('-' for stdout)
     #[arg(short, long, default_value = "-")]
     output: String,
-
-    /// Watch file for changes; update output on change. (FILE must be given)
-    #[arg(short, long, requires = "file")]
-    watch: bool,
 
     /// Add debug info (e.g. input source) to output
     #[arg(long)]
@@ -152,20 +144,12 @@ pub struct Config {
     pub input_path: String,
     /// Path to output file, or '-' for stdout
     pub output_path: String,
-    /// Stay monitoring `input_path` for changes (Requires input_path is not stdin)
-    pub watch: bool,
     /// transform config options
     pub transform: TransformConfig,
 }
 
 impl Config {
     fn from_args(args: Arguments) -> Result<Self> {
-        if args.watch && args.file == "-" {
-            // Should already be enforced by clap validation
-            return Err(Error::Cli(
-                "A non-stdin file must be provided with -w/--watch argument".into(),
-            ));
-        }
         if args.file != "-" && args.output != "-" {
             // Arguably creating this struct shouldn't do any IO, but this is a
             // deliberate UX safety restriction on the CLI which is worth keeping
@@ -189,7 +173,6 @@ impl Config {
         Ok(Self {
             input_path: args.file,
             output_path: args.output,
-            watch: args.watch,
             transform: TransformConfig {
                 debug: args.debug,
                 scale: args.scale,
@@ -240,42 +223,5 @@ pub fn get_config() -> Result<Config> {
 
 /// Run the `svgdx` program with a given `Config`.
 pub fn run(config: Config) -> Result<()> {
-    if !config.watch {
-        transform_file(&config.input_path, &config.output_path, &config.transform)?;
-    } else if config.input_path != "-" {
-        let watch = config.input_path;
-        let (tx, rx) = channel();
-        let mut watcher =
-            new_debouncer(Duration::from_millis(250), tx).expect("Could not create watcher");
-        let watch_path = Path::new(&watch);
-        watcher
-            .watcher()
-            .watch(Path::new(&watch), RecursiveMode::NonRecursive)
-            .map_err(Error::from_err)?;
-        transform_file(&watch, &config.output_path, &config.transform).unwrap_or_else(|e| {
-            eprintln!("transform failed: {e:?}");
-        });
-        eprintln!("Watching {watch} for changes");
-        loop {
-            match rx.recv() {
-                Ok(Ok(events)) => {
-                    for event in events {
-                        if event.path.canonicalize().map_err(Error::Io)?
-                            == watch_path.canonicalize().map_err(Error::Io)?
-                        {
-                            eprintln!("{} changed", event.path.to_string_lossy());
-                            transform_file(&watch, &config.output_path, &config.transform)
-                                .unwrap_or_else(|e| {
-                                    eprintln!("transform failed: {e:?}");
-                                });
-                        }
-                    }
-                }
-                Ok(Err(e)) => eprintln!("Watch error {e:?}"),
-                Err(e) => eprintln!("Channel error: {e:?}"),
-            }
-        }
-    }
-
-    Ok(())
+    transform_file(&config.input_path, &config.output_path, &config.transform)
 }
