@@ -66,7 +66,7 @@ fn test_config_background() {
 fn test_config_auto_style() {
     let input = r#"
 <svg>
-<config add-auto-styles="true"/>
+<config auto-style-mode="css"/>
 <rect xy="0" wh="5"/>
 </svg>
 "#;
@@ -76,7 +76,7 @@ fn test_config_auto_style() {
 
     let input = r#"
 <svg>
-<config add-auto-styles="false"/>
+<config auto-style-mode="none"/>
 <rect xy="0" wh="5"/>
 </svg>
 "#;

@@ -73,7 +73,7 @@ Using the shortcuts introduced so far, this SVG file can be created from the fol
 
 ```xml-svgdx
 <svg>
-  <config add-auto-styles="false"/>
+  <config auto-style-mode="none"/>
   <rect xy="0" wh="120 50" style="fill:red"/>
   <rect xy="120 0" wh="120 50" style="fill:green"/>
   <rect xy="240 0" wh="120 50" style="fill:blue"/>

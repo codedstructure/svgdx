@@ -1,5 +1,5 @@
 <svg width="300" height="100" viewBox="0 0 300 100">
-  <config add-auto-styles="false"/>
+  <config auto-style-mode="none"/>
   <!--
     This implements the example from
     https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands

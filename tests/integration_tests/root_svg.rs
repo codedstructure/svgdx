@@ -106,7 +106,7 @@ fn test_internal_svg() {
     // if the xmlns attribute is present
     let input = r##"
 <svg>
-  <config add-auto-styles="false"/>
+  <config auto-style-mode="none"/>
   <rect xy="10" wh="50"/>
   <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="50cm" height="25cm">
     <rect x="0" y="0" width="50" height="25" text="blob"/>

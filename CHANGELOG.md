@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Removed: previously deprecated `--use-local-styles` and `--no-auto-styles`,
+  together with `add-auto-styles` config option.  Use the `auto-style-mode`
+  config option and CLI option instead.
+
 - Removed: support for -w / --watch argument in the CLI. Use an external tool
   such as [watchexec](https://github.com/watchexec/watchexec) instead.
 

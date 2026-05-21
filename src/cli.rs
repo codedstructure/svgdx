@@ -56,20 +56,6 @@ struct Arguments {
     #[arg(long, default_value = "5")]
     border: u16,
 
-    /// Don't add referenced styles automatically
-    #[arg(long)]
-    #[deprecated(note = "use `auto-style-mode` instead")]
-    no_auto_styles: bool,
-
-    /// Make styles local to this document using CSS nesting.
-    ///
-    /// Useful when embedding multiple SVGs in a single document,
-    /// especially if they use different themes.
-    /// May not work in all SVG applications.
-    #[arg(long)]
-    #[deprecated(note = "use `auto-style-mode` instead")]
-    use_local_styles: bool,
-
     /// Auto-style mode to use
     #[arg(long, default_value = "css")]
     auto_style_mode: AutoStyleMode,
@@ -177,16 +163,7 @@ impl Config {
                 debug: args.debug,
                 scale: args.scale,
                 border: args.border,
-                #[allow(deprecated)]
-                auto_style_mode: if args.no_auto_styles {
-                    AutoStyleMode::None
-                } else if args.use_local_styles {
-                    AutoStyleMode::Inline
-                } else {
-                    args.auto_style_mode
-                },
-                #[allow(deprecated)]
-                use_local_styles: args.use_local_styles,
+                auto_style_mode: args.auto_style_mode,
                 background: args.background,
                 seed: args.seed,
                 add_metadata: args.add_metadata,

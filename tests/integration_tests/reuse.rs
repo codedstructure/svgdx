@@ -384,7 +384,7 @@ fn test_nesting_depth_limit() {
 fn test_reuse_group_rel() {
     let input = r##"
 <svg>
-<config border="0" add-auto-styles="false"/>
+<config border="0" auto-style-mode="none"/>
 <g id="tt"><rect xy="5" wh="10"/></g>
 <reuse id="a" href="#tt" xy="5 10"/>
 </svg>
@@ -397,7 +397,7 @@ fn test_reuse_group_rel() {
 
     let input = r##"
 <svg>
-<config border="0" add-auto-styles="false"/>
+<config border="0" auto-style-mode="none"/>
 <defs>
 <g id="tt"><rect xy="5" wh="10"/></g>
 </defs>
@@ -417,7 +417,7 @@ fn test_reuse_group_rel() {
     // <defs> block and an arbitrary positioned element in the document.
     let input = r##"
 <svg>
-<config border="0" add-auto-styles="false"/>
+<config border="0" auto-style-mode="none"/>
 <defs>
 <rect id="tt" xy="5" wh="10"/>
 </defs>
