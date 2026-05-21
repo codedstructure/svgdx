@@ -1,8 +1,18 @@
 use assert_cmd::{Command, cargo, pkg_name};
 use assertables::assert_contains;
 use std::io::Write;
-use svgdx::cli::Config;
+use svgdx::Result;
+use svgdx::cli::{CliAction, parse_args};
 use tempfile::NamedTempFile;
+
+/// Create a `Config` object set up given a command line string.
+///
+/// The string is parsed using `shlex::split()`, so values containing
+/// spaces or quotes should be quoted or escaped appropriately.
+pub fn from_cmdline(args: &str) -> Result<CliAction> {
+    let args = shlex::split(args).unwrap_or_default();
+    parse_args(args.into_iter()) //.map_err(Error::from_err)
+}
 
 #[test]
 fn test_cmdline_bad_args() {
@@ -20,12 +30,12 @@ fn test_cmdline_help() {
 
 #[test]
 fn test_cmdline_config() {
-    let config = Config::from_cmdline(&format!("{} --help", pkg_name!()));
-    assert!(config.is_err());
+    let config = from_cmdline(&format!("{} --help", pkg_name!()));
+    assert!(matches!(config, Ok(CliAction::Help)));
 
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
-    let config = Config::from_cmdline(&format!(
+    let config = from_cmdline(&format!(
         "{} {}",
         pkg_name!(),
         tmpfile.path().to_str().unwrap(),
@@ -36,7 +46,7 @@ fn test_cmdline_config() {
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let outfile = NamedTempFile::new().expect("could not create outfile");
-    let config = Config::from_cmdline(&format!(
+    let config = from_cmdline(&format!(
         "{} -o {} {}",
         pkg_name!(),
         outfile.path().to_str().unwrap(),
