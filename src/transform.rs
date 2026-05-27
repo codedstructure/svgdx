@@ -249,11 +249,6 @@ impl Transformer {
         if !orig_svg_attrs.contains_key("xmlns") {
             new_svg_attrs.insert("xmlns", "http://www.w3.org/2000/svg");
         }
-        if !orig_svg_attrs.contains_key("id") {
-            if let Some(local_id) = &self.context.local_style_id {
-                new_svg_attrs.insert("id", local_id.as_str());
-            }
-        }
         let mut root_style = orig_svg_style.map(|s| s.to_string()).unwrap_or_default();
         if let Some(svg_style) = &self.context.config.svg_style {
             root_style.push(' ');

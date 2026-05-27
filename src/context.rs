@@ -8,7 +8,6 @@ use crate::types::{AttrMap, ElRef, OrderIndex, StyleMap, attr_split, extract_url
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
@@ -123,8 +122,6 @@ pub struct TransformerContext {
     pub in_specs: bool,
     /// The event-representation of the entire input SVG
     pub events: Vec<InputEvent>,
-    /// id used by top-level SVG element if local_styles is true
-    pub local_style_id: Option<String>,
     /// Config of transformer processing; updated by `<config>` elements
     pub config: TransformConfig,
     /// Set of custom element names registered via `<specs element="...">`
@@ -140,7 +137,6 @@ impl Default for TransformerContext {
             current_index: OrderIndex::new(0),
             scope_stack: Vec::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
-            local_style_id: None,
             current_depth: 0,
             real_svg: false,
             in_specs: false,
@@ -340,18 +336,6 @@ impl TransformerContext {
 
     pub fn set_config(&mut self, config: TransformConfig) {
         self.seed_rng(config.seed);
-        if config.use_local_styles {
-            // randomise the local id to avoid conflicts with other SVG
-            // elements in the same (e.g. HTML) document.
-            let now_seed = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_micros() as u64;
-            let mut rng = Pcg32::seed_from_u64(now_seed);
-            self.local_style_id = Some(format!("svgdx-{:08x}", rng.random::<u32>()))
-        } else {
-            self.local_style_id = None;
-        }
         for (k, v) in &config.vars {
             self.set_var(k.as_str(), v.as_str());
         }

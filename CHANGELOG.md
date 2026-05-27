@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Breaking changes (CLI):
+
+  - the input file was previously a positional argument, it now uses the `-i`
+    / `--input` flag.
+
+  - if stdin is a terminal no `-i` argument is provided, the CLI now prints
+    a usage message rather than wait for input, hopefully improving UX when
+    running for the first time.
+
+- Removed: previously deprecated `--use-local-styles` and `--no-auto-styles`,
+  together with `add-auto-styles` config option.  Use the `auto-style-mode`
+  config option and CLI option instead.
+
+- Removed: support for -w / --watch argument in the CLI. Use an external tool
+  such as [watchexec](https://github.com/watchexec/watchexec) instead.
+
 ## [0.29.0 - 2026-05-17]
 
 - Added: support for key-value pairs in `TransformConfig` to be used as initial

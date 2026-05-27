@@ -29,17 +29,39 @@ impl std::str::FromStr for ThemeType {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "default" => Ok(Self::default()),
-            "bold" => Ok(Self::Bold),
-            "fine" => Ok(Self::Fine),
-            "glass" => Ok(Self::Glass),
-            "light" => Ok(Self::Light),
-            "dark" => Ok(Self::Dark),
+            s if s == Self::Default.to_string() => Ok(Self::Default),
+            s if s == Self::Bold.to_string() => Ok(Self::Bold),
+            s if s == Self::Fine.to_string() => Ok(Self::Fine),
+            s if s == Self::Glass.to_string() => Ok(Self::Glass),
+            s if s == Self::Light.to_string() => Ok(Self::Light),
+            s if s == Self::Dark.to_string() => Ok(Self::Dark),
             _ => Err(Error::InvalidValue(
-                "theme (default, bold, fine, glass, light, dark)".into(),
+                format!(
+                    "theme ({}, {}, {}, {}, {}, {})",
+                    ThemeType::Default,
+                    ThemeType::Bold,
+                    ThemeType::Fine,
+                    ThemeType::Glass,
+                    ThemeType::Light,
+                    ThemeType::Dark
+                ),
                 s.into(),
             )),
         }
+    }
+}
+
+impl std::fmt::Display for ThemeType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ThemeType::Default => "default",
+            ThemeType::Bold => "bold",
+            ThemeType::Fine => "fine",
+            ThemeType::Glass => "glass",
+            ThemeType::Light => "light",
+            ThemeType::Dark => "dark",
+        };
+        f.write_str(s)
     }
 }
 

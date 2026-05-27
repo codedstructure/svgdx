@@ -41,6 +41,7 @@ use std::io::{BufRead, Cursor, Write};
 use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
+#[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
 mod constants;
 mod context;
@@ -60,8 +61,15 @@ pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 pub use types::VarName;
 
+use crate::constants::{
+    DEFAULT_BACKGROUND, DEFAULT_BORDER, DEFAULT_DEPTH_LIMIT, DEFAULT_FONT_FAMILY,
+    DEFAULT_FONT_SIZE, DEFAULT_LOOP_LIMIT, DEFAULT_PATH_REPEAT_LIMIT, DEFAULT_RNG_SEED,
+    DEFAULT_SCALE, DEFAULT_VAR_LIMIT,
+};
+
 // Allow users of this as a library to easily retrieve the version of svgdx being used
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+pub const VERSION_FULL: &str = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
 
 /// Settings to configure a single transformation.
 ///
@@ -98,8 +106,6 @@ pub struct TransformConfig {
     pub font_family: String,
     /// Theme to use (default "default")
     pub theme: ThemeType,
-    /// Make styles local to this document
-    pub use_local_styles: bool,
     /// Optional style to apply to SVG root element
     pub svg_style: Option<String>,
     /// Error handling mode
@@ -112,20 +118,19 @@ impl Default for TransformConfig {
     fn default() -> Self {
         Self {
             debug: false,
-            scale: 1.0,
-            border: 5,
+            scale: DEFAULT_SCALE,
+            border: DEFAULT_BORDER,
             auto_style_mode: AutoStyleMode::default(),
-            background: "default".to_owned(),
-            seed: 0,
-            loop_limit: 1000,
-            var_limit: 1024,
-            depth_limit: 100,
-            path_repeat_limit: 10000,
+            background: DEFAULT_BACKGROUND.to_owned(),
+            seed: DEFAULT_RNG_SEED,
+            loop_limit: DEFAULT_LOOP_LIMIT,
+            var_limit: DEFAULT_VAR_LIMIT,
+            depth_limit: DEFAULT_DEPTH_LIMIT,
+            path_repeat_limit: DEFAULT_PATH_REPEAT_LIMIT,
             add_metadata: false,
-            font_size: 3.0,
-            font_family: "sans-serif".to_owned(),
+            font_size: DEFAULT_FONT_SIZE,
+            font_family: DEFAULT_FONT_FAMILY.to_owned(),
             theme: ThemeType::default(),
-            use_local_styles: false,
             svg_style: None,
             error_mode: ErrorMode::default(),
             vars: HashMap::new(),
@@ -150,14 +155,30 @@ impl std::str::FromStr for ErrorMode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "strict" => Ok(ErrorMode::Strict),
-            "warn" => Ok(ErrorMode::Warn),
-            "ignore" => Ok(ErrorMode::Ignore),
+            s if s == ErrorMode::Strict.to_string() => Ok(ErrorMode::Strict),
+            s if s == ErrorMode::Warn.to_string() => Ok(ErrorMode::Warn),
+            s if s == ErrorMode::Ignore.to_string() => Ok(ErrorMode::Ignore),
             _ => Err(Error::InvalidValue(
-                "error-mode must be 'strict', 'warn', or 'ignore'".to_string(),
+                format!(
+                    "error-mode must be '{}', '{}', or '{}'",
+                    ErrorMode::Strict,
+                    ErrorMode::Warn,
+                    ErrorMode::Ignore,
+                ),
                 s.to_string(),
             )),
         }
+    }
+}
+
+impl std::fmt::Display for ErrorMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            ErrorMode::Strict => "strict",
+            ErrorMode::Warn => "warn",
+            ErrorMode::Ignore => "ignore",
+        };
+        f.write_str(s)
     }
 }
 

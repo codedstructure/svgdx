@@ -1,5 +1,4 @@
 use super::SvgElement;
-use crate::AutoStyleMode;
 use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
@@ -41,16 +40,6 @@ impl EventGen for ConfigElement<'_> {
             match key.as_str() {
                 "scale" => new_config.scale = value.parse()?,
                 "debug" => new_config.debug = value.parse()?,
-                // deprecated - use `auto-style-mode` instead
-                "add-auto-styles" => {
-                    new_config.auto_style_mode = if value.parse()? {
-                        AutoStyleMode::Css
-                    } else {
-                        AutoStyleMode::None
-                    }
-                }
-                // deprecated - use `auto-style-mode="inline"` instead
-                "use-local-styles" => new_config.use_local_styles = value.parse()?,
                 "auto-style-mode" => new_config.auto_style_mode = value.parse()?,
                 "border" => new_config.border = value.parse()?,
                 "background" => new_config.background = value,

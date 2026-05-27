@@ -1,14 +1,23 @@
 use assert_cmd::{Command, cargo, pkg_name};
 use assertables::assert_contains;
 use std::io::Write;
-use svgdx::cli::Config;
+use svgdx::Result;
+use svgdx::cli::{CliAction, parse_args};
 use tempfile::NamedTempFile;
+
+/// Create a `Config` object set up given a command line string.
+///
+/// The string is parsed using `shlex::split()`, so values containing
+/// spaces or quotes should be quoted or escaped appropriately.
+pub fn from_cmdline(args: &str) -> Result<CliAction> {
+    let args = shlex::split(args).unwrap_or_default();
+    parse_args(args)
+}
 
 #[test]
 fn test_cmdline_bad_args() {
     let mut cmd = Command::new(cargo::cargo_bin!());
-    // -w without an input file should fail
-    cmd.arg("-w").assert().failure().code(2);
+    cmd.arg("-zyx").assert().failure().code(2);
 }
 
 #[test]
@@ -21,13 +30,13 @@ fn test_cmdline_help() {
 
 #[test]
 fn test_cmdline_config() {
-    let config = Config::from_cmdline(&format!("{} --help", pkg_name!()));
-    assert!(config.is_err());
+    let config = from_cmdline(&format!("{} --help", pkg_name!()));
+    assert!(matches!(config, Ok(CliAction::Help)));
 
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
-    let config = Config::from_cmdline(&format!(
-        "{} {}",
+    let config = from_cmdline(&format!(
+        "{} -i {}",
         pkg_name!(),
         tmpfile.path().to_str().unwrap(),
     ))
@@ -37,11 +46,11 @@ fn test_cmdline_config() {
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let outfile = NamedTempFile::new().expect("could not create outfile");
-    let config = Config::from_cmdline(&format!(
-        "{} -o {} {}",
+    let config = from_cmdline(&format!(
+        "{} -i {} -o {}",
         pkg_name!(),
-        outfile.path().to_str().unwrap(),
         tmpfile.path().to_str().unwrap(),
+        outfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
     svgdx::cli::run(config).expect("run failed");
@@ -59,6 +68,7 @@ fn test_cmdline_same_file() {
     let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.current_dir(cwd)
         .args([
+            "-i",
             filename.to_str().unwrap(),
             "-o",
             &format!("./{}x", filename.to_str().unwrap()),
@@ -70,6 +80,7 @@ fn test_cmdline_same_file() {
     let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.current_dir(cwd)
         .args([
+            "-i",
             filename.to_str().unwrap(),
             "-o",
             &format!("./{}", filename.to_str().unwrap()),
