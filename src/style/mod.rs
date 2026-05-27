@@ -43,10 +43,21 @@ impl std::str::FromStr for AutoStyleMode {
 
     fn from_str(s: &str) -> Result<Self> {
         match s {
-            "none" => Ok(AutoStyleMode::None),
-            "inline" => Ok(AutoStyleMode::Inline),
-            "css" => Ok(AutoStyleMode::Css),
+            s if s == AutoStyleMode::None.to_string() => Ok(AutoStyleMode::None),
+            s if s == AutoStyleMode::Inline.to_string() => Ok(AutoStyleMode::Inline),
+            s if s == AutoStyleMode::Css.to_string() => Ok(AutoStyleMode::Css),
             _ => Err(Error::InvalidValue("auto-style-mode".into(), s.into())),
         }
+    }
+}
+
+impl std::fmt::Display for AutoStyleMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            AutoStyleMode::None => "none",
+            AutoStyleMode::Inline => "inline",
+            AutoStyleMode::Css => "css",
+        };
+        f.write_str(s)
     }
 }

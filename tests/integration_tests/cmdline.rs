@@ -11,7 +11,7 @@ use tempfile::NamedTempFile;
 /// spaces or quotes should be quoted or escaped appropriately.
 pub fn from_cmdline(args: &str) -> Result<CliAction> {
     let args = shlex::split(args).unwrap_or_default();
-    parse_args(args.into_iter()) //.map_err(Error::from_err)
+    parse_args(args)
 }
 
 #[test]
@@ -36,7 +36,7 @@ fn test_cmdline_config() {
     let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let config = from_cmdline(&format!(
-        "{} {}",
+        "{} -i {}",
         pkg_name!(),
         tmpfile.path().to_str().unwrap(),
     ))
@@ -47,10 +47,10 @@ fn test_cmdline_config() {
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let outfile = NamedTempFile::new().expect("could not create outfile");
     let config = from_cmdline(&format!(
-        "{} -o {} {}",
+        "{} -i {} -o {}",
         pkg_name!(),
-        outfile.path().to_str().unwrap(),
         tmpfile.path().to_str().unwrap(),
+        outfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
     svgdx::cli::run(config).expect("run failed");
@@ -68,6 +68,7 @@ fn test_cmdline_same_file() {
     let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.current_dir(cwd)
         .args([
+            "-i",
             filename.to_str().unwrap(),
             "-o",
             &format!("./{}x", filename.to_str().unwrap()),
@@ -79,6 +80,7 @@ fn test_cmdline_same_file() {
     let mut cmd = Command::new(cargo::cargo_bin!());
     cmd.current_dir(cwd)
         .args([
+            "-i",
             filename.to_str().unwrap(),
             "-o",
             &format!("./{}", filename.to_str().unwrap()),

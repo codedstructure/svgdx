@@ -104,10 +104,11 @@ After installation, two binaries are available:
 
 ### svgdx
 
-    svgdx [INPUT] [-o OUTPUT]
+    svgdx [-i INPUT] [-o OUTPUT]
 
-By default, `svgdx` reads from stdin and writes to standard output, so if run without any
-arguments it simply waits for input.
+By default, `svgdx` reads from stdin and writes to standard output, so it can be
+used as a filter in a pipeline (note it requires an explicit '-i' argument if
+stdin is a terminal).
 
 ### svgdx-server & editor
 
@@ -144,7 +145,7 @@ Prepare an input file ([examples/simple.xml](examples/simple.xml)):
 Process the input with `svgdx`:
 
 ```bash
-$ svgdx examples/simple.svg -o examples/simple.svg
+$ svgdx -i examples/simple.svg -o examples/simple.svg
 ```
 
 ### Output

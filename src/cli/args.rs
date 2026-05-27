@@ -1,57 +1,55 @@
 use crate::errors::{Error, Result};
 use crate::{AutoStyleMode, ErrorMode, ThemeType};
+use std::io::IsTerminal;
 use std::str::FromStr;
 
-pub const USAGE: &str = concat!(
-    "svgdx ",
-    env!("CARGO_PKG_VERSION"),
-    r#" - create SVG diagrams easily
+use crate::constants::*;
 
-Usage: svgdx [OPTIONS] [FILE]
+pub const NO_INPUT_STDIN_TERMINAL: &str = r"Not defaulting '--input' when stdin is a terminal.
 
-Arguments:
-  [FILE]  File to process ('-' for stdin) [default: -]
+Use '-h' or '--help' for usage.";
+
+pub fn usage() -> String {
+    let default_theme = ThemeType::default().to_string();
+    let default_error_mode = ErrorMode::default().to_string();
+    let default_auto_style_mode = AutoStyleMode::default().to_string();
+    format!(
+        r#"
+Usage:
+  svgdx [OPTIONS]
 
 Options:
-  -o, --output <FILE>              Target output file ('-' for stdout)
-            [default: '-', i.e. stdout]
-      --debug                      Add debug info (e.g. input source) to output
-      --scale <SCALE>              Scale of user-units to mm for root svg element
-            [default: 1.0]
-      --border <BORDER>            Border width around image in user-units
-            [default: 5]
-      --auto-style-mode <MODE>     Auto-style mode: none, inline, css
-            [default: 'css']
-      --background <COLOUR>        Default background colour
-            [default: 'default']
-      --seed <SEED>                Seed for RNG functions
-            [default: 0]
-      --add-metadata               Include metadata in output
-      --loop-limit <N>             Limit on loop element iterations
-            [default: 1000]
-      --var-limit <N>              Limit on length of variable values
-            [default: 1024]
-      --depth-limit <N>            Recursion depth limit
-            [default: 100]
-      --path-repeat-limit <N>      Path repeat expansion limit
-            [default: 10000]
-      --font-size <SIZE>           Default font-size in user-units
-            [default: 3.0]
-      --font-family <FAMILY>       Default font-family for text elements
-            [default: 'sans-serif']
-      --theme <THEME>              Theme: default, bold, fine, glass, light, dark
-            [default: 'default']
-      --svg-style <STYLE>          Optional style to apply to SVG root element
-      --error-mode <MODE>          Error handling: strict, warn, ignore
-            [default: 'strict']
-  -D, --var <KEY=VALUE>            Variable key=value pairs (may be repeated)
-  -h, --help                       Show this help
-  -V, --version                    Display program version
+  -i, --input <INPUT>           Input file ('-' for stdin) ['-']
+  -o, --output <OUTPUT>         Target output file ('-' for stdout) ['-']
+      --debug                   Add debug info (e.g. input source) to output
+      --scale <SCALE>           User-units per mm for root SVG element [{DEFAULT_SCALE}]
+      --border <BORDER>         Border width around image in user-units [{DEFAULT_BORDER}]
+      --auto-style-mode <MODE>  Auto-style mode: none, inline, css ['{default_auto_style_mode}']
+      --background <COLOUR>     Default background colour ['{DEFAULT_BACKGROUND}']
+      --seed <SEED>             Seed for RNG functions [{DEFAULT_RNG_SEED}]
+      --add-metadata            Include metadata in output
+      --loop-limit <N>          Limit on loop element iterations [{DEFAULT_LOOP_LIMIT}]
+      --var-limit <N>           Limit on length of variable values [{DEFAULT_VAR_LIMIT}]
+      --depth-limit <N>         Recursion depth limit [{DEFAULT_DEPTH_LIMIT}]
+      --path-repeat-limit <N>   Path repeat expansion limit [{DEFAULT_PATH_REPEAT_LIMIT}]
+      --font-size <SIZE>        Default font-size in user-units [{DEFAULT_FONT_SIZE}]
+      --font-family <FAMILY>    Default font-family for text ['{DEFAULT_FONT_FAMILY}']
+      --theme <THEME>           Select theme to apply ['{default_theme}']
+      --svg-style <STYLE>       Optional style to apply to SVG root element
+      --error-mode <MODE>       Error handling: strict, warn, ignore ['{default_error_mode}']
+  -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
+  -h, --help                    Show this help
+  -V, --version                 Display program version
+
+Notes:
+  INPUT only defaults to stdin when not a terminal; use explicit `-i -` to read
+  from stdin on a terminal.
 "#
-);
+    )
+}
 
 pub struct Args {
-    pub file: String,
+    pub input: String,
     pub output: String,
     pub debug: bool,
     pub scale: f32,
@@ -75,21 +73,21 @@ pub struct Args {
 impl Default for Args {
     fn default() -> Self {
         Self {
-            file: "-".to_string(),
+            input: "-".to_string(),
             output: "-".to_string(),
             debug: false,
-            scale: 1.0,
-            border: 5,
+            scale: DEFAULT_SCALE,
+            border: DEFAULT_BORDER,
             auto_style_mode: AutoStyleMode::default(),
-            background: "default".to_string(),
-            seed: 0,
+            background: DEFAULT_BACKGROUND.to_string(),
+            seed: DEFAULT_RNG_SEED,
             add_metadata: false,
-            loop_limit: 1000,
-            var_limit: 1024,
-            depth_limit: 100,
-            path_repeat_limit: 10000,
-            font_size: 3.0,
-            font_family: "sans-serif".to_string(),
+            loop_limit: DEFAULT_LOOP_LIMIT,
+            var_limit: DEFAULT_VAR_LIMIT,
+            depth_limit: DEFAULT_DEPTH_LIMIT,
+            path_repeat_limit: DEFAULT_PATH_REPEAT_LIMIT,
+            font_size: DEFAULT_FONT_SIZE,
+            font_family: DEFAULT_FONT_FAMILY.to_string(),
             theme: ThemeType::default(),
             svg_style: None,
             error_mode: ErrorMode::default(),
@@ -99,8 +97,13 @@ impl Default for Args {
 }
 
 pub enum CliAction {
+    // -h or --help
     Help,
+    // svgdx -V or --version
     Version,
+    // stdin is terminal and we have no INPUT arg
+    ImplicitStdinTerminal,
+    // normal usage
     Run(Args),
 }
 
@@ -127,12 +130,12 @@ where
     v.parse().map_err(|e| Error::Cli(format!("'{flag}': {e}")))
 }
 
-pub fn parse_args(args: impl Iterator<Item = String>) -> Result<CliAction> {
-    let mut args = args.peekable();
+pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
+    let mut args = args.into_iter().peekable();
     let _ = args.next(); // skip argv[0]
 
     let mut parsed = Args::default();
-    let mut got_file = false;
+    let mut input_value = None;
 
     while let Some(arg) = args.next() {
         // Support --flag=value style by splitting on the first '='
@@ -142,13 +145,6 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<CliAction> {
         };
 
         match key.as_str() {
-            "--" => {
-                // End of options; consume the next arg as the positional file
-                if let Some(file) = args.next() {
-                    parsed.file = file;
-                }
-                break;
-            }
             "-h" | "--help" => {
                 return Ok(CliAction::Help);
             }
@@ -157,6 +153,9 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<CliAction> {
             }
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;
+            }
+            "-i" | "--input" => {
+                input_value = Some(take_value(&key, embedded, &mut args)?);
             }
             "--debug" => parsed.debug = true,
             "--scale" => parsed.scale = parse_value(&key, embedded, &mut args)?,
@@ -194,13 +193,30 @@ pub fn parse_args(args: impl Iterator<Item = String>) -> Result<CliAction> {
             "-D" | "--var" => {
                 parsed.vars.push(take_value(&key, embedded, &mut args)?);
             }
-            _ if !key.starts_with('-') && !got_file => {
-                parsed.file = key;
-                got_file = true;
-            }
             _ => return Err(Error::Cli(format!("unknown argument: '{key}'"))),
         }
     }
 
+    match input_value {
+        Some(v) => parsed.input = v,
+        None => {
+            // Default to stdin, but only if not a terminal
+            if std::io::stdin().is_terminal() {
+                return Ok(CliAction::ImplicitStdinTerminal);
+            }
+        }
+    }
+
     Ok(CliAction::Run(parsed))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_args() {
+        let config = parse_args(vec!["svgdx".to_string(), "--help".to_string()]);
+        assert!(matches!(config, Ok(CliAction::Help)));
+    }
 }

@@ -1,11 +1,9 @@
 mod args;
 use std::{path::Path, str::FromStr};
 
-use crate::{Error, Result, VarName, transform_file};
+use crate::{Error, Result, TransformConfig, VERSION_FULL, VarName, transform_file};
 
-pub use args::{Args, CliAction, USAGE, parse_args};
-
-use crate::TransformConfig;
+pub use args::{Args, CliAction, NO_INPUT_STDIN_TERMINAL, parse_args, usage};
 
 #[derive(Clone, Debug)]
 struct VarSpec {
@@ -49,11 +47,11 @@ pub struct Config {
 
 impl Args {
     pub fn into_config(self) -> Result<Config> {
-        if self.file != "-" && self.output != "-" {
+        if self.input != "-" && self.output != "-" {
             // Arguably creating this struct shouldn't do any IO, but this is a
             // deliberate UX safety restriction on the CLI which is worth keeping
             // as high-level as possible to keep the lower level API cleaner.
-            let in_path = Path::new(&self.file);
+            let in_path = Path::new(&self.input);
             let out_path = Path::new(&self.output);
             if out_path.exists()
                 && out_path.canonicalize().map_err(Error::from_err)?
@@ -70,7 +68,7 @@ impl Args {
             .map(|s| s.parse())
             .collect::<Result<Vec<VarSpec>>>()?;
         Ok(Config {
-            input_path: self.file,
+            input_path: self.input,
             output_path: self.output,
             transform: TransformConfig {
                 debug: self.debug,
@@ -98,10 +96,15 @@ impl Args {
 pub fn run(config: CliAction) -> Result<()> {
     match config {
         CliAction::Help => {
-            println!("{USAGE}");
+            println!("{}", usage());
+        }
+        CliAction::ImplicitStdinTerminal => {
+            println!("{VERSION_FULL}");
+            println!();
+            println!("{NO_INPUT_STDIN_TERMINAL}");
         }
         CliAction::Version => {
-            println!("svgdx {}", env!("CARGO_PKG_VERSION"));
+            println!("{VERSION_FULL}");
         }
         CliAction::Run(args) => {
             let config = args.into_config()?;
