@@ -269,11 +269,7 @@ impl SvgElement {
     }
 
     pub fn apply_auto_styles(&mut self, styles: &StyleMap) {
-        for (key, value) in styles {
-            if !self.styles.contains_key(key) {
-                self.styles.insert(key, value);
-            }
-        }
+        self.styles = self.styles.merge_styles(styles);
     }
 
     pub fn add_styles_from(&mut self, other: &Self) {

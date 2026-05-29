@@ -467,6 +467,16 @@ impl StyleMap {
             styles: OrderedMap::new(),
         }
     }
+
+    pub fn merge_styles(&self, other: &Self) -> Self {
+        let mut merged = self.clone();
+        for (key, value) in other {
+            if !merged.contains_key(key.as_str()) {
+                merged.insert(key.clone(), value.clone());
+            }
+        }
+        merged
+    }
 }
 
 impl From<Vec<(String, String)>> for StyleMap {

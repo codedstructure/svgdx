@@ -22,17 +22,17 @@ impl Stylable for EventStyleWrapper<'_> {
         if styles.is_empty() {
             return;
         }
-        let mut styles = styles.to_string();
         for (key, value) in self.raw.get_attrs_mut().iter_mut() {
             if key == "style" {
-                styles = format!("{}; {}", value, styles);
-                break;
+                let existing = value.parse::<StyleMap>().unwrap_or_default();
+                *value = existing.merge_styles(styles).to_string();
+                return;
             }
         }
 
-        if !styles.is_empty() {
-            self.raw.get_attrs_mut().push(("style".to_string(), styles));
-        }
+        self.raw
+            .get_attrs_mut()
+            .push(("style".to_string(), styles.to_string()));
     }
 }
 

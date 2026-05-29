@@ -237,6 +237,59 @@ fn test_inline_style_priority() {
 }
 
 #[test]
+fn test_inline_style_merges_default() {
+    let input = r#"
+<svg><config auto-style-mode="inline"/>
+<defaults><rect style="stroke: none"/></defaults>
+<rect wh="10" class="d-fill-blue"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output.matches(r#"style=""#).count(), 1);
+    assert_contains!(output, r#"stroke: none;"#);
+    assert_contains!(output, r#"fill: blue;"#);
+}
+
+#[test]
+fn test_inline_style_local_overrides_defaults_and_auto() {
+    let input = r#"
+<svg><config auto-style-mode="inline"/>
+<defaults><rect style="fill: green; stroke: none"/></defaults>
+<rect wh="10" class="d-fill-blue" style="fill: red"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    let rect_line = output
+        .lines()
+        .find(|l| l.contains("<rect "))
+        .unwrap();
+
+    assert_eq!(rect_line.matches(r#"style=""#).count(), 1);
+    assert_contains!(rect_line, "fill: red;");
+    assert_contains!(rect_line, "stroke: none;");
+    assert_not_contains!(rect_line, "fill: green;");
+    assert_not_contains!(rect_line, "fill: blue;");
+}
+
+#[test]
+fn test_inline_style_defaults_override_auto() {
+    let input = r#"
+<svg><config auto-style-mode="inline"/>
+<defaults><rect style="fill: green"/></defaults>
+<rect wh="10" class="d-fill-blue"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    let rect_line = output
+        .lines()
+        .find(|l| l.contains("<rect "))
+        .unwrap();
+
+    assert_contains!(rect_line, "fill: green;");
+    assert_not_contains!(rect_line, "fill: blue;");
+}
+
+#[test]
 fn test_inline_style_reuse() {
     let input = r##"
 <svg><config auto-style-mode="inline"/>
