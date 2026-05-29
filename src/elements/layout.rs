@@ -3,8 +3,8 @@ use std::str::FromStr;
 
 use super::SvgElement;
 use crate::constants::{
-    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
-    SCALARSPEC_SEP, VAR_PREFIX,
+    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
+    VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_type_el;
@@ -12,9 +12,11 @@ use crate::elements::path::path_bbox;
 use crate::errors::{Error, Result};
 use crate::geometry::{
     BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size, TransformAttr,
-    TrblLength, strp_length,
+    TrblLength, parse_elref_suffix, strp_length,
 };
-use crate::types::{attr_split, extract_elref, fstr, split_compound_attr, strp};
+use crate::types::{
+    attr_split, extract_elref, extract_elref_token, fstr, split_compound_attr, strp,
+};
 
 /// Replace all refspec entries in a string with lookup results
 /// Suitable for use with path `d` or polyline `points` attributes
@@ -25,45 +27,19 @@ use crate::types::{attr_split, extract_elref, fstr, split_compound_attr, strp};
 fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     // For most elements either a `#elem~X` or `#elem@X` form is required,
     // but for `<point>` elements a standalone `#elem` suffices.
-
-    let word_break = |c: char| {
-        !(
-            // not ideal, e.g. a second '.' *would* be a word break.
-            c.is_alphanumeric()
-                || c == '_'
-                || c == '-'
-                || c == SCALARSPEC_SEP
-                || c == RELPOS_SEP
-                || c == LOCSPEC_SEP
-                || c == EDGESPEC_SEP
-                || c == '%'
-        )
-    };
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
         if let Some(idx) = value.find([ELREF_ID_PREFIX, ELREF_PREVIOUS, ELREF_NEXT]) {
             result.push_str(&value[..idx]);
             value = &value[idx..];
-            if let Some(mut idx) = value[1..].find(word_break) {
-                if value.starts_with(ELREF_ID_PREFIX) {
-                    idx += 1; // account for ignoring # in word break search
-                } else {
-                    // account for ignoring ^/+/^^^ in word break search
-                    let elref_char = if value.starts_with(ELREF_PREVIOUS) {
-                        ELREF_PREVIOUS
-                    } else {
-                        ELREF_NEXT
-                    };
-                    let new_s = value.trim_start_matches(elref_char);
-                    idx = value.len() - new_s.len(); // asummes elref_char is 1 byte
-                }
-                result.push_str(&expand_single_relspec(&value[..idx], ctx));
-                value = &value[idx..];
+            if let Some(token) = extract_elref_token(value) {
+                result.push_str(&expand_single_relspec(token, ctx));
+                value = &value[token.len()..];
             } else {
-                result.push_str(&expand_single_relspec(value, ctx));
-                break;
-            };
+                result.push_str(&value[..1]);
+                value = &value[1..];
+            }
         } else {
             result.push_str(value);
             break;
@@ -73,17 +49,14 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
 }
 
 fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
-    let elem_loc = |elem: &SvgElement, loc: LocSpec| {
-        ctx.get_element_bbox(elem)
-            .map(|bb| bb.map(|bb| bb.locspec(loc)))
-    };
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name() == "point" {
-            if let Ok(Some(point)) = elem_loc(elem, LocSpec::Center) {
+            if let Ok(point) = elem.get_element_loc_coord(ctx, ElementLoc::LocSpec(LocSpec::Center))
+            {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
-        } else if let Some(loc) = rest.strip_prefix(LOCSPEC_SEP).and_then(|s| s.parse().ok()) {
-            if let Ok(Some(point)) = elem_loc(elem, loc) {
+        } else if let Ok(Some(loc)) = parse_elref_suffix(rest) {
+            if let Ok(point) = elem.get_element_loc_coord(ctx, loc) {
                 return format!("{} {}", fstr(point.0), fstr(point.1));
             }
         } else if let Some(scalar) = rest
@@ -258,7 +231,7 @@ impl SvgElement {
 
     pub fn get_element_loc_coord(
         &self,
-        elem_map: &impl ElementMap,
+        elem_map: &(impl ElementMap + ?Sized),
         loc: ElementLoc,
     ) -> Result<(f32, f32)> {
         match loc {
@@ -827,7 +800,7 @@ fn eval_pos_attr(
     if let Ok(attr_ss) = ScalarSpec::from_str(name) {
         if let (Some(el), remain) = split_relspec(value, ctx)? {
             if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                return pos_attr_helper(element, remain, &bbox, attr_ss, force_origin);
+                return pos_attr_helper(element, el, ctx, remain, &bbox, attr_ss, force_origin);
             }
         }
     }
@@ -836,6 +809,8 @@ fn eval_pos_attr(
 
 fn pos_attr_helper(
     element: &SvgElement,
+    ref_el: &SvgElement,
+    ctx: &impl ElementMap,
     remain: &str,
     bbox: &BoundingBox,
     attr_ss: ScalarSpec,
@@ -856,7 +831,7 @@ fn pos_attr_helper(
             v = len.adjust(v);
         }
     } else {
-        let mut loc = if element.name() == "text" {
+        let default_loc = if element.name() == "text" {
             // text elements (currently) have no size, and default
             // to center of the referenced element
             LocSpec::from_str(element.get_attr("text-loc").unwrap_or("c"))?
@@ -870,15 +845,18 @@ fn pos_attr_helper(
             // will set x2 to the 'x2' (i.e. right edge) of #abc
             attr_ss.into()
         };
+        let mut loc = ElementLoc::LocSpec(default_loc);
         // "[@loc][ delta]"
-        if let Some(ls) = loc_str.strip_prefix(LOCSPEC_SEP) {
-            loc = ls.parse()?;
+        if !loc_str.is_empty() {
+            loc = parse_elref_suffix(loc_str)?.ok_or_else(|| {
+                Error::Parse(format!("could not parse '{loc_str}' in this context"))
+            })?;
         } else if !loc_str.is_empty() {
             return Err(Error::Parse(format!(
                 "could not parse '{loc_str}' in this context",
             )));
         }
-        let (x, y) = bbox.locspec(loc);
+        let (x, y) = ref_el.get_element_loc_coord(ctx, loc)?;
         use ScalarSpec::*;
         let (base, dim) = match attr_ss {
             Minx | Maxx | Cx => (x, bbox.width()),
@@ -1075,6 +1053,35 @@ mod tests {
     use crate::types::ElRef;
 
     use super::*;
+
+    struct FixedBBoxContext(BoundingBox);
+
+    impl ElementMap for FixedBBoxContext {
+        fn set_current_element(&mut self, _el: &SvgElement) {}
+
+        fn get_element(&self, _id: &ElRef) -> Option<&SvgElement> {
+            None
+        }
+
+        fn get_element_bbox(&self, _el: &SvgElement) -> Result<Option<BoundingBox>> {
+            Ok(Some(self.0))
+        }
+
+        fn get_element_size(&self, el: &SvgElement) -> Result<Option<Size>> {
+            el.size(self)
+        }
+    }
+
+    fn pos_attr_helper(
+        element: &SvgElement,
+        remain: &str,
+        bbox: &BoundingBox,
+        attr_ss: ScalarSpec,
+        force_origin: bool,
+    ) -> Result<String> {
+        let ctx = FixedBBoxContext(*bbox);
+        super::pos_attr_helper(element, element, &ctx, remain, bbox, attr_ss, force_origin)
+    }
 
     #[test]
     fn test_spread_attr() {
@@ -1306,5 +1313,23 @@ mod tests {
         assert_eq!(out, "10 20");
         let out = expand_relspec("1 2 #abc@t 3 4 #abc~h 5 6 #abc@c", &ctx);
         assert_eq!(out, "1 2 5 0 3 4 20 5 6 5 10");
+
+        ctx.add(
+            "line1",
+            SvgElement::new(
+                "line",
+                &[
+                    (String::from("x1"), String::from("0")),
+                    (String::from("y1"), String::from("0")),
+                    (String::from("x2"), String::from("20")),
+                    (String::from("y2"), String::from("10")),
+                ],
+            ),
+        );
+
+        let out = expand_relspec("#line1:20%", &ctx);
+        assert_eq!(out, "4 2");
+        let out = expand_relspec("M #line1:20% L #line1:3/10", &ctx);
+        assert_eq!(out, "M 4 2 L 6 3");
     }
 }

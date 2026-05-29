@@ -5,12 +5,12 @@ use std::str::FromStr;
 
 use super::functions::{Function, eval_function};
 use crate::constants::{
-    ELREF_ID_PREFIX, EXPR_END, EXPR_START, LOCSPEC_SEP, SCALARSPEC_SEP, VAR_END_BRACE,
-    VAR_OPEN_BRACE, VAR_PREFIX,
+    ELREF_ID_PREFIX, EXPR_END, EXPR_START, SCALARSPEC_SEP, VAR_END_BRACE, VAR_OPEN_BRACE,
+    VAR_PREFIX,
 };
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Error, Result};
-use crate::geometry::{BoundingBox, LocSpec, ScalarSpec};
+use crate::geometry::{BoundingBox, ScalarSpec, parse_elref_suffix};
 use crate::types::{VarName, extract_elref, fstr};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -516,13 +516,18 @@ pub(super) fn tokenize(input: &str) -> Result<Vec<Token>> {
             '-' if !in_elref_id => Token::Sub, // '-' is valid in an ElRef::Id
             '*' => Token::Mul,
             '/' => {
-                if buffer.is_empty() && tokens.last() == Some(&Token::Div) {
+                if in_elref_id {
+                    // '/' could be valid in e.g. `#abc:3/4`
+                    Token::Other
+                } else if buffer.is_empty() && tokens.last() == Some(&Token::Div) {
                     tokens.pop();
                     Token::IntDiv
                 } else {
                     Token::Div
                 }
             }
+            // '%' could be valid in e.g. `#abc:20%`
+            '%' if in_elref_id => Token::Other,
             '%' => Token::Mod,
             ',' => Token::Comma,
             ' ' | '\t' => Token::Whitespace,
@@ -669,8 +674,8 @@ impl<'a> EvalState<'a> {
             return Ok([bb.x1(), bb.y1(), bb.x2(), bb.y2()].into());
         } else if let Some(ss) = remain.strip_prefix(SCALARSPEC_SEP) {
             return Ok(bb.scalarspec(ScalarSpec::from_str(ss)?).into());
-        } else if let Some(ls) = remain.strip_prefix(LOCSPEC_SEP) {
-            let (x, y) = bb.locspec(LocSpec::from_str(ls)?);
+        } else if let Some(loc) = parse_elref_suffix(remain)? {
+            let (x, y) = elem.get_element_loc_coord(self.context, loc)?;
             return Ok([x, y].into());
         }
         Err(Error::Parse(format!(

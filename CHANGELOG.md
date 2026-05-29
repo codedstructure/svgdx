@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for generic line/path offset element refs using #ref:20%
+  syntax, and general consistency improvements to elref parsing throughout.
+  (Previously this syntax was only available in connectors).
+
 - Breaking changes (CLI):
 
   - the input file was previously a positional argument, it now uses the `-i`

@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
 use crate::errors::{Error, Result};
-use crate::types::{ElRef, attr_split, extract_elref, fstr, strp};
+use crate::types::{attr_split, fstr, strp};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
@@ -111,7 +111,6 @@ impl FromStr for Length {
     /// Parse a ratio (float or %age) to an f32
     /// Note this deliberately does not clamp to 0..1
     fn from_str(value: &str) -> Result<Self> {
-        let value = value.trim();
         if let Some(pc) = value.strip_suffix('%') {
             Ok(Length::Ratio(strp(pc)? * 0.01))
         } else if let Some((numer, denom)) = value.split_once('/') {
@@ -170,7 +169,7 @@ pub enum LocSpec {
     LeftEdge(Length),
 }
 
-/// `LocSpec` defines a location on a `SvgElement`
+/// `ElementLoc` defines a location on (or relative to) an `SvgElement`
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ElementLoc {
     LocSpec(LocSpec),
@@ -211,16 +210,15 @@ impl FromStr for ElementLoc {
     type Err = Error;
 
     fn from_str(value: &str) -> Result<Self> {
+        // LocSpec can contain both an edge which includes an optional length,
+        // but a `Length` alone is also valid (at least for elements where LineOffset
+        // makes sense)
         if let Ok(ls) = LocSpec::from_str(value) {
             Ok(ElementLoc::LocSpec(ls))
-        } else if let Some((edge, len)) = value.split_once(EDGESPEC_SEP) {
-            let len = len.parse::<Length>()?;
-            match edge {
-                "" => Ok(ElementLoc::LineOffset(len)),
-                _ => Err(Error::Parse(format!("invalid LocSpec format {value}"))),
-            }
+        } else if let Ok(len) = value.parse::<Length>() {
+            Ok(ElementLoc::LineOffset(len))
         } else {
-            Err(Error::Parse(format!("invalid LocSpec format {value}")))
+            Err(Error::Parse(format!("invalid ElementLoc format {value}")))
         }
     }
 }
@@ -384,32 +382,30 @@ impl FromStr for DirSpec {
     }
 }
 
-/// Parse a elref + optional ElementLoc, e.g. `#id@tl:10%` or `#id`
-pub fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
-    let (elref, remain) = extract_elref(s)?;
-    if remain.is_empty() {
-        return Ok((elref, None));
+/// Parse the optional suffix following an `ElRef`, e.g. `@tl`, `@t:10%`, `:25%`, or ``.
+pub fn parse_elref_suffix(s: &str) -> Result<Option<ElementLoc>> {
+    if s.is_empty() {
+        return Ok(None);
     }
-    let remain = remain
-        .strip_prefix(LOCSPEC_SEP)
-        .ok_or_else(|| Error::Parse(format!("invalid locspec: '{s}'")))?;
-    let mut chars = remain.chars();
-    let mut loc = String::new();
-    loop {
-        match chars.next() {
-            Some(c) if c.is_whitespace() => {
-                return Err(Error::Parse(format!("invalid locspec: '{s}'")));
-            }
-            Some(c) => loc.push(c),
-            None => return Ok((elref, Some(loc.parse()?))),
-        }
+    if let Some(loc) = s.strip_prefix(LOCSPEC_SEP) {
+        return Ok(Some(ElementLoc::LocSpec(loc.parse()?)));
     }
+    if let Some(len) = s.strip_prefix(EDGESPEC_SEP) {
+        return Ok(Some(ElementLoc::LineOffset(len.parse()?)));
+    }
+    Err(Error::Parse(format!("invalid locspec: '{s}'")))
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::geometry::BoundingBox;
+    use crate::types::{ElRef, extract_elref};
+
+    fn parse_el_loc(s: &str) -> Result<(ElRef, Option<ElementLoc>)> {
+        let (elref, remain) = extract_elref(s)?;
+        Ok((elref, parse_elref_suffix(remain)?))
+    }
 
     #[test]
     fn test_parse_loc() {
@@ -435,10 +431,42 @@ mod test {
             )
         );
         assert_eq!(
+            parse_el_loc("#id:25%").unwrap(),
+            (
+                ElRef::Id("id".to_string()),
+                Some(ElementLoc::LineOffset(Length::Ratio(0.25)))
+            )
+        );
+        assert_eq!(
+            parse_el_loc("#ns:thing:1/4").unwrap(),
+            (
+                ElRef::Id("ns:thing".to_string()),
+                Some(ElementLoc::LineOffset(Length::Rational(
+                    1,
+                    NonZeroU32::new(4).unwrap()
+                )))
+            )
+        );
+        assert_eq!(
+            parse_el_loc("^:25%").unwrap(),
+            (
+                ElRef::Prev(std::num::NonZeroU8::new(1).unwrap()),
+                Some(ElementLoc::LineOffset(Length::Ratio(0.25)))
+            )
+        );
+        assert_eq!(
+            parse_el_loc("++:3").unwrap(),
+            (
+                ElRef::Next(std::num::NonZeroU8::new(2).unwrap()),
+                Some(ElementLoc::LineOffset(Length::Absolute(3.0)))
+            )
+        );
+        assert_eq!(
             parse_el_loc("#id").unwrap(),
             (ElRef::Id("id".to_string()), None)
         );
         assert!(parse_el_loc("#id@").is_err());
+        assert!(parse_el_loc("#id@:25%").is_err());
         assert!(parse_el_loc("#id@ l").is_err());
     }
 

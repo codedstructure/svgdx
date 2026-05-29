@@ -155,6 +155,13 @@ fn test_mid() {
     let expected = r#">25, 20</text>"#;
     assert_contains!(transform_str_default(input).unwrap(), expected);
 
+    let input = r##"
+  <line id="ii" xy1="0 0" xy2="20 10"/>
+  <text text="{{mid(#ii:20%, #ii:80%)}}"/>
+"##;
+    let expected = r#">10, 5</text>"#;
+    assert_contains!(transform_str_default(input).unwrap(), expected);
+
     // midpoint of two elements
     let input = r##"
   <rect id="a" wh="20"/>

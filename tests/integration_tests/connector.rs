@@ -357,6 +357,30 @@ fn test_connector_into_relpos_group() {
 }
 
 #[test]
+fn test_connector_line_offset_refspec() {
+    let input = r##"
+<line xy1="80 10" xy2="90 40" id="ii"/>
+<line start="#ii:20%" end="#ii:80%"/>
+"##;
+    let expected = r#"<line x1="82" y1="16" x2="88" y2="34"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_connector_line_offset_prev_next_refspec() {
+    let input = r##"
+<line xy1="80 10" xy2="90 40"/>
+<line start="^:20%" end="^:80%"/>
+<line start="+:20%" end="+:80%"/>
+<line xy1="100 20" xy2="130 50"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line x1="82" y1="16" x2="88" y2="34"/>"#);
+    assert_contains!(output, r#"<line x1="106" y1="26" x2="124" y2="44"/>"#);
+}
+
+#[test]
 fn test_connector_overlapping_bboxes() {
     // When two bboxes intersect, no line should be rendered
     let input = r##"

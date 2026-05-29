@@ -1,5 +1,9 @@
-use crate::constants::{ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS};
+use crate::constants::{
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
+    SCALARSPEC_SEP,
+};
 use crate::errors::{Error, Result};
+use crate::geometry::Length;
 use std::fmt::{self, Display};
 use std::num::NonZeroU8;
 use std::ops::{Deref, DerefMut};
@@ -647,38 +651,100 @@ impl Display for ElRef {
     }
 }
 
-/// return Elref and remaining string
-pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
-    let first_char_match = |c: char| c.is_alphabetic() || c == '_';
-    let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-';
+/// Return the longest leading token starting with an elref prefix char.
+///
+/// Scans from the start of `s` and returns the maximal non-whitespace prefix
+/// that could contain an `ElRef` together with any immediate `@...`, `~...`,
+/// `|...`, or `:length` suffix.
+pub fn extract_elref_token(s: &str) -> Option<&str> {
+    let is_token_char = |c: char| {
+        c.is_alphanumeric()
+            || matches!(
+                c,
+                '_' | '-'
+                    | EDGESPEC_SEP
+                    | LOCSPEC_SEP
+                    | SCALARSPEC_SEP
+                    | RELPOS_SEP
+                    | '.'
+                    | '%'
+                    | '/'
+            )
+    };
 
-    if let Some(s) = s.strip_prefix(ELREF_ID_PREFIX) {
-        if s.starts_with(first_char_match) {
-            if let Some(split) = s.find(|c: char| !subseq_char_match(c)) {
-                let (id, remain) = s.split_at(split);
-                return Ok((ElRef::Id(id.to_owned()), remain));
-            } else {
-                return Ok((ElRef::Id(s.to_owned()), ""));
-            }
-        }
+    if let Some(rest) = s.strip_prefix(ELREF_ID_PREFIX) {
+        let token_end = rest
+            .find(|c: char| c.is_whitespace() || !is_token_char(c))
+            .unwrap_or(rest.len());
+        Some(&s[..token_end + 1])
     } else if s.starts_with([ELREF_PREVIOUS, ELREF_NEXT]) {
         let elref_char = if s.starts_with(ELREF_PREVIOUS) {
             ELREF_PREVIOUS
         } else {
             ELREF_NEXT
         };
+        let rest = s.trim_start_matches(elref_char);
+        let prefix_len = s.len() - rest.len();
+        let suffix_len = rest
+            .find(|c: char| c.is_whitespace() || !is_token_char(c))
+            .unwrap_or(rest.len());
+        Some(&s[..prefix_len + suffix_len])
+    } else {
+        None
+    }
+}
 
-        let new_s = s.trim_start_matches(elref_char);
-        let num = (s.len() - new_s.len()) as u8; // asummes elref_char is 1 byte
-
-        let non_zero_num = NonZeroU8::new(num).expect("cannot be 0 due to starts_with");
-
-        let elref = if elref_char == ELREF_PREVIOUS {
-            ElRef::Prev(non_zero_num)
-        } else {
-            ElRef::Next(non_zero_num)
+/// return Elref and remaining string
+pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
+    if let Some(candidate) = extract_elref_token(s) {
+        let first_char_match = |c: char| c.is_alphabetic() || c == '_';
+        let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-' || c == ':';
+        let parse_id_elref = |value: &str| {
+            let mut chars = value.chars();
+            if let Some(first) = chars.next() {
+                if first_char_match(first) && chars.all(subseq_char_match) {
+                    return Some(ElRef::Id(value.to_owned()));
+                }
+            }
+            None
         };
-        return Ok((elref, new_s));
+
+        let token_head = candidate
+            .split_once([LOCSPEC_SEP, SCALARSPEC_SEP, RELPOS_SEP])
+            .map(|(head, _)| head)
+            .unwrap_or(candidate);
+
+        if let Some(id_candidate) = token_head.strip_prefix(ELREF_ID_PREFIX) {
+            // Only treat the final ':' as a suffix boundary when the tail is a
+            // valid Length. Otherwise ':' remains part of the id.
+            if let Some((id, suffix)) = id_candidate.rsplit_once(EDGESPEC_SEP) {
+                if let (Some(elref), Ok(_)) = (parse_id_elref(id), suffix.parse::<Length>()) {
+                    return Ok((elref, &s[id.len() + 1..]));
+                }
+            }
+
+            if let Some(elref) = parse_id_elref(id_candidate) {
+                return Ok((elref, &s[token_head.len()..]));
+            }
+        } else if token_head.starts_with([ELREF_PREVIOUS, ELREF_NEXT]) {
+            let elref_char = if token_head.starts_with(ELREF_PREVIOUS) {
+                ELREF_PREVIOUS
+            } else {
+                ELREF_NEXT
+            };
+
+            let new_s = token_head.trim_start_matches(elref_char);
+            let num = (token_head.len() - new_s.len()) as u8; // asummes elref_char is 1 byte
+
+            let non_zero_num = NonZeroU8::new(num).expect("cannot be 0 due to starts_with");
+
+            let elref = if elref_char == ELREF_PREVIOUS {
+                ElRef::Prev(non_zero_num)
+            } else {
+                ElRef::Next(non_zero_num)
+            };
+            return Ok((elref, &s[num as usize..]));
+        }
     }
 
     Err(Error::Parse(format!("invalid elref format '{s}'")))
@@ -949,6 +1015,18 @@ mod test {
         assert_eq!(
             extract_elref("#id@tl:10%").unwrap(),
             (ElRef::Id("id".to_string()), "@tl:10%")
+        );
+        assert_eq!(
+            extract_elref("#id:20%").unwrap(),
+            (ElRef::Id("id".to_string()), ":20%")
+        );
+        assert_eq!(
+            extract_elref("#ns:thing:20%").unwrap(),
+            (ElRef::Id("ns:thing".to_string()), ":20%")
+        );
+        assert_eq!(
+            extract_elref("#ns:thing@r").unwrap(),
+            (ElRef::Id("ns:thing".to_string()), "@r")
         );
         assert_eq!(
             extract_elref("#id").unwrap(),

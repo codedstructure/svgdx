@@ -141,6 +141,42 @@ fn test_position_scalar_locspec() {
 }
 
 #[test]
+fn test_position_line_offset_refspec() {
+    let input = r##"
+<line xy1="80 10" xy2="90 40" id="ii"/>
+<line xy1="#ii:20%" xy2="#ii:80%"/>
+"##;
+    let expected = r#"
+<line id="ii" x1="80" y1="10" x2="90" y2="40"/>
+<line x1="82" y1="16" x2="88" y2="34"/>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_position_line_offset_prev_next_refspec() {
+    let input = r##"
+<line xy1="80 10" xy2="90 40"/>
+<line xy1="^:20%" xy2="^:80%"/>
+<line xy1="+:20%" xy2="+:80%"/>
+<line xy1="100 20" xy2="130 50"/>
+"##;
+    let expected = r#"
+<line x1="80" y1="10" x2="90" y2="40"/>
+<line x1="82" y1="16" x2="88" y2="34"/>
+<line x1="106" y1="26" x2="124" y2="44"/>
+<line x1="100" y1="20" x2="130" y2="50"/>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
 fn test_position_scalar_edge() {
     let input = r##"
 <rect id="a" x="1" y="2" width="3" height="4"/>
