@@ -9,14 +9,14 @@ pub const NO_INPUT_STDIN_TERMINAL: &str = r"Not defaulting '--input' when stdin 
 
 Use '-h' or '--help' for usage.";
 
-pub fn usage() -> String {
+pub fn usage(program_name: &str) -> String {
     let default_theme = ThemeType::default().to_string();
     let default_error_mode = ErrorMode::default().to_string();
     let default_auto_style_mode = AutoStyleMode::default().to_string();
     format!(
         r#"
 Usage:
-  svgdx [OPTIONS]
+  {program_name} [OPTIONS]
 
 Options:
   -i, --input <INPUT>           Input file ('-' for stdin) ['-']

@@ -1,9 +1,39 @@
 use assert_cmd::{Command, cargo, pkg_name};
 use assertables::assert_contains;
+use std::fs::{self, File};
 use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use svgdx::Result;
 use svgdx::cli::{CliAction, parse_args};
-use tempfile::NamedTempFile;
+
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+struct TestTempFile {
+    path: PathBuf,
+}
+
+impl TestTempFile {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "svgdx-test-{}-{}.tmp",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        File::create(&path).expect("could not create tmpfile");
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TestTempFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
+}
 
 /// Create a `Config` object set up given a command line string.
 ///
@@ -33,7 +63,7 @@ fn test_cmdline_config() {
     let config = from_cmdline(&format!("{} --help", pkg_name!()));
     assert!(matches!(config, Ok(CliAction::Help)));
 
-    let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
+    let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let config = from_cmdline(&format!(
         "{} -i {}",
@@ -41,11 +71,11 @@ fn test_cmdline_config() {
         tmpfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::cli::run(config).expect("run failed");
+    svgdx::cli::run(config, "test").expect("run failed");
 
-    let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
+    let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
-    let outfile = NamedTempFile::new().expect("could not create outfile");
+    let outfile = TestTempFile::new();
     let config = from_cmdline(&format!(
         "{} -i {} -o {}",
         pkg_name!(),
@@ -53,12 +83,12 @@ fn test_cmdline_config() {
         outfile.path().to_str().unwrap(),
     ))
     .expect("cmdline should be valid");
-    svgdx::cli::run(config).expect("run failed");
+    svgdx::cli::run(config, "test").expect("run failed");
 }
 
 #[test]
 fn test_cmdline_same_file() {
-    let mut tmpfile = NamedTempFile::new().expect("could not create tmpfile");
+    let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
 
     let cwd = tmpfile.path().parent().unwrap();
@@ -88,4 +118,14 @@ fn test_cmdline_same_file() {
         .assert()
         .failure()
         .code(1);
+}
+
+impl Write for TestTempFile {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        File::options().append(true).open(&self.path)?.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        File::options().append(true).open(&self.path)?.flush()
+    }
 }

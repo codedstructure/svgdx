@@ -1,3 +1,5 @@
+mod args;
+
 use axum::{
     Router,
     body::Body,
@@ -7,11 +9,13 @@ use axum::{
     routing::{get, post},
 };
 use serde_derive::Deserialize;
-use tokio::sync::mpsc::Sender;
+use tokio::sync::mpsc::{Sender, channel};
 
 use crate::errors::Error;
 use crate::json_api::{TransformResponse, transform_json_impl};
-use crate::{TransformConfig, transform_str};
+use crate::{TransformConfig, VERSION, transform_str};
+
+pub use args::{Args, CliAction, parse_args, usage};
 
 // Content-Security-Policy - allow inline CSS used for the generated SVG images,
 // but otherwise restrict to same-origin resources.
@@ -33,6 +37,43 @@ impl From<RequestConfig> for TransformConfig {
         TransformConfig {
             add_metadata: config.add_metadata,
             ..Default::default()
+        }
+    }
+}
+
+impl Args {
+    fn socket_addr(&self) -> String {
+        if self.address.is_ipv6() {
+            format!("[{}]:{}", self.address, self.port)
+        } else {
+            format!("{}:{}", self.address, self.port)
+        }
+    }
+}
+
+pub async fn run(config: CliAction, program_name: &str) {
+    match config {
+        CliAction::Help => {
+            println!("{}", usage(program_name));
+        }
+        CliAction::Version => {
+            println!("{program_name} v{VERSION}");
+        }
+        CliAction::Run(args) => {
+            let address = args.socket_addr();
+            let mut tx = None;
+            if args.open {
+                let (ch_tx, mut rx) = channel(1);
+                tx = Some(ch_tx);
+                let address = address.clone();
+                tokio::spawn(async move {
+                    if rx.recv().await.is_some() {
+                        open::that(format!("http://{address}"))
+                            .unwrap_or_else(|e| eprintln!("Failed to open browser: {e}"));
+                    }
+                });
+            }
+            start_server(Some(&address), tx).await;
         }
     }
 }
@@ -81,8 +122,6 @@ fn transform_raw_handler(input: String, config: RequestConfig) -> Response<Body>
                 .unwrap()
         })
         .unwrap_or_else(|e| {
-            // TODO: make the error more informative, e.g. by returning a JSON object
-            // including line number(s) of failed elements.
             Response::builder()
                 .status(400)
                 .header("Content-Type", "text/plain")
@@ -93,11 +132,9 @@ fn transform_raw_handler(input: String, config: RequestConfig) -> Response<Body>
 
 macro_rules! include_or_read {
     ($path:expr, $mime:expr) => {{
-        // If configured as a release build, use include_bytes! to embed the file.
         #[cfg(not(debug_assertions))]
         let content =
             include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/editor/", $path)).as_ref();
-        // During development it's useful to have it re-read each request.
         #[cfg(debug_assertions)]
         let content = tokio::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/editor/", $path))
             .await
@@ -135,19 +172,14 @@ async fn favicon() -> impl IntoResponse {
     include_ico!("favicon.ico")
 }
 
-// Note svgdx-server injects a different bootstrap script (-server.js) vs the bootstrap
-// picked up by a static file server (such as `python3 -m http.server`). This is to ensure
-// transform requests come to the server rather than being handled by the browser WASM code.
 async fn bootstrap() -> impl IntoResponse {
     include_js!("svgdx-bootstrap-server.js")
 }
 
 async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
     match path.as_str() {
-        // Main editor files
         "main.js" => include_js!("static/main.js"),
         "svgdx-editor.css" => include_css!("static/svgdx-editor.css"),
-        // Modules
         "modules/config.js" => include_js!("static/modules/config.js"),
         "modules/storage.js" => include_js!("static/modules/storage.js"),
         "modules/dom.js" => include_js!("static/modules/dom.js"),
@@ -161,7 +193,6 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
         "modules/clipboard.js" => include_js!("static/modules/clipboard.js"),
         "modules/toolbar.js" => include_js!("static/modules/toolbar.js"),
         "modules/slider.js" => include_js!("static/modules/slider.js"),
-        // CodeMirror vendor files
         "vendor/cm5/codemirror.min.css" => {
             include_css!("static/vendor/cm5/codemirror.min.css")
         }

@@ -27,7 +27,6 @@ pub use themes::{ContextTheme, ThemeType};
 /// Any required `<defs>` entries are also added, unless the mode is set to
 /// `None`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum AutoStyleMode {
     /// Don't process auto-style classes.
     None,

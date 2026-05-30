@@ -1,7 +1,7 @@
 mod args;
 use std::{path::Path, str::FromStr};
 
-use crate::{Error, Result, TransformConfig, VERSION_FULL, VarName, transform_file};
+use crate::{Error, Result, TransformConfig, VERSION, VarName, transform_file};
 
 pub use args::{Args, CliAction, NO_INPUT_STDIN_TERMINAL, parse_args, usage};
 
@@ -93,18 +93,18 @@ impl Args {
     }
 }
 
-pub fn run(config: CliAction) -> Result<()> {
+pub fn run(config: CliAction, program_name: &str) -> Result<()> {
     match config {
         CliAction::Help => {
-            println!("{}", usage());
+            println!("{}", usage(program_name));
         }
         CliAction::ImplicitStdinTerminal => {
-            println!("{VERSION_FULL}");
+            println!("{program_name} v{VERSION}");
             println!();
             println!("{NO_INPUT_STDIN_TERMINAL}");
         }
         CliAction::Version => {
-            println!("{VERSION_FULL}");
+            println!("{program_name} v{VERSION}");
         }
         CliAction::Run(args) => {
             let config = args.into_config()?;

@@ -7,7 +7,6 @@ use crate::errors::{Error, Result};
 
 /// Auto-style themes for svgdx.
 #[derive(Default, Debug, Clone)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ThemeType {
     /// The default theme, suitable for line diagrams.
     #[default]

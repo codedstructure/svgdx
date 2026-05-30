@@ -30,15 +30,14 @@
 use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "cli")]
-use std::fs::{self, File};
+use std::fs::File;
 #[cfg(feature = "cli")]
 use std::io::{BufReader, IsTerminal, Read};
+#[cfg(feature = "cli")]
+use std::path::{Path, PathBuf};
 
 use std::collections::HashMap;
 use std::io::{BufRead, Cursor, Write};
-
-#[cfg(feature = "cli")]
-use tempfile::NamedTempFile;
 
 #[cfg(feature = "cli")]
 #[cfg(not(target_arch = "wasm32"))]
@@ -69,7 +68,6 @@ use crate::constants::{
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-pub const VERSION_FULL: &str = concat!(env!("CARGO_PKG_NAME"), " v", env!("CARGO_PKG_VERSION"));
 
 /// Settings to configure a single transformation.
 ///
@@ -139,7 +137,6 @@ impl Default for TransformConfig {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "cli", derive(clap::ValueEnum))]
 pub enum ErrorMode {
     /// Un-resolved errors prevent processing
     #[default]
@@ -225,15 +222,34 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
     if output == "-" {
         transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
     } else {
-        let mut out_temp = NamedTempFile::new().map_err(Error::Io)?;
-        transform_stream(&mut in_reader, &mut out_temp, cfg)?;
-        // Copy content rather than rename (by .persist()) since this
-        // could cross filesystems; some apps (e.g. eog) also fail to
-        // react to 'moved-over' files.
-        fs::copy(out_temp.path(), output).map_err(Error::Io)?;
+        let temp_output = output_temp_path(output);
+        let transform_result = (|| -> Result<()> {
+            let mut out_temp = File::create(&temp_output).map_err(Error::Io)?;
+            transform_stream(&mut in_reader, &mut out_temp, cfg)?;
+            out_temp.flush().map_err(Error::Io)?;
+            std::fs::rename(&temp_output, output).map_err(Error::Io)?;
+            Ok(())
+        })();
+
+        if transform_result.is_err() {
+            let _ = std::fs::remove_file(&temp_output);
+        }
+
+        transform_result?;
     }
 
     Ok(())
+}
+
+#[cfg(feature = "cli")]
+fn output_temp_path(output: &str) -> PathBuf {
+    let output = Path::new(output);
+    let parent = output.parent().unwrap_or_else(|| Path::new("."));
+    let file_name = output
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("svgdx-output");
+    parent.join(format!("{file_name}.{}.tmp", std::process::id()))
 }
 
 #[deprecated(
