@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: `auto-style-mode="inline"` multiple `style` attribute generation.
 
+- Fixed: zero-length connectors no-longer omitted, so layout references to
+  them still work.
+
 - Breaking changes (CLI):
 
   - the input file was previously a positional argument, it now uses the `-i`

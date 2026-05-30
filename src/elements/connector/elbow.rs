@@ -172,6 +172,14 @@ impl ElbowConnector {
         let (x1, y1) = self.start.origin;
         let (x2, y2) = self.end.origin;
 
+        if self.start.origin == self.end.origin {
+            return Ok(SvgElement::new(
+                "polyline",
+                &[("points".to_string(), format!("{} {}", fstr(x1), fstr(y1)))],
+            )
+            .with_attrs_from(&self.source_element));
+        }
+
         let default_ratio_offset = Length::Ratio(0.5);
         let default_abs_offset = Length::Absolute(3.);
 

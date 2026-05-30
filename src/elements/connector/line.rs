@@ -370,7 +370,9 @@ impl LineConnector {
     }
 
     pub fn render(&self, _ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
-        if self.overlap {
+        // Keep zero-length connectors so they contribute a point bbox,
+        // but skip non-degenerate connectors between overlapping bboxes.
+        if self.overlap && self.start.origin != self.end.origin {
             return Ok(None);
         }
 

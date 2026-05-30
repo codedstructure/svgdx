@@ -51,6 +51,27 @@ fn test_connector_fixed_end() {
 }
 
 #[test]
+fn test_zero_length_connectors() {
+    // line
+    let input = r##"
+<point id="p0" xy="10"/>
+<point id="p1" xy="10"/>
+<line start="#p0" end="#p1"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line x1="10" y1="10" x2="10" y2="10"/>"#);
+
+    // polyline
+    let input = r##"
+<point id="p0" xy="10"/>
+<point id="p1" xy="10"/>
+<polyline start="#p0" end="#p1"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<polyline points="10 10"/>"#);
+}
+
+#[test]
 fn test_connector_h() {
     let input = r##"
 <rect x="0" y="0" width="5" height="5" id="a" />

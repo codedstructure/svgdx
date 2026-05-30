@@ -259,10 +259,7 @@ fn test_inline_style_local_overrides_defaults_and_auto() {
 </svg>
 "#;
     let output = transform_str_default(input).unwrap();
-    let rect_line = output
-        .lines()
-        .find(|l| l.contains("<rect "))
-        .unwrap();
+    let rect_line = output.lines().find(|l| l.contains("<rect ")).unwrap();
 
     assert_eq!(rect_line.matches(r#"style=""#).count(), 1);
     assert_contains!(rect_line, "fill: red;");
@@ -280,10 +277,7 @@ fn test_inline_style_defaults_override_auto() {
 </svg>
 "#;
     let output = transform_str_default(input).unwrap();
-    let rect_line = output
-        .lines()
-        .find(|l| l.contains("<rect "))
-        .unwrap();
+    let rect_line = output.lines().find(|l| l.contains("<rect ")).unwrap();
 
     assert_contains!(rect_line, "fill: green;");
     assert_not_contains!(rect_line, "fill: blue;");
