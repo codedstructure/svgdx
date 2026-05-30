@@ -25,8 +25,8 @@ check:
 docs:
 	sh scripts/docs.sh
 
-mdbook: svgdx
-	MDBOOK_SVGDX_BIN="$(abspath $(SVGDX))" mdbook serve --open docs/mdbook
+mdbook:
+	sh scripts/mdbook.sh serve --open docs/mdbook
 
 wasm:
 	sh scripts/wasm_build.sh
