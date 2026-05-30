@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 
 set -euo pipefail
-set -x
 
 # This script wraps mdbook and ensures the mdbook-svgdx preprocessor
 # is installed and meets the required version.
 
-for prereq in mdbook mdbook-svgdx jq; do
+for prereq in mdbook mdbook-svgdx; do
     if ! command -v "$prereq" >/dev/null 2>&1; then
         echo "error: $prereq not found" >&2
         exit 1
@@ -48,14 +47,12 @@ if [[ -z "$version" ]] || ! version_check "$version"; then
     exit 1
 fi
 
-cargo build --release --bin svgdx --no-default-features --features cli
+(cd "$REPO_ROOT"; cargo build --release --bin svgdx --no-default-features --features cli)
+svgdx_bin="${REPO_ROOT}/target/release/svgdx"
 
-target_dir="$(cargo metadata --format-version 1 --no-deps | jq -r .target_directory)"
-svgdx_bin="$target_dir/release/svgdx"
-
-if [[ -z "$target_dir" || ! -x "$svgdx_bin" ]]; then
+if ! [[ -x "$svgdx_bin" ]]; then
     echo "error: could not locate built svgdx binary under cargo target directory" >&2
     exit 1
 fi
 
-MDBOOK_SVGDX_BIN="$svgdx_bin" exec mdbook "$@"
+(cd "$REPO_ROOT"; MDBOOK_SVGDX_BIN="$svgdx_bin" exec mdbook "$@")
