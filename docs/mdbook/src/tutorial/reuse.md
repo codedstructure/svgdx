@@ -1,4 +1,12 @@
-# Delta 8 - Reuse
+# Delta 8 - Reuse, defaults, and custom elements
+
+> `svgdx` fragments may be instantiated - with variation - later in a document
+
+## Overview
+
+This page discusses how content in your svgdx document may define templates which may later be instantiated.
+
+It starts by discussing SVG's `<use>` element, provided as part of standard SVG, before moving on to discuss the `<reuse>` element provided by svgdx allowing parameterised re-use, syntax sugar allowing custom elements to be defined, and the `<defaults>` element allowing a level of attribute inheritance.
 
 ## The `<use>` element
 
@@ -51,19 +59,132 @@ The `<reuse>` element is modelled on `<use>`, and in most cases any `<use>` elem
 </svg>
 ```
 
+### The `<specs>` container element
+
+With `<reuse>` duplicating the entire element into the rendered document, there is no benefit to keeping the source definition in the rendered document: a new `svgdx` element named `<specs>` is introduced that acts equivalently to SVG's `<defs>` element but doesn't appear in the rendered document.
+
 One of the key ways structural changes can be made is through the use of _context variables_.
 From the perspective of the referenced element, these are normal variables, used with the `$name` syntax as part of attribute values. The _source_ of these variables is not a `<vars>` or `<loop>` element, but additional attributes on the `<reuse>` element itself.
 
+When using injected context variables, the template may not be valid at the point it appears in the input document (i.e. the variables might not be defined at the point the template appears).
+In a `<defs>` container `svgdx` would still attempt (and fail) to evaluate variables, while elements within a `<specs>` element are deliberately not evaluated in any way until referenced from a `<reuse>` element.
+
 ```xml-svgdx
 <svg>
- <defs>
+ <specs>
   <symbol id="a">
    <rect wh="15" class="d-fill-$colour"/>
    <circle r="5" cxy="^" text="$colour"/>
   </symbol>
- </defs>
+ </specs>
 <reuse href="#a" colour="blue"/>
 <reuse href="#a" x="20" colour="red"/>
+</svg>
+```
+
+## Custom elements
+
+Custom elements may be defined within an svgdx input document using reuse semantics. This feature is implemented as syntax sugar over `specs` and `reuse`.
+
+Rather than using `<specs>` purely as a container for elements referenced via `<reuse>`, a `<specs>` element with an `element` attribute defines a custom element.
+
+```xml
+<specs>
+  <symbol id="name">
+    ...
+  </symbol>
+</specs>
+<reuse href="#name" ...>
+```
+
+can be rewritten as the more semantic
+
+```xml
+<specs element="name">
+  ...
+</specs>
+<name .../>
+```
+
+Note that not all values of `name` are valid as custom element names - at least the following are reserved by svgdx:
+
+ * `config`
+ * `reuse`
+ * `specs`
+ * `defaults`
+ * `var`
+ * `if`
+ * `loop`
+ * `for`
+
+> NOTE: Avoid defining custom elements that conflict with standard SVG elements.
+> The list of reserved elements may expand in future.
+
+```xml-svgdx
+<svg>
+  <specs element="document">
+    <!--
+      name: document
+      variables: width, height, text
+    -->
+    <var fold="{{min($width, $height) / 3}}"/>
+    <path d="M 0 0 H {{$width - $fold}} L $width $fold V $height H 0 Z
+             M {{$width - $fold}} 0 V $fold H $width" style="fill: whitesmoke"/>
+    <text xy="^@c" text="$text"/>
+  </specs>
+  <document xy="0" width="15" height="20" text="ABC"/>
+  <document xy="^|h 10" width="20" height="10" text="DOC"/>
+</svg>
+```
+
+## The `<defaults>` element
+
+The `<defaults>` element provided by svgdx is normally used as a _container_ element - surrounding another group of elements which act as 'blueprints' for setting the attributes of matching elements within that scope.
+
+Suppose we want all rectangles to have rounded corners, and a default size of 30x10. We can encode these as default attributes for all rectangles:
+
+```xml-svgdx
+<svg>
+  <defaults>
+    <rect rx="2" wh="30 10"/>
+  </defaults>
+  <rect text="hello!"/>
+  <rect xy="^|v 5" rx="5" text="rounder"/>
+  <rect xy="^|v 5" height="15" text="height\noverride!"/>
+</svg>
+```
+
+There are several concepts to be aware of when using the `defaults` element:
+
+  * Defaults are **scoped** to the current nesting level and below. For each attribute, a lookup for the default value to use starts at the inner-most nesting level and bubbles up to the root element until a match is found or no default is specified.
+  * Defaults apply to **matching** elements: the simplest case is the element name being the same (as in the earlier example using `rect`), but the `<_ .../>` element (i.e. element '_') may be used to match all element types, with the `match` attribute in elements applying further restrictions on either class or element type. The syntax roughly matches very basic CSS selectors: comma separated 'alternate' matching, with `element.class1.class2` or `.class3` type selectors in each of the comma-separated parts. Only element type and class-based matching are implemented.
+  * Certain attributes are **augmented** rather than **set if absent**. In the example above, the `rx` and `wh` attributes are set on the target when not already present, but for the following attributes any defaults are _appended_ to existing values:
+    * `class`
+    * `style`
+    * `text-style`
+    * `transform`
+    > NOTE: this doesn't always work as expected, as no concept of 'related' classes or styles exists. Setting a default colour through a default class and later attempting to override it with a locally defined colour class will result in both colour classes or styles defined on the target.
+  * While `<defaults>` is typically used as a container, any attributes defined directly on this element are equivalent to those on a contained `<_ .../>` element, so is also useful asas an **empty element**. `<defaults .../>` is equivalent to `<defaults><_ .../></defaults>`, i.e. it applies to every element subject to any provided `match` attribute.
+
+The following fuller example shows these in practice.
+
+```xml-svgdx
+<svg>
+  <defaults rx="1" xy="^|h 2" wh="5"/>
+  <rect xy="0"/>
+  <g>
+    <defaults wh="12" class="d-thick">
+      <rect class="d-text-italic"/>
+      <circle class="d-dot"/>
+      <_ match=".error" class="d-fill-red"/>
+      <_ match=".warn" class="d-fill-orange"/>
+      <_ match=".ok" class="d-fill-green"/>
+    </defaults>
+    <rect text="stop" class="error"/>
+    <circle text="ready" class="warn"/>
+    <rect text="Go!" width="20" rx="3" class="ok"/>
+  </g>
+  <circle />
 </svg>
 ```
 
