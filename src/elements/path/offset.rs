@@ -1,4 +1,5 @@
 use super::SvgElement;
+use super::syntax::PATH_COMMANDS;
 use crate::errors::{Error, Result};
 use crate::geometry::Length;
 use crate::types::{attr_split, strp};
@@ -22,10 +23,7 @@ pub fn get_point_along_path(el: &SvgElement, length: Length) -> Result<(f32, f32
         let mut op = ' ';
         let mut arg_num = 0;
         for item in attr_split(d) {
-            if item.starts_with([
-                'a', 'A', 'b', 'B', 'c', 'C', 'h', 'H', 'l', 'L', 'm', 'M', 'q', 'Q', 's', 'S',
-                't', 'T', 'v', 'V', 'z', 'Z',
-            ]) {
+            if item.starts_with(PATH_COMMANDS) {
                 if let Some(c) = item.chars().next() {
                     op = c;
                     arg_num = 0;
