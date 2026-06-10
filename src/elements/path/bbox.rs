@@ -1,11 +1,12 @@
 use super::SvgElement;
 use crate::errors::{Error, Result};
-use crate::geometry::BoundingBox;
+use crate::geometry::{BoundingBox, Length};
 
 use super::syntax::{PathSyntax, SvgPathSyntax};
 
+#[derive(Clone)]
 struct PathParser {
-    tokens: SvgPathSyntax,
+    tokens: SvgPathSyntax, // TODO: ref to make clone cheaper?
     // current position, updated as commands are processed
     position: Option<(f32, f32)>,
     // location to return to for 'Z'/'z' commands
@@ -41,6 +42,20 @@ impl PathParser {
             max_x: 0.,
             max_y: 0.,
         }
+    }
+
+    fn reset(&mut self) {
+        self.tokens.reset();
+        self.position = None;
+        self.subpath_start = None;
+        self.command = None;
+        self.cubic_cp2 = None;
+        self.quadratic_cp = None;
+        self.elapsed_distance = 0.;
+        self.min_x = 0.;
+        self.min_y = 0.;
+        self.max_x = 0.;
+        self.max_y = 0.;
     }
 
     fn extend_extrema(&mut self, pos: (f32, f32)) {
@@ -86,7 +101,7 @@ impl PathParser {
         }
     }
 
-    fn get_length(&self) -> f32 {
+    fn length_so_far(&self) -> f32 {
         self.elapsed_distance
     }
 
@@ -398,6 +413,105 @@ impl PathParser {
         }
         Ok(())
     }
+
+    fn full_length(&mut self) -> Result<f32> {
+        // TODO: memoize?
+        self.evaluate()?;
+        Ok(self.length_so_far())
+    }
+
+    fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<(f32, f32)> {
+        let command = self.tokens.read_command()?;
+
+        match command {
+            'L' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let target = self.tokens.read_coord()?;
+                let dx = target.0 - pos.0;
+                let dy = target.1 - pos.1;
+                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+            }
+            'l' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let (dx, dy) = self.tokens.read_coord()?;
+                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+            }
+            'H' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let new_x = self.tokens.read_number()?;
+                let dx = new_x - pos.0;
+                return Ok((pos.0 + dx * ratio, pos.1));
+            }
+            'h' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let dx = self.tokens.read_number()?;
+                return Ok((pos.0 + dx * ratio, pos.1));
+            }
+            'V' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let new_y = self.tokens.read_number()?;
+                let dy = new_y - pos.1;
+                return Ok((pos.0, pos.1 + dy * ratio));
+            }
+            'v' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let dy = self.tokens.read_number()?;
+                return Ok((pos.0, pos.1 + dy * ratio));
+            }
+            'z' | 'Z' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let target = self.subpath_start.unwrap_or(pos);
+                let dx = target.0 - pos.0;
+                let dy = target.1 - pos.1;
+                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+            }
+            _ => Err(Error::InvalidValue(
+                "path command".to_string(),
+                self.command.unwrap_or_default().to_string(),
+            ))?,
+        }
+    }
+
+    fn point_at_offset(&mut self, offset: Length) -> Result<(f32, f32)> {
+        self.reset();
+
+        // if offset is ratio, get path length and convert to absolute
+        let target_distance = match offset {
+            Length::Absolute(v) => v,
+            Length::Ratio(_) | Length::Rational(_, _) => {
+                let td = offset.evaluate(self.full_length()?);
+                self.reset();
+                td
+            }
+        };
+
+        self.tokens.skip_whitespace();
+        while !self.tokens.at_end() {
+            let snapshot = self.clone();
+            let old_length = self.length_so_far();
+            self.process_instruction()?;
+            let new_length = self.length_so_far();
+            if (new_length - target_distance).abs() < 1e-6 {
+                // target point is ~exactly at the end of a command.
+                break;
+            } else if new_length > target_distance {
+                let contribution = new_length - old_length;
+                // how far into the command to reach the target offset
+                let ratio = (target_distance - old_length) / contribution;
+                if ratio < 0. {
+                    // may happen if offset is negative; we'll return the first
+                    // position point since we've processed a command.
+                    break;
+                }
+                // gone too far; rewind to snapshot and evaluate
+                // just this command to find exact point at offset
+                *self = snapshot;
+                return self.probe_instruction_at_ratio(ratio);
+            }
+        }
+
+        Ok(self.position.unwrap_or((0., 0.)))
+    }
 }
 
 /// Compute the extremal points of a quadratic Bezier
@@ -697,6 +811,8 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
 
 #[cfg(test)]
 mod tests {
+    use std::num::NonZeroU32;
+
     use super::*;
 
     #[test]
@@ -1001,22 +1117,90 @@ mod tests {
     fn test_path_length() {
         // simple linear segments
         let mut pp = PathParser::new("m0 0h10v10h-10");
-        pp.evaluate().unwrap();
-        assert_eq!(pp.get_length(), 30.);
+        assert_eq!(pp.full_length().unwrap(), 30.);
 
         // include diagonal line
         let mut pp = PathParser::new("m0 0h10v10z");
-        pp.evaluate().unwrap();
-        assert!((pp.get_length() - (20. + 10. * (2f32).sqrt())).abs() < 1e-4);
+        assert!((pp.full_length().unwrap() - (20. + 10. * (2f32).sqrt())).abs() < 1e-4);
 
         // multiple subpaths - should ignore jumps
         let mut pp = PathParser::new("m0 0h10m 20 0v10");
-        pp.evaluate().unwrap();
-        assert_eq!(pp.get_length(), 20.);
+        assert_eq!(pp.full_length().unwrap(), 20.);
 
         // multiple subpaths, start off origin
         let mut pp = PathParser::new("m12 45h10m 20 0v10");
-        pp.evaluate().unwrap();
-        assert_eq!(pp.get_length(), 20.);
+        assert_eq!(pp.full_length().unwrap(), 20.);
+    }
+
+    #[test]
+    fn test_point_at_offset() {
+        let mut pp = PathParser::new("M 0 0 h10v10h10");
+
+        // at start
+        assert_eq!(pp.point_at_offset(Length::Absolute(0.)).unwrap(), (0., 0.));
+        // at end
+        assert_eq!(
+            pp.point_at_offset(Length::Absolute(30.)).unwrap(),
+            (20., 10.)
+        );
+        // halfway along first segment
+        assert_eq!(pp.point_at_offset(Length::Absolute(5.)).unwrap(), (5., 0.));
+        // halfway along second segment
+        assert_eq!(
+            pp.point_at_offset(Length::Absolute(15.)).unwrap(),
+            (10., 5.)
+        );
+        // halfway along third segment
+        assert_eq!(
+            pp.point_at_offset(Length::Absolute(25.)).unwrap(),
+            (15., 10.)
+        );
+        // beyond end should clamp to end point
+        assert_eq!(
+            pp.point_at_offset(Length::Absolute(35.)).unwrap(),
+            (20., 10.)
+        );
+        // negative offset should clamp to start point
+        assert_eq!(pp.point_at_offset(Length::Absolute(-5.)).unwrap(), (0., 0.));
+
+        // ratios
+        assert_eq!(pp.point_at_offset(Length::Ratio(0.)).unwrap(), (0., 0.));
+        assert_eq!(pp.point_at_offset(Length::Ratio(0.5)).unwrap(), (10., 5.));
+        assert_eq!(pp.point_at_offset(Length::Ratio(1.)).unwrap(), (20., 10.));
+
+        // rationals
+        assert_eq!(
+            pp.point_at_offset(Length::Rational(0, NonZeroU32::new(1).unwrap()))
+                .unwrap(),
+            (0., 0.)
+        );
+        assert_eq!(
+            pp.point_at_offset(Length::Rational(1, NonZeroU32::new(3).unwrap()))
+                .unwrap(),
+            (10., 0.)
+        );
+        assert_eq!(
+            pp.point_at_offset(Length::Rational(1, NonZeroU32::new(2).unwrap()))
+                .unwrap(),
+            (10., 5.)
+        );
+        assert_eq!(
+            pp.point_at_offset(Length::Rational(2, NonZeroU32::new(3).unwrap()))
+                .unwrap(),
+            (10., 10.)
+        );
+        assert_eq!(
+            pp.point_at_offset(Length::Rational(1, NonZeroU32::new(1).unwrap()))
+                .unwrap(),
+            (20., 10.)
+        );
+
+        // test 'z'
+        assert_eq!(
+            PathParser::new("m0 0h10v10h-10z")
+                .point_at_offset(Length::Absolute(35.))
+                .unwrap(),
+            (0., 5.)
+        )
     }
 }

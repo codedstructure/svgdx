@@ -8,6 +8,7 @@ pub const PATH_COMMANDS: [char; 20] = [
     'C', 'c', 'S', 's', 'Q', 'q', 'T', 't', 'A', 'a', // curve commands
 ];
 
+#[derive(Clone)]
 pub struct SvgPathSyntax {
     data: Vec<char>,
     index: usize,
@@ -19,6 +20,10 @@ impl SvgPathSyntax {
             data: data.chars().collect(),
             index: 0,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.index = 0;
     }
 }
 
