@@ -17,6 +17,9 @@ struct PathParser {
     cubic_cp2: Option<(f32, f32)>,
     // previous control point (if any) for evaluating 'T' and 't'
     quadratic_cp: Option<(f32, f32)>,
+    // distance along the path so far, for line-offset
+    elapsed_distance: f32,
+    // extrema, updated as path is processed
     min_x: f32,
     min_y: f32,
     max_x: f32,
@@ -32,6 +35,7 @@ impl PathParser {
             command: None,
             cubic_cp2: None,
             quadratic_cp: None,
+            elapsed_distance: 0.,
             min_x: 0.,
             min_y: 0.,
             max_x: 0.,
@@ -39,20 +43,37 @@ impl PathParser {
         }
     }
 
-    fn update_position(&mut self, pos: (f32, f32)) {
-        let old_pos = self.position;
-        self.position = Some(pos);
-        if old_pos.is_none() {
-            self.min_x = pos.0;
-            self.min_y = pos.1;
-            self.max_x = pos.0;
-            self.max_y = pos.1;
+    fn extend_extrema(&mut self, pos: (f32, f32)) {
+        let (x, y) = pos;
+        if self.position.is_none() {
+            self.min_x = x;
+            self.min_y = y;
+            self.max_x = x;
+            self.max_y = y;
         } else {
-            self.min_x = self.min_x.min(pos.0);
-            self.min_y = self.min_y.min(pos.1);
-            self.max_x = self.max_x.max(pos.0);
-            self.max_y = self.max_y.max(pos.1);
+            self.min_x = self.min_x.min(x);
+            self.min_y = self.min_y.min(y);
+            self.max_x = self.max_x.max(x);
+            self.max_y = self.max_y.max(y);
         }
+    }
+
+    fn extend_subpath(&mut self, pos: (f32, f32)) {
+        self.extend_extrema(pos);
+
+        let (old_x, old_y) = self.position.unwrap_or(pos);
+        let (x, y) = pos;
+        self.elapsed_distance += (x - old_x).hypot(y - old_y);
+
+        self.position = Some(pos);
+    }
+
+    fn new_subpath(&mut self, pos: (f32, f32)) {
+        self.extend_extrema(pos);
+        // note we don't add to elapsed_distance here; instantly jump to the new position.
+        self.position = Some(pos);
+
+        self.subpath_start = Some(pos);
     }
 
     fn get_bbox(&self) -> Option<BoundingBox> {
@@ -61,8 +82,12 @@ impl PathParser {
                 self.min_x, self.min_y, self.max_x, self.max_y,
             ))
         } else {
-            None // we've never called update_position()
+            None // we've never called extend_subpath()
         }
+    }
+
+    fn get_length(&self) -> f32 {
+        self.elapsed_distance
     }
 
     fn process_instruction(&mut self) -> Result<()> {
@@ -94,59 +119,57 @@ impl PathParser {
             'M' => {
                 // "(x y)+"
                 let xy = self.tokens.read_coord()?;
-                self.update_position(xy);
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
                 // (the first moveto is also the start of a subpath)
-                self.subpath_start = Some(xy);
+                self.new_subpath(xy);
             }
             'm' => {
                 // "(x y)+"
                 let (dx, dy) = self.tokens.read_coord()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
                 let xy = (px + dx, py + dy);
-                self.update_position(xy);
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
-                self.subpath_start = Some(xy);
+                self.new_subpath(xy);
             }
             'L' => {
                 // "(x y)+"
                 let xy = self.tokens.read_coord()?;
-                self.update_position(xy);
+                self.extend_subpath(xy);
             }
             'l' => {
                 // "(x y)+"
                 let (dx, dy) = self.tokens.read_coord()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
-                self.update_position((px + dx, py + dy));
+                self.extend_subpath((px + dx, py + dy));
             }
             'H' => {
                 // "x+"
                 let new_x = self.tokens.read_number()?;
                 let (_, py) = self.position.unwrap_or((0., 0.));
-                self.update_position((new_x, py));
+                self.extend_subpath((new_x, py));
             }
             'h' => {
                 // "x+"
                 let dx = self.tokens.read_number()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
-                self.update_position((px + dx, py));
+                self.extend_subpath((px + dx, py));
             }
             'V' => {
                 // "y+"
                 let new_y = self.tokens.read_number()?;
                 let (px, _) = self.position.unwrap_or((0., 0.));
-                self.update_position((px, new_y));
+                self.extend_subpath((px, new_y));
             }
             'v' => {
                 // "y+"
                 let dy = self.tokens.read_number()?;
                 let (px, py) = self.position.unwrap_or((0., 0.));
-                self.update_position((px, py + dy));
+                self.extend_subpath((px, py + dy));
             }
             'Z' | 'z' => {
-                self.update_position(self.subpath_start.unwrap_or((0., 0.)));
+                self.extend_subpath(self.subpath_start.unwrap_or((0., 0.)));
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
                 self.command = None;
@@ -161,9 +184,9 @@ impl PathParser {
                 cubic_cp2 = Some(cp2);
                 let extrema = cubic_extrema(start, cp1, cp2, end);
                 for point in extrema {
-                    self.update_position(point);
+                    self.extend_subpath(point);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'c' => {
                 // (x1 y1 x2 y2 x y)+
@@ -180,9 +203,9 @@ impl PathParser {
                 cubic_cp2 = Some(cp2);
                 let extrema = cubic_extrema(start, cp1, cp2, end);
                 for point in extrema {
-                    self.update_position(point);
+                    self.extend_subpath(point);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'S' => {
                 // S: "(x2 y2 x y)+"
@@ -205,9 +228,9 @@ impl PathParser {
                 cubic_cp2 = Some(cp2);
                 let extrema = cubic_extrema(start, cp1, cp2, end);
                 for e in extrema {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             's' => {
                 // s: "(x2 y2 x y)+"
@@ -233,9 +256,9 @@ impl PathParser {
                 cubic_cp2 = Some(cp2);
                 let extrema = cubic_extrema(start, cp1, cp2, end);
                 for e in extrema {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'Q' => {
                 // Q: "(x1 y1 x y)+"
@@ -245,9 +268,9 @@ impl PathParser {
 
                 quadratic_cp = Some(cp);
                 for e in quadratic_extrema(start, cp, end) {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'q' => {
                 // q: "(x1 y1 x y)+"
@@ -261,9 +284,9 @@ impl PathParser {
 
                 quadratic_cp = Some(cp);
                 for e in quadratic_extrema(start, cp, end) {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'T' => {
                 // "(x y)+"
@@ -282,9 +305,9 @@ impl PathParser {
 
                 quadratic_cp = Some(cp);
                 for e in quadratic_extrema(start, cp, end) {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             't' => {
                 // "(x y)+"
@@ -305,9 +328,9 @@ impl PathParser {
 
                 quadratic_cp = Some(cp);
                 for e in quadratic_extrema(start, cp, end) {
-                    self.update_position(e);
+                    self.extend_subpath(e);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'A' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
@@ -329,9 +352,9 @@ impl PathParser {
                     end,
                 );
                 for point in extrema {
-                    self.update_position(point);
+                    self.extend_subpath(point);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
@@ -354,9 +377,9 @@ impl PathParser {
                     end,
                 );
                 for point in extrema {
-                    self.update_position(point);
+                    self.extend_subpath(point);
                 }
-                self.update_position(end);
+                self.extend_subpath(end);
             }
             _ => Err(Error::InvalidValue(
                 "path command".to_string(),
@@ -972,5 +995,28 @@ mod tests {
         let mut pp = PathParser::new("m0 0 20 20h-10zm 5 -10h20v-10zm20 10l20 30");
         pp.evaluate().unwrap();
         assert_eq!(pp.get_bbox(), Some(BoundingBox::new(0., -20., 45., 30.)));
+    }
+
+    #[test]
+    fn test_path_length() {
+        // simple linear segments
+        let mut pp = PathParser::new("m0 0h10v10h-10");
+        pp.evaluate().unwrap();
+        assert_eq!(pp.get_length(), 30.);
+
+        // include diagonal line
+        let mut pp = PathParser::new("m0 0h10v10z");
+        pp.evaluate().unwrap();
+        assert!((pp.get_length() - (20. + 10. * (2f32).sqrt())).abs() < 1e-4);
+
+        // multiple subpaths - should ignore jumps
+        let mut pp = PathParser::new("m0 0h10m 20 0v10");
+        pp.evaluate().unwrap();
+        assert_eq!(pp.get_length(), 20.);
+
+        // multiple subpaths, start off origin
+        let mut pp = PathParser::new("m12 45h10m 20 0v10");
+        pp.evaluate().unwrap();
+        assert_eq!(pp.get_length(), 20.);
     }
 }
