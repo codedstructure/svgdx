@@ -275,8 +275,8 @@ mod tests {
         let result = get_point_along_linelike_type_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, -3.0, 0.001);
-        assert_abs_diff_le_x!(y, 3.0, 0.001);
+        assert_abs_diff_le_x!(x, 3.0, 0.001);
+        assert_abs_diff_le_x!(y, -3.0, 0.001);
 
         // over extended other direction
         let element = SvgElement::new(
@@ -286,8 +286,8 @@ mod tests {
         let result = get_point_along_linelike_type_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.0, 0.001);
-        assert_abs_diff_le_x!(y, -4.0, 0.001);
+        assert_abs_diff_le_x!(x, -5.0, 0.001);
+        assert_abs_diff_le_x!(y, 2.0, 0.001);
 
         // test A
 

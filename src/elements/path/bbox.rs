@@ -429,41 +429,197 @@ impl PathParser {
                 let target = self.tokens.read_coord()?;
                 let dx = target.0 - pos.0;
                 let dy = target.1 - pos.1;
-                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
             }
             'l' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let (dx, dy) = self.tokens.read_coord()?;
-                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
             }
             'H' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let new_x = self.tokens.read_number()?;
                 let dx = new_x - pos.0;
-                return Ok((pos.0 + dx * ratio, pos.1));
+                Ok((pos.0 + dx * ratio, pos.1))
             }
             'h' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let dx = self.tokens.read_number()?;
-                return Ok((pos.0 + dx * ratio, pos.1));
+                Ok((pos.0 + dx * ratio, pos.1))
             }
             'V' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let new_y = self.tokens.read_number()?;
                 let dy = new_y - pos.1;
-                return Ok((pos.0, pos.1 + dy * ratio));
+                Ok((pos.0, pos.1 + dy * ratio))
             }
             'v' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let dy = self.tokens.read_number()?;
-                return Ok((pos.0, pos.1 + dy * ratio));
+                Ok((pos.0, pos.1 + dy * ratio))
             }
             'z' | 'Z' => {
                 let pos = self.position.unwrap_or((0., 0.));
                 let target = self.subpath_start.unwrap_or(pos);
                 let dx = target.0 - pos.0;
                 let dy = target.1 - pos.1;
-                return Ok((pos.0 + dx * ratio, pos.1 + dy * ratio));
+                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
+            }
+            'C' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp1 = self.tokens.read_coord()?;
+                let cp2 = self.tokens.read_coord()?;
+                let end = self.tokens.read_coord()?;
+                Ok((
+                    evaluate_cubic(pos.0, cp1.0, cp2.0, end.0, ratio),
+                    evaluate_cubic(pos.1, cp1.1, cp2.1, end.1, ratio),
+                ))
+            }
+            'c' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp1 = self.tokens.read_coord()?;
+                let cp2 = self.tokens.read_coord()?;
+                let (dx, dy) = self.tokens.read_coord()?;
+                let cp1 = (pos.0 + cp1.0, pos.1 + cp1.1);
+                let cp2 = (pos.0 + cp2.0, pos.1 + cp2.1);
+                let end = (pos.0 + dx, pos.1 + dy);
+                Ok((
+                    evaluate_cubic(pos.0, cp1.0, cp2.0, end.0, ratio),
+                    evaluate_cubic(pos.1, cp1.1, cp2.1, end.1, ratio),
+                ))
+            }
+            'S' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp2 = self.tokens.read_coord()?;
+                let end = self.tokens.read_coord()?;
+
+                let cp1 = if let Some((prev_cp2x, prev_cp2y)) = self.cubic_cp2 {
+                    let (px, py) = pos;
+                    (2. * px - prev_cp2x, 2. * py - prev_cp2y)
+                } else {
+                    pos
+                };
+
+                Ok((
+                    evaluate_cubic(pos.0, cp1.0, cp2.0, end.0, ratio),
+                    evaluate_cubic(pos.1, cp1.1, cp2.1, end.1, ratio),
+                ))
+            }
+            's' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp2 = self.tokens.read_coord()?;
+                let (dx, dy) = self.tokens.read_coord()?;
+
+                let cp1 = if let Some((prev_cp2x, prev_cp2y)) = self.cubic_cp2 {
+                    let (px, py) = pos;
+                    (2. * px - prev_cp2x, 2. * py - prev_cp2y)
+                } else {
+                    pos
+                };
+                let cp2 = (pos.0 + cp2.0, pos.1 + cp2.1);
+                let end = (pos.0 + dx, pos.1 + dy);
+
+                Ok((
+                    evaluate_cubic(pos.0, cp1.0, cp2.0, end.0, ratio),
+                    evaluate_cubic(pos.1, cp1.1, cp2.1, end.1, ratio),
+                ))
+            }
+            'Q' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp = self.tokens.read_coord()?;
+                let end = self.tokens.read_coord()?;
+
+                Ok((
+                    evaluate_quadratic(pos.0, cp.0, end.0, ratio),
+                    evaluate_quadratic(pos.1, cp.1, end.1, ratio),
+                ))
+            }
+            'q' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let cp = self.tokens.read_coord()?;
+                let (dx, dy) = self.tokens.read_coord()?;
+
+                let cp = (pos.0 + cp.0, pos.1 + cp.1);
+                let end = (pos.0 + dx, pos.1 + dy);
+
+                Ok((
+                    evaluate_quadratic(pos.0, cp.0, end.0, ratio),
+                    evaluate_quadratic(pos.1, cp.1, end.1, ratio),
+                ))
+            }
+            'T' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let end = self.tokens.read_coord()?;
+
+                let cp = if let Some((prev_cpx, prev_cpy)) = self.quadratic_cp {
+                    let (px, py) = pos;
+                    (2. * px - prev_cpx, 2. * py - prev_cpy)
+                } else {
+                    pos
+                };
+
+                Ok((
+                    evaluate_quadratic(pos.0, cp.0, end.0, ratio),
+                    evaluate_quadratic(pos.1, cp.1, end.1, ratio),
+                ))
+            }
+            't' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let (dx, dy) = self.tokens.read_coord()?;
+
+                let cp = if let Some((prev_cpx, prev_cpy)) = self.quadratic_cp {
+                    let (px, py) = pos;
+                    (2. * px - prev_cpx, 2. * py - prev_cpy)
+                } else {
+                    pos
+                };
+                let end = (pos.0 + dx, pos.1 + dy);
+
+                Ok((
+                    evaluate_quadratic(pos.0, cp.0, end.0, ratio),
+                    evaluate_quadratic(pos.1, cp.1, end.1, ratio),
+                ))
+            }
+            'A' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let rx = self.tokens.read_non_negative()?;
+                let ry = self.tokens.read_non_negative()?;
+                let x_axis_rotation = self.tokens.read_number()?;
+                let large_arc_flag = self.tokens.read_flag()? != 0;
+                let sweep_flag = self.tokens.read_flag()? != 0;
+                let end = self.tokens.read_coord()?;
+
+                Ok(evaluate_arc(
+                    pos,
+                    rx,
+                    ry,
+                    x_axis_rotation,
+                    large_arc_flag,
+                    sweep_flag,
+                    end,
+                    ratio,
+                ))
+            }
+            'a' => {
+                let pos = self.position.unwrap_or((0., 0.));
+                let rx = self.tokens.read_non_negative()?;
+                let ry = self.tokens.read_non_negative()?;
+                let x_axis_rotation = self.tokens.read_number()?;
+                let large_arc_flag = self.tokens.read_flag()? != 0;
+                let sweep_flag = self.tokens.read_flag()? != 0;
+                let (dx, dy) = self.tokens.read_coord()?;
+                let end = (pos.0 + dx, pos.1 + dy);
+
+                Ok(evaluate_arc(
+                    pos,
+                    rx,
+                    ry,
+                    x_axis_rotation,
+                    large_arc_flag,
+                    sweep_flag,
+                    end,
+                    ratio,
+                ))
             }
             _ => Err(Error::InvalidValue(
                 "path command".to_string(),
@@ -633,24 +789,8 @@ fn arc_extrema(
         return vec![];
     }
 
-    let (rx, ry) = (rx.abs(), ry.abs());
     let phi = x_axis_rotation.to_radians();
-
-    // Scale radii if required to reach the endpoint
-    // https://www.w3.org/TR/SVG2/implnote.html#ArcCorrectionOutOfRangeRadii
-    // this duplicates some code in endpoint_to_center, but the scaled values
-    // are needed later in this function.
-    let cos_phi = phi.cos();
-    let sin_phi = phi.sin();
-    let x1_prime = cos_phi * (start.0 - end.0) / 2.0 + sin_phi * (start.1 - end.1) / 2.0;
-    let y1_prime = -sin_phi * (start.0 - end.0) / 2.0 + cos_phi * (start.1 - end.1) / 2.0;
-
-    let lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
-    let (rx, ry) = if lambda > 1.0 {
-        (rx * lambda.sqrt(), ry * lambda.sqrt())
-    } else {
-        (rx, ry)
-    };
+    let (rx, ry) = normalize_arc_radii(start, end, rx, ry, phi);
 
     // Convert to center form
     let (center, start_angle, sweep_angle) =
@@ -694,6 +834,32 @@ fn arc_extrema(
         })
         .map(|(x, y)| (fround(x), fround(y)))
         .collect()
+}
+
+fn normalize_arc_radii(
+    start: (f32, f32),
+    end: (f32, f32),
+    rx: f32,
+    ry: f32,
+    phi: f32,
+) -> (f32, f32) {
+    let (rx, ry) = (rx.abs(), ry.abs());
+
+    // SVG requires scaling radii up when the requested ellipse is too small to
+    // connect the given endpoints; see SVG 2 implnote B.2.5.
+    // https://www.w3.org/TR/SVG2/implnote.html#ArcCorrectionOutOfRangeRadii
+    let cos_phi = phi.cos();
+    let sin_phi = phi.sin();
+    let x1_prime = cos_phi * (start.0 - end.0) / 2.0 + sin_phi * (start.1 - end.1) / 2.0;
+    let y1_prime = -sin_phi * (start.0 - end.0) / 2.0 + cos_phi * (start.1 - end.1) / 2.0;
+
+    let lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
+    if lambda > 1.0 {
+        let scale = lambda.sqrt();
+        (rx * scale, ry * scale)
+    } else {
+        (rx, ry)
+    }
 }
 
 // Implements https://www.w3.org/TR/SVG2/implnote.html#ArcConversionEndpointToCenter
@@ -807,6 +973,54 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     } else {
         Ok(None)
     }
+}
+
+pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32, f32)> {
+    if let Some(path_data) = element.get_attr("d") {
+        let mut pp = PathParser::new(path_data);
+        pp.point_at_offset(offset)
+    } else {
+        Err(Error::MissingAttr("d".to_string()))
+    }
+}
+
+fn evaluate_cubic(p0: f32, p1: f32, p2: f32, p3: f32, t: f32) -> f32 {
+    let mt = 1.0 - t;
+    mt * mt * mt * p0 + 3.0 * mt * mt * t * p1 + 3.0 * mt * t * t * p2 + t * t * t * p3
+}
+
+fn evaluate_quadratic(p0: f32, p1: f32, p2: f32, t: f32) -> f32 {
+    let mt = 1.0 - t;
+    mt * mt * p0 + 2.0 * mt * t * p1 + t * t * p2
+}
+
+fn evaluate_arc(
+    pos: (f32, f32),
+    rx: f32,
+    ry: f32,
+    x_axis_rotation: f32,
+    large_arc_flag: bool,
+    sweep_flag: bool,
+    end: (f32, f32),
+    t: f32,
+) -> (f32, f32) {
+    const EPSILON: f32 = 1e-6;
+
+    if (pos.0 - end.0).hypot(pos.1 - end.1) < EPSILON {
+        return pos;
+    }
+
+    if rx.abs() < EPSILON || ry.abs() < EPSILON {
+        let dx = end.0 - pos.0;
+        let dy = end.1 - pos.1;
+        return (pos.0 + dx * t, pos.1 + dy * t);
+    }
+
+    let phi = x_axis_rotation.to_radians();
+    let (rx, ry) = normalize_arc_radii(pos, end, rx, ry, phi);
+    let (center, start_angle, sweep_angle) =
+        endpoint_to_center(pos, end, rx, ry, phi, large_arc_flag, sweep_flag);
+    ellipse_point(center, rx, ry, phi, start_angle + sweep_angle * t)
 }
 
 #[cfg(test)]
@@ -1133,7 +1347,7 @@ mod tests {
     }
 
     #[test]
-    fn test_point_at_offset() {
+    fn test_point_at_offset_linear() {
         let mut pp = PathParser::new("M 0 0 h10v10h10");
 
         // at start
@@ -1201,6 +1415,55 @@ mod tests {
                 .point_at_offset(Length::Absolute(35.))
                 .unwrap(),
             (0., 5.)
-        )
+        );
+    }
+
+    #[test]
+    fn test_point_at_offset_curve() {
+        // test quadratic bezier
+        assert_eq!(
+            PathParser::new("M 0 0 Q 20 40 40 0")
+                .point_at_offset(Length::Ratio(0.5))
+                .unwrap(),
+            (20., 20.)
+        );
+
+        // test cubic bezier
+        assert_eq!(
+            PathParser::new("M 0 0 C 0 40 40 40 40 0")
+                .point_at_offset(Length::Ratio(0.5))
+                .unwrap(),
+            (20., 30.)
+        );
+
+        // test arc (radius 40; center 50,50; start at 10,50 travel ccw)
+        // Note a single arc command cannot represent a full circle.
+        let mut pp = PathParser::new("M 10 50 A 40 40 0 1 0 90 50 A 40 40 0 1 0 10 50");
+        for (offset, expected) in [
+            (Length::Rational(0, NonZeroU32::new(4).unwrap()), (10., 50.)),
+            (Length::Rational(1, NonZeroU32::new(4).unwrap()), (50., 90.)),
+            (Length::Rational(2, NonZeroU32::new(4).unwrap()), (90., 50.)),
+            (Length::Rational(3, NonZeroU32::new(4).unwrap()), (50., 10.)),
+            (Length::Rational(4, NonZeroU32::new(4).unwrap()), (10., 50.)),
+        ] {
+            let point = pp.point_at_offset(offset).unwrap();
+            assert!(
+                (point.0 - expected.0).abs() < 1e-4 && (point.1 - expected.1).abs() < 1e-4,
+                "Failed for offset {offset:?}: got {point:?}, expected {expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_point_at_offset_arc_with_scaled_radii() {
+        let mut pp = PathParser::new("M 0 0 A 13 10 0 1 0 27 1");
+
+        assert_eq!(pp.point_at_offset(Length::Ratio(0.)).unwrap(), (0., 0.));
+
+        let point = pp.point_at_offset(Length::Ratio(1.)).unwrap();
+        assert!(
+            (point.0 - 27.).abs() < 1e-4 && (point.1 - 1.).abs() < 1e-4,
+            "Expected endpoint on scaled arc, got {point:?}"
+        );
     }
 }
