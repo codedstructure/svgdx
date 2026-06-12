@@ -1,3 +1,4 @@
+mod arc;
 mod bbox;
 mod bearing;
 mod convert;
