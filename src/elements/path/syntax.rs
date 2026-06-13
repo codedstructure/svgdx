@@ -1,5 +1,14 @@
 use crate::errors::{Error, Result};
 
+// This assumes that any svgdx path extensions ('B'/'b', repeats) have already
+// been resolved, and path data is SVG-compliant.
+// https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
+pub const PATH_COMMANDS: [char; 20] = [
+    'M', 'm', 'Z', 'z', 'L', 'l', 'H', 'h', 'V', 'v', // line and move commands
+    'C', 'c', 'S', 's', 'Q', 'q', 'T', 't', 'A', 'a', // curve commands
+];
+
+#[derive(Clone)]
 pub struct SvgPathSyntax {
     data: Vec<char>,
     index: usize,
@@ -12,6 +21,10 @@ impl SvgPathSyntax {
             index: 0,
         }
     }
+
+    pub fn reset(&mut self) {
+        self.index = 0;
+    }
 }
 
 impl PathSyntax for SvgPathSyntax {
@@ -20,7 +33,7 @@ impl PathSyntax for SvgPathSyntax {
         let c = self
             .current()
             .ok_or_else(|| Error::Parse("no data".to_string()))?;
-        Ok("MmLlHhVvZzCcSsQqTtAa".contains(c))
+        Ok(PATH_COMMANDS.contains(&c))
     }
 
     fn current(&self) -> Option<char> {
