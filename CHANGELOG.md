@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   syntax, and general consistency improvements to elref parsing throughout.
   (Previously this syntax was only available in connectors).
 
+  NOTE: the length of curved path segments is only approximated; line offsets
+  into paths with bezier or arc commands may be slightly inaccurate.
+
 - Fixed: `auto-style-mode="inline"` multiple `style` attribute generation.
 
 - Fixed: zero-length connectors no-longer omitted, so layout references to

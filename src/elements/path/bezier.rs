@@ -1,7 +1,10 @@
+use super::sample::{sample_length, sample_point_at_ratio};
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
 
 const EPSILON: f32 = 1e-6;
+const QUADRATIC_SAMPLES: usize = 8;
+const CUBIC_SAMPLES: usize = 12;
 
 pub(super) struct CubicBezierParams {
     start: (f32, f32),
@@ -101,6 +104,14 @@ impl CubicBezierParams {
             evaluate_cubic(self.start.1, self.cp1.1, self.cp2.1, self.end.1, t),
         )
     }
+
+    pub fn approx_length(&self) -> f32 {
+        sample_length(CUBIC_SAMPLES, |t| self.evaluate(t))
+    }
+
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+        sample_point_at_ratio(CUBIC_SAMPLES, ratio, |t| self.evaluate(t))
+    }
 }
 
 pub(super) struct QuadraticBezierParams {
@@ -170,6 +181,14 @@ impl QuadraticBezierParams {
             evaluate_quadratic(self.start.0, self.cp.0, self.end.0, t),
             evaluate_quadratic(self.start.1, self.cp.1, self.end.1, t),
         )
+    }
+
+    pub fn approx_length(&self) -> f32 {
+        sample_length(QUADRATIC_SAMPLES, |t| self.evaluate(t))
+    }
+
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+        sample_point_at_ratio(QUADRATIC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 }
 

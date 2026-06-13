@@ -4,6 +4,7 @@ mod bearing;
 mod bezier;
 mod convert;
 mod repeat;
+mod sample;
 mod syntax;
 #[cfg(test)]
 mod test_path;

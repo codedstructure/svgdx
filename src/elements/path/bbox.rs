@@ -60,21 +60,6 @@ impl PathParser {
         self.max_y = 0.;
     }
 
-    #[cfg(test)]
-    pub fn at_end(&self) -> bool {
-        self.tokens.at_end()
-    }
-
-    #[cfg(test)]
-    pub fn skip_whitespace(&mut self) {
-        self.tokens.skip_whitespace();
-    }
-
-    #[cfg(test)]
-    pub fn position(&self) -> Option<(f32, f32)> {
-        self.position
-    }
-
     fn extend_extrema(&mut self, pos: (f32, f32)) {
         let (x, y) = pos;
         if self.position.is_none() {
@@ -98,6 +83,18 @@ impl PathParser {
         self.elapsed_distance += (x - old_x).hypot(y - old_y);
 
         self.position = Some(pos);
+    }
+
+    fn extend_curve<I>(&mut self, end: (f32, f32), extrema: I, length: f32)
+    where
+        I: IntoIterator<Item = (f32, f32)>,
+    {
+        for point in extrema {
+            self.extend_extrema(point);
+        }
+        self.extend_extrema(end);
+        self.elapsed_distance += length;
+        self.position = Some(end);
     }
 
     fn new_subpath(&mut self, pos: (f32, f32)) {
@@ -227,10 +224,7 @@ impl PathParser {
                 )?;
 
                 next_cubic_cp2 = Some(curve.control_point_2());
-                for point in curve.extrema() {
-                    self.extend_subpath(point);
-                }
-                self.extend_subpath(curve.end());
+                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'S' | 's' => {
                 let curve = CubicBezierParams::from_smooth_tokens(
@@ -241,10 +235,7 @@ impl PathParser {
                 )?;
 
                 next_cubic_cp2 = Some(curve.control_point_2());
-                for point in curve.extrema() {
-                    self.extend_subpath(point);
-                }
-                self.extend_subpath(curve.end());
+                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'Q' | 'q' => {
                 let curve = QuadraticBezierParams::from_tokens(
@@ -254,10 +245,7 @@ impl PathParser {
                 )?;
 
                 next_quadratic_cp = Some(curve.control_point());
-                for point in curve.extrema() {
-                    self.extend_subpath(point);
-                }
-                self.extend_subpath(curve.end());
+                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'T' | 't' => {
                 let curve = QuadraticBezierParams::from_smooth_tokens(
@@ -268,10 +256,7 @@ impl PathParser {
                 )?;
 
                 next_quadratic_cp = Some(curve.control_point());
-                for point in curve.extrema() {
-                    self.extend_subpath(point);
-                }
-                self.extend_subpath(curve.end());
+                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'A' | 'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
@@ -281,11 +266,7 @@ impl PathParser {
                     is_relative,
                 )?;
 
-                let extrema = arc.extrema();
-                for point in extrema {
-                    self.extend_subpath(point);
-                }
-                self.extend_subpath(arc.end());
+                self.extend_curve(arc.end(), arc.extrema(), arc.approx_length());
             }
             _ => Err(Error::InvalidValue(
                 "path command".to_string(),
@@ -365,27 +346,27 @@ impl PathParser {
                 self.position.unwrap_or((0., 0.)),
                 is_relative,
             )?
-            .evaluate(ratio)),
+            .approx_point_at_ratio(ratio)),
             'S' | 's' => Ok(CubicBezierParams::from_smooth_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 self.cubic_cp2,
                 is_relative,
             )?
-            .evaluate(ratio)),
+            .approx_point_at_ratio(ratio)),
             'Q' | 'q' => Ok(QuadraticBezierParams::from_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 is_relative,
             )?
-            .evaluate(ratio)),
+            .approx_point_at_ratio(ratio)),
             'T' | 't' => Ok(QuadraticBezierParams::from_smooth_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 self.quadratic_cp,
                 is_relative,
             )?
-            .evaluate(ratio)),
+            .approx_point_at_ratio(ratio)),
             'A' | 'a' => {
                 let arc = ArcParams::from_tokens(
                     &mut self.tokens,
@@ -393,7 +374,7 @@ impl PathParser {
                     is_relative,
                 )?;
 
-                Ok(arc.evaluate(ratio))
+                Ok(arc.approx_point_at_ratio(ratio))
             }
             _ => Err(Error::InvalidValue(
                 "path command".to_string(),
@@ -460,5 +441,20 @@ pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32
         pp.point_at_offset(offset)
     } else {
         Err(Error::MissingAttr("d".to_string()))
+    }
+}
+
+#[cfg(test)]
+impl PathParser {
+    pub fn at_end(&self) -> bool {
+        self.tokens.at_end()
+    }
+
+    pub fn skip_whitespace(&mut self) {
+        self.tokens.skip_whitespace();
+    }
+
+    pub fn position(&self) -> Option<(f32, f32)> {
+        self.position
     }
 }

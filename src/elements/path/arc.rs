@@ -1,9 +1,11 @@
+use super::sample::{sample_length, sample_point_at_ratio};
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
 
 use std::f32::consts::PI;
 
 const EPSILON: f32 = 1e-6;
+const ARC_SAMPLES: usize = 16;
 
 pub(super) struct ArcParams {
     start: (f32, f32),
@@ -146,6 +148,14 @@ impl ArcParams {
         let (center, start_angle, sweep_angle) = self.endpoint_to_center();
         let phi = self.x_axis_rotation.to_radians();
         ellipse_point(center, self.rx, self.ry, phi, start_angle + sweep_angle * t)
+    }
+
+    pub fn approx_length(&self) -> f32 {
+        sample_length(ARC_SAMPLES, |t| self.evaluate(t))
+    }
+
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+        sample_point_at_ratio(ARC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 
     // Implements https://www.w3.org/TR/SVG2/implnote.html#ArcConversionEndpointToCenter

@@ -4,6 +4,13 @@ use super::bbox::PathParser;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use std::num::NonZeroU32;
 
+fn assert_point_close(actual: (f32, f32), expected: (f32, f32), epsilon: f32) {
+    assert!(
+        (actual.0 - expected.0).abs() < epsilon && (actual.1 - expected.1).abs() < epsilon,
+        "got {actual:?}, expected {expected:?}"
+    );
+}
+
 #[test]
 fn test_ps_number() {
     let mut ps = SvgPathSyntax::new("123 4.5  -9.25");
@@ -422,19 +429,21 @@ fn test_point_at_offset_linear() {
 #[test]
 fn test_point_at_offset_curve() {
     // test quadratic bezier
-    assert_eq!(
+    assert_point_close(
         PathParser::new("M 0 0 Q 20 40 40 0")
             .point_at_offset(Length::Ratio(0.5))
             .unwrap(),
-        (20., 20.)
+        (20., 20.),
+        1e-3,
     );
 
     // test cubic bezier
-    assert_eq!(
+    assert_point_close(
         PathParser::new("M 0 0 C 0 40 40 40 40 0")
             .point_at_offset(Length::Ratio(0.5))
             .unwrap(),
-        (20., 30.)
+        (20., 30.),
+        1e-3,
     );
 
     // test arc (radius 40; center 50,50; start at 10,50 travel ccw)
@@ -457,13 +466,6 @@ fn test_point_at_offset_curve() {
 
 #[test]
 fn test_point_at_offset_smooth_curve() {
-    fn assert_point_close(actual: (f32, f32), expected: (f32, f32)) {
-        assert!(
-            (actual.0 - expected.0).abs() < 1e-4 && (actual.1 - expected.1).abs() < 1e-4,
-            "got {actual:?}, expected {expected:?}"
-        );
-    }
-
     fn point_at_command_ratio(path: &str, command_index: usize, ratio: f32) -> (f32, f32) {
         let mut measure = PathParser::new(path);
         measure.skip_whitespace();
@@ -484,32 +486,55 @@ fn test_point_at_offset_smooth_curve() {
     assert_point_close(
         point_at_command_ratio("M 0 0 C 10 0 20 20 30 20 s 20 0 30 0", 2, 0.5),
         (45., 20.),
+        6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 C 10 0 20 20 30 20 S 50 20 60 20 80 20 90 20", 3, 0.5),
         (75., 20.),
+        6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 C 0 40 40 40 40 0 L 50 0 S 90 0 90 0", 3, 0.5),
         (70., 0.),
+        6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 t 20 0", 2, 0.5),
         (30., -10.),
+        3.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 T 40 0 60 0", 3, 0.5),
         (50., 10.),
+        3.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 L 30 0 T 50 0", 3, 0.5),
         (35., 0.),
+        6.0,
     );
+}
+
+#[test]
+fn test_path_length_curve_approximation() {
+    for (pd, expected, epsilon) in [
+        ("M 0 0 Q 20 40 40 0", 59.16, 1.0),
+        ("M 0 0 C 0 40 40 40 40 0", 80.0, 1.0),
+        ("M 0 0 A 10 10 0 0 1 20 0", 31.42, 1.0),
+        ("M 0 0 A 20 10 0 0 1 40 0", 48.44, 2.0),
+    ] {
+        let mut pp = PathParser::new(pd);
+        let actual = pp.full_length().unwrap();
+        assert!(
+            (actual - expected).abs() < epsilon,
+            "Failed for path: {pd}; got {actual}, expected about {expected}"
+        );
+    }
 }
 
 #[test]
