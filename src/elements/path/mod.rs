@@ -5,6 +5,8 @@ mod bezier;
 mod convert;
 mod repeat;
 mod syntax;
+#[cfg(test)]
+mod test_path;
 
 use super::SvgElement;
 
