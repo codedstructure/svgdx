@@ -1,6 +1,7 @@
 mod arc;
 mod bbox;
 mod bearing;
+mod bezier;
 mod convert;
 mod repeat;
 mod syntax;
