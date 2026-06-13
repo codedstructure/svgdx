@@ -546,17 +546,17 @@ impl SvgElement {
 impl SvgElement {
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     pub fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
-        if self.name == "path" {
-            if let Some(d) = self.get_attr("d") {
-                let mut d = d.to_string();
-                if d.chars().any(|c| c == 'r' || c == 'R') {
-                    d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
-                }
-                if d.chars().any(|c| c == 'b' || c == 'B') {
-                    d = process_path_bearing(&d)?;
-                }
-                self.set_attr("d", &d);
+        if self.name == "path"
+            && let Some(d) = self.get_attr("d")
+        {
+            let mut d = d.to_string();
+            if d.chars().any(|c| c == 'r' || c == 'R') {
+                d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
             }
+            if d.chars().any(|c| c == 'b' || c == 'B') {
+                d = process_path_bearing(&d)?;
+            }
+            self.set_attr("d", &d);
         }
 
         if is_connector(self) {

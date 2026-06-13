@@ -760,20 +760,20 @@ fn logical(eval_state: &mut EvalState) -> Result<ExprValue> {
 fn comparison(eval_state: &mut EvalState) -> Result<ExprValue> {
     let t = term(eval_state)?;
     if let Ok(mut first) = t.one_number() {
-        if let Some(Token::Symbol(s)) = eval_state.peek().cloned() {
-            if let Ok(op) = s.parse::<ComparisonOp>() {
-                eval_state.advance();
-                let second = term(eval_state)?.one_number()?;
-                let comp = match op {
-                    ComparisonOp::Eq => first == second,
-                    ComparisonOp::Ne => first != second,
-                    ComparisonOp::Gt => first > second,
-                    ComparisonOp::Ge => first >= second,
-                    ComparisonOp::Lt => first < second,
-                    ComparisonOp::Le => first <= second,
-                };
-                first = comp as i32 as f32;
-            }
+        if let Some(Token::Symbol(s)) = eval_state.peek().cloned()
+            && let Ok(op) = s.parse::<ComparisonOp>()
+        {
+            eval_state.advance();
+            let second = term(eval_state)?.one_number()?;
+            let comp = match op {
+                ComparisonOp::Eq => first == second,
+                ComparisonOp::Ne => first != second,
+                ComparisonOp::Gt => first > second,
+                ComparisonOp::Ge => first >= second,
+                ComparisonOp::Lt => first < second,
+                ComparisonOp::Le => first <= second,
+            };
+            first = comp as i32 as f32;
         }
         Ok(first.into())
     } else {

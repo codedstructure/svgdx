@@ -711,10 +711,11 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         let subseq_char_match = |c: char| c.is_alphanumeric() || c == '_' || c == '-' || c == ':';
         let parse_id_elref = |value: &str| {
             let mut chars = value.chars();
-            if let Some(first) = chars.next() {
-                if first_char_match(first) && chars.all(subseq_char_match) {
-                    return Some(ElRef::Id(value.to_owned()));
-                }
+            if let Some(first) = chars.next()
+                && first_char_match(first)
+                && chars.all(subseq_char_match)
+            {
+                return Some(ElRef::Id(value.to_owned()));
             }
             None
         };
@@ -727,10 +728,10 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
         if let Some(id_candidate) = token_head.strip_prefix(ELREF_ID_PREFIX) {
             // Only treat the final ':' as a suffix boundary when the tail is a
             // valid Length. Otherwise ':' remains part of the id.
-            if let Some((id, suffix)) = id_candidate.rsplit_once(EDGESPEC_SEP) {
-                if let (Some(elref), Ok(_)) = (parse_id_elref(id), suffix.parse::<Length>()) {
-                    return Ok((elref, &s[id.len() + 1..]));
-                }
+            if let Some((id, suffix)) = id_candidate.rsplit_once(EDGESPEC_SEP)
+                && let (Some(elref), Ok(_)) = (parse_id_elref(id), suffix.parse::<Length>())
+            {
+                return Ok((elref, &s[id.len() + 1..]));
             }
 
             if let Some(elref) = parse_id_elref(id_candidate) {

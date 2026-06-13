@@ -62,13 +62,11 @@ fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
         } else if let Some(scalar) = rest
             .strip_prefix(SCALARSPEC_SEP)
             .and_then(|s| s.parse().ok())
-        {
-            if let Ok(Some(pos)) = ctx
+            && let Ok(Some(pos)) = ctx
                 .get_element_bbox(elem)
                 .map(|bb| bb.map(|bb| bb.scalarspec(scalar)))
-            {
-                return fstr(pos);
-            }
+        {
+            return fstr(pos);
         }
     }
     value.to_string()
@@ -757,35 +755,34 @@ fn resolve_size_delta(element: &mut SvgElement) {
         ),
     };
 
-    if let Some(dw) = element.pop_attr("dw") {
-        if let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x))) {
-            element.set_num_attr("width", new_w);
-        }
+    if let Some(dw) = element.pop_attr("dw")
+        && let Ok(Some(new_w)) = strp_length(&dw).map(|dw| w.map(|x| dw.adjust(x)))
+    {
+        element.set_num_attr("width", new_w);
     }
-    if let Some(dh) = element.pop_attr("dh") {
-        if let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x))) {
-            element.set_num_attr("height", new_h);
-        }
+    if let Some(dh) = element.pop_attr("dh")
+        && let Ok(Some(new_h)) = strp_length(&dh).map(|dh| h.map(|x| dh.adjust(x)))
+    {
+        element.set_num_attr("height", new_h);
     }
 }
 
 fn eval_size_attr(name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
-    if let Ok(attr_ss) = ScalarSpec::from_str(name) {
-        if let (Some(el), remain) = split_relspec(value, ctx)? {
-            if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                // default value - same 'type' as attr name, e.g. y2 => ymax
-                let mut v = bbox.scalarspec(attr_ss);
-                // "[~scalarspec][ delta]"
-                let (ss_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
-                if let Some(ss) = ss_str.strip_prefix(SCALARSPEC_SEP) {
-                    v = bbox.scalarspec(ss.parse()?);
-                }
-                if let Ok(len) = strp_length(dxy) {
-                    v = len.adjust(v);
-                }
-                return Ok(fstr(v));
-            }
+    if let Ok(attr_ss) = ScalarSpec::from_str(name)
+        && let (Some(el), remain) = split_relspec(value, ctx)?
+        && let Ok(Some(bbox)) = ctx.get_element_bbox(el)
+    {
+        // default value - same 'type' as attr name, e.g. y2 => ymax
+        let mut v = bbox.scalarspec(attr_ss);
+        // "[~scalarspec][ delta]"
+        let (ss_str, dxy) = remain.split_once(' ').unwrap_or((remain, ""));
+        if let Some(ss) = ss_str.strip_prefix(SCALARSPEC_SEP) {
+            v = bbox.scalarspec(ss.parse()?);
         }
+        if let Ok(len) = strp_length(dxy) {
+            v = len.adjust(v);
+        }
+        return Ok(fstr(v));
     }
     Ok(value.to_owned())
 }
@@ -797,12 +794,11 @@ fn eval_pos_attr(
     ctx: &impl ElementMap,
     force_origin: bool,
 ) -> Result<String> {
-    if let Ok(attr_ss) = ScalarSpec::from_str(name) {
-        if let (Some(el), remain) = split_relspec(value, ctx)? {
-            if let Ok(Some(bbox)) = ctx.get_element_bbox(el) {
-                return pos_attr_helper(element, el, ctx, remain, &bbox, attr_ss, force_origin);
-            }
-        }
+    if let Ok(attr_ss) = ScalarSpec::from_str(name)
+        && let (Some(el), remain) = split_relspec(value, ctx)?
+        && let Ok(Some(bbox)) = ctx.get_element_bbox(el)
+    {
+        return pos_attr_helper(element, el, ctx, remain, &bbox, attr_ss, force_origin);
     }
     Ok(value.to_owned())
 }
@@ -961,13 +957,13 @@ fn expand_compound_size(el: &mut SvgElement) {
         el.set_default_attr("width", &w);
         el.set_default_attr("height", &h);
     }
-    if el.name() == "ellipse" {
-        if let Some(rxy) = el.pop_attr("rxy") {
-            // Split value into rx and ry
-            let (rx, ry) = split_compound_attr(&rxy);
-            el.set_default_attr("rx", &rx);
-            el.set_default_attr("ry", &ry);
-        }
+    if el.name() == "ellipse"
+        && let Some(rxy) = el.pop_attr("rxy")
+    {
+        // Split value into rx and ry
+        let (rx, ry) = split_compound_attr(&rxy);
+        el.set_default_attr("rx", &rx);
+        el.set_default_attr("ry", &ry);
     }
     if let Some(dwh) = el.pop_attr("dwh") {
         // Split value into dw and dh

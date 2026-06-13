@@ -240,23 +240,23 @@ impl MatchType {
                 }
             }
             MatchType::NumericSuffix(name) => {
-                if let Some((prefix, suffix)) = class.rsplit_once('-') {
-                    if prefix == *name {
-                        if let Ok(num) = suffix.parse::<u32>() {
-                            return Some(MatchResult::NumericSuffix(prefix.to_string(), num));
-                        }
-                    }
+                if let Some((prefix, suffix)) = class.rsplit_once('-')
+                    && prefix == *name
+                    && let Ok(num) = suffix.parse::<u32>()
+                {
+                    return Some(MatchResult::NumericSuffix(prefix.to_string(), num));
                 }
                 None
             }
             MatchType::ColourSuffix(name) => {
-                if let Some((prefix, suffix)) = class.rsplit_once('-') {
-                    if prefix == *name && COLOUR_LIST.binary_search(&suffix).is_ok() {
-                        return Some(MatchResult::ColourSuffix(
-                            prefix.to_string(),
-                            suffix.to_string(),
-                        ));
-                    }
+                if let Some((prefix, suffix)) = class.rsplit_once('-')
+                    && prefix == *name
+                    && COLOUR_LIST.binary_search(&suffix).is_ok()
+                {
+                    return Some(MatchResult::ColourSuffix(
+                        prefix.to_string(),
+                        suffix.to_string(),
+                    ));
                 }
                 None
             }

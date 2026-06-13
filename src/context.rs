@@ -29,10 +29,10 @@ impl ElementMatch {
     }
     fn matches(&self, el: &SvgElement) -> bool {
         // early reject if element name doesn't match
-        if let Some(match_el) = &self.element {
-            if el.name() != *match_el {
-                return false;
-            }
+        if let Some(match_el) = &self.element
+            && el.name() != *match_el
+        {
+            return false;
         }
         // early accept if there are no matches
         if self.matches.is_empty() {
@@ -229,13 +229,13 @@ impl ElementMap for TransformerContext {
             // assumes el has already had position & attributes resolved
             let translate_x = el.get_attr("x");
             let translate_y = el.get_attr("y");
-            if translate_x.is_some() || translate_y.is_some() {
-                if let Some(bbox) = &mut el_bbox {
-                    el_bbox = Some(bbox.translated(
-                        translate_x.map(strp).unwrap_or(Ok(0.))?,
-                        translate_y.map(strp).unwrap_or(Ok(0.))?,
-                    ));
-                }
+            if (translate_x.is_some() || translate_y.is_some())
+                && let Some(bbox) = &mut el_bbox
+            {
+                el_bbox = Some(bbox.translated(
+                    translate_x.map(strp).unwrap_or(Ok(0.))?,
+                    translate_y.map(strp).unwrap_or(Ok(0.))?,
+                ));
             }
         }
 

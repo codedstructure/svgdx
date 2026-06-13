@@ -37,10 +37,10 @@ fn is_real_svg(events: &InputList) -> bool {
         if let Ok(el) = SvgElement::try_from(ev.clone()) {
             // "Real" SVG documents will have an `xmlns` attribute with
             // the value "http://www.w3.org/2000/svg"
-            if el.name() == "svg" {
-                if let Some(val) = el.get_attr("xmlns") {
-                    return val == "http://www.w3.org/2000/svg";
-                }
+            if el.name() == "svg"
+                && let Some(val) = el.get_attr("xmlns")
+            {
+                return val == "http://www.w3.org/2000/svg";
             }
             return false;
         }
@@ -257,10 +257,10 @@ impl Transformer {
         if !root_style.is_empty() {
             new_svg_attrs.insert("style", root_style);
         }
-        if let Some(class) = orig_svg_class {
-            if !class.is_empty() {
-                new_svg_attrs.insert("class", class.join(" "));
-            }
+        if let Some(class) = orig_svg_class
+            && !class.is_empty()
+        {
+            new_svg_attrs.insert("class", class.join(" "));
         }
         // If width or height are provided, leave width/height/viewBox alone.
         let orig_width = orig_svg_attrs.get("width");

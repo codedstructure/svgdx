@@ -92,10 +92,10 @@ impl EventGen for LoopElement<'_> {
                     if iteration >= loop_count {
                         break;
                     }
-                } else if let LoopType::While(expr) = &loop_def.loop_type {
-                    if !eval_condition(expr, context)? {
-                        break;
-                    }
+                } else if let LoopType::While(expr) = &loop_def.loop_type
+                    && !eval_condition(expr, context)?
+                {
+                    break;
                 }
 
                 if !loop_var_name.is_empty() {
@@ -113,10 +113,10 @@ impl EventGen for LoopElement<'_> {
                     bbox.extend(bb);
                 }
 
-                if let LoopType::Until(expr) = &loop_def.loop_type {
-                    if eval_condition(expr, context)? {
-                        break;
-                    }
+                if let LoopType::Until(expr) = &loop_def.loop_type
+                    && eval_condition(expr, context)?
+                {
+                    break;
                 }
                 iteration += 1;
                 loop_var_value += loop_step;

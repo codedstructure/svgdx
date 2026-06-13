@@ -74,13 +74,13 @@ impl StyleProvider for DefaultStyles {
 
     fn on_match(&mut self, _rule: &Rule, selected: &Selected) -> bool {
         // if we've already seen an SVG, veto further matches
-        if let Selected::Element(mr) = selected {
-            if mr.as_element() == Some("svg".to_string()) {
-                if self.seen_svg {
-                    return false;
-                }
-                self.seen_svg = true;
+        if let Selected::Element(mr) = selected
+            && mr.as_element() == Some("svg".to_string())
+        {
+            if self.seen_svg {
+                return false;
             }
+            self.seen_svg = true;
         }
         true
     }
@@ -146,11 +146,11 @@ impl StyleProvider for ColourStyles {
     }
 
     fn on_match(&mut self, _rule: &Rule, selected: &Selected) -> bool {
-        if let Selected::TextLike(mr) = selected {
-            if mr.as_class() == Some("d-none".to_string()) {
-                // Don't set fill:none for text inferred through d-$COLOUR
-                return false;
-            }
+        if let Selected::TextLike(mr) = selected
+            && mr.as_class() == Some("d-none".to_string())
+        {
+            // Don't set fill:none for text inferred through d-$COLOUR
+            return false;
         }
         true
     }
@@ -435,10 +435,10 @@ impl StyleProvider for DashStyles {
     }
 
     fn on_match(&mut self, _rule: &Rule, _selected: &Selected) -> bool {
-        if let Some(class) = _selected.as_class() {
-            if class == "d-flow" || class.starts_with("d-flow-") {
-                self.need_flow = true;
-            }
+        if let Some(class) = _selected.as_class()
+            && (class == "d-flow" || class.starts_with("d-flow-"))
+        {
+            self.need_flow = true;
         }
         true
     }

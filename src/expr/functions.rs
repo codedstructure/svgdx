@@ -517,7 +517,7 @@ pub fn eval_function(
 
         // Bounding box functions
         Function::Surround => {
-            if args.len() % 4 != 0 || args.is_empty() {
+            if !args.len().is_multiple_of(4) || args.is_empty() {
                 return Err(Error::Arity(
                     "surround() requires one or more bounding boxes".to_string(),
                 ));

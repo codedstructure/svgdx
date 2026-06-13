@@ -61,14 +61,14 @@ fn get_text_position(
     // If a 'rel' attribute is present on a <text> element, resolve it to
     // determine the bounding box and element type (for inside/outside default).
     let mut text_ref_element = element.clone();
-    if element.name() == "text" {
-        if let Some(ref_str) = element.pop_attr("rel") {
-            let elref: ElRef = ref_str.parse()?;
-            text_ref_element = ctx
-                .get_element(&elref)
-                .ok_or_else(|| Error::Reference(elref))?
-                .clone();
-        }
+    if element.name() == "text"
+        && let Some(ref_str) = element.pop_attr("rel")
+    {
+        let elref: ElRef = ref_str.parse()?;
+        text_ref_element = ctx
+            .get_element(&elref)
+            .ok_or_else(|| Error::Reference(elref))?
+            .clone();
     }
 
     let mut text_classes = vec!["d-text".to_owned()];
@@ -217,18 +217,18 @@ pub fn process_text_attr(
     let mut lines = vec![vec![]];
     for span in spans.iter() {
         let mut segments = span.text.lines();
-        if let Some(first) = segments.next() {
-            if !first.is_empty() {
-                lines
-                    .last_mut()
-                    .expect("added item not removed")
-                    .push(MdSpan {
-                        code: span.code,
-                        bold: span.bold,
-                        italic: span.italic,
-                        text: first.to_string(),
-                    });
-            }
+        if let Some(first) = segments.next()
+            && !first.is_empty()
+        {
+            lines
+                .last_mut()
+                .expect("added item not removed")
+                .push(MdSpan {
+                    code: span.code,
+                    bold: span.bold,
+                    italic: span.italic,
+                    text: first.to_string(),
+                });
         }
 
         for s in segments {
@@ -240,19 +240,18 @@ pub fn process_text_attr(
             }]);
         }
 
-        if let Some(last_char) = span.text.chars().last() {
-            if last_char == '\n' {
-                lines.push(vec![]);
-            }
+        if let Some(last_char) = span.text.chars().last()
+            && last_char == '\n'
+        {
+            lines.push(vec![]);
         }
     }
     // if last char is newline don't do the new line
-    if let Some(last_span) = spans.last() {
-        if let Some(last_char) = last_span.text.chars().last() {
-            if last_char == '\n' {
-                lines.pop();
-            }
-        }
+    if let Some(last_span) = spans.last()
+        && let Some(last_char) = last_span.text.chars().last()
+        && last_char == '\n'
+    {
+        lines.pop();
     }
 
     // fill empty lines with empty strings

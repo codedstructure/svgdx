@@ -9,7 +9,7 @@ license = "MIT"
 edition = "2024"
 default-run = "svgdx"
 exclude = ["/examples", "/docs"]
-rust-version = "1.85"
+rust-version = "1.88"
 
 [features]
 default = ["cli", "server"]
@@ -37,7 +37,7 @@ crate-type = ["cdylib", "rlib"]
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
-assertables = "9.5.0"
+assertables = "10.1.0"
 itertools = "0.14.0"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]

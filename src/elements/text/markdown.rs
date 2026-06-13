@@ -178,7 +178,7 @@ fn md_parse_code_blocks(
                 let escaped = del_ind != 0
                     && delimiters[del_ind - 1].ind + removed_spans == delimiters[del_ind].ind
                     && delimiters[del_ind - 1].char_type == DelimiterType::Escape
-                    && delimiters[del_ind - 1].num_delimiters % 2 != 0;
+                    && !delimiters[del_ind - 1].num_delimiters.is_multiple_of(2);
                 let needed_len = match escaped {
                     false => delimiters[del_ind].num_delimiters,
                     true => delimiters[del_ind].num_delimiters - 1,
@@ -319,7 +319,7 @@ fn md_parse_escapes(
                         .repeat(delimiters[del_ind].num_delimiters / 2);
 
                     // if escapes don't all cancel out
-                    if delimiters[del_ind].num_delimiters % 2 != 0 {
+                    if !delimiters[del_ind].num_delimiters.is_multiple_of(2) {
                         if del_ind != delimiters.len() - 1
                             && delimiters[del_ind + 1].ind == delimiters[del_ind].ind
                         {
