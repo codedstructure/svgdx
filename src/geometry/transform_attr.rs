@@ -188,59 +188,66 @@ impl TransformAttr {
         }
     }
 
-    pub fn apply(&self, bbox: &BoundingBox) -> BoundingBox {
-        let mut result = *bbox;
+    pub fn apply_to_point(&self, x: f32, y: f32) -> (f32, f32) {
+        let mut result = (x, y);
 
         for transform in self.transforms.iter().rev() {
-            match *transform {
-                TransformType::Translate(tx, ty) => {
-                    result = result.xfrm_translate(tx, ty);
-                }
-                TransformType::Scale(sx, sy) => {
-                    result = result.xfrm_scale(sx, sy);
-                }
+            result = match *transform {
+                TransformType::Translate(tx, ty) => (result.0 + tx, result.1 + ty),
+                TransformType::Scale(sx, sy) => (result.0 * sx, result.1 * sy),
                 TransformType::Rotate(angle, cx, cy) => {
                     let angle = (angle as f64).to_radians();
                     let (cx, cy) = (cx as f64, cy as f64);
-                    let sin_a = angle.sin();
-                    let cos_a = angle.cos();
-                    let (x1, y1, x2, y2) = (
-                        result.x1() as f64,
-                        result.y1() as f64,
-                        result.x2() as f64,
-                        result.y2() as f64,
-                    );
-                    // TODO: ideally we'd get the convex hull of the shape (or simply a set
-                    // of points on the shape boundary, even internal) and rotate each point
-                    // to derive the resulting bounding box; this currently over-estimates
-                    // bboxes for non-rectangular shapes (e.g. a circle at 45deg will have a
-                    // larger bbox than a circle at 0deg despite being the same size)
-                    let corners = [(x1, y1), (x2, y1), (x1, y2), (x2, y2)];
-                    let rot = corners
-                        .iter()
-                        .map(|&(x, y)| {
-                            let rot_x = cx + (x - cx) * cos_a - (y - cy) * sin_a;
-                            let rot_y = cy + (x - cx) * sin_a + (y - cy) * cos_a;
-                            (rot_x, rot_y)
-                        })
-                        .collect::<Vec<_>>();
-                    let min_x = rot[0].0.min(rot[1].0).min(rot[2].0).min(rot[3].0);
-                    let max_x = rot[0].0.max(rot[1].0).max(rot[2].0).max(rot[3].0);
-                    let min_y = rot[0].1.min(rot[1].1).min(rot[2].1).min(rot[3].1);
-                    let max_y = rot[0].1.max(rot[1].1).max(rot[2].1).max(rot[3].1);
-                    // deliberate down-sampling of floating point...
-                    let min_x = ((16384.0 * min_x).round() / 16384.0) as f32;
-                    let min_y = ((16384.0 * min_y).round() / 16384.0) as f32;
-                    let max_x = ((16384.0 * max_x).round() / 16384.0) as f32;
-                    let max_y = ((16384.0 * max_y).round() / 16384.0) as f32;
-
-                    result = BoundingBox::new(min_x, min_y, max_x, max_y);
+                    let (x, y) = (result.0 as f64, result.1 as f64);
+                    let (sin_a, cos_a) = angle.sin_cos();
+                    let rot_x = cx + (x - cx) * cos_a - (y - cy) * sin_a;
+                    let rot_y = cy + (x - cx) * sin_a + (y - cy) * cos_a;
+                    (rot_x as f32, rot_y as f32)
                 }
-                _ => (),
-            }
+                _ => result,
+            };
         }
 
         result
+    }
+
+    pub fn apply(&self, bbox: &BoundingBox) -> BoundingBox {
+        // TODO: ideally we'd get the convex hull of the shape (or simply a set
+        // of points on the shape boundary, even internal) and transform each point
+        // to derive the resulting bounding box; this currently over-estimates
+        // bboxes for non-rectangular shapes (e.g. a circle at 45deg will have a
+        // larger bbox than a circle at 0deg despite being the same size)
+        let corners = [
+            self.apply_to_point(bbox.x1(), bbox.y1()),
+            self.apply_to_point(bbox.x2(), bbox.y1()),
+            self.apply_to_point(bbox.x1(), bbox.y2()),
+            self.apply_to_point(bbox.x2(), bbox.y2()),
+        ];
+
+        let min_x = corners
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::INFINITY, f32::min);
+        let min_y = corners
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::INFINITY, f32::min);
+        let max_x = corners
+            .iter()
+            .map(|(x, _)| *x)
+            .fold(f32::NEG_INFINITY, f32::max);
+        let max_y = corners
+            .iter()
+            .map(|(_, y)| *y)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        // deliberate down-sampling of floating point
+        BoundingBox::new(
+            (16384.0 * min_x).round() / 16384.0,
+            (16384.0 * min_y).round() / 16384.0,
+            (16384.0 * max_x).round() / 16384.0,
+            (16384.0 * max_y).round() / 16384.0,
+        )
     }
 
     pub fn translate(&mut self, tx: f32, ty: f32) {
@@ -345,6 +352,12 @@ mod test {
         let t: TransformAttr = "translate(10,0) rotate(90, 2, 1)".parse().unwrap();
         let bbox = BoundingBox::new(0., 0., 4., 2.);
         assert_eq!(t.apply(&bbox), BoundingBox::new(11., -1., 13., 3.));
+    }
+
+    #[test]
+    fn test_apply_point_multiple() {
+        let t: TransformAttr = "scale(2) translate(10,20)".parse().unwrap();
+        assert_eq!(t.apply_to_point(1., 2.), (22., 44.));
     }
 
     #[test]

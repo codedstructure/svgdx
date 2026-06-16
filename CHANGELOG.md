@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Fix: fix line-offset for elements with transform (e.g. paths with dirspec)
+
 ## [0.30.0 - 2026-06-13]
 
 - Changed: bumped MSRV to 1.88.

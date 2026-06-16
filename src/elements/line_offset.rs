@@ -1,6 +1,6 @@
 use super::{SvgElement, path::get_point_along_path};
 use crate::errors::{Error, Result};
-use crate::geometry::Length;
+use crate::geometry::{Length, TransformAttr};
 use crate::types::{attr_split, strp};
 
 fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
@@ -87,13 +87,20 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
 }
 
 pub fn get_point_along_linelike_type_el(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
-    match el.name() {
+    let point = match el.name() {
         "line" => get_point_along_line(el, length),
         "polyline" => get_point_along_polyline(el, length),
         "path" => get_point_along_path(el, length),
         _ => Err(Error::InternalLogic(
             "point_along_line on a non line-like element".to_string(),
         )),
+    }?;
+
+    if let Some(transform) = el.get_attr("transform") {
+        let transform: TransformAttr = transform.parse()?;
+        Ok(transform.apply_to_point(point.0, point.1))
+    } else {
+        Ok(point)
     }
 }
 
@@ -301,5 +308,22 @@ mod tests {
         let (x, y) = result.unwrap();
         assert_abs_diff_le_x!(x, 1.5 * 2.0f32.sqrt(), 0.001);
         assert_abs_diff_le_x!(y, 1.5 * 2.0f32.sqrt(), 0.001);
+    }
+
+    #[test]
+    fn test_path_transform() {
+        let element = SvgElement::new(
+            "path",
+            &[
+                ("d".to_string(), "M 0 0 h 10".to_string()),
+                ("transform".to_string(), "translate(10, 0)".to_string()),
+            ],
+        );
+
+        let result = get_point_along_linelike_type_el(&element, Length::Ratio(0.5));
+        assert!(result.is_ok());
+        let (x, y) = result.unwrap();
+        assert_abs_diff_le_x!(x, 15.0, 0.001);
+        assert_abs_diff_le_x!(y, 0.0, 0.001);
     }
 }
