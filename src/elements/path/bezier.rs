@@ -6,14 +6,14 @@ const EPSILON: f32 = 1e-6;
 const QUADRATIC_SAMPLES: usize = 8;
 const CUBIC_SAMPLES: usize = 12;
 
-pub(super) struct CubicBezierParams {
+pub(super) struct CubicBezier {
     start: (f32, f32),
     cp1: (f32, f32),
     cp2: (f32, f32),
     end: (f32, f32),
 }
 
-impl CubicBezierParams {
+impl CubicBezier {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
         start: (f32, f32),
@@ -114,13 +114,13 @@ impl CubicBezierParams {
     }
 }
 
-pub(super) struct QuadraticBezierParams {
+pub(super) struct QuadraticBezier {
     start: (f32, f32),
     cp: (f32, f32),
     end: (f32, f32),
 }
 
-impl QuadraticBezierParams {
+impl QuadraticBezier {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
         start: (f32, f32),

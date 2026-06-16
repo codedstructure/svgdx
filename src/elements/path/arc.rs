@@ -7,7 +7,7 @@ use std::f32::consts::PI;
 const EPSILON: f32 = 1e-6;
 const ARC_SAMPLES: usize = 16;
 
-pub(super) struct ArcParams {
+pub(super) struct Arc {
     start: (f32, f32),
     rx: f32,
     ry: f32,
@@ -17,7 +17,7 @@ pub(super) struct ArcParams {
     end: (f32, f32),
 }
 
-impl ArcParams {
+impl Arc {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
         start: (f32, f32),
@@ -38,7 +38,7 @@ impl ArcParams {
             (end_x, end_y)
         };
 
-        let mut ap = ArcParams {
+        let mut ap = Arc {
             start,
             rx,
             ry,

@@ -1,6 +1,6 @@
 use super::SvgElement;
-use super::arc::ArcParams;
-use super::bezier::{CubicBezierParams, QuadraticBezierParams};
+use super::arc::Arc;
+use super::bezier::{CubicBezier, QuadraticBezier};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
 
@@ -217,7 +217,7 @@ impl PathParser {
                 self.command = None;
             }
             'C' | 'c' => {
-                let curve = CubicBezierParams::from_tokens(
+                let curve = CubicBezier::from_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     is_relative,
@@ -227,7 +227,7 @@ impl PathParser {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'S' | 's' => {
-                let curve = CubicBezierParams::from_smooth_tokens(
+                let curve = CubicBezier::from_smooth_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     previous_cubic_cp2,
@@ -238,7 +238,7 @@ impl PathParser {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'Q' | 'q' => {
-                let curve = QuadraticBezierParams::from_tokens(
+                let curve = QuadraticBezier::from_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     is_relative,
@@ -248,7 +248,7 @@ impl PathParser {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'T' | 't' => {
-                let curve = QuadraticBezierParams::from_smooth_tokens(
+                let curve = QuadraticBezier::from_smooth_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     previous_quadratic_cp,
@@ -260,7 +260,7 @@ impl PathParser {
             }
             'A' | 'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let arc = ArcParams::from_tokens(
+                let arc = Arc::from_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     is_relative,
@@ -341,26 +341,26 @@ impl PathParser {
                 let dy = target.1 - pos.1;
                 Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
             }
-            'C' | 'c' => Ok(CubicBezierParams::from_tokens(
+            'C' | 'c' => Ok(CubicBezier::from_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
-            'S' | 's' => Ok(CubicBezierParams::from_smooth_tokens(
+            'S' | 's' => Ok(CubicBezier::from_smooth_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 self.cubic_cp2,
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
-            'Q' | 'q' => Ok(QuadraticBezierParams::from_tokens(
+            'Q' | 'q' => Ok(QuadraticBezier::from_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
-            'T' | 't' => Ok(QuadraticBezierParams::from_smooth_tokens(
+            'T' | 't' => Ok(QuadraticBezier::from_smooth_tokens(
                 &mut self.tokens,
                 self.position.unwrap_or((0., 0.)),
                 self.quadratic_cp,
@@ -368,7 +368,7 @@ impl PathParser {
             )?
             .approx_point_at_ratio(ratio)),
             'A' | 'a' => {
-                let arc = ArcParams::from_tokens(
+                let arc = Arc::from_tokens(
                     &mut self.tokens,
                     self.position.unwrap_or((0., 0.)),
                     is_relative,

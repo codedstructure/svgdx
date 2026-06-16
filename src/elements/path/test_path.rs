@@ -1,6 +1,6 @@
 use crate::geometry::{BoundingBox, Length};
 
-use super::bbox::PathParser;
+use super::parser::PathParser;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use std::num::NonZeroU32;
 
