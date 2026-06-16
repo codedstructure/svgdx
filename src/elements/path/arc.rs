@@ -1,3 +1,4 @@
+use super::Vec2;
 use super::sample::{sample_length, sample_point_at_ratio};
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
@@ -8,35 +9,26 @@ const EPSILON: f32 = 1e-6;
 const ARC_SAMPLES: usize = 16;
 
 pub(super) struct Arc {
-    start: (f32, f32),
+    start: Vec2,
     rx: f32,
     ry: f32,
     x_axis_rotation: f32,
     large_arc_flag: bool,
     sweep_flag: bool,
-    end: (f32, f32),
+    end: Vec2,
 }
 
 impl Arc {
-    pub fn from_tokens(
-        tokens: &mut SvgPathSyntax,
-        start: (f32, f32),
-        relative: bool,
-    ) -> Result<Self> {
+    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
         // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-        let (start_x, start_y) = start;
         let rx = tokens.read_non_negative()?;
         let ry = tokens.read_non_negative()?;
         let x_axis_rotation = tokens.read_number()?;
         let large_arc_flag = tokens.read_flag()? != 0;
         let sweep_flag = tokens.read_flag()? != 0;
-        let (end_x, end_y) = tokens.read_coord()?;
+        let end = tokens.read_coord()?;
 
-        let end = if relative {
-            (start_x + end_x, start_y + end_y)
-        } else {
-            (end_x, end_y)
-        };
+        let end = if relative { start + end } else { end };
 
         let mut ap = Arc {
             start,
@@ -52,7 +44,7 @@ impl Arc {
         Ok(ap)
     }
 
-    pub fn end(&self) -> (f32, f32) {
+    pub fn end(&self) -> Vec2 {
         self.end
     }
 
@@ -63,12 +55,13 @@ impl Arc {
         // SVG requires scaling radii up when the requested ellipse is too small to
         // connect the given endpoints; see SVG 2 implnote B.2.5.
         // https://www.w3.org/TR/SVG2/implnote.html#ArcCorrectionOutOfRangeRadii
-        let cos_phi = phi.cos();
-        let sin_phi = phi.sin();
-        let (start_x, start_y) = self.start;
-        let (end_x, end_y) = self.end;
-        let x1_prime = cos_phi * (start_x - end_x) / 2.0 + sin_phi * (start_y - end_y) / 2.0;
-        let y1_prime = -sin_phi * (start_x - end_x) / 2.0 + cos_phi * (start_y - end_y) / 2.0;
+        let (sin_phi, cos_phi) = phi.sin_cos();
+
+        // "translation which places the origin at the midpoint"
+        let inv_midpoint = (self.start - self.end) / 2.;
+        // "rotation to line up the coordinate axes with the axes of the ellipse."
+        let x1_prime = cos_phi * inv_midpoint.x + sin_phi * inv_midpoint.y;
+        let y1_prime = -sin_phi * inv_midpoint.x + cos_phi * inv_midpoint.y;
 
         let lambda = (x1_prime * x1_prime) / (rx * rx) + (y1_prime * y1_prime) / (ry * ry);
         if lambda > 1.0 {
@@ -78,10 +71,10 @@ impl Arc {
         }
     }
 
-    pub fn extrema(&self) -> Vec<(f32, f32)> {
+    pub fn extrema(&self) -> Vec<Vec2> {
         if self.rx.abs() < EPSILON
             || self.ry.abs() < EPSILON
-            || (self.start.0 - self.end.0).hypot(self.start.1 - self.end.1) < EPSILON
+            || self.start.distance(self.end) < EPSILON
         {
             return vec![];
         }
@@ -127,22 +120,17 @@ impl Arc {
                     None
                 }
             })
-            .map(|(x, y)| (fround(x), fround(y)))
+            .map(|v| v.apply(fround))
             .collect()
     }
 
-    pub fn evaluate(&self, t: f32) -> (f32, f32) {
-        let (x, y) = (self.start.0, self.start.1);
-        let (end_x, end_y) = (self.end.0, self.end.1);
-
-        if (x - end_x).hypot(y - end_y) < EPSILON {
-            return (x, y);
+    pub fn evaluate(&self, t: f32) -> Vec2 {
+        if self.start.distance(self.end) < EPSILON {
+            return self.start;
         }
 
         if self.rx.abs() < EPSILON || self.ry.abs() < EPSILON {
-            let dx = end_x - x;
-            let dy = end_y - y;
-            return (x + dx * t, y + dy * t);
+            return self.start + t * (self.end - self.start);
         }
 
         let (center, start_angle, sweep_angle) = self.endpoint_to_center();
@@ -154,16 +142,16 @@ impl Arc {
         sample_length(ARC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(ARC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 
     // Implements https://www.w3.org/TR/SVG2/implnote.html#ArcConversionEndpointToCenter
-    fn endpoint_to_center(&self) -> ((f32, f32), f32, f32) {
+    fn endpoint_to_center(&self) -> (Vec2, f32, f32) {
         let phi = self.x_axis_rotation.to_radians();
 
-        let (x1, y1) = self.start;
-        let (x2, y2) = self.end;
+        let (x1, y1) = (self.start.x, self.start.y);
+        let (x2, y2) = (self.end.x, self.end.y);
         let cos_phi = phi.cos();
         let sin_phi = phi.sin();
 
@@ -219,17 +207,17 @@ impl Arc {
             delta_theta -= 2.0 * PI;
         }
 
-        ((cx, cy), theta1, delta_theta)
+        (Vec2::new(cx, cy), theta1, delta_theta)
     }
 }
 
-fn ellipse_point(center: (f32, f32), rx: f32, ry: f32, phi: f32, t: f32) -> (f32, f32) {
+fn ellipse_point(center: Vec2, rx: f32, ry: f32, phi: f32, t: f32) -> Vec2 {
     let (cos_t, sin_t) = (t.cos(), t.sin());
     let (cos_phi, sin_phi) = (phi.cos(), phi.sin());
 
-    (
-        center.0 + rx * cos_t * cos_phi - ry * sin_t * sin_phi,
-        center.1 + rx * cos_t * sin_phi + ry * sin_t * cos_phi,
+    Vec2::new(
+        center.x + rx * cos_t * cos_phi - ry * sin_t * sin_phi,
+        center.y + rx * cos_t * sin_phi + ry * sin_t * cos_phi,
     )
 }
 

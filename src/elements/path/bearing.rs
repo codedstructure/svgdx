@@ -94,9 +94,9 @@ impl PathBearing {
                 self.bearing += bearing;
             }
             'm' | 'l' if self.bearing != 0. => {
-                let (dx, dy) = self.tokens.read_coord()?;
-                let cosb = self.bearing.to_radians().cos();
-                let sinb = self.bearing.to_radians().sin();
+                let delta = self.tokens.read_coord()?;
+                let (dx, dy) = (delta.x, delta.y);
+                let (sinb, cosb) = self.bearing.to_radians().sin_cos();
                 // "When a relative l command is used, the end point of the line is
                 // (cpx + x cos cb + y sin cb, cpy + x sin cb + y cos cb)."
                 let bdx = fstr(dx * cosb + dy * sinb);
@@ -109,8 +109,9 @@ impl PathBearing {
                 let offset = self.tokens.read_number()?;
                 // "When a relative h command is used, the end point of the line is (cpx + x cos cb, cpy + x sin cb)."
                 // "When a relative v command is used, the end point of the line is (cpx + y sin cb, cpy + y cos cb)."
-                let bdx = fstr(offset * self.bearing.to_radians().cos());
-                let bdy = fstr(offset * self.bearing.to_radians().sin());
+                let (sinb, cosb) = self.bearing.to_radians().sin_cos();
+                let bdx = fstr(offset * cosb);
+                let bdy = fstr(offset * sinb);
                 // convert to l command in native coordinates
                 self.output.push('l');
                 if cmd == 'h' {

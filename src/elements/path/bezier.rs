@@ -1,3 +1,4 @@
+use super::Vec2;
 use super::sample::{sample_length, sample_point_at_ratio};
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
@@ -7,63 +8,40 @@ const QUADRATIC_SAMPLES: usize = 8;
 const CUBIC_SAMPLES: usize = 12;
 
 pub(super) struct CubicBezier {
-    start: (f32, f32),
-    cp1: (f32, f32),
-    cp2: (f32, f32),
-    end: (f32, f32),
+    start: Vec2,
+    cp1: Vec2,
+    cp2: Vec2,
+    end: Vec2,
 }
 
 impl CubicBezier {
-    pub fn from_tokens(
-        tokens: &mut SvgPathSyntax,
-        start: (f32, f32),
-        relative: bool,
-    ) -> Result<Self> {
-        let cp1 = tokens.read_coord()?;
-        let cp2 = tokens.read_coord()?;
-        let end = tokens.read_coord()?;
-        Ok(Self::new(start, cp1, cp2, end, relative))
+    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        let adjust = |p: Vec2| {
+            if relative { start + p } else { p }
+        };
+        let cp1 = adjust(tokens.read_coord()?);
+        let cp2 = adjust(tokens.read_coord()?);
+        let end = adjust(tokens.read_coord()?);
+        Ok(Self::new(start, cp1, cp2, end))
     }
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: (f32, f32),
-        previous_cp2: Option<(f32, f32)>,
+        start: Vec2,
+        previous_cp2: Option<Vec2>,
         relative: bool,
     ) -> Result<Self> {
-        let cp2 = tokens.read_coord()?;
-        let end = tokens.read_coord()?;
-        let cp1 = reflect_control_point(start, previous_cp2);
-        let (cp2, end) = if relative {
-            (offset_point(start, cp2), offset_point(start, end))
-        } else {
-            (cp2, end)
+        let adjust = |p: Vec2| {
+            if relative { start + p } else { p }
         };
-        Ok(Self {
-            start,
-            cp1,
-            cp2,
-            end,
-        })
+        let cp2 = adjust(tokens.read_coord()?);
+        let end = adjust(tokens.read_coord()?);
+        // start and previous_cp2 are always absolute.
+        let cp1 = reflect_control_point(start, previous_cp2);
+        Ok(Self::new(start, cp1, cp2, end))
     }
 
-    fn new(
-        start: (f32, f32),
-        cp1: (f32, f32),
-        cp2: (f32, f32),
-        end: (f32, f32),
-        relative: bool,
-    ) -> Self {
-        let (cp1, cp2, end) = if relative {
-            (
-                offset_point(start, cp1),
-                offset_point(start, cp2),
-                offset_point(start, end),
-            )
-        } else {
-            (cp1, cp2, end)
-        };
-
+    fn new(start: Vec2, cp1: Vec2, cp2: Vec2, end: Vec2) -> Self {
         Self {
             start,
             cp1,
@@ -72,36 +50,36 @@ impl CubicBezier {
         }
     }
 
-    pub fn control_point_2(&self) -> (f32, f32) {
+    pub fn control_point_2(&self) -> Vec2 {
         self.cp2
     }
 
-    pub fn end(&self) -> (f32, f32) {
+    pub fn end(&self) -> Vec2 {
         self.end
     }
 
-    pub fn extrema(&self) -> Vec<(f32, f32)> {
+    pub fn extrema(&self) -> Vec<Vec2> {
         let mut all_t = Vec::new();
         all_t.extend(cubic_stationary_ts(
-            self.start.0,
-            self.cp1.0,
-            self.cp2.0,
-            self.end.0,
+            self.start.x,
+            self.cp1.x,
+            self.cp2.x,
+            self.end.x,
         ));
         all_t.extend(cubic_stationary_ts(
-            self.start.1,
-            self.cp1.1,
-            self.cp2.1,
-            self.end.1,
+            self.start.y,
+            self.cp1.y,
+            self.cp2.y,
+            self.end.y,
         ));
 
         all_t.into_iter().map(|t| self.evaluate(t)).collect()
     }
 
-    pub fn evaluate(&self, t: f32) -> (f32, f32) {
-        (
-            evaluate_cubic(self.start.0, self.cp1.0, self.cp2.0, self.end.0, t),
-            evaluate_cubic(self.start.1, self.cp1.1, self.cp2.1, self.end.1, t),
+    pub fn evaluate(&self, t: f32) -> Vec2 {
+        Vec2::new(
+            evaluate_cubic(self.start.x, self.cp1.x, self.cp2.x, self.end.x, t),
+            evaluate_cubic(self.start.y, self.cp1.y, self.cp2.y, self.end.y, t),
         )
     }
 
@@ -109,66 +87,53 @@ impl CubicBezier {
         sample_length(CUBIC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(CUBIC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 }
 
 pub(super) struct QuadraticBezier {
-    start: (f32, f32),
-    cp: (f32, f32),
-    end: (f32, f32),
+    start: Vec2,
+    cp: Vec2,
+    end: Vec2,
 }
 
 impl QuadraticBezier {
-    pub fn from_tokens(
-        tokens: &mut SvgPathSyntax,
-        start: (f32, f32),
-        relative: bool,
-    ) -> Result<Self> {
-        let cp = tokens.read_coord()?;
-        let end = tokens.read_coord()?;
-        Ok(Self::new(start, cp, end, relative))
+    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        let adjust = |p: Vec2| {
+            if relative { start + p } else { p }
+        };
+        let cp = adjust(tokens.read_coord()?);
+        let end = adjust(tokens.read_coord()?);
+        Ok(Self { start, cp, end })
     }
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: (f32, f32),
-        previous_cp: Option<(f32, f32)>,
+        start: Vec2,
+        previous_cp: Option<Vec2>,
         relative: bool,
     ) -> Result<Self> {
-        let end = tokens.read_coord()?;
-        let cp = reflect_control_point(start, previous_cp);
-        let end = if relative {
-            offset_point(start, end)
-        } else {
-            end
+        let adjust = |p: Vec2| {
+            if relative { start + p } else { p }
         };
+        let end = adjust(tokens.read_coord()?);
+        let cp = reflect_control_point(start, previous_cp);
         Ok(Self { start, cp, end })
     }
 
-    fn new(start: (f32, f32), cp: (f32, f32), end: (f32, f32), relative: bool) -> Self {
-        let (cp, end) = if relative {
-            (offset_point(start, cp), offset_point(start, end))
-        } else {
-            (cp, end)
-        };
-
-        Self { start, cp, end }
-    }
-
-    pub fn control_point(&self) -> (f32, f32) {
+    pub fn control_point(&self) -> Vec2 {
         self.cp
     }
 
-    pub fn end(&self) -> (f32, f32) {
+    pub fn end(&self) -> Vec2 {
         self.end
     }
 
-    pub fn extrema(&self) -> Vec<(f32, f32)> {
+    pub fn extrema(&self) -> Vec<Vec2> {
         [
-            quadratic_stationary_t(self.start.0, self.cp.0, self.end.0),
-            quadratic_stationary_t(self.start.1, self.cp.1, self.end.1),
+            quadratic_stationary_t(self.start.x, self.cp.x, self.end.x),
+            quadratic_stationary_t(self.start.y, self.cp.y, self.end.y),
         ]
         .into_iter()
         .flatten()
@@ -176,10 +141,10 @@ impl QuadraticBezier {
         .collect()
     }
 
-    pub fn evaluate(&self, t: f32) -> (f32, f32) {
-        (
-            evaluate_quadratic(self.start.0, self.cp.0, self.end.0, t),
-            evaluate_quadratic(self.start.1, self.cp.1, self.end.1, t),
+    pub fn evaluate(&self, t: f32) -> Vec2 {
+        Vec2::new(
+            evaluate_quadratic(self.start.x, self.cp.x, self.end.x, t),
+            evaluate_quadratic(self.start.y, self.cp.y, self.end.y, t),
         )
     }
 
@@ -187,18 +152,14 @@ impl QuadraticBezier {
         sample_length(QUADRATIC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> (f32, f32) {
+    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(QUADRATIC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 }
 
-fn offset_point(origin: (f32, f32), delta: (f32, f32)) -> (f32, f32) {
-    (origin.0 + delta.0, origin.1 + delta.1)
-}
-
-fn reflect_control_point(start: (f32, f32), previous_cp: Option<(f32, f32)>) -> (f32, f32) {
-    if let Some((prev_cpx, prev_cpy)) = previous_cp {
-        (2. * start.0 - prev_cpx, 2. * start.1 - prev_cpy)
+fn reflect_control_point(start: Vec2, previous_cp: Option<Vec2>) -> Vec2 {
+    if let Some(prev_cp) = previous_cp {
+        2. * start - prev_cp
     } else {
         start
     }

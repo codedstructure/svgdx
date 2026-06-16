@@ -1,6 +1,6 @@
-use super::SvgElement;
 use super::arc::Arc;
 use super::bezier::{CubicBezier, QuadraticBezier};
+use super::{SvgElement, Vec2};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
 
@@ -10,16 +10,16 @@ use super::syntax::{PathSyntax, SvgPathSyntax};
 pub(super) struct PathParser {
     tokens: SvgPathSyntax, // TODO: ref to make clone cheaper?
     // current position, updated as commands are processed
-    position: Option<(f32, f32)>,
+    position: Option<Vec2>,
     // location to return to for 'Z'/'z' commands
-    subpath_start: Option<(f32, f32)>,
+    subpath_start: Option<Vec2>,
     // current command being processed; most commands take multiple parameter
     // sets without repeating the command character
     command: Option<char>,
     // previous second control point (if any) for evaluating 'S' and 's'
-    cubic_cp2: Option<(f32, f32)>,
+    cubic_cp2: Option<Vec2>,
     // previous control point (if any) for evaluating 'T' and 't'
-    quadratic_cp: Option<(f32, f32)>,
+    quadratic_cp: Option<Vec2>,
     // distance along the path so far, for line-offset
     elapsed_distance: f32,
     // extrema, updated as path is processed
@@ -60,8 +60,8 @@ impl PathParser {
         self.max_y = 0.;
     }
 
-    fn extend_extrema(&mut self, pos: (f32, f32)) {
-        let (x, y) = pos;
+    fn extend_extrema(&mut self, pos: Vec2) {
+        let (x, y) = (pos.x, pos.y);
         if self.position.is_none() {
             self.min_x = x;
             self.min_y = y;
@@ -75,19 +75,18 @@ impl PathParser {
         }
     }
 
-    fn extend_subpath(&mut self, pos: (f32, f32)) {
+    fn extend_subpath(&mut self, pos: Vec2) {
         self.extend_extrema(pos);
 
-        let (old_x, old_y) = self.position.unwrap_or(pos);
-        let (x, y) = pos;
-        self.elapsed_distance += (x - old_x).hypot(y - old_y);
+        let old = self.position.unwrap_or(pos);
+        self.elapsed_distance += pos.distance(old);
 
         self.position = Some(pos);
     }
 
-    fn extend_curve<I>(&mut self, end: (f32, f32), extrema: I, length: f32)
+    fn extend_curve<I>(&mut self, end: Vec2, extrema: I, length: f32)
     where
-        I: IntoIterator<Item = (f32, f32)>,
+        I: IntoIterator<Item = Vec2>,
     {
         for point in extrema {
             self.extend_extrema(point);
@@ -97,7 +96,7 @@ impl PathParser {
         self.position = Some(end);
     }
 
-    fn new_subpath(&mut self, pos: (f32, f32)) {
+    fn new_subpath(&mut self, pos: Vec2) {
         self.extend_extrema(pos);
         // note we don't add to elapsed_distance here; instantly jump to the new position.
         self.position = Some(pos);
@@ -150,12 +149,12 @@ impl PathParser {
         // Smooth curve reflection only applies when the immediately preceding
         // instruction was the matching bezier type, so every other instruction
         // must clear the stored control points after it is processed.
-        let mut next_cubic_cp2: Option<(f32, f32)> = None;
-        let mut next_quadratic_cp: Option<(f32, f32)> = None;
+        let mut next_cubic_cp2: Option<Vec2> = None;
+        let mut next_quadratic_cp: Option<Vec2> = None;
 
         let command = self.read_instruction_command()?;
-
         let is_relative = command.is_lowercase();
+        let pos = self.position.unwrap_or_default();
 
         match command {
             'M' => {
@@ -168,12 +167,10 @@ impl PathParser {
             }
             'm' => {
                 // "(x y)+"
-                let (dx, dy) = self.tokens.read_coord()?;
-                let (px, py) = self.position.unwrap_or((0., 0.));
-                let xy = (px + dx, py + dy);
+                let delta = self.tokens.read_coord()?;
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
-                self.new_subpath(xy);
+                self.new_subpath(pos + delta);
             }
             'L' => {
                 // "(x y)+"
@@ -182,46 +179,37 @@ impl PathParser {
             }
             'l' => {
                 // "(x y)+"
-                let (dx, dy) = self.tokens.read_coord()?;
-                let (px, py) = self.position.unwrap_or((0., 0.));
-                self.extend_subpath((px + dx, py + dy));
+                let delta = self.tokens.read_coord()?;
+                self.extend_subpath(pos + delta);
             }
             'H' => {
                 // "x+"
                 let new_x = self.tokens.read_number()?;
-                let (_, py) = self.position.unwrap_or((0., 0.));
-                self.extend_subpath((new_x, py));
+                self.extend_subpath(Vec2::new(new_x, pos.y));
             }
             'h' => {
                 // "x+"
                 let dx = self.tokens.read_number()?;
-                let (px, py) = self.position.unwrap_or((0., 0.));
-                self.extend_subpath((px + dx, py));
+                self.extend_subpath(pos + Vec2::new(dx, 0.));
             }
             'V' => {
                 // "y+"
                 let new_y = self.tokens.read_number()?;
-                let (px, _) = self.position.unwrap_or((0., 0.));
-                self.extend_subpath((px, new_y));
+                self.extend_subpath(Vec2::new(pos.x, new_y));
             }
             'v' => {
                 // "y+"
                 let dy = self.tokens.read_number()?;
-                let (px, py) = self.position.unwrap_or((0., 0.));
-                self.extend_subpath((px, py + dy));
+                self.extend_subpath(pos + Vec2::new(0., dy));
             }
             'Z' | 'z' => {
-                self.extend_subpath(self.subpath_start.unwrap_or((0., 0.)));
+                self.extend_subpath(self.subpath_start.unwrap_or_default());
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
                 self.command = None;
             }
             'C' | 'c' => {
-                let curve = CubicBezier::from_tokens(
-                    &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
-                    is_relative,
-                )?;
+                let curve = CubicBezier::from_tokens(&mut self.tokens, pos, is_relative)?;
 
                 next_cubic_cp2 = Some(curve.control_point_2());
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
@@ -229,7 +217,7 @@ impl PathParser {
             'S' | 's' => {
                 let curve = CubicBezier::from_smooth_tokens(
                     &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
+                    pos,
                     previous_cubic_cp2,
                     is_relative,
                 )?;
@@ -238,11 +226,7 @@ impl PathParser {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             'Q' | 'q' => {
-                let curve = QuadraticBezier::from_tokens(
-                    &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
-                    is_relative,
-                )?;
+                let curve = QuadraticBezier::from_tokens(&mut self.tokens, pos, is_relative)?;
 
                 next_quadratic_cp = Some(curve.control_point());
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
@@ -250,7 +234,7 @@ impl PathParser {
             'T' | 't' => {
                 let curve = QuadraticBezier::from_smooth_tokens(
                     &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
+                    pos,
                     previous_quadratic_cp,
                     is_relative,
                 )?;
@@ -260,11 +244,7 @@ impl PathParser {
             }
             'A' | 'a' => {
                 // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let arc = Arc::from_tokens(
-                    &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
-                    is_relative,
-                )?;
+                let arc = Arc::from_tokens(&mut self.tokens, pos, is_relative)?;
 
                 self.extend_curve(arc.end(), arc.extrema(), arc.approx_length());
             }
@@ -292,7 +272,7 @@ impl PathParser {
         Ok(self.length_so_far())
     }
 
-    fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<(f32, f32)> {
+    fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<Vec2> {
         let command = self.read_instruction_command()?;
 
         let is_relative = command.is_lowercase();
@@ -301,68 +281,65 @@ impl PathParser {
         // so the stored control-point state already matches the smooth-curve context.
         match command {
             'L' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let target = self.tokens.read_coord()?;
-                let dx = target.0 - pos.0;
-                let dy = target.1 - pos.1;
-                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
+                let delta = target - pos;
+                Ok(pos + ratio * delta)
             }
             'l' => {
-                let pos = self.position.unwrap_or((0., 0.));
-                let (dx, dy) = self.tokens.read_coord()?;
-                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
+                let pos = self.position.unwrap_or_default();
+                let delta = self.tokens.read_coord()?;
+                Ok(pos + ratio * delta)
             }
             'H' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let new_x = self.tokens.read_number()?;
-                let dx = new_x - pos.0;
-                Ok((pos.0 + dx * ratio, pos.1))
+                let target = Vec2::new(new_x, pos.y);
+                Ok(pos + ratio * (target - pos))
             }
             'h' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let dx = self.tokens.read_number()?;
-                Ok((pos.0 + dx * ratio, pos.1))
+                Ok(pos + ratio * Vec2::new(dx, 0.))
             }
             'V' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let new_y = self.tokens.read_number()?;
-                let dy = new_y - pos.1;
-                Ok((pos.0, pos.1 + dy * ratio))
+                let target = Vec2::new(pos.x, new_y);
+                Ok(pos + ratio * (target - pos))
             }
             'v' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let dy = self.tokens.read_number()?;
-                Ok((pos.0, pos.1 + dy * ratio))
+                Ok(pos + ratio * Vec2::new(0., dy))
             }
             'z' | 'Z' => {
-                let pos = self.position.unwrap_or((0., 0.));
+                let pos = self.position.unwrap_or_default();
                 let target = self.subpath_start.unwrap_or(pos);
-                let dx = target.0 - pos.0;
-                let dy = target.1 - pos.1;
-                Ok((pos.0 + dx * ratio, pos.1 + dy * ratio))
+                Ok(pos + ratio * (target - pos))
             }
             'C' | 'c' => Ok(CubicBezier::from_tokens(
                 &mut self.tokens,
-                self.position.unwrap_or((0., 0.)),
+                self.position.unwrap_or_default(),
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
             'S' | 's' => Ok(CubicBezier::from_smooth_tokens(
                 &mut self.tokens,
-                self.position.unwrap_or((0., 0.)),
+                self.position.unwrap_or_default(),
                 self.cubic_cp2,
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
             'Q' | 'q' => Ok(QuadraticBezier::from_tokens(
                 &mut self.tokens,
-                self.position.unwrap_or((0., 0.)),
+                self.position.unwrap_or_default(),
                 is_relative,
             )?
             .approx_point_at_ratio(ratio)),
             'T' | 't' => Ok(QuadraticBezier::from_smooth_tokens(
                 &mut self.tokens,
-                self.position.unwrap_or((0., 0.)),
+                self.position.unwrap_or_default(),
                 self.quadratic_cp,
                 is_relative,
             )?
@@ -370,7 +347,7 @@ impl PathParser {
             'A' | 'a' => {
                 let arc = Arc::from_tokens(
                     &mut self.tokens,
-                    self.position.unwrap_or((0., 0.)),
+                    self.position.unwrap_or_default(),
                     is_relative,
                 )?;
 
@@ -383,7 +360,7 @@ impl PathParser {
         }
     }
 
-    pub fn point_at_offset(&mut self, offset: Length) -> Result<(f32, f32)> {
+    pub fn point_at_offset(&mut self, offset: Length) -> Result<Vec2> {
         self.reset();
 
         // if offset is ratio, get path length and convert to absolute
@@ -421,7 +398,7 @@ impl PathParser {
             }
         }
 
-        Ok(self.position.unwrap_or((0., 0.)))
+        Ok(self.position.unwrap_or_default())
     }
 }
 
@@ -435,10 +412,11 @@ pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
     }
 }
 
+// TODO: update return type when callers know about Vec2
 pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32, f32)> {
     if let Some(path_data) = element.get_attr("d") {
         let mut pp = PathParser::new(path_data);
-        pp.point_at_offset(offset)
+        pp.point_at_offset(offset).map(|p| (p.x, p.y))
     } else {
         Err(Error::MissingAttr("d".to_string()))
     }
@@ -454,7 +432,7 @@ impl PathParser {
         self.tokens.skip_whitespace();
     }
 
-    pub fn position(&self) -> Option<(f32, f32)> {
+    pub fn position(&self) -> Option<Vec2> {
         self.position
     }
 }

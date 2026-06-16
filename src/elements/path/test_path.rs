@@ -1,12 +1,13 @@
 use crate::geometry::{BoundingBox, Length};
 
+use super::Vec2;
 use super::parser::PathParser;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use std::num::NonZeroU32;
 
-fn assert_point_close(actual: (f32, f32), expected: (f32, f32), epsilon: f32) {
+fn assert_point_close(actual: Vec2, expected: Vec2, epsilon: f32) {
     assert!(
-        (actual.0 - expected.0).abs() < epsilon && (actual.1 - expected.1).abs() < epsilon,
+        actual.distance(expected) < epsilon,
         "got {actual:?}, expected {expected:?}"
     );
 }
@@ -68,51 +69,51 @@ fn test_ps_flag() {
 #[test]
 fn test_ps_coord() {
     let mut ps = SvgPathSyntax::new("123 456");
-    assert_eq!(ps.read_coord().unwrap(), (123., 456.));
+    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
 
     let mut ps = SvgPathSyntax::new("123,456");
-    assert_eq!(ps.read_coord().unwrap(), (123., 456.));
+    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
 
     let mut ps = SvgPathSyntax::new("123 ,   456");
-    assert_eq!(ps.read_coord().unwrap(), (123., 456.));
+    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
 
     // Example from https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
     // 'for the string "M 0.6.5" … the first coordinate will be "0.6" and
     // the second coordinate will be ".5".'
     let mut ps = SvgPathSyntax::new("0.6.5");
-    assert_eq!(ps.read_coord().unwrap(), (0.6, 0.5));
+    assert_eq!(ps.read_coord().unwrap(), Vec2::new(0.6, 0.5));
 }
 
 #[test]
 fn test_pp_move() {
     let mut pp = PathParser::new("M10 20");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 20.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // if the first command is 'm' (relative moveto) it is treated
     // as an absolute moveto.
     let mut pp = PathParser::new("m10 20");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 20.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new("M10 20 100 200");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((100., 200.)));
+    assert_eq!(pp.position(), Some(Vec2::new(100., 200.)));
     assert!(pp.at_end());
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new("m10 20 100 200");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((110., 220.)));
+    assert_eq!(pp.position(), Some(Vec2::new(110., 220.)));
     assert!(pp.at_end());
 
     // Example from spec - grammar section.
     let mut pp = PathParser::new("M 0.6.5");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((0.6, 0.5)));
+    assert_eq!(pp.position(), Some(Vec2::new(0.6, 0.5)));
     assert!(pp.at_end());
 
     //
@@ -120,26 +121,26 @@ fn test_pp_move() {
     //
     let mut pp = PathParser::new("L10 20");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 20.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // if the first command is 'm' (relative moveto) it is treated
     // as an absolute moveto.
     let mut pp = PathParser::new("l10 20");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 20.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new("L10 20 100 200");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((100., 200.)));
+    assert_eq!(pp.position(), Some(Vec2::new(100., 200.)));
     assert!(pp.at_end());
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new("l10 20 100 200");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((110., 220.)));
+    assert_eq!(pp.position(), Some(Vec2::new(110., 220.)));
     assert!(pp.at_end());
 
     //
@@ -147,22 +148,22 @@ fn test_pp_move() {
     //
     let mut pp = PathParser::new("H 10");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 0.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("H 10 80 30");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((30., 0.)));
+    assert_eq!(pp.position(), Some(Vec2::new(30., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("h 10");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((10., 0.)));
+    assert_eq!(pp.position(), Some(Vec2::new(10., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("h 10 80 30");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((120., 0.)));
+    assert_eq!(pp.position(), Some(Vec2::new(120., 0.)));
     assert!(pp.at_end());
 
     //
@@ -170,22 +171,22 @@ fn test_pp_move() {
     //
     let mut pp = PathParser::new("V 10");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((0., 10.)));
+    assert_eq!(pp.position(), Some(Vec2::new(0., 10.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("V 10 80 30");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((0., 30.)));
+    assert_eq!(pp.position(), Some(Vec2::new(0., 30.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("v 10");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((0., 10.)));
+    assert_eq!(pp.position(), Some(Vec2::new(0., 10.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new("v 10 80 30");
     pp.evaluate().unwrap();
-    assert_eq!(pp.position(), Some((0., 120.)));
+    assert_eq!(pp.position(), Some(Vec2::new(0., 120.)));
     assert!(pp.at_end());
 }
 
@@ -359,62 +360,80 @@ fn test_point_at_offset_linear() {
     let mut pp = PathParser::new("M 0 0 h10v10h10");
 
     // at start
-    assert_eq!(pp.point_at_offset(Length::Absolute(0.)).unwrap(), (0., 0.));
+    assert_eq!(
+        pp.point_at_offset(Length::Absolute(0.)).unwrap(),
+        Vec2::new(0., 0.)
+    );
     // at end
     assert_eq!(
         pp.point_at_offset(Length::Absolute(30.)).unwrap(),
-        (20., 10.)
+        Vec2::new(20., 10.)
     );
     // halfway along first segment
-    assert_eq!(pp.point_at_offset(Length::Absolute(5.)).unwrap(), (5., 0.));
+    assert_eq!(
+        pp.point_at_offset(Length::Absolute(5.)).unwrap(),
+        Vec2::new(5., 0.)
+    );
     // halfway along second segment
     assert_eq!(
         pp.point_at_offset(Length::Absolute(15.)).unwrap(),
-        (10., 5.)
+        Vec2::new(10., 5.)
     );
     // halfway along third segment
     assert_eq!(
         pp.point_at_offset(Length::Absolute(25.)).unwrap(),
-        (15., 10.)
+        Vec2::new(15., 10.)
     );
     // beyond end should clamp to end point
     assert_eq!(
         pp.point_at_offset(Length::Absolute(35.)).unwrap(),
-        (20., 10.)
+        Vec2::new(20., 10.)
     );
     // negative offset should clamp to start point
-    assert_eq!(pp.point_at_offset(Length::Absolute(-5.)).unwrap(), (0., 0.));
+    assert_eq!(
+        pp.point_at_offset(Length::Absolute(-5.)).unwrap(),
+        Vec2::new(0., 0.)
+    );
 
     // ratios
-    assert_eq!(pp.point_at_offset(Length::Ratio(0.)).unwrap(), (0., 0.));
-    assert_eq!(pp.point_at_offset(Length::Ratio(0.5)).unwrap(), (10., 5.));
-    assert_eq!(pp.point_at_offset(Length::Ratio(1.)).unwrap(), (20., 10.));
+    assert_eq!(
+        pp.point_at_offset(Length::Ratio(0.)).unwrap(),
+        Vec2::new(0., 0.)
+    );
+    assert_eq!(
+        pp.point_at_offset(Length::Ratio(0.5)).unwrap(),
+        Vec2::new(10., 5.)
+    );
+    assert_eq!(
+        pp.point_at_offset(Length::Ratio(1.)).unwrap(),
+        Vec2::new(20., 10.)
+    );
 
     // rationals
     assert_eq!(
         pp.point_at_offset(Length::Rational(0, NonZeroU32::new(1).unwrap()))
             .unwrap(),
-        (0., 0.)
+        Vec2::new(0., 0.)
     );
     assert_eq!(
         pp.point_at_offset(Length::Rational(1, NonZeroU32::new(3).unwrap()))
             .unwrap(),
-        (10., 0.)
+        Vec2::new(10., 0.)
     );
     assert_eq!(
         pp.point_at_offset(Length::Rational(1, NonZeroU32::new(2).unwrap()))
             .unwrap(),
-        (10., 5.)
+        Vec2::new(10., 5.)
     );
     assert_eq!(
         pp.point_at_offset(Length::Rational(2, NonZeroU32::new(3).unwrap()))
             .unwrap(),
-        (10., 10.)
+        Vec2::new(10., 10.)
     );
     assert_eq!(
         pp.point_at_offset(Length::Rational(1, NonZeroU32::new(1).unwrap()))
             .unwrap(),
-        (20., 10.)
+        Vec2::new(20., 10.)
     );
 
     // test 'z'
@@ -422,7 +441,7 @@ fn test_point_at_offset_linear() {
         PathParser::new("m0 0h10v10h-10z")
             .point_at_offset(Length::Absolute(35.))
             .unwrap(),
-        (0., 5.)
+        Vec2::new(0., 5.)
     );
 }
 
@@ -433,7 +452,7 @@ fn test_point_at_offset_curve() {
         PathParser::new("M 0 0 Q 20 40 40 0")
             .point_at_offset(Length::Ratio(0.5))
             .unwrap(),
-        (20., 20.),
+        Vec2::new(20., 20.),
         1e-3,
     );
 
@@ -442,7 +461,7 @@ fn test_point_at_offset_curve() {
         PathParser::new("M 0 0 C 0 40 40 40 40 0")
             .point_at_offset(Length::Ratio(0.5))
             .unwrap(),
-        (20., 30.),
+        Vec2::new(20., 30.),
         1e-3,
     );
 
@@ -450,23 +469,35 @@ fn test_point_at_offset_curve() {
     // Note a single arc command cannot represent a full circle.
     let mut pp = PathParser::new("M 10 50 A 40 40 0 1 0 90 50 A 40 40 0 1 0 10 50");
     for (offset, expected) in [
-        (Length::Rational(0, NonZeroU32::new(4).unwrap()), (10., 50.)),
-        (Length::Rational(1, NonZeroU32::new(4).unwrap()), (50., 90.)),
-        (Length::Rational(2, NonZeroU32::new(4).unwrap()), (90., 50.)),
-        (Length::Rational(3, NonZeroU32::new(4).unwrap()), (50., 10.)),
-        (Length::Rational(4, NonZeroU32::new(4).unwrap()), (10., 50.)),
+        (
+            Length::Rational(0, NonZeroU32::new(4).unwrap()),
+            Vec2::new(10., 50.),
+        ),
+        (
+            Length::Rational(1, NonZeroU32::new(4).unwrap()),
+            Vec2::new(50., 90.),
+        ),
+        (
+            Length::Rational(2, NonZeroU32::new(4).unwrap()),
+            Vec2::new(90., 50.),
+        ),
+        (
+            Length::Rational(3, NonZeroU32::new(4).unwrap()),
+            Vec2::new(50., 10.),
+        ),
+        (
+            Length::Rational(4, NonZeroU32::new(4).unwrap()),
+            Vec2::new(10., 50.),
+        ),
     ] {
         let point = pp.point_at_offset(offset).unwrap();
-        assert!(
-            (point.0 - expected.0).abs() < 1e-4 && (point.1 - expected.1).abs() < 1e-4,
-            "Failed for offset {offset:?}: got {point:?}, expected {expected:?}"
-        );
+        assert_point_close(point, expected, 1e-4);
     }
 }
 
 #[test]
 fn test_point_at_offset_smooth_curve() {
-    fn point_at_command_ratio(path: &str, command_index: usize, ratio: f32) -> (f32, f32) {
+    fn point_at_command_ratio(path: &str, command_index: usize, ratio: f32) -> Vec2 {
         let mut measure = PathParser::new(path);
         measure.skip_whitespace();
 
@@ -485,37 +516,37 @@ fn test_point_at_offset_smooth_curve() {
 
     assert_point_close(
         point_at_command_ratio("M 0 0 C 10 0 20 20 30 20 s 20 0 30 0", 2, 0.5),
-        (45., 20.),
+        Vec2::new(45., 20.),
         6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 C 10 0 20 20 30 20 S 50 20 60 20 80 20 90 20", 3, 0.5),
-        (75., 20.),
+        Vec2::new(75., 20.),
         6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 C 0 40 40 40 40 0 L 50 0 S 90 0 90 0", 3, 0.5),
-        (70., 0.),
+        Vec2::new(70., 0.),
         6.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 t 20 0", 2, 0.5),
-        (30., -10.),
+        Vec2::new(30., -10.),
         3.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 T 40 0 60 0", 3, 0.5),
-        (50., 10.),
+        Vec2::new(50., 10.),
         3.0,
     );
 
     assert_point_close(
         point_at_command_ratio("M 0 0 Q 10 20 20 0 L 30 0 T 50 0", 3, 0.5),
-        (35., 0.),
+        Vec2::new(35., 0.),
         6.0,
     );
 }
@@ -541,11 +572,9 @@ fn test_path_length_curve_approximation() {
 fn test_point_at_offset_arc_with_scaled_radii() {
     let mut pp = PathParser::new("M 0 0 A 13 10 0 1 0 27 1");
 
-    assert_eq!(pp.point_at_offset(Length::Ratio(0.)).unwrap(), (0., 0.));
+    let point = pp.point_at_offset(Length::Ratio(0.)).unwrap();
+    assert_point_close(point, Vec2::new(0., 0.), 1e-4);
 
     let point = pp.point_at_offset(Length::Ratio(1.)).unwrap();
-    assert!(
-        (point.0 - 27.).abs() < 1e-4 && (point.1 - 1.).abs() < 1e-4,
-        "Expected endpoint on scaled arc, got {point:?}"
-    );
+    assert_point_close(point, Vec2::new(27., 1.), 1e-4);
 }
