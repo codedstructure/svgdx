@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support for skewX/skewY/matrix components in transform attributes for
+  deriving bounding boxes; previously only translate/scale/rotate were handled.
+
 - Fix: fix line-offset for elements with transform (e.g. paths with dirspec)
 
 ## [0.30.0 - 2026-06-13]

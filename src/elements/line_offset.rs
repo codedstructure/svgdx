@@ -98,7 +98,7 @@ pub fn get_point_along_linelike_type_el(el: &SvgElement, length: Length) -> Resu
 
     if let Some(transform) = el.get_attr("transform") {
         let transform: TransformAttr = transform.parse()?;
-        Ok(transform.apply_to_point(point.0, point.1))
+        transform.apply_to_point(point.0, point.1)
     } else {
         Ok(point)
     }

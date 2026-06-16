@@ -281,7 +281,7 @@ impl ElementMap for TransformerContext {
                     }
                     if let Some(xfrm_attr) = el.get_attr("transform") {
                         let xfrm: TransformAttr = xfrm_attr.parse().unwrap_or_default();
-                        *bbox = xfrm.apply(bbox);
+                        *bbox = xfrm.apply(bbox)?;
                     }
                 }
             }

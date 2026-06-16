@@ -188,7 +188,7 @@ impl TransformAttr {
         }
     }
 
-    pub fn apply_to_point(&self, x: f32, y: f32) -> (f32, f32) {
+    pub fn apply_to_point(&self, x: f32, y: f32) -> Result<(f32, f32)> {
         let mut result = (x, y);
 
         for transform in self.transforms.iter().rev() {
@@ -204,24 +204,45 @@ impl TransformAttr {
                     let rot_y = cy + (x - cx) * sin_a + (y - cy) * cos_a;
                     (rot_x as f32, rot_y as f32)
                 }
-                _ => result,
+                TransformType::SkewX(angle) => {
+                    let tan_a = (angle as f64).to_radians().tan() as f32;
+                    if tan_a.abs() > 1e5 {
+                        return Err(Error::MissingBBox(
+                            "skewX with excessive tan(angle)".to_string(),
+                        ));
+                    }
+                    (result.0 + tan_a * result.1, result.1)
+                }
+                TransformType::SkewY(angle) => {
+                    let tan_a = (angle as f64).to_radians().tan() as f32;
+                    if tan_a.abs() > 1e5 {
+                        return Err(Error::MissingBBox(
+                            "skewX with excessive tan(angle)".to_string(),
+                        ));
+                    }
+                    (result.0, result.1 + tan_a * result.0)
+                }
+                TransformType::Matrix(a, b, c, d, e, f) => (
+                    a * result.0 + c * result.1 + e,
+                    b * result.0 + d * result.1 + f,
+                ),
             };
         }
 
-        result
+        Ok(result)
     }
 
-    pub fn apply(&self, bbox: &BoundingBox) -> BoundingBox {
+    pub fn apply(&self, bbox: &BoundingBox) -> Result<BoundingBox> {
         // TODO: ideally we'd get the convex hull of the shape (or simply a set
         // of points on the shape boundary, even internal) and transform each point
         // to derive the resulting bounding box; this currently over-estimates
         // bboxes for non-rectangular shapes (e.g. a circle at 45deg will have a
         // larger bbox than a circle at 0deg despite being the same size)
         let corners = [
-            self.apply_to_point(bbox.x1(), bbox.y1()),
-            self.apply_to_point(bbox.x2(), bbox.y1()),
-            self.apply_to_point(bbox.x1(), bbox.y2()),
-            self.apply_to_point(bbox.x2(), bbox.y2()),
+            self.apply_to_point(bbox.x1(), bbox.y1())?,
+            self.apply_to_point(bbox.x2(), bbox.y1())?,
+            self.apply_to_point(bbox.x1(), bbox.y2())?,
+            self.apply_to_point(bbox.x2(), bbox.y2())?,
         ];
 
         let min_x = corners
@@ -242,12 +263,12 @@ impl TransformAttr {
             .fold(f32::NEG_INFINITY, f32::max);
 
         // deliberate down-sampling of floating point
-        BoundingBox::new(
+        Ok(BoundingBox::new(
             (16384.0 * min_x).round() / 16384.0,
             (16384.0 * min_y).round() / 16384.0,
             (16384.0 * max_x).round() / 16384.0,
             (16384.0 * max_y).round() / 16384.0,
-        )
+        ))
     }
 
     pub fn translate(&mut self, tx: f32, ty: f32) {
@@ -298,43 +319,43 @@ mod test {
 
     #[test]
     fn test_apply_translate() {
-        let bbox = BoundingBox::new(0., 0., 10., 10.);
+        let bb = BoundingBox::new(0., 0., 10., 10.);
 
         let t: TransformAttr = "translate(10,20)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(10., 20., 20., 30.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(10., 20., 20., 30.));
 
         let t: TransformAttr = "translate(10)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(10., 0., 20., 10.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(10., 0., 20., 10.));
     }
 
     #[test]
     fn test_apply_scale() {
-        let bbox = BoundingBox::new(0., 0., 10., 10.);
+        let bb = BoundingBox::new(0., 0., 10., 10.);
         let t: TransformAttr = "scale(2)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(0., 0., 20., 20.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(0., 0., 20., 20.));
 
         let t: TransformAttr = "scale(2, 3)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(0., 0., 20., 30.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(0., 0., 20., 30.));
     }
 
     #[test]
     fn test_apply_rotate() {
-        let bbox = BoundingBox::new(-10., -5., 10., 5.);
+        let bb = BoundingBox::new(-10., -5., 10., 5.);
         let t: TransformAttr = "rotate(90)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(-5., -10., 5., 10.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(-5., -10., 5., 10.));
 
-        let bbox = BoundingBox::new(0., 0., 10., 5.);
+        let bb = BoundingBox::new(0., 0., 10., 5.);
         let t: TransformAttr = "rotate(90)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(-5., 0., 0., 10.));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(-5., 0., 0., 10.));
 
-        let bbox = BoundingBox::new(0., 0., 10., 5.);
+        let bb = BoundingBox::new(0., 0., 10., 5.);
         let t: TransformAttr = "rotate(90, 5, 2.5)".parse().unwrap();
-        assert_eq!(t.apply(&bbox), BoundingBox::new(2.5, -2.5, 7.5, 7.5));
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(2.5, -2.5, 7.5, 7.5));
 
-        let bbox = BoundingBox::new(-5., -5., 5., 5.);
+        let bb = BoundingBox::new(-5., -5., 5., 5.);
         let t: TransformAttr = "rotate(45, 0, 0)".parse().unwrap();
         assert_eq!(
-            t.apply(&bbox),
+            t.apply(&bb).unwrap(),
             BoundingBox::new(-7.071045, -7.071045, 7.071045, 7.071045)
         );
     }
@@ -342,22 +363,22 @@ mod test {
     #[test]
     fn test_apply_multiple() {
         let t: TransformAttr = "scale(2) translate(10,20)".parse().unwrap();
-        let bbox = BoundingBox::new(0., 0., 10., 10.);
-        assert_eq!(t.apply(&bbox), BoundingBox::new(20., 40., 40., 60.));
+        let bb = BoundingBox::new(0., 0., 10., 10.);
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(20., 40., 40., 60.));
 
         let t: TransformAttr = "rotate(90, 12, 1) translate(10,0)".parse().unwrap();
-        let bbox = BoundingBox::new(0., 0., 4., 2.);
-        assert_eq!(t.apply(&bbox), BoundingBox::new(11., -1., 13., 3.));
+        let bb = BoundingBox::new(0., 0., 4., 2.);
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(11., -1., 13., 3.));
 
         let t: TransformAttr = "translate(10,0) rotate(90, 2, 1)".parse().unwrap();
-        let bbox = BoundingBox::new(0., 0., 4., 2.);
-        assert_eq!(t.apply(&bbox), BoundingBox::new(11., -1., 13., 3.));
+        let bb = BoundingBox::new(0., 0., 4., 2.);
+        assert_eq!(t.apply(&bb).unwrap(), BoundingBox::new(11., -1., 13., 3.));
     }
 
     #[test]
     fn test_apply_point_multiple() {
         let t: TransformAttr = "scale(2) translate(10,20)".parse().unwrap();
-        assert_eq!(t.apply_to_point(1., 2.), (22., 44.));
+        assert_eq!(t.apply_to_point(1., 2.).unwrap(), (22., 44.));
     }
 
     #[test]

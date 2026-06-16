@@ -456,7 +456,7 @@ impl SvgElement {
         // apply any `transform` attr transformations to the bbox
         if let (Some(transform), Some(bbox)) = (self.get_attr("transform"), &mut el_bbox) {
             let transform: TransformAttr = transform.parse()?;
-            el_bbox = Some(transform.apply(bbox));
+            el_bbox = Some(transform.apply(bbox)?);
         }
         Ok(el_bbox)
     }

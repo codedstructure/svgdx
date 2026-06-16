@@ -104,4 +104,15 @@ fn test_rel_line_offset_with_transform() {
 "##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, r#"<circle cx="15" cy="0" r="1"/>"#);
+
+    // test additional skew
+    let input = r##"
+<svg>
+  <point wh="0"/>
+  <path xy="^|h 10" id="p0" d="M0 0h10" transform="skewY(45)"/>
+  <circle cxy="#p0:50%" r="1"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<circle cx="15" cy="10" r="1"/>"#);
 }
