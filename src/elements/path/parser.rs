@@ -1,5 +1,6 @@
 use super::arc::Arc;
 use super::bezier::{CubicBezier, QuadraticBezier};
+use super::lines::{HorizontalLineTo, LineTo, MoveTo, VerticalLineTo};
 use super::{SvgElement, Vec2};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
@@ -157,53 +158,32 @@ impl PathParser {
         let pos = self.position.unwrap_or_default();
 
         match command {
-            'M' => {
+            'M' | 'm' => {
                 // "(x y)+"
-                let xy = self.tokens.read_coord()?;
+                let jump = MoveTo::from_tokens(&mut self.tokens, pos, is_relative)?;
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
                 // (the first moveto is also the start of a subpath)
-                self.new_subpath(xy);
+                self.new_subpath(jump.end());
             }
-            'm' => {
+            'L' | 'l' => {
                 // "(x y)+"
-                let delta = self.tokens.read_coord()?;
-                // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
-                // the first command) represent the start of a new subpath'
-                self.new_subpath(pos + delta);
+                let line = LineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+                self.extend_subpath(line.end());
             }
-            'L' => {
-                // "(x y)+"
-                let xy = self.tokens.read_coord()?;
-                self.extend_subpath(xy);
-            }
-            'l' => {
-                // "(x y)+"
-                let delta = self.tokens.read_coord()?;
-                self.extend_subpath(pos + delta);
-            }
-            'H' => {
+            'H' | 'h' => {
                 // "x+"
-                let new_x = self.tokens.read_number()?;
-                self.extend_subpath(Vec2::new(new_x, pos.y));
+                let line = HorizontalLineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+                self.extend_subpath(line.end());
             }
-            'h' => {
-                // "x+"
-                let dx = self.tokens.read_number()?;
-                self.extend_subpath(pos + Vec2::new(dx, 0.));
-            }
-            'V' => {
+            'V' | 'v' => {
                 // "y+"
-                let new_y = self.tokens.read_number()?;
-                self.extend_subpath(Vec2::new(pos.x, new_y));
-            }
-            'v' => {
-                // "y+"
-                let dy = self.tokens.read_number()?;
-                self.extend_subpath(pos + Vec2::new(0., dy));
+                let line = VerticalLineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+                self.extend_subpath(line.end());
             }
             'Z' | 'z' => {
-                self.extend_subpath(self.subpath_start.unwrap_or_default());
+                let line = LineTo::from_endpoints(pos, self.subpath_start.unwrap_or_default());
+                self.extend_subpath(line.end());
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
                 self.command = None;
@@ -280,43 +260,30 @@ impl PathParser {
         // point_at_offset rewinds to the parser snapshot taken before this instruction,
         // so the stored control-point state already matches the smooth-curve context.
         match command {
-            'L' => {
-                let pos = self.position.unwrap_or_default();
-                let target = self.tokens.read_coord()?;
-                let delta = target - pos;
-                Ok(pos + ratio * delta)
-            }
-            'l' => {
-                let pos = self.position.unwrap_or_default();
-                let delta = self.tokens.read_coord()?;
-                Ok(pos + ratio * delta)
-            }
-            'H' => {
-                let pos = self.position.unwrap_or_default();
-                let new_x = self.tokens.read_number()?;
-                let target = Vec2::new(new_x, pos.y);
-                Ok(pos + ratio * (target - pos))
-            }
-            'h' => {
-                let pos = self.position.unwrap_or_default();
-                let dx = self.tokens.read_number()?;
-                Ok(pos + ratio * Vec2::new(dx, 0.))
-            }
-            'V' => {
-                let pos = self.position.unwrap_or_default();
-                let new_y = self.tokens.read_number()?;
-                let target = Vec2::new(pos.x, new_y);
-                Ok(pos + ratio * (target - pos))
-            }
-            'v' => {
-                let pos = self.position.unwrap_or_default();
-                let dy = self.tokens.read_number()?;
-                Ok(pos + ratio * Vec2::new(0., dy))
-            }
+            'L' | 'l' => Ok(LineTo::from_tokens(
+                &mut self.tokens,
+                self.position.unwrap_or_default(),
+                is_relative,
+            )?
+            .point_at_ratio(ratio)),
+            'H' | 'h' => Ok(HorizontalLineTo::from_tokens(
+                &mut self.tokens,
+                self.position.unwrap_or_default(),
+                is_relative,
+            )?
+            .point_at_ratio(ratio)),
+            'V' | 'v' => Ok(VerticalLineTo::from_tokens(
+                &mut self.tokens,
+                self.position.unwrap_or_default(),
+                is_relative,
+            )?
+            .point_at_ratio(ratio)),
             'z' | 'Z' => {
                 let pos = self.position.unwrap_or_default();
-                let target = self.subpath_start.unwrap_or(pos);
-                Ok(pos + ratio * (target - pos))
+                Ok(
+                    LineTo::from_endpoints(pos, self.subpath_start.unwrap_or(pos))
+                        .point_at_ratio(ratio),
+                )
             }
             'C' | 'c' => Ok(CubicBezier::from_tokens(
                 &mut self.tokens,

@@ -2,6 +2,7 @@ mod arc;
 mod bearing;
 mod bezier;
 mod convert;
+mod lines;
 mod parser;
 mod repeat;
 mod sample;
