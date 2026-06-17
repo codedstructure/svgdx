@@ -1,6 +1,4 @@
-use super::arc::Arc;
-use super::bezier::{CubicBezier, QuadraticBezier};
-use super::lines::{HorizontalLineTo, LineTo, MoveTo, VerticalLineTo};
+use super::command::Command;
 use super::{SvgElement, Vec2};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
@@ -150,89 +148,54 @@ impl PathParser {
         // Smooth curve reflection only applies when the immediately preceding
         // instruction was the matching bezier type, so every other instruction
         // must clear the stored control points after it is processed.
-        let mut next_cubic_cp2: Option<Vec2> = None;
-        let mut next_quadratic_cp: Option<Vec2> = None;
-
         let command = self.read_instruction_command()?;
-        let is_relative = command.is_lowercase();
         let pos = self.position.unwrap_or_default();
 
-        match command {
-            'M' | 'm' => {
-                // "(x y)+"
-                let jump = MoveTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+        let instruction = Command::from_tokens(
+            &mut self.tokens,
+            command,
+            pos,
+            self.subpath_start,
+            previous_cubic_cp2,
+            previous_quadratic_cp,
+        )?;
+
+        let next_cubic_cp2 = instruction.next_cubic_cp2();
+        let next_quadratic_cp = instruction.next_quadratic_cp();
+
+        match instruction {
+            Command::MoveTo(jump) => {
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
                 // (the first moveto is also the start of a subpath)
                 self.new_subpath(jump.end());
             }
-            'L' | 'l' => {
-                // "(x y)+"
-                let line = LineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+            Command::LineTo(line) => {
                 self.extend_subpath(line.end());
             }
-            'H' | 'h' => {
-                // "x+"
-                let line = HorizontalLineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+            Command::HorizontalLineTo(line) => {
                 self.extend_subpath(line.end());
             }
-            'V' | 'v' => {
-                // "y+"
-                let line = VerticalLineTo::from_tokens(&mut self.tokens, pos, is_relative)?;
+            Command::VerticalLineTo(line) => {
                 self.extend_subpath(line.end());
             }
-            'Z' | 'z' => {
-                let line = LineTo::from_endpoints(pos, self.subpath_start.unwrap_or_default());
+            Command::ClosePath(line) => {
                 self.extend_subpath(line.end());
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
                 self.command = None;
             }
-            'C' | 'c' => {
-                let curve = CubicBezier::from_tokens(&mut self.tokens, pos, is_relative)?;
-
-                next_cubic_cp2 = Some(curve.control_point_2());
+            Command::CubicBezier(curve) => {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
-            'S' | 's' => {
-                let curve = CubicBezier::from_smooth_tokens(
-                    &mut self.tokens,
-                    pos,
-                    previous_cubic_cp2,
-                    is_relative,
-                )?;
-
-                next_cubic_cp2 = Some(curve.control_point_2());
+            Command::QuadraticBezier(curve) => {
                 self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
-            'Q' | 'q' => {
-                let curve = QuadraticBezier::from_tokens(&mut self.tokens, pos, is_relative)?;
-
-                next_quadratic_cp = Some(curve.control_point());
-                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
-            }
-            'T' | 't' => {
-                let curve = QuadraticBezier::from_smooth_tokens(
-                    &mut self.tokens,
-                    pos,
-                    previous_quadratic_cp,
-                    is_relative,
-                )?;
-
-                next_quadratic_cp = Some(curve.control_point());
-                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
-            }
-            'A' | 'a' => {
-                // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
-                let arc = Arc::from_tokens(&mut self.tokens, pos, is_relative)?;
-
+            Command::Arc(arc) => {
                 self.extend_curve(arc.end(), arc.extrema(), arc.approx_length());
             }
-            _ => Err(Error::InvalidValue(
-                "path command".to_string(),
-                self.command.unwrap_or_default().to_string(),
-            ))?,
         }
+
         self.cubic_cp2 = next_cubic_cp2;
         self.quadratic_cp = next_quadratic_cp;
         Ok(())
@@ -255,76 +218,16 @@ impl PathParser {
     fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<Vec2> {
         let command = self.read_instruction_command()?;
 
-        let is_relative = command.is_lowercase();
+        let instruction = Command::from_tokens(
+            &mut self.tokens,
+            command,
+            self.position.unwrap_or_default(),
+            self.subpath_start,
+            self.cubic_cp2,
+            self.quadratic_cp,
+        )?;
 
-        // point_at_offset rewinds to the parser snapshot taken before this instruction,
-        // so the stored control-point state already matches the smooth-curve context.
-        match command {
-            'L' | 'l' => Ok(LineTo::from_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                is_relative,
-            )?
-            .point_at_ratio(ratio)),
-            'H' | 'h' => Ok(HorizontalLineTo::from_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                is_relative,
-            )?
-            .point_at_ratio(ratio)),
-            'V' | 'v' => Ok(VerticalLineTo::from_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                is_relative,
-            )?
-            .point_at_ratio(ratio)),
-            'z' | 'Z' => {
-                let pos = self.position.unwrap_or_default();
-                Ok(
-                    LineTo::from_endpoints(pos, self.subpath_start.unwrap_or(pos))
-                        .point_at_ratio(ratio),
-                )
-            }
-            'C' | 'c' => Ok(CubicBezier::from_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                is_relative,
-            )?
-            .approx_point_at_ratio(ratio)),
-            'S' | 's' => Ok(CubicBezier::from_smooth_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                self.cubic_cp2,
-                is_relative,
-            )?
-            .approx_point_at_ratio(ratio)),
-            'Q' | 'q' => Ok(QuadraticBezier::from_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                is_relative,
-            )?
-            .approx_point_at_ratio(ratio)),
-            'T' | 't' => Ok(QuadraticBezier::from_smooth_tokens(
-                &mut self.tokens,
-                self.position.unwrap_or_default(),
-                self.quadratic_cp,
-                is_relative,
-            )?
-            .approx_point_at_ratio(ratio)),
-            'A' | 'a' => {
-                let arc = Arc::from_tokens(
-                    &mut self.tokens,
-                    self.position.unwrap_or_default(),
-                    is_relative,
-                )?;
-
-                Ok(arc.approx_point_at_ratio(ratio))
-            }
-            _ => Err(Error::InvalidValue(
-                "path command".to_string(),
-                self.command.unwrap_or_default().to_string(),
-            ))?,
-        }
+        Ok(instruction.point_at_ratio(ratio))
     }
 
     pub fn point_at_offset(&mut self, offset: Length) -> Result<Vec2> {

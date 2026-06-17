@@ -16,6 +16,7 @@ pub(super) struct CubicBezier {
 
 impl CubicBezier {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "(x1 y1 x2 y2 x y)+"
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -31,6 +32,7 @@ impl CubicBezier {
         previous_cp2: Option<Vec2>,
         relative: bool,
     ) -> Result<Self> {
+        // "(x2 y2 x y)+"
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -87,7 +89,7 @@ impl CubicBezier {
         sample_length(CUBIC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
+    pub fn point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(CUBIC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 }
@@ -100,6 +102,7 @@ pub(super) struct QuadraticBezier {
 
 impl QuadraticBezier {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "(x1 y1 x y)+"
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -114,6 +117,7 @@ impl QuadraticBezier {
         previous_cp: Option<Vec2>,
         relative: bool,
     ) -> Result<Self> {
+        // "(x y)+"
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -152,7 +156,7 @@ impl QuadraticBezier {
         sample_length(QUADRATIC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
+    pub fn point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(QUADRATIC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 }

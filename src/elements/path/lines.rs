@@ -8,6 +8,7 @@ pub(super) struct MoveTo {
 
 impl MoveTo {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "(x y)+"
         let end = tokens.read_coord()?;
         let end = if relative { start + end } else { end };
         Ok(Self { end })
@@ -25,6 +26,7 @@ pub(super) struct LineTo {
 
 impl LineTo {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "(x y)+"
         let end = tokens.read_coord()?;
         let end = if relative { start + end } else { end };
         Ok(Self { start, end })
@@ -50,6 +52,7 @@ pub(super) struct HorizontalLineTo {
 
 impl HorizontalLineTo {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "x+"
         let x = tokens.read_number()?;
         let end_x = if relative { start.x + x } else { x };
         let end = Vec2::new(end_x, start.y);
@@ -72,6 +75,7 @@ pub(super) struct VerticalLineTo {
 
 impl VerticalLineTo {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+        // "y+"
         let y = tokens.read_number()?;
         let end_y = if relative { start.y + y } else { y };
         let end = Vec2::new(start.x, end_y);

@@ -1,6 +1,7 @@
 mod arc;
 mod bearing;
 mod bezier;
+mod command;
 mod convert;
 mod lines;
 mod parser;

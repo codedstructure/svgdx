@@ -142,7 +142,7 @@ impl Arc {
         sample_length(ARC_SAMPLES, |t| self.evaluate(t))
     }
 
-    pub fn approx_point_at_ratio(&self, ratio: f32) -> Vec2 {
+    pub fn point_at_ratio(&self, ratio: f32) -> Vec2 {
         sample_point_at_ratio(ARC_SAMPLES, ratio, |t| self.evaluate(t))
     }
 
