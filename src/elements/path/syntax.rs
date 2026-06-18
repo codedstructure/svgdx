@@ -1,3 +1,4 @@
+use super::types::Vec2;
 use crate::errors::{Error, Result};
 
 // This assumes that any svgdx path extensions ('B'/'b', repeats) have already
@@ -49,7 +50,7 @@ impl PathSyntax for SvgPathSyntax {
     }
 }
 
-pub trait PathSyntax {
+pub(super) trait PathSyntax {
     fn at_command(&self) -> Result<bool>;
     fn current(&self) -> Option<char>;
     fn advance(&mut self);
@@ -164,12 +165,12 @@ pub trait PathSyntax {
         Ok(s.parse()?)
     }
 
-    fn read_coord(&mut self) -> Result<(f32, f32)> {
+    fn read_coord(&mut self) -> Result<Vec2> {
         let x = self.read_number()?;
         self.skip_wsp_comma();
         let y = self.read_number()?;
         self.skip_wsp_comma();
-        Ok((x, y))
+        Ok(Vec2::new(x, y))
     }
 
     fn read_command(&mut self) -> Result<char> {
