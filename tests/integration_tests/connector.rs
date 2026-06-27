@@ -389,6 +389,18 @@ fn test_connector_line_offset_refspec() {
 }
 
 #[test]
+fn test_connector_text_line_offset_loc() {
+    let input = r##"
+<rect id="a" xy="0" wh="10"/>
+<rect id="b" xy="30 20" wh="10"/>
+<line start="#a@r" end="#b@l" text="mid" text-loc="50%"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line x1="10" y1="5" x2="30" y2="25"/>"#);
+    assert_contains!(output, r#"<text x="20" y="15" class="d-text">mid</text>"#);
+}
+
+#[test]
 fn test_connector_line_offset_prev_next_refspec() {
     let input = r##"
 <line xy1="80 10" xy2="90 40"/>

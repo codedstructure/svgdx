@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: text-loc can now be given a 'Length' (ratio as 10% or 3/4, or
+  absolute) for line-like elements (line, polyline, path) which will place text
+  at that point along the line; typically use with `class="d-text-ol"`.
+
 - Added: support for skewX/skewY/matrix components in transform attributes for
   deriving bounding boxes; previously only translate/scale/rotate were handled.
 

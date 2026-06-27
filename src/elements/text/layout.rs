@@ -1,7 +1,8 @@
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
+use crate::elements::line_offset::get_point_along_linelike_el;
 use crate::errors::{Error, Result};
-use crate::geometry::LocSpec;
+use crate::geometry::ElementLoc;
 use crate::types::{ElRef, attr_split_cycle, fstr, strp};
 
 use super::markdown::{MdSpan, get_md_value};
@@ -34,7 +35,7 @@ fn get_text_value(text_value: &str) -> String {
 fn get_text_position(
     element: &mut SvgElement,
     ctx: &impl ElementMap,
-) -> Result<(f32, f32, bool, LocSpec, Vec<String>)> {
+) -> Result<(f32, f32, bool, ElementLoc, Vec<String>)> {
     let mut t_dx = 0.;
     let mut t_dy = 0.;
     {
@@ -73,7 +74,7 @@ fn get_text_position(
 
     let mut text_classes = vec!["d-text".to_owned()];
     let text_loc_str = element.pop_attr("text-loc").unwrap_or("c".into());
-    let text_anchor = text_loc_str.parse::<LocSpec>()?;
+    let text_anchor = text_loc_str.parse::<ElementLoc>()?;
 
     // Default dx/dy to push it in slightly from the edge (or out for lines);
     // Without offset text squishes to the edge and can be unreadable
@@ -93,7 +94,7 @@ fn get_text_position(
         matches!(text_ref_element.name(), "line" | "point" | "text")
     };
     match text_anchor {
-        ls if ls.is_top() => {
+        ElementLoc::LocSpec(ls) if ls.is_top() => {
             text_classes.push(
                 match (outside, vertical) {
                     (false, false) => "d-text-top",
@@ -105,7 +106,7 @@ fn get_text_position(
             );
             t_dy += if outside { -text_offset } else { text_offset };
         }
-        ls if ls.is_bottom() => {
+        ElementLoc::LocSpec(ls) if ls.is_bottom() => {
             text_classes.push(
                 match (outside, vertical) {
                     (false, false) => "d-text-bottom",
@@ -119,9 +120,10 @@ fn get_text_position(
         }
         _ => (),
     }
-
+    // NOTE: we need to left/right *as well as* top/bottom, so this cannot be
+    // merged into the match above.
     match text_anchor {
-        ls if ls.is_left() => {
+        ElementLoc::LocSpec(ls) if ls.is_left() => {
             text_classes.push(
                 match (outside, vertical) {
                     (false, false) => "d-text-left",
@@ -133,7 +135,7 @@ fn get_text_position(
             );
             t_dx += if outside { -text_offset } else { text_offset };
         }
-        ls if ls.is_right() => {
+        ElementLoc::LocSpec(ls) if ls.is_right() => {
             text_classes.push(
                 match (outside, vertical) {
                     (false, false) => "d-text-right",
@@ -151,10 +153,13 @@ fn get_text_position(
     // Assumption is that text should be centered within the rect,
     // and has styling via CSS to reflect this, e.g.:
     //  text.d-text { dominant-baseline: central; text-anchor: middle; }
-    let (mut tdx, mut tdy) = text_ref_element
-        .bbox()?
-        .ok_or_else(|| Error::MissingBBox(element.to_string()))?
-        .locspec(text_anchor);
+    let (mut tdx, mut tdy) = match text_anchor {
+        ElementLoc::LocSpec(text_anchor) => text_ref_element
+            .bbox()?
+            .ok_or_else(|| Error::MissingBBox(element.to_string()))?
+            .locspec(text_anchor),
+        ElementLoc::LineOffset(length) => get_point_along_linelike_el(&text_ref_element, length)?,
+    };
 
     tdx += t_dx;
     tdy += t_dy;
@@ -393,15 +398,15 @@ pub fn process_text_attr(
         // Determine position of first text line; others follow this based on line spacing
         let first_line_offset = match (outside, vertical, text_loc) {
             // shapes - text 'inside'
-            (false, false, ls) if ls.is_top() => WRAP_DOWN,
-            (false, false, ls) if ls.is_bottom() => WRAP_UP,
-            (false, true, ls) if ls.is_left() => WRAP_DOWN,
-            (false, true, ls) if ls.is_right() => WRAP_UP,
-            // lines - text 'beyond'
-            (true, false, ls) if ls.is_top() => WRAP_UP,
-            (true, false, ls) if ls.is_bottom() => WRAP_DOWN,
-            (true, true, ls) if ls.is_left() => WRAP_UP,
-            (true, true, ls) if ls.is_right() => WRAP_DOWN,
+            (false, false, ElementLoc::LocSpec(ls)) if ls.is_top() => WRAP_DOWN,
+            (false, false, ElementLoc::LocSpec(ls)) if ls.is_bottom() => WRAP_UP,
+            (false, true, ElementLoc::LocSpec(ls)) if ls.is_left() => WRAP_DOWN,
+            (false, true, ElementLoc::LocSpec(ls)) if ls.is_right() => WRAP_UP,
+            // lines - text 'beyond' (unless Element::LineOffset)
+            (true, false, ElementLoc::LocSpec(ls)) if ls.is_top() => WRAP_UP,
+            (true, false, ElementLoc::LocSpec(ls)) if ls.is_bottom() => WRAP_DOWN,
+            (true, true, ElementLoc::LocSpec(ls)) if ls.is_left() => WRAP_UP,
+            (true, true, ElementLoc::LocSpec(ls)) if ls.is_right() => WRAP_DOWN,
             (_, _, _) => WRAP_MID,
         };
 

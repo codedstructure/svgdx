@@ -213,6 +213,75 @@ fn test_text_line() {
 }
 
 #[test]
+fn test_text_line_offset_loc() {
+    let input = r#"
+<line xy1="0" xy2="10" text="blob" text-loc="20%"/>
+"#;
+    let expected = r#"
+<line x1="0" y1="0" x2="10" y2="10"/>
+<text x="2" y="2" class="d-text">blob</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<polyline points="0 0 10 0 10 10" text="corner" text-loc="12"/>
+"#;
+    let expected = r#"
+<polyline points="0 0 10 0 10 10"/>
+<text x="10" y="2" class="d-text">corner</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r#"
+<path d="M0 0h10v10" text="corner" text-loc="3/4"/>
+"#;
+    let expected = r#"
+<path d="M0 0h10v10"/>
+<text x="10" y="5" class="d-text">corner</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
+fn test_text_line_offset_multiline_and_rel() {
+    let input = r#"
+<line xy1="0" xy2="10 0" text="multi\nline" text-loc="80%"/>
+"#;
+    let expected = r#"
+<line x1="0" y1="0" x2="10" y2="0"/>
+<text x="8" y="0" class="d-text">
+<tspan x="8" dy="-0.525em">multi</tspan><tspan x="8" dy="1.05em">line</tspan>
+</text>
+"#;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+
+    let input = r##"
+<polyline id="p1" points="0 0 10 0 10 10"/>
+<text rel="#p1" text="label" text-loc="75%"/>
+"##;
+    let expected = r##"
+<polyline id="p1" points="0 0 10 0 10 10"/>
+<text x="10" y="5" class="d-text">label</text>
+"##;
+    assert_eq!(
+        transform_str_default(input).unwrap().trim(),
+        expected.trim()
+    );
+}
+
+#[test]
 fn test_text_content() {
     let input = r#"
 <rect xy="0" wh="10">some text</rect>

@@ -7,7 +7,7 @@ use crate::constants::{
     VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
-use crate::elements::line_offset::get_point_along_linelike_type_el;
+use crate::elements::line_offset::get_point_along_linelike_el;
 use crate::elements::path::path_bbox;
 use crate::errors::{Error, Result};
 use crate::geometry::{
@@ -233,7 +233,7 @@ impl SvgElement {
         loc: ElementLoc,
     ) -> Result<(f32, f32)> {
         match loc {
-            ElementLoc::LineOffset(l) => get_point_along_linelike_type_el(self, l),
+            ElementLoc::LineOffset(l) => get_point_along_linelike_el(self, l),
             ElementLoc::LocSpec(spec) => Ok(elem_map
                 .get_element_bbox(self)?
                 .ok_or_else(|| Error::MissingBBox(self.to_string()))?

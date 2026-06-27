@@ -33,6 +33,8 @@ pub enum Error {
     CircularRef(String),
     /// Document structure is invalid
     Document(String),
+    /// The element is invalid in this context
+    InvalidElement(String),
     /// An attribute is invalid in this context
     InvalidAttr(String),
     /// A required attribute is missing
@@ -73,6 +75,7 @@ impl std::fmt::Display for Error {
                 write!(f, "Circular reference error: {reason}")
             }
             Error::Document(reason) => write!(f, "Document error: {reason}"),
+            Error::InvalidElement(reason) => write!(f, "Invalid element: {reason}"),
             Error::InvalidAttr(reason) => write!(f, "Invalid attribute: {reason}"),
             Error::MissingAttr(attr) => write!(f, "Element missing attribute '{attr}'"),
             Error::MissingBBox(reason) => write!(f, "Missing bounding box: {reason}"),
@@ -109,6 +112,7 @@ impl std::error::Error for Error {
             Error::PathRepeatLimit(_, _) => None,
             Error::CircularRef(_) => None,
             Error::Document(_) => None,
+            Error::InvalidElement(_) => None,
             Error::InvalidAttr(_) => None,
             Error::MissingAttr(_) => None,
             Error::MissingBBox(_) => None,
