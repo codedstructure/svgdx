@@ -1,3 +1,4 @@
+use assertables::{assert_contains, assert_not_contains};
 use svgdx::transform_str_default;
 
 #[test]
@@ -279,6 +280,30 @@ fn test_text_line_offset_multiline_and_rel() {
         transform_str_default(input).unwrap().trim(),
         expected.trim()
     );
+}
+
+#[test]
+fn test_text_attrs_consumed() {
+    let input = r##"
+<rect id="r1" wh="100" text="control" text-rotate="90"/>
+<text id="t1" rel="#r1" text="text\nlines" text-rotate="45" text-lsp="0.8"/>
+"##;
+
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(
+        output,
+        r#"<text x="50" y="50" transform="rotate(90, 50, 50)" class="d-text">control</text>"#
+    );
+    assert_contains!(
+        output,
+        r#"<text id="t1" x="50" y="50" transform="rotate(45, 50, 50)" class="d-text">"#
+    );
+    assert_contains!(
+        output,
+        r#"<tspan x="50" dy="-0.4em">text</tspan><tspan x="50" dy="0.8em">lines</tspan>"#
+    );
+    assert_not_contains!(output, "text-rotate=");
+    assert_not_contains!(output, "text-lsp=");
 }
 
 #[test]
