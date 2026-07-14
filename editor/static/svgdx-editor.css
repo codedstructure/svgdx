@@ -442,9 +442,18 @@ header h1 {
 
 header nav {
     display: flex;
-    gap: 12px;
+    gap: 5px;
     align-items: center;
     flex-wrap: wrap;
+}
+
+header nav a {
+    padding: 5px 10px;
+}
+
+header nav a:hover,
+header nav a:focus {
+    background-color: #bbc;
 }
 
 header a {

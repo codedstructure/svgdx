@@ -13,6 +13,9 @@ pub struct Args {
     /// Port to listen on
     pub port: u16,
 
+    /// Redirect /docs/ requests to this URL
+    pub docs_redirect_url: Option<String>,
+
     /// Open browser on startup
     pub open: bool,
 }
@@ -31,6 +34,7 @@ impl Default for Args {
                 .parse()
                 .expect("default address should be valid"),
             port: DEFAULT_PORT,
+            docs_redirect_url: None,
             open: DEFAULT_OPEN,
         }
     }
@@ -45,6 +49,8 @@ Usage:
 Options:
       --address <ADDRESS>  Address to listen on ['{DEFAULT_ADDRESS}']
   -p, --port <PORT>        Port to listen on [{DEFAULT_PORT}]
+      --docs-redirect-url <URL>
+                           Redirect /docs/ requests to this URL
       --open               Open browser on startup
   -h, --help               Show this help
   -V, --version            Display program version
@@ -94,6 +100,9 @@ pub fn parse_args(
             "-V" | "--version" => return Ok(CliAction::Version),
             "--address" => parsed.address = parse_value(&key, embedded, &mut args)?,
             "-p" | "--port" => parsed.port = parse_value(&key, embedded, &mut args)?,
+            "--docs-redirect-url" => {
+                parsed.docs_redirect_url = Some(take_value(&key, embedded, &mut args)?)
+            }
             "--open" => parsed.open = true,
             _ => return Err(format!("unknown argument: '{key}'")),
         }
@@ -118,11 +127,16 @@ mod tests {
             "--address=::1".to_string(),
             "-p".to_string(),
             "4000".to_string(),
+            "--docs-redirect-url=http://127.0.0.1:3000/".to_string(),
             "--open".to_string(),
         ]) {
             Ok(CliAction::Run(args)) => {
                 assert_eq!(args.address, "::1".parse::<IpAddr>().unwrap());
                 assert_eq!(args.port, 4000);
+                assert_eq!(
+                    args.docs_redirect_url.as_deref(),
+                    Some("http://127.0.0.1:3000/")
+                );
                 assert!(args.open);
             }
             other => panic!("unexpected parse result: {other:?}"),
