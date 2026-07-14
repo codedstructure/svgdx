@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix: avoid propagating text modifying attributes (`text-style`, `text-lsp`,
   etc) to output when on a `<text>` element.
 
+- Fix: the presence of default variables injected a 'top-level' scope which
+  inhibited 'real root SVG element' detection to trigger round-tripping.
+  Refactored scope handling (variables and defaults) as part of this.
+
 ## [0.30.0 - 2026-06-13]
 
 - Changed: bumped MSRV to 1.88.

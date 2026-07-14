@@ -49,6 +49,7 @@ mod elements;
 mod errors;
 mod expr;
 mod geometry;
+mod scope;
 #[cfg(feature = "server")]
 pub mod server;
 mod style;

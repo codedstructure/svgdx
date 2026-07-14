@@ -1,5 +1,5 @@
 use assertables::{assert_contains, assert_not_contains};
-use svgdx::transform_str_default;
+use svgdx::{TransformConfig, transform_str, transform_str_default};
 
 #[test]
 fn test_roundtrip_minimal() {
@@ -189,4 +189,25 @@ fn test_roundtrip_style() {
     );
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, inner);
+}
+
+#[test]
+fn test_roundtrip_default_vars() {
+    let input = r##"
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="100" height="50" viewBox="0 0 100 50">
+  <g x="2" y="3">
+    <rect x="10" y="$VALUE" width="20" height="30"/>
+  </g>
+</svg>
+"##;
+    // variable substitution should be ignored, but check the addition
+    // of a default variable doesn't defeat roundtrip detection
+    let config = TransformConfig {
+        vars: vec![("VALUE".parse().unwrap(), "3".to_string())]
+            .into_iter()
+            .collect(),
+        ..Default::default()
+    };
+    let output = transform_str(input, &config).unwrap();
+    assert_eq!(output, input);
 }
