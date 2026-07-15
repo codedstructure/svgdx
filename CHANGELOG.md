@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0 - 2026-07-15]
+
 - Added: text-loc can now be given a 'Length' (ratio as 10% or 3/4, or
   absolute) for line-like elements (line, polyline, path) which will place text
   at that point along the line; typically use with `class="d-text-ol"`.
@@ -22,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix: the presence of default variables injected a 'top-level' scope which
   inhibited 'real root SVG element' detection to trigger round-tripping.
   Refactored scope handling (variables and defaults) as part of this.
+
+- Editor: add docs link to navbar. Defaults to /docs/, but this can be
+  overridden with the svgdx-server CLI `--docs-redirect-url` option to trigger
+  a redirect to e.g. a local `mdbook --serve` instance.
 
 ## [0.30.0 - 2026-06-13]
 
