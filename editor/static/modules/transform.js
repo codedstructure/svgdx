@@ -7,6 +7,7 @@ import {
     IN_PROGRESS_TIMEOUT_MS
 } from './config.js';
 import { statusbar } from './dom.js';
+import { formatStatusError } from './statusbar.js';
 
 /**
  * Create a rate-limited wrapper for a function
@@ -103,7 +104,7 @@ async function transformViaServer(input, config) {
         };
     } catch (e) {
         statusbar.style.color = 'darkred';
-        statusbar.innerText = `svgdx editor - error: ${e.message}`;
+        statusbar.innerText = formatStatusError(e.message);
         console.error('Error sending data to /api/transform_json', e);
         return {
             ok: false,

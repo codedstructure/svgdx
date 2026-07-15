@@ -5,9 +5,10 @@ use axum::{
     body::Body,
     extract::{Path, Query},
     http::Response,
-    response::IntoResponse,
+    response::{IntoResponse, Redirect},
     routing::{get, post},
 };
+use hyper::StatusCode;
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::{Sender, channel};
 
@@ -73,7 +74,7 @@ pub async fn run(config: CliAction, program_name: &str) {
                     }
                 });
             }
-            start_server(Some(&address), tx).await;
+            start_server(Some(&address), tx, args.docs_redirect_url.clone()).await;
         }
     }
 }
@@ -114,20 +115,22 @@ fn transform_raw_handler(input: String, config: RequestConfig) -> Response<Body>
                 Ok(output)
             }
         })
-        .map(|output| {
-            Response::builder()
-                .header("Content-Type", "image/svg+xml")
-                .header("Content-Security-Policy", CSP)
-                .body(Body::from(output))
-                .unwrap()
-        })
-        .unwrap_or_else(|e| {
-            Response::builder()
-                .status(400)
-                .header("Content-Type", "text/plain")
-                .body(Body::from(format!("Error: {e}")))
-                .unwrap()
-        })
+        .map(|output| respond_ok(output, "image/svg+xml"))
+        .unwrap_or_else(|e| respond(format!("Error: {e}"), "text/plain", StatusCode::BAD_REQUEST))
+}
+
+// return 200 OK with given body / mime-type
+fn respond_ok(content: impl Into<Body>, mime: &str) -> Response<Body> {
+    respond(content, mime, StatusCode::OK)
+}
+
+fn respond(content: impl Into<Body>, mime: &str, status: StatusCode) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .header("Content-Type", mime)
+        .header("Content-Security-Policy", CSP)
+        .body(content.into())
+        .unwrap()
 }
 
 macro_rules! include_or_read {
@@ -139,12 +142,7 @@ macro_rules! include_or_read {
         let content = tokio::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/editor/", $path))
             .await
             .unwrap();
-
-        Response::builder()
-            .header("Content-Type", $mime)
-            .header("Content-Security-Policy", CSP)
-            .body(Body::from(content))
-            .unwrap()
+        respond_ok(content, $mime)
     }};
 }
 
@@ -173,7 +171,17 @@ async fn favicon() -> impl IntoResponse {
 }
 
 async fn bootstrap() -> impl IntoResponse {
-    include_js!("svgdx-bootstrap-server.js")
+    // server mode bootstrap; hardcoded here rather than loaded
+    // from file to allow version string to be injected.
+    let content = format!(
+        r#"
+console.log("svgdx: using server transform");
+window.svgdx_use_server = true;
+window.svgdx_version_label = "svgdx v{VERSION}";
+window.dispatchEvent(new Event('svgdx-ready'));
+"#
+    );
+    respond_ok(content, "application/javascript")
 }
 
 async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
@@ -221,15 +229,34 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
     }
 }
 
-pub async fn start_server(listen_addr: Option<&str>, ready: Option<Sender<()>>) {
+async fn not_found() -> impl IntoResponse {
+    (StatusCode::NOT_FOUND, "404 Not Found\n")
+}
+
+pub async fn start_server(
+    listen_addr: Option<&str>,
+    ready: Option<Sender<()>>,
+    docs_redirect_url: Option<String>,
+) {
     let addr = listen_addr.unwrap_or("127.0.0.1:3003");
-    let app = Router::new()
+    let mut app = Router::new()
         .route("/", get(index))
         .route("/favicon.ico", get(favicon))
         .route("/static/{*path}", get(static_file))
         .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/api/transform", post(transform))
-        .route("/api/transform_json", post(transform_json));
+        .route("/api/transform_json", post(transform_json))
+        .fallback(not_found);
+
+    // When running locally, docs might be served from elsewhere.
+    if let Some(docs_redirect_url) = docs_redirect_url {
+        println!("Redirecting /docs/ to: {docs_redirect_url}");
+        app = app.route(
+            "/docs/",
+            get(move || async move { Redirect::temporary(&docs_redirect_url) }),
+        );
+    }
+
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     println!("Listening on: http://{addr}");
     if let Some(ready) = ready {

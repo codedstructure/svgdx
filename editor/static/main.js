@@ -8,7 +8,7 @@ import { initTabs, saveCurrentTabContent } from './modules/tabs.js';
 import { initLayout } from './modules/layout.js';
 import { initViewport, getCurrentViewBox } from './modules/viewport.js';
 import { initSplitters } from './modules/splitter.js';
-import { initStatusbar, setStatus } from './modules/statusbar.js';
+import { initStatusbar, setStatus, getDefaultStatusText, formatStatusError } from './modules/statusbar.js';
 import { initClipboard } from './modules/clipboard.js';
 import { initToolbar } from './modules/toolbar.js';
 import { initSlider, updateSlider } from './modules/slider.js';
@@ -164,10 +164,10 @@ async function update() {
             outputContainer.classList.add('error');
             editorContainer.classList.add('error');
             errorOutput.innerText = result.error;
-            setStatus('svgdx editor');
+            setStatus(getDefaultStatusText());
         }
     } catch (e) {
-        setStatus(`svgdx editor - error: ${e.message}`, true);
+        setStatus(formatStatusError(e.message), true);
         console.error('Error during transform', e);
     }
 }

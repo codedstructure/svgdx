@@ -2,11 +2,21 @@
 
 import { svgOutputContainer, statusbar, clientToSvg } from './dom.js';
 
+export function getDefaultStatusText() {
+    return window.svgdx_version_label || 'svgdx';
+}
+
+export function formatStatusError(message) {
+    return `${getDefaultStatusText()} - error: ${message}`;
+}
+
 /**
  * Initialize statusbar functionality
  * @param {Object} editor - Editor adapter instance
  */
 export function initStatusbar(editor) {
+    statusbar.innerText = getDefaultStatusText();
+
     // Mouse/pointer move updates statusbar with context info
     document.addEventListener('pointermove', (e) => {
         const svg = svgOutputContainer.querySelector('svg');
@@ -66,7 +76,7 @@ export function initStatusbar(editor) {
 
             statusbar.innerText = statusText;
         } else {
-            statusbar.innerText = 'svgdx editor';
+            statusbar.innerText = getDefaultStatusText();
         }
     });
 

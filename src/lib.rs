@@ -70,6 +70,13 @@ use crate::constants::{
 // Allow users of this as a library to easily retrieve the version of svgdx being used
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
+// for injecting into svgdx-bootstrap.js
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub fn version_label() -> String {
+    format!("svgdx v{VERSION}")
+}
+
 /// Settings to configure a single transformation.
 ///
 /// Note the settings here are specific to a single transformation; alternate front-ends
