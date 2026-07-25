@@ -38,6 +38,9 @@ Options:
       --svg-style <STYLE>       Optional style to apply to SVG root element
       --error-mode <MODE>       Error handling: strict, warn, ignore ['{default_error_mode}']
   -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
+      --pandoc-lua-filter       Write lua filter to stdout (use to process
+                                markdown with embedded `svgdx` fenced code
+                                blocks using pandoc's --lua-filter)
   -h, --help                    Show this help
   -V, --version                 Display program version
 
@@ -103,6 +106,8 @@ pub enum CliAction {
     Version,
     // stdin is terminal and we have no INPUT arg
     ImplicitStdinTerminal,
+    // for --pandoc-lua-filter
+    PandocLuaFilterOutput,
     // normal usage
     Run(Args),
 }
@@ -150,6 +155,9 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
             }
             "-V" | "--version" => {
                 return Ok(CliAction::Version);
+            }
+            "--pandoc-lua-filter" => {
+                return Ok(CliAction::PandocLuaFilterOutput);
             }
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;

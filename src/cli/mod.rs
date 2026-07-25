@@ -106,6 +106,14 @@ pub fn run(config: CliAction, program_name: &str) -> Result<()> {
         CliAction::Version => {
             println!("{program_name} v{VERSION}");
         }
+        CliAction::PandocLuaFilterOutput => {
+            let content = include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/lua/",
+                "svgdx-pandoc-filter.lua"
+            ));
+            print!("{content}");
+        }
         CliAction::Run(args) => {
             let config = args.into_config()?;
             transform_file(&config.input_path, &config.output_path, &config.transform)?;

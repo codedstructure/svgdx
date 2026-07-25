@@ -63,6 +63,9 @@ fn test_cmdline_config() {
     let config = from_cmdline(&format!("{} --help", pkg_name!()));
     assert!(matches!(config, Ok(CliAction::Help)));
 
+    let config = from_cmdline(&format!("{} --pandoc-lua-filter", pkg_name!()));
+    assert!(matches!(config, Ok(CliAction::PandocLuaFilterOutput)));
+
     let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let config = from_cmdline(&format!(
@@ -84,6 +87,29 @@ fn test_cmdline_config() {
     ))
     .expect("cmdline should be valid");
     svgdx::cli::run(config, "test").expect("run failed");
+}
+
+#[test]
+fn test_cmdline_pandoc_lua_filter_output() {
+    let expected = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("lua")
+            .join("svgdx-pandoc-filter.lua"),
+    )
+    .expect("failed to read embedded lua filter");
+
+    let mut cmd = Command::new(cargo::cargo_bin!());
+    let output = String::from_utf8(
+        cmd.arg("--pandoc-lua-filter")
+            .assert()
+            .success()
+            .get_output()
+            .stdout
+            .clone(),
+    )
+    .expect("non-UTF8");
+
+    assert_eq!(output, expected);
 }
 
 #[test]
