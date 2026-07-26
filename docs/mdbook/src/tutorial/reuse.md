@@ -1,4 +1,4 @@
-# Delta 8 - Reuse, defaults, and custom elements
+# Delta 9 - Reuse, defaults, and custom elements
 
 > `svgdx` fragments may be instantiated - with variation - later in a document
 

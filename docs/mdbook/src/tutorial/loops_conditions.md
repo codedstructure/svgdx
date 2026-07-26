@@ -1,4 +1,4 @@
-# Delta 7 - Loops and Conditions
+# Delta 8 - Loops and Conditions
 
 > `svgdx` allows elements to be included multiple times, or conditionally included.
 

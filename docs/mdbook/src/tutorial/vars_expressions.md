@@ -1,4 +1,4 @@
-# Delta 6 - Variables and Expressions
+# Delta 7 - Variables and Expressions
 
 ## Variables
 
