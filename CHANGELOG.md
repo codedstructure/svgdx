@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `svgdx --pandoc-lua-filter` emits a built-in Pandoc Lua filter for
+  `svgdx` fenced code blocks. See [lua/README.md](lua/README.md) for details.
+
 ## [0.31.0 - 2026-07-15]
 
 - Added: text-loc can now be given a 'Length' (ratio as 10% or 3/4, or

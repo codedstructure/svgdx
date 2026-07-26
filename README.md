@@ -81,8 +81,10 @@ This repository includes a local server implementing the same editor, allowing f
 _note that the svgdx.net editor is whenever a new version of svgdx is tagged,
 so be aware that breaking changes may affect your diagrams._
 
-Integrations with **[mdBook][]** and **[pandoc][]** are supported via the plugins [mdbook-svgdx][] and [svgdx-pandoc][] respectively;
-these both provide support for Markdown documents containing `svgdx`-fenced code-blocks, which are processed and rendered as inline SVG images.
+Integrations with **[mdBook][]** and **[pandoc][]** are supported, allowing Markdown documents containing
+`svgdx`-fenced code-blocks to be processed and rendered as inline or linked SVG images.
+Use [mdbook-svgdx][] for mdBook books.
+For pandoc, either use the separate [svgdx-pandoc][] project or the built-in [Lua filter](lua/README.md).
 
 [svgdx.net]: https://svgdx.net
 [mdBook]: https://rust-lang.github.io/mdBook/

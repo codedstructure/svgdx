@@ -61,6 +61,59 @@ local function write_file(path, content)
   end
 end
 
+-- Formats where the output document links to the image file rather than
+-- embedding it. The user's relative path is preserved as the image link so
+-- it remains readable and editable in the output source.
+local linked_formats = {
+  html = true, html4 = true, html5 = true, chunkedhtml = true,
+  markdown = true, markdown_strict = true, markdown_phpextra = true,
+  markdown_github = true, markdown_mmd = true,
+  gfm = true, commonmark = true, commonmark_x = true,
+  rst = true, mediawiki = true, textile = true,
+  dokuwiki = true, xwiki = true, twiki = true, jira = true,
+  org = true, muse = true, asciidoc = true, asciidoctor = true,
+}
+
+-- Given the user-supplied output= path, return (write_path, link_path):
+--   write_path: absolute path where the SVG will be written
+--   link_path:  path to embed as the image src in the output document
+--
+-- For relative paths, the SVG is always written to that path resolved against
+-- the output document's directory (so the physical file location is the same
+-- regardless of where pandoc is run from or which format is being generated).
+--
+-- For linked formats (HTML, Markdown, etc) the link keeps the user's original
+-- relative path, which the reader resolves from the document's own location.
+-- For embedded formats (PDF, DOCX, etc) the link is the absolute write path,
+-- so pandoc's pipeline can find the file regardless of its working directory.
+-- When pandoc writes to stdout, there is no document location to resolve a
+-- relative link against, so the absolute write path is used in all formats.
+-- Absolute output= paths are always used verbatim as both write and link.
+local function resolve_output_paths(output_path)
+  local cwd = pandoc.system.get_working_directory()
+  local function make_abs(p)
+    if pandoc.path.is_absolute(p) then
+      return pandoc.path.normalize(p)
+    end
+    return pandoc.path.normalize(pandoc.path.join({ cwd, p }))
+  end
+
+  if pandoc.path.is_absolute(output_path) then
+    local abs = pandoc.path.normalize(output_path)
+    return abs, abs
+  end
+
+  local out_file = PANDOC_STATE.output_file
+  local has_output_file = out_file and out_file ~= "" and out_file ~= "-"
+  local base_dir = has_output_file
+    and pandoc.path.directory(make_abs(out_file))
+    or cwd
+  local write_path = pandoc.path.normalize(pandoc.path.join({ base_dir, output_path }))
+  local link_path = (has_output_file and linked_formats[FORMAT]) and output_path or write_path
+  return write_path, link_path
+end
+
+
 -- Blank lines within inline SVG can confuse Markdown processors into treating
 -- subsequent content as a new block; see https://spec.commonmark.org/0.31.2/#html-blocks
 local function blank_line_remover(s)
@@ -82,7 +135,7 @@ local function CodeBlock(block)
   end
 
   -- Pipe the block content through svgdx executable.
-  local ok, svg = exec_svgdx({}, block.text)
+  local ok, svg = exec_svgdx({ "--auto-style-mode", "inline" }, block.text)
   if not ok then
     return error_block(svg)
   end
@@ -91,11 +144,12 @@ local function CodeBlock(block)
   -- return an image link.
   local output_path = block.attributes.output
   if output_path and output_path ~= "" then
-    local write_ok, write_err = pcall(write_file, output_path, svg)
+    local write_path, link_path = resolve_output_paths(output_path)
+    local write_ok, write_err = pcall(write_file, write_path, svg)
     if not write_ok then
       return error_block(write_err)
     end
-    return pandoc.Para({ pandoc.Image({}, output_path, "") })
+    return pandoc.Para({ pandoc.Image({}, link_path, "") })
   end
 
   -- Strip blank lines in inline SVG for valid Markdown

@@ -1,47 +1,40 @@
 # svgdx Pandoc Lua filter
 
-This repository contains a [Pandoc](https://pandoc.org) 3+ Lua filter for Markdown documents with `svgdx` fenced code blocks. Released `svgdx` builds expose the checked-in filter via `svgdx --pandoc-lua-filter`; from a repository checkout you can also point pandoc directly at `lua/svgdx-pandoc-filter.lua`.
+This directory contains a pandoc Lua filter to convert Markdown containing
+fenced `svgdx` blocks to SVG images linked or embedded in the output document.
 
 ## Requirements
 
-- **[Pandoc](https://pandoc.org)** 3.0 or later
-- **[svgdx](https://svgdx.net)** on your `PATH`
+- [Pandoc](https://pandoc.org) 3+
+- [svgdx](https://svgdx.net) on your `PATH`
 
-## Basic usage
+The `SVGDX_BIN` environment variable may point to a specific `svgdx` executable,
+avoiding the need to have svgdx on your PATH.
+
+## Invoking the filter from pandoc
+
+The Lua filter is embedded within the `svgdx` command line binary, so it may be
+used with Bash process substitution when running pandoc:
 
 ```sh
 pandoc --standalone --lua-filter <(svgdx --pandoc-lua-filter) input.md -o output.html
 ```
 
-If you are working from a checkout of this repository, the equivalent direct file path is:
+If you are working from a this project's source code, point pandoc at the Lua
+file instead:
 
 ```sh
 pandoc --standalone --lua-filter lua/svgdx-pandoc-filter.lua input.md -o output.html
 ```
 
-Inline SVG is the default. Use a normal `svgdx` fence:
+By default, `svgdx`-fenced code blocks are converted to inline SVG within
+generated output. This is useful for HTML and Markdown output.
 
-````markdown
-```svgdx
-<svg>
-  <rect wh="20 10" text="Hello svgdx"/>
-</svg>
-```
-````
+## Use `output=` when pandoc needs a real image file
 
-The filter runs the block through `svgdx` and embeds the resulting SVG directly in the output document. In inline mode it strips blank lines from the generated SVG so that embedded HTML stays valid inside Markdown.
-
-See the [example document](./example.md) for a complete example.
-
-> By default the filter runs `svgdx` on the PATH, but if the `SVGDX_BIN` environment variable is set it will be used instead.
->
-> ```sh
-> SVGDX_BIN=/opt/custom/bin/svgdx pandoc --standalone --lua-filter <(svgdx --pandoc-lua-filter) input.md -o output.html
-> ```
-
-## Writing SVG files
-
-To write a rendered diagram to a specific SVG file instead of inlining it, use Pandoc's standard fenced-code attributes:
+For PDF, docx, and any other embedded-document workflow, give the fence an
+`output` attribute so the filter writes an SVG file and inserts an image
+reference:
 
 ````markdown
 ```{.svgdx output="images/hello.svg"}
@@ -51,17 +44,21 @@ To write a rendered diagram to a specific SVG file instead of inlining it, use P
 ```
 ````
 
-When `output` is present, the filter overwrites that file with the rendered SVG and returns an image link pointing at the same path.
+> NOTE: \```{.svgdx output="thing.svg"} is equivalent to \```svgdx {output="thing.svg"}
 
-- The parent directory must already exist.
-- Relative paths are resolved from pandoc's current working directory.
-- The filter always writes SVG bytes; it does not inspect the extension.
-- Explicit output preserves the rendered SVG line structure; blank-line stripping is only applied to inline output.
+This may also be useful in 'linked' formats such as Markdown or HTML when standalone image files are more suitable.
 
-This version deliberately does not generate PNG files or manage temporary files. If you need PNG or PDF derivatives, run a separate post-processing step over the generated SVG files.
+The filter resolves a relative `output=` path from the output document's directory. That keeps the generated SVG next to the document you are building rather than next to the source Markdown.
 
-## Error handling
+- When pandoc writes a linked format such as HTML or Markdown to a file, the
+  image link stays relative, so moving the document and its `images/` directory
+  together still works.
+- When pandoc builds an embedded format such as PDF or docx, or when pandoc
+  writes to stdout, the image link becomes absolute so pandoc and its helper
+  tools can still find the SVG.
+- If `output=` is already absolute, that exact path is used.
+- Any parent directories of specified output files must already exist, but note
+  that existing files will be overwritten.
 
-- If `svgdx` is not available when the filter loads, pandoc stops immediately with an error.
-- If processing a block fails, the filter writes a warning to stderr and inserts a red-bordered HTML error block at that point in the document.
-- If writing an explicit `output` file fails, the filter reports it the same way.
+See [example.md](./example.md) for a short input file that demonstrates both
+inline output and use of the `output=` attribute.
