@@ -9,6 +9,7 @@ use crate::types::{ElRef, OrderIndex, extract_urlref, strp};
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::ops::{Deref, DerefMut};
 
 use rand::prelude::*;
 use rand_pcg::Pcg32;
@@ -292,12 +293,13 @@ impl TransformerContext {
         }
     }
 
-    pub fn push_element(&mut self, el: &SvgElement) {
-        self.scope_stack.push_element(el);
-    }
-
-    pub fn pop_element(&mut self) {
-        self.scope_stack.pop();
+    pub fn with_element_scope<T>(
+        &mut self,
+        el: &SvgElement,
+        f: impl FnOnce(&mut TransformerContext) -> T,
+    ) -> T {
+        let mut scope = ElementScope::new(self, el);
+        f(&mut scope)
     }
 
     pub fn is_top_level(&self) -> bool {
@@ -368,5 +370,63 @@ impl TransformerContext {
                 .nth((-offset - 1) as usize)
                 .map(|(_, value)| value)
         }
+    }
+}
+
+// RAII guard for element scope; pushes on creation, pops on drop.
+#[must_use]
+pub struct ElementScope<'a> {
+    context: &'a mut TransformerContext,
+}
+
+impl<'a> ElementScope<'a> {
+    fn new(context: &'a mut TransformerContext, el: &SvgElement) -> Self {
+        context.scope_stack.push_element(el);
+        Self { context }
+    }
+}
+
+impl Deref for ElementScope<'_> {
+    type Target = TransformerContext;
+
+    fn deref(&self) -> &Self::Target {
+        self.context
+    }
+}
+
+impl DerefMut for ElementScope<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.context
+    }
+}
+
+impl Drop for ElementScope<'_> {
+    fn drop(&mut self) {
+        self.context.scope_stack.pop();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_with_element_scope_pops_on_error() {
+        let mut context = TransformerContext::new();
+        let err = context.with_element_scope(
+            &SvgElement::new("g", &[("width".to_string(), "3".to_string())]),
+            |context| -> Result<()> {
+                assert!(!context.is_top_level());
+                assert_eq!(context.get_var("width").as_deref(), Some("3"));
+                Err(Error::MissingAttr("href".to_string()))
+            },
+        );
+
+        match err {
+            Err(Error::MissingAttr(attr)) => assert_eq!(attr, "href"),
+            other => panic!("unexpected result: {other:?}"),
+        }
+        assert!(context.is_top_level());
+        assert_eq!(context.get_var("width"), None);
     }
 }

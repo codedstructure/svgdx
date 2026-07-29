@@ -155,139 +155,138 @@ impl EventGen for LinearGradient<'_> {
             Vec::new()
         };
 
-        // push variables onto the stack
-        context.push_element(self.0);
-
-        // expand any provided compound attributes
-        if let Some(xy1) = new_el.pop_attr("xy1") {
-            let (x1, y1) = split_compound_attr(&xy1);
-            new_el.set_default_attr("x1", &x1);
-            new_el.set_default_attr("y1", &y1);
-        }
-        let origin: Option<(f32, f32)> = {
-            let x1 = new_el.get_attr("x1").map(strp_length).transpose()?;
-            let y1 = new_el.get_attr("y1").map(strp_length).transpose()?;
-            match (x1, y1) {
-                (Some(x1), Some(y1)) => Some((x1.evaluate(1.), y1.evaluate(1.))),
-                _ => None,
+        let inner = context.with_element_scope(self.0, |context| -> Result<OutputList> {
+            // expand any provided compound attributes
+            if let Some(xy1) = new_el.pop_attr("xy1") {
+                let (x1, y1) = split_compound_attr(&xy1);
+                new_el.set_default_attr("x1", &x1);
+                new_el.set_default_attr("y1", &y1);
             }
-        };
-        if let Some(xy2) = new_el.pop_attr("xy2") {
-            let (x2, y2) = split_compound_attr(&xy2);
-            new_el.set_default_attr("x2", &x2);
-            new_el.set_default_attr("y2", &y2);
-        }
-        let endpoint: Option<(f32, f32)> = {
-            let x2 = new_el.get_attr("x2").map(strp_length).transpose()?;
-            let y2 = new_el.get_attr("y2").map(strp_length).transpose()?;
-            match (x2, y2) {
-                (Some(x2), Some(y2)) => Some((x2.evaluate(1.), y2.evaluate(1.))),
-                _ => None,
-            }
-        };
-
-        let length = new_el
-            .pop_attr("length")
-            .map(|length| {
-                strp_length(&length)
-                    .map_err(|e| Error::InvalidValue(format!("invalid length: {e}"), length))
-            })
-            .transpose()?;
-
-        let dir = new_el
-            .pop_attr("dir")
-            .map(|dir| {
-                {
-                    // normalize angle to 0-360 range
-                    strp(&dir).map(|a| {
-                        let a = a % 360.0;
-                        if a < 0.0 { a + 360.0 } else { a }
-                    })
+            let origin: Option<(f32, f32)> = {
+                let x1 = new_el.get_attr("x1").map(strp_length).transpose()?;
+                let y1 = new_el.get_attr("y1").map(strp_length).transpose()?;
+                match (x1, y1) {
+                    (Some(x1), Some(y1)) => Some((x1.evaluate(1.), y1.evaluate(1.))),
+                    _ => None,
                 }
-                .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))
-            })
-            .transpose()?;
-
-        match (origin, endpoint, length, dir) {
-            (_, Some(_), None, None) | (Some(_), None, None, None) | (None, None, None, None) => {
-                // no-op; one or zero coord pairs with no further constraints,
-                // leave to SVG's defaults.
+            };
+            if let Some(xy2) = new_el.pop_attr("xy2") {
+                let (x2, y2) = split_compound_attr(&xy2);
+                new_el.set_default_attr("x2", &x2);
+                new_el.set_default_attr("y2", &y2);
             }
-            (Some(_), None, maybe_len, maybe_dir)
-            | (None, Some(_), maybe_len, maybe_dir)
-            | (None, None, maybe_len, maybe_dir) => {
-                let dir = maybe_dir.unwrap_or(0.0);
+            let endpoint: Option<(f32, f32)> = {
+                let x2 = new_el.get_attr("x2").map(strp_length).transpose()?;
+                let y2 = new_el.get_attr("y2").map(strp_length).transpose()?;
+                match (x2, y2) {
+                    (Some(x2), Some(y2)) => Some((x2.evaluate(1.), y2.evaluate(1.))),
+                    _ => None,
+                }
+            };
 
-                // Determine fixed coord
-                let fixed = if let Some(xy1) = origin {
-                    xy1
-                } else if let Some(xy2) = endpoint {
-                    xy2
-                } else {
-                    // Select corner based on angle quadrant
-                    match dir {
-                        d if (0.0..=90.0).contains(&d) => (0.0, 0.0),
-                        d if (90.0..180.0).contains(&d) => (1.0, 0.0),
-                        d if (180.0..=270.0).contains(&d) => (1.0, 1.0),
-                        _ => (0.0, 1.0),
+            let length = new_el
+                .pop_attr("length")
+                .map(|length| {
+                    strp_length(&length)
+                        .map_err(|e| Error::InvalidValue(format!("invalid length: {e}"), length))
+                })
+                .transpose()?;
+
+            let dir = new_el
+                .pop_attr("dir")
+                .map(|dir| {
+                    {
+                        // normalize angle to 0-360 range
+                        strp(&dir).map(|a| {
+                            let a = a % 360.0;
+                            if a < 0.0 { a + 360.0 } else { a }
+                        })
                     }
-                };
+                    .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))
+                })
+                .transpose()?;
 
-                let (x_fixed, y_fixed) = fixed;
-                let rad = dir.to_radians();
+            match (origin, endpoint, length, dir) {
+                (_, Some(_), None, None)
+                | (Some(_), None, None, None)
+                | (None, None, None, None) => {
+                    // no-op; one or zero coord pairs with no further constraints,
+                    // leave to SVG's defaults.
+                }
+                (Some(_), None, maybe_len, maybe_dir)
+                | (None, Some(_), maybe_len, maybe_dir)
+                | (None, None, maybe_len, maybe_dir) => {
+                    let dir = maybe_dir.unwrap_or(0.0);
 
-                // Calculate the other endpoint
-                let (x_calc, y_calc) = if let Some(length) = maybe_len {
-                    let icept = intercept_unit_square(fixed, dir);
-                    let dist = ((icept.0 - x_fixed).powi(2) + (icept.1 - y_fixed).powi(2)).sqrt();
-                    (
-                        x_fixed + length.evaluate(dist) * rad.cos(),
-                        y_fixed + length.evaluate(dist) * rad.sin(),
-                    )
-                } else {
-                    intercept_unit_square(fixed, dir)
-                };
+                    // Determine fixed coord
+                    let fixed = if let Some(xy1) = origin {
+                        xy1
+                    } else if let Some(xy2) = endpoint {
+                        xy2
+                    } else {
+                        // Select corner based on angle quadrant
+                        match dir {
+                            d if (0.0..=90.0).contains(&d) => (0.0, 0.0),
+                            d if (90.0..180.0).contains(&d) => (1.0, 0.0),
+                            d if (180.0..=270.0).contains(&d) => (1.0, 1.0),
+                            _ => (0.0, 1.0),
+                        }
+                    };
 
-                // Set the appropriate missing coordinate pair(s)
-                if origin.is_none() && endpoint.is_none() {
-                    // No coordinates provided - set all four
-                    new_el.set_default_num_attr("x1", x_fixed);
-                    new_el.set_default_num_attr("y1", y_fixed);
-                    new_el.set_default_num_attr("x2", x_calc);
-                    new_el.set_default_num_attr("y2", y_calc);
-                } else if endpoint.is_none() {
-                    // Have origin, set endpoint
-                    new_el.set_default_num_attr("x2", x_calc);
-                    new_el.set_default_num_attr("y2", y_calc);
-                } else {
-                    // Have endpoint, set origin
-                    new_el.set_default_num_attr("x1", x_calc);
-                    new_el.set_default_num_attr("y1", y_calc);
+                    let (x_fixed, y_fixed) = fixed;
+                    let rad = dir.to_radians();
+
+                    // Calculate the other endpoint
+                    let (x_calc, y_calc) = if let Some(length) = maybe_len {
+                        let icept = intercept_unit_square(fixed, dir);
+                        let dist =
+                            ((icept.0 - x_fixed).powi(2) + (icept.1 - y_fixed).powi(2)).sqrt();
+                        (
+                            x_fixed + length.evaluate(dist) * rad.cos(),
+                            y_fixed + length.evaluate(dist) * rad.sin(),
+                        )
+                    } else {
+                        intercept_unit_square(fixed, dir)
+                    };
+
+                    // Set the appropriate missing coordinate pair(s)
+                    if origin.is_none() && endpoint.is_none() {
+                        // No coordinates provided - set all four
+                        new_el.set_default_num_attr("x1", x_fixed);
+                        new_el.set_default_num_attr("y1", y_fixed);
+                        new_el.set_default_num_attr("x2", x_calc);
+                        new_el.set_default_num_attr("y2", y_calc);
+                    } else if endpoint.is_none() {
+                        // Have origin, set endpoint
+                        new_el.set_default_num_attr("x2", x_calc);
+                        new_el.set_default_num_attr("y2", y_calc);
+                    } else {
+                        // Have endpoint, set origin
+                        new_el.set_default_num_attr("x1", x_calc);
+                        new_el.set_default_num_attr("y1", y_calc);
+                    }
+                }
+                (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {
+                    // origin + endpoint together with either length or dir is over-constrained
+                    return Err(Error::InvalidValue(
+                        "Over-constrained linearGradient definition".into(),
+                        self.0.to_string(),
+                    ));
                 }
             }
-            (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {
-                // origin + endpoint together with either length or dir is over-constrained
-                return Err(Error::InvalidValue(
-                    "Over-constrained linearGradient definition".into(),
-                    self.0.to_string(),
-                ));
-            }
-        }
 
-        let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
-            // get the inner events / bbox first, as some outer element attrs
-            // (e.g. `transform` via rotate) may depend on the bbox.
-            let mut inner_events = inner_events.clone();
-            inner_events.rebase_under(new_el.order_index.clone());
-            process_events(inner_events, context).inspect_err(|_| {
-                context.pop_element();
-            })?
-        } else {
-            (OutputList::new(), None)
-        };
+            let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
+                // get the inner events / bbox first, as some outer element attrs
+                // (e.g. `transform` via rotate) may depend on the bbox.
+                let mut inner_events = inner_events.clone();
+                inner_events.rebase_under(new_el.order_index.clone());
+                process_events(inner_events, context)?
+            } else {
+                (OutputList::new(), None)
+            };
 
-        // pop variables off the stack
-        context.pop_element();
+            Ok(inner)
+        })?;
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() && new_inner.is_empty() {
@@ -366,23 +365,19 @@ impl EventGen for RadialGradient<'_> {
             new_el.set_default_attr("fy", &cy);
         }
 
-        // push variables onto the stack
-        context.push_element(self.0);
+        let inner = context.with_element_scope(self.0, |context| -> Result<OutputList> {
+            let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
+                // get the inner events / bbox first, as some outer element attrs
+                // (e.g. `transform` via rotate) may depend on the bbox.
+                let mut inner_events = inner_events.clone();
+                inner_events.rebase_under(new_el.order_index.clone());
+                process_events(inner_events, context)?
+            } else {
+                (OutputList::new(), None)
+            };
 
-        let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
-            // get the inner events / bbox first, as some outer element attrs
-            // (e.g. `transform` via rotate) may depend on the bbox.
-            let mut inner_events = inner_events.clone();
-            inner_events.rebase_under(new_el.order_index.clone());
-            process_events(inner_events, context).inspect_err(|_| {
-                context.pop_element();
-            })?
-        } else {
-            (OutputList::new(), None)
-        };
-
-        // pop variables off the stack
-        context.pop_element();
+            Ok(inner)
+        })?;
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() && new_inner.is_empty() {

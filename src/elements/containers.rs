@@ -76,12 +76,11 @@ impl EventGen for Container<'_> {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
-                    context.push_element(self.0);
                     let mut inner_events = inner_events.clone();
                     inner_events.rebase_under(new_el.order_index.clone());
-                    let res = process_events(inner_events, context);
-                    context.pop_element();
-                    res?
+                    context.with_element_scope(self.0, |context| {
+                        process_events(inner_events, context)
+                    })?
                 };
                 events.extend(evlist);
                 events.push(EventKind::End(self.0.name().to_owned()));
@@ -118,23 +117,16 @@ impl EventGen for GroupElement<'_> {
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
 
-        // push variables onto the stack
-        context.push_element(self.0);
-
         let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
             // get the inner events / bbox first, as some outer element attrs
             // (e.g. `transform` via rotate) may depend on the bbox.
             let mut inner_events = inner_events.clone();
             inner_events.rebase_under(new_el.order_index.clone());
-            process_events(inner_events, context).inspect_err(|_| {
-                context.pop_element();
-            })?
+            // process with current element as new scope
+            context.with_element_scope(self.0, |context| process_events(inner_events, context))?
         } else {
             (OutputList::new(), None)
         };
-
-        // pop variables off the stack
-        context.pop_element();
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
