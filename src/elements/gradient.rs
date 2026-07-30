@@ -31,7 +31,7 @@ use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
 use crate::geometry::{BoundingBox, Length, strp_length};
-use crate::transform::{EventGen, process_events};
+use crate::transform::EventGen;
 use crate::types::{attr_split, fstr, split_compound_attr, strp};
 
 #[derive(Debug, PartialEq)]
@@ -275,15 +275,11 @@ impl EventGen for LinearGradient<'_> {
                 }
             }
 
-            let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
-                // get the inner events / bbox first, as some outer element attrs
-                // (e.g. `transform` via rotate) may depend on the bbox.
-                let mut inner_events = inner_events.clone();
-                inner_events.rebase_under(new_el.order_index.clone());
-                process_events(inner_events, context)?
-            } else {
-                (OutputList::new(), None)
-            };
+            // get the inner events / bbox first, as some outer element attrs
+            // (e.g. `transform` via rotate) may depend on the bbox.
+            let (inner, _) = self
+                .0
+                .process_inner_events(new_el.order_index.clone(), context)?;
 
             Ok(inner)
         })?;
@@ -366,15 +362,11 @@ impl EventGen for RadialGradient<'_> {
         }
 
         let inner = context.with_element_scope(self.0, |context| -> Result<OutputList> {
-            let (inner, _) = if let Some(inner_events) = self.0.inner_events(context) {
-                // get the inner events / bbox first, as some outer element attrs
-                // (e.g. `transform` via rotate) may depend on the bbox.
-                let mut inner_events = inner_events.clone();
-                inner_events.rebase_under(new_el.order_index.clone());
-                process_events(inner_events, context)?
-            } else {
-                (OutputList::new(), None)
-            };
+            // get the inner events / bbox first, as some outer element attrs
+            // (e.g. `transform` via rotate) may depend on the bbox.
+            let (inner, _) = self
+                .0
+                .process_inner_events(new_el.order_index.clone(), context)?;
 
             Ok(inner)
         })?;

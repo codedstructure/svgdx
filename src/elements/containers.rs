@@ -3,7 +3,7 @@ use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
-use crate::transform::{EventGen, process_events};
+use crate::transform::EventGen;
 
 /// Container will be used for many elements which contain other elements,
 /// but have no independent behaviour, such as defs, linearGradient, etc.
@@ -76,10 +76,9 @@ impl EventGen for Container<'_> {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
-                    let mut inner_events = inner_events.clone();
-                    inner_events.rebase_under(new_el.order_index.clone());
                     context.with_element_scope(self.0, |context| {
-                        process_events(inner_events, context)
+                        self.0
+                            .process_inner_events(new_el.order_index.clone(), context)
                     })?
                 };
                 events.extend(evlist);
@@ -117,16 +116,12 @@ impl EventGen for GroupElement<'_> {
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
 
-        let (inner, content_bb) = if let Some(inner_events) = self.0.inner_events(context) {
-            // get the inner events / bbox first, as some outer element attrs
-            // (e.g. `transform` via rotate) may depend on the bbox.
-            let mut inner_events = inner_events.clone();
-            inner_events.rebase_under(new_el.order_index.clone());
-            // process with current element as new scope
-            context.with_element_scope(self.0, |context| process_events(inner_events, context))?
-        } else {
-            (OutputList::new(), None)
-        };
+        // get the inner events / bbox first, as some outer element attrs
+        // (e.g. `transform` via rotate) may depend on the bbox.
+        let (inner, content_bb) = context.with_element_scope(self.0, |context| {
+            self.0
+                .process_inner_events(new_el.order_index.clone(), context)
+        })?;
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;

@@ -98,8 +98,9 @@ impl EventGen for SpecsElement<'_> {
         }
         if let Some(inner_events) = self.0.inner_events(context) {
             context.in_specs = true;
-            process_events(inner_events, context)?;
+            let res = process_events(inner_events, context);
             context.in_specs = false;
+            res?;
         }
         Ok((OutputList::new(), None))
     }
@@ -175,14 +176,12 @@ impl EventGen for IfElement<'_> {
             .0
             .get_attr("test")
             .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
-        if eval_condition(test, context)?
-            && let Some(inner_events) = self.0.inner_events(context)
-        {
+        if eval_condition(test, context)? {
             // must rebase inner events under this element's order index
             // for group transform processing to work
-            let mut inner_events = inner_events.clone();
-            inner_events.rebase_under(self.0.order_index.clone());
-            return process_events(inner_events.clone(), context);
+            return self
+                .0
+                .process_inner_events(self.0.order_index.clone(), context);
         }
 
         Ok((OutputList::new(), None))

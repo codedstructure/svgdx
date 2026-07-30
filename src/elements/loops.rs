@@ -4,7 +4,7 @@ use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
-use crate::transform::{EventGen, process_events};
+use crate::transform::EventGen;
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -66,63 +66,56 @@ impl EventGen for LoopElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = self.0;
+        let loop_def = LoopDef::try_from(self.0)?;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
-        if let (Ok(loop_def), Some(inner_events)) = (
-            LoopDef::try_from(event_element),
-            event_element.inner_events(context),
-        ) {
-            let mut iteration = 0;
-            let mut loop_var_name = String::new();
-            let mut loop_count = 0;
-            let mut loop_var_value = 0.;
-            let mut loop_step = 1.;
-            if let LoopType::Repeat(count) = &loop_def.loop_type {
-                loop_count = eval_attr(count, context)?.parse()?;
-            }
-            if let Some((loop_var, start, step)) = loop_def.loop_spec {
-                loop_var_name = eval_attr(&loop_var, context)?;
-                loop_var_value = eval_attr(&start, context)?.parse()?;
-                loop_step = eval_attr(&step, context)?.parse()?;
-            }
+        let mut iteration = 0;
+        let mut loop_var_name = String::new();
+        let mut loop_count = 0;
+        let mut loop_var_value = 0.;
+        let mut loop_step = 1.;
+        if let LoopType::Repeat(count) = &loop_def.loop_type {
+            loop_count = eval_attr(count, context)?.parse()?;
+        }
+        if let Some((loop_var, start, step)) = loop_def.loop_spec {
+            loop_var_name = eval_attr(&loop_var, context)?;
+            loop_var_value = eval_attr(&start, context)?.parse()?;
+            loop_step = eval_attr(&step, context)?.parse()?;
+        }
 
-            loop {
-                if let LoopType::Repeat(_) = &loop_def.loop_type {
-                    if iteration >= loop_count {
-                        break;
-                    }
-                } else if let LoopType::While(expr) = &loop_def.loop_type
-                    && !eval_condition(expr, context)?
-                {
+        loop {
+            if let LoopType::Repeat(_) = &loop_def.loop_type {
+                if iteration >= loop_count {
                     break;
                 }
+            } else if let LoopType::While(expr) = &loop_def.loop_type
+                && !eval_condition(expr, context)?
+            {
+                break;
+            }
 
-                if !loop_var_name.is_empty() {
-                    context.set_var(&loop_var_name, &loop_var_value.to_string());
-                }
+            if !loop_var_name.is_empty() {
+                context.set_var(&loop_var_name, &loop_var_value.to_string());
+            }
 
-                // Each iteration needs different order indices on elements, so e.g.
-                // ElRef::Prev isn't identical for each iteration.
-                let iter_oi = event_element.order_index.with_index(iteration as usize);
-                let mut inner_events = inner_events.clone();
-                inner_events.rebase_under(iter_oi);
-                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
-                gen_events.extend(ev_list);
-                if let Some(bb) = ev_bbox {
-                    bbox.extend(bb);
-                }
+            // Each iteration needs different order indices on elements, so e.g.
+            // ElRef::Prev isn't identical for each iteration.
+            let iter_oi = self.0.order_index.with_index(iteration as usize);
+            let (ev_list, ev_bbox) = self.0.process_inner_events(iter_oi, context)?;
+            gen_events.extend(ev_list);
+            if let Some(bb) = ev_bbox {
+                bbox.extend(bb);
+            }
 
-                if let LoopType::Until(expr) = &loop_def.loop_type
-                    && eval_condition(expr, context)?
-                {
-                    break;
-                }
-                iteration += 1;
-                loop_var_value += loop_step;
-                if iteration > context.config.loop_limit {
-                    return Err(Error::LoopLimit(iteration, context.config.loop_limit));
-                }
+            if let LoopType::Until(expr) = &loop_def.loop_type
+                && eval_condition(expr, context)?
+            {
+                break;
+            }
+            iteration += 1;
+            loop_var_value += loop_step;
+            if iteration > context.config.loop_limit {
+                return Err(Error::LoopLimit(iteration, context.config.loop_limit));
             }
         }
         Ok((gen_events, bbox.build()))
@@ -165,39 +158,30 @@ impl EventGen for ForElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let event_element = self.0;
+        let for_def = ForDef::try_from(self.0)?;
+        let data_list: Vec<_> = eval_list(&for_def.data, context)?;
         let mut gen_events = OutputList::new();
         let mut bbox = BoundingBoxBuilder::new();
         let mut idx = 0;
-        let for_def = ForDef::try_from(event_element)?;
-        if let Some(inner_events) = event_element.inner_events(context) {
-            let data_list: Vec<_> = eval_list(&for_def.data, context)?;
-            let idx_name = for_def.idx_name.clone();
 
-            // TODO: should a new context be created for for loops, so
-            // loop & idx vars don't leak out / override existing vars?
-            for item in data_list {
-                context.set_var(&for_def.var_name, &item);
-                if let Some(ref idx_name) = idx_name {
-                    context.set_var(idx_name, &idx.to_string());
-                }
-                let iter_oi = event_element.order_index.with_index(idx as usize);
-                let mut inner_events = inner_events.clone();
-                inner_events.rebase_under(iter_oi);
-                let (ev_list, ev_bbox) = process_events(inner_events.clone(), context)?;
-                gen_events.extend(ev_list);
-                if let Some(bb) = ev_bbox {
-                    bbox.extend(bb);
-                }
-                idx += 1;
-                if idx > context.config.loop_limit {
-                    return Err(Error::LoopLimit(idx, context.config.loop_limit));
-                }
+        // TODO: should a new context be created for for loops, so
+        // loop & idx vars don't leak out / override existing vars?
+        for item in data_list {
+            context.set_var(&for_def.var_name, &item);
+            if let Some(idx_name) = &for_def.idx_name {
+                context.set_var(idx_name, &idx.to_string());
             }
-            Ok((gen_events, bbox.build()))
-        } else {
-            // empty for loop element
-            Ok((gen_events, None))
+            let iter_oi = self.0.order_index.with_index(idx as usize);
+            let (ev_list, ev_bbox) = self.0.process_inner_events(iter_oi, context)?;
+            gen_events.extend(ev_list);
+            if let Some(bb) = ev_bbox {
+                bbox.extend(bb);
+            }
+            idx += 1;
+            if idx > context.config.loop_limit {
+                return Err(Error::LoopLimit(idx, context.config.loop_limit));
+            }
         }
+        Ok((gen_events, bbox.build()))
     }
 }

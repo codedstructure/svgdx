@@ -10,7 +10,7 @@ use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
-use crate::transform::EventGen;
+use crate::transform::{EventGen, process_events};
 use crate::types::{AttrMap, ClassList, OrderIndex, StyleMap, extract_urlref, fstr, strp};
 
 use core::fmt::Display;
@@ -415,6 +415,20 @@ impl SvgElement {
             }
         }
         None
+    }
+
+    /// process element's inner events, rebasing them under given order index
+    pub fn process_inner_events(
+        &self,
+        oi_base: OrderIndex,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        if let Some(mut inner_events) = self.inner_events(context) {
+            inner_events.rebase_under(oi_base);
+            process_events(inner_events, context)
+        } else {
+            Ok((OutputList::new(), None))
+        }
     }
 
     pub fn all_events(&self, context: &TransformerContext) -> InputList {
