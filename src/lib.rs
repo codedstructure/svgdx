@@ -144,18 +144,6 @@ fn output_temp_path(output: &str) -> PathBuf {
     parent.join(format!("{file_name}.{}.tmp", std::process::id()))
 }
 
-#[deprecated(
-    note = "Use 'transform_json' for WASM entrypoint, or transform_str/transform_str_default for Rust library use"
-)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn transform_string(input: String, add_metadata: bool) -> core::result::Result<String, String> {
-    let cfg = TransformConfig {
-        add_metadata,
-        ..Default::default()
-    };
-    transform_str(input, &cfg).map_err(|e| e.to_string())
-}
-
 /// Transform `input` provided as a string, returning the result as a string.
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
