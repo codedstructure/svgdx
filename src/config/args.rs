@@ -9,6 +9,7 @@ use crate::constants::{
     DEFAULT_SCALE, DEFAULT_VAR_LIMIT,
 };
 
+#[derive(Debug)]
 pub struct TransformArgs {
     pub debug: bool,
     pub scale: f32,

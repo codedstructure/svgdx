@@ -219,6 +219,19 @@ pub mod json_api {
         }
     }
 
+    impl RequestConfig {
+        pub fn merge_config(&self, server_config: &TransformConfig) -> TransformConfig {
+            let mut merged = server_config.clone();
+            merged.add_metadata = self.add_metadata;
+            for (k, v) in &self.vars {
+                if let Ok(var_name) = k.parse() {
+                    merged.vars.insert(var_name, v.clone());
+                }
+            }
+            merged
+        }
+    }
+
     #[derive(Debug, Serialize)]
     pub struct TransformResponse {
         pub version: u32,
@@ -253,7 +266,7 @@ pub mod json_api {
     /// Transform input using JSON request/response format.
     ///
     /// Takes a JSON string containing `TransformRequest`, returns `TransformResponse`
-    pub fn transform_json_impl(input: &str) -> TransformResponse {
+    pub fn transform_json_impl(input: &str, cfg: &TransformConfig) -> TransformResponse {
         match serde_json::from_str::<TransformRequest>(input) {
             Ok(request) => {
                 if request.version != JSON_API_VERSION {
@@ -262,11 +275,8 @@ pub mod json_api {
                         request.version, JSON_API_VERSION
                     ))
                 } else {
-                    match request
-                        .config
-                        .try_into()
-                        .and_then(|cfg| transform_str(request.input, &cfg))
-                    {
+                    let cfg = request.config.merge_config(cfg);
+                    match transform_str(request.input, &cfg) {
                         Ok(svg) => TransformResponse::success(svg),
                         Err(e) => TransformResponse::error(e.to_string()),
                     }
@@ -293,7 +303,16 @@ pub mod json_api {
 #[cfg(feature = "json")]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn transform_json(input: &str) -> String {
-    let result = json_api::transform_json_impl(input);
+    let cfg = TransformConfig::default();
+    let result = json_api::transform_json_impl(input, &cfg);
+    serde_json::to_string(&result).expect("Failed to serialize response")
+}
+
+// note this is not (currently) exposed to WASM; it's intended to support
+// svgdx-server's transform config options.
+#[cfg(feature = "json")]
+pub fn transform_json_with_config(input: &str, cfg: &TransformConfig) -> String {
+    let result = json_api::transform_json_impl(input, cfg);
     serde_json::to_string(&result).expect("Failed to serialize response")
 }
 

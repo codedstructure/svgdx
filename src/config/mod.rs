@@ -1,5 +1,7 @@
 #[cfg(any(feature = "cli", feature = "server"))]
 mod args;
+#[cfg(feature = "server")]
+pub use args::parse_value;
 #[cfg(any(feature = "cli", feature = "server"))]
 pub use args::{TransformArgs, common_usage, take_value};
 
