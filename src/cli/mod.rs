@@ -1,32 +1,9 @@
 mod args;
-use std::{path::Path, str::FromStr};
+use std::path::Path;
 
-use crate::{Error, Result, TransformConfig, VERSION, VarName, transform_file};
+use crate::{Error, Result, TransformConfig, VERSION, transform_file};
 
 pub use args::{Args, CliAction, NO_INPUT_STDIN_TERMINAL, parse_args, usage};
-
-#[derive(Clone, Debug)]
-struct VarSpec {
-    pub key: VarName,
-    pub value: String,
-}
-
-impl FromStr for VarSpec {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        let (key, value) = s
-            .split_once('=')
-            .ok_or_else(|| Error::Cli(format!("Missing '=' in '--var {s}'")))?;
-
-        let key = key.parse()?;
-
-        Ok(VarSpec {
-            key,
-            value: value.to_string(),
-        })
-    }
-}
 
 /// Top-level configuration used by the `svgdx` command-line process.
 ///
@@ -62,33 +39,10 @@ impl Args {
                 ));
             }
         }
-        let vars = self
-            .vars
-            .iter()
-            .map(|s| s.parse())
-            .collect::<Result<Vec<VarSpec>>>()?;
         Ok(Config {
             input_path: self.input,
             output_path: self.output,
-            transform: TransformConfig {
-                debug: self.debug,
-                scale: self.scale,
-                border: self.border,
-                auto_style_mode: self.auto_style_mode,
-                background: self.background,
-                seed: self.seed,
-                add_metadata: self.add_metadata,
-                loop_limit: self.loop_limit,
-                var_limit: self.var_limit,
-                depth_limit: self.depth_limit,
-                path_repeat_limit: self.path_repeat_limit,
-                font_size: self.font_size,
-                font_family: self.font_family,
-                theme: self.theme,
-                svg_style: self.svg_style,
-                error_mode: self.error_mode,
-                vars: vars.into_iter().map(|v| (v.key, v.value)).collect(),
-            },
+            transform: self.config.into(),
         })
     }
 }
