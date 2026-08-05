@@ -1,5 +1,8 @@
 use std::net::IpAddr;
 
+use crate::config::{TransformArgs, common_usage, parse_value, take_value};
+use crate::{Error, Result};
+
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
 pub const DEFAULT_PORT: u16 = 3003;
 pub const DEFAULT_OPEN: bool = false;
@@ -18,6 +21,9 @@ pub struct Args {
 
     /// Open browser on startup
     pub open: bool,
+
+    /// Common transform options
+    pub config: TransformArgs,
 }
 
 #[derive(Debug)]
@@ -36,54 +42,33 @@ impl Default for Args {
             port: DEFAULT_PORT,
             docs_redirect_url: None,
             open: DEFAULT_OPEN,
+            config: TransformArgs::default(),
         }
     }
 }
 
 pub fn usage(program_name: &str) -> String {
+    let common_usage = common_usage();
     format!(
         r#"
 Usage:
   {program_name} [OPTIONS]
 
 Options:
-      --address <ADDRESS>  Address to listen on ['{DEFAULT_ADDRESS}']
-  -p, --port <PORT>        Port to listen on [{DEFAULT_PORT}]
-      --docs-redirect-url <URL>
-                           Redirect /docs/ requests to this URL
-      --open               Open browser on startup
-  -h, --help               Show this help
-  -V, --version            Display program version
+      --address <ADDRESS>       Address to listen on ['{DEFAULT_ADDRESS}']
+  -p, --port <PORT>             Port to listen on [{DEFAULT_PORT}]
+      --docs-redirect-url <URL> Redirect /docs/ requests to this URL
+      --open                    Open browser on startup
+  -h, --help                    Show this help
+  -V, --version                 Display program version
+
+Transform Options:
+{common_usage}
 "#
     )
 }
 
-fn take_value(
-    flag: &str,
-    embedded: Option<String>,
-    args: &mut impl Iterator<Item = String>,
-) -> std::result::Result<String, String> {
-    embedded
-        .or_else(|| args.next())
-        .ok_or_else(|| format!("'{flag}' requires a value"))
-}
-
-fn parse_value<T>(
-    flag: &str,
-    embedded: Option<String>,
-    args: &mut impl Iterator<Item = String>,
-) -> std::result::Result<T, String>
-where
-    T: std::str::FromStr,
-    T::Err: std::fmt::Display,
-{
-    let value = take_value(flag, embedded, args)?;
-    value.parse().map_err(|e| format!("'{flag}': {e}"))
-}
-
-pub fn parse_args(
-    args: impl IntoIterator<Item = String>,
-) -> std::result::Result<CliAction, String> {
+pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
     let mut args = args.into_iter();
     let _ = args.next();
 
@@ -104,7 +89,11 @@ pub fn parse_args(
                 parsed.docs_redirect_url = Some(take_value(&key, embedded, &mut args)?)
             }
             "--open" => parsed.open = true,
-            _ => return Err(format!("unknown argument: '{key}'")),
+            _ => {
+                if !parsed.config.handle_arg(&key, embedded, &mut args)? {
+                    return Err(Error::Cli(format!("unknown argument: '{key}'")));
+                }
+            }
         }
     }
 

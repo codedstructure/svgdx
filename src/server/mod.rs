@@ -1,9 +1,9 @@
-mod args;
+use std::sync::Arc;
 
 use axum::{
     Router,
     body::Body,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::Response,
     response::{IntoResponse, Redirect},
     routing::{get, post},
@@ -15,6 +15,8 @@ use tokio::sync::mpsc::{Sender, channel};
 use crate::errors::Error;
 use crate::json_api::{TransformResponse, transform_json_impl};
 use crate::{TransformConfig, VERSION, transform_str};
+
+mod args;
 
 pub use args::{Args, CliAction, parse_args, usage};
 
@@ -28,15 +30,15 @@ const CSP: &str = "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; sty
 // Not all fields make sense for the editor, but add_metadata
 // is needed to allow hover-over line highlighting.
 #[derive(Debug, Default, Deserialize)]
-struct RequestConfig {
+struct RequestParams {
     #[serde(default)]
     add_metadata: bool,
 }
 
-impl From<RequestConfig> for TransformConfig {
-    fn from(config: RequestConfig) -> Self {
+impl From<RequestParams> for TransformConfig {
+    fn from(params: RequestParams) -> Self {
         TransformConfig {
-            add_metadata: config.add_metadata,
+            add_metadata: params.add_metadata,
             ..Default::default()
         }
     }
@@ -74,23 +76,36 @@ pub async fn run(config: CliAction, program_name: &str) {
                     }
                 });
             }
-            start_server(Some(&address), tx, args.docs_redirect_url.clone()).await;
+            start_server(
+                Some(&address),
+                tx,
+                args.docs_redirect_url.clone(),
+                Arc::new(args.config.into()),
+            )
+            .await;
         }
     }
 }
 
-async fn transform(config: Query<RequestConfig>, input: String) -> impl IntoResponse {
-    let Query(config) = config;
+async fn transform(
+    State(server_config): State<Arc<TransformConfig>>,
+    params: Query<RequestParams>,
+    input: String,
+) -> impl IntoResponse {
+    let Query(params) = params;
 
-    transform_raw_handler(input, config)
+    transform_raw_handler(input, params, &server_config)
 }
 
-async fn transform_json(input: String) -> impl IntoResponse {
-    transform_json_handler(input)
+async fn transform_json(
+    State(config): State<Arc<TransformConfig>>,
+    input: String,
+) -> impl IntoResponse {
+    transform_json_handler(input, &config)
 }
 
-fn transform_json_handler(input: String) -> Response<Body> {
-    let response: TransformResponse = transform_json_impl(&input);
+fn transform_json_handler(input: String, config: &TransformConfig) -> Response<Body> {
+    let response: TransformResponse = transform_json_impl(&input, config);
 
     let is_error = response.error.is_some();
     let body = serde_json::to_string(&response).expect("Failed to serialize response");
@@ -106,8 +121,16 @@ fn transform_json_handler(input: String) -> Response<Body> {
     builder.body(Body::from(body)).unwrap()
 }
 
-fn transform_raw_handler(input: String, config: RequestConfig) -> Response<Body> {
-    transform_str(input, &config.into())
+fn transform_raw_handler(
+    input: String,
+    params: RequestParams,
+    server_config: &TransformConfig,
+) -> Response<Body> {
+    // Merge request config with server config (only `add_metadata` for raw handler)
+    let mut cfg = server_config.clone();
+    cfg.add_metadata = params.add_metadata;
+
+    transform_str(input, &cfg)
         .and_then(|output| {
             if output.is_empty() {
                 Err(Error::Document("empty response".into()))
@@ -237,6 +260,7 @@ pub async fn start_server(
     listen_addr: Option<&str>,
     ready: Option<Sender<()>>,
     docs_redirect_url: Option<String>,
+    config: Arc<TransformConfig>,
 ) {
     let addr = listen_addr.unwrap_or("127.0.0.1:3003");
     let mut app = Router::new()
@@ -246,6 +270,7 @@ pub async fn start_server(
         .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/api/transform", post(transform))
         .route("/api/transform_json", post(transform_json))
+        .with_state(config)
         .fallback(not_found);
 
     // When running locally, docs might be served from elsewhere.

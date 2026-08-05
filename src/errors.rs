@@ -47,7 +47,7 @@ pub enum Error {
     Multi(HashMap<OrderIndex, (SvgElement, Error)>),
     /// Wrapper for other error types
     Other(Box<dyn std::error::Error>),
-    #[cfg(feature = "cli")]
+    #[cfg(any(feature = "cli", feature = "server"))]
     Cli(String),
 }
 
@@ -92,7 +92,7 @@ impl std::fmt::Display for Error {
                 Ok(())
             }
             Error::Other(source) => source.fmt(f),
-            #[cfg(feature = "cli")]
+            #[cfg(any(feature = "cli", feature = "server"))]
             Error::Cli(reason) => write!(f, "{reason}"),
         }
     }
@@ -119,7 +119,7 @@ impl std::error::Error for Error {
             Error::InternalLogic(_) => None,
             Error::Multi(_) => None,
             Error::Other(e) => Some(&**e),
-            #[cfg(feature = "cli")]
+            #[cfg(any(feature = "cli", feature = "server"))]
             Error::Cli(_) => None,
         }
     }

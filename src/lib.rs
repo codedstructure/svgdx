@@ -31,17 +31,16 @@ use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "cli")]
 use std::fs::File;
+use std::io::{BufRead, Cursor, Write};
 #[cfg(feature = "cli")]
 use std::io::{BufReader, IsTerminal, Read};
 #[cfg(feature = "cli")]
 use std::path::{Path, PathBuf};
 
-use std::collections::HashMap;
-use std::io::{BufRead, Cursor, Write};
-
 #[cfg(feature = "cli")]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
+mod config;
 mod constants;
 mod context;
 mod document;
@@ -56,16 +55,11 @@ mod style;
 mod transform;
 mod types;
 
+pub use config::{ErrorMode, TransformConfig};
 pub use errors::{Error, Result};
 pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 pub use types::VarName;
-
-use crate::constants::{
-    DEFAULT_BACKGROUND, DEFAULT_BORDER, DEFAULT_DEPTH_LIMIT, DEFAULT_FONT_FAMILY,
-    DEFAULT_FONT_SIZE, DEFAULT_LOOP_LIMIT, DEFAULT_PATH_REPEAT_LIMIT, DEFAULT_RNG_SEED,
-    DEFAULT_SCALE, DEFAULT_VAR_LIMIT,
-};
 
 // Allow users of this as a library to easily retrieve the version of svgdx being used
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -75,116 +69,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[wasm_bindgen]
 pub fn version_label() -> String {
     format!("svgdx v{VERSION}")
-}
-
-/// Settings to configure a single transformation.
-///
-/// Note the settings here are specific to a single transformation; alternate front-ends
-/// may use this directly rather than `Config` which wraps this struct when `svgdx` is
-/// run as a command-line program.
-#[derive(Clone, Debug)]
-pub struct TransformConfig {
-    /// Add debug info (e.g. input source) to output
-    pub debug: bool,
-    /// Overall output image scale (in mm as scale of user units)
-    pub scale: f32,
-    /// Border width (user-units, default 5)
-    pub border: u16,
-    /// Add style & defs entries based on class usage
-    pub auto_style_mode: AutoStyleMode,
-    /// Background colour (default "default" - use theme default or none)
-    pub background: String, // TODO: sanitize this with a `Colour: FromStr + Display` type
-    /// Random seed
-    pub seed: u64,
-    /// Maximum loop iterations
-    pub loop_limit: u32,
-    /// Max length of variable
-    pub var_limit: u32,
-    /// Maximum depth of recursion
-    pub depth_limit: u32,
-    /// Maximum path repeat expansion (`r` command)
-    pub path_repeat_limit: u32,
-    /// Add source metadata to output
-    pub add_metadata: bool,
-    /// Default font-size (in user-units)
-    pub font_size: f32,
-    /// Default font-family
-    pub font_family: String,
-    /// Theme to use (default "default")
-    pub theme: ThemeType,
-    /// Optional style to apply to SVG root element
-    pub svg_style: Option<String>,
-    /// Error handling mode
-    pub error_mode: ErrorMode,
-    /// Set of initial variable values
-    pub vars: HashMap<VarName, String>,
-}
-
-impl Default for TransformConfig {
-    fn default() -> Self {
-        Self {
-            debug: false,
-            scale: DEFAULT_SCALE,
-            border: DEFAULT_BORDER,
-            auto_style_mode: AutoStyleMode::default(),
-            background: DEFAULT_BACKGROUND.to_owned(),
-            seed: DEFAULT_RNG_SEED,
-            loop_limit: DEFAULT_LOOP_LIMIT,
-            var_limit: DEFAULT_VAR_LIMIT,
-            depth_limit: DEFAULT_DEPTH_LIMIT,
-            path_repeat_limit: DEFAULT_PATH_REPEAT_LIMIT,
-            add_metadata: false,
-            font_size: DEFAULT_FONT_SIZE,
-            font_family: DEFAULT_FONT_FAMILY.to_owned(),
-            theme: ThemeType::default(),
-            svg_style: None,
-            error_mode: ErrorMode::default(),
-            vars: HashMap::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum ErrorMode {
-    /// Un-resolved errors prevent processing
-    #[default]
-    Strict,
-    /// Continue with error message in XML comment
-    Warn,
-    /// Continue silently ignoring errors
-    Ignore,
-}
-
-impl std::str::FromStr for ErrorMode {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s {
-            s if s == ErrorMode::Strict.to_string() => Ok(ErrorMode::Strict),
-            s if s == ErrorMode::Warn.to_string() => Ok(ErrorMode::Warn),
-            s if s == ErrorMode::Ignore.to_string() => Ok(ErrorMode::Ignore),
-            _ => Err(Error::InvalidValue(
-                format!(
-                    "error-mode must be '{}', '{}', or '{}'",
-                    ErrorMode::Strict,
-                    ErrorMode::Warn,
-                    ErrorMode::Ignore,
-                ),
-                s.to_string(),
-            )),
-        }
-    }
-}
-
-impl std::fmt::Display for ErrorMode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            ErrorMode::Strict => "strict",
-            ErrorMode::Warn => "warn",
-            ErrorMode::Ignore => "ignore",
-        };
-        f.write_str(s)
-    }
 }
 
 /// Reads from the `reader` stream, processes document, and writes to `writer`.
@@ -260,18 +144,6 @@ fn output_temp_path(output: &str) -> PathBuf {
     parent.join(format!("{file_name}.{}.tmp", std::process::id()))
 }
 
-#[deprecated(
-    note = "Use 'transform_json' for WASM entrypoint, or transform_str/transform_str_default for Rust library use"
-)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn transform_string(input: String, add_metadata: bool) -> core::result::Result<String, String> {
-    let cfg = TransformConfig {
-        add_metadata,
-        ..Default::default()
-    };
-    transform_str(input, &cfg).map_err(|e| e.to_string())
-}
-
 /// Transform `input` provided as a string, returning the result as a string.
 ///
 /// The transform can be modified by providing a suitable `TransformConfig` value.
@@ -335,6 +207,19 @@ pub mod json_api {
         }
     }
 
+    impl RequestConfig {
+        pub fn merge_config(&self, server_config: &TransformConfig) -> TransformConfig {
+            let mut merged = server_config.clone();
+            merged.add_metadata = self.add_metadata;
+            for (k, v) in &self.vars {
+                if let Ok(var_name) = k.parse() {
+                    merged.vars.insert(var_name, v.clone());
+                }
+            }
+            merged
+        }
+    }
+
     #[derive(Debug, Serialize)]
     pub struct TransformResponse {
         pub version: u32,
@@ -369,7 +254,7 @@ pub mod json_api {
     /// Transform input using JSON request/response format.
     ///
     /// Takes a JSON string containing `TransformRequest`, returns `TransformResponse`
-    pub fn transform_json_impl(input: &str) -> TransformResponse {
+    pub fn transform_json_impl(input: &str, cfg: &TransformConfig) -> TransformResponse {
         match serde_json::from_str::<TransformRequest>(input) {
             Ok(request) => {
                 if request.version != JSON_API_VERSION {
@@ -378,11 +263,8 @@ pub mod json_api {
                         request.version, JSON_API_VERSION
                     ))
                 } else {
-                    match request
-                        .config
-                        .try_into()
-                        .and_then(|cfg| transform_str(request.input, &cfg))
-                    {
+                    let cfg = request.config.merge_config(cfg);
+                    match transform_str(request.input, &cfg) {
                         Ok(svg) => TransformResponse::success(svg),
                         Err(e) => TransformResponse::error(e.to_string()),
                     }
@@ -409,7 +291,16 @@ pub mod json_api {
 #[cfg(feature = "json")]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn transform_json(input: &str) -> String {
-    let result = json_api::transform_json_impl(input);
+    let cfg = TransformConfig::default();
+    let result = json_api::transform_json_impl(input, &cfg);
+    serde_json::to_string(&result).expect("Failed to serialize response")
+}
+
+// note this is not (currently) exposed to WASM; it's intended to support
+// svgdx-server's transform config options.
+#[cfg(feature = "json")]
+pub fn transform_json_with_config(input: &str, cfg: &TransformConfig) -> String {
+    let result = json_api::transform_json_impl(input, cfg);
     serde_json::to_string(&result).expect("Failed to serialize response")
 }
 
