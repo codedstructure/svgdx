@@ -14,6 +14,7 @@
 - [Delta 7 - Variables and Expressions](tutorial/vars_expressions.md)
 - [Delta 8 - Loops and Conditions](tutorial/loops_conditions.md)
 - [Delta 9 - Reuse](tutorial/reuse.md)
+- [Delta 10 - Libraries](tutorial/libraries.md)
 
 # Reference
 
