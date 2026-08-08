@@ -376,7 +376,7 @@ impl Transformer {
         let mut injected_any = false;
 
         for library in self.context.libraries() {
-            for defs in library.used_defs() {
+            for defs in library.output_fragments() {
                 defs_events.push(EventKind::Text("\n  ".to_owned()));
                 defs_events.extend(OutputList::from(defs));
                 injected_any = true;

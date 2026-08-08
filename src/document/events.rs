@@ -195,16 +195,6 @@ impl InputList {
         })
     }
 
-    pub fn find_all(&self, name: &str, depth: Option<usize>) -> impl Iterator<Item = &InputEvent> {
-        let n = name.to_string(); // clone for lifetime reasons
-        self.events.iter().filter(move |ev| match &ev.event {
-            EventKind::Start(e) | EventKind::Empty(e) => {
-                e.0 == n && depth.is_none_or(|d| ev.meta.depth == d)
-            }
-            _ => false,
-        })
-    }
-
     pub fn push(&mut self, ev: impl Into<InputEvent>) {
         let ev = ev.into();
         self.events.push(ev.clone());
