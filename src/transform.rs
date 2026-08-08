@@ -371,6 +371,25 @@ impl Transformer {
         }
     }
 
+    fn library_defs_events(&self) -> OutputList {
+        let mut defs_events = OutputList::new();
+        let mut injected_any = false;
+
+        for library in self.context.libraries() {
+            for defs in library.output_fragments() {
+                defs_events.push(EventKind::Text("\n  ".to_owned()));
+                defs_events.extend(OutputList::from(defs));
+                injected_any = true;
+            }
+        }
+
+        if injected_any {
+            defs_events.push(EventKind::Text("\n".to_owned()));
+        }
+
+        defs_events
+    }
+
     fn autostyle_css_events(&self, auto_styles: Vec<String>) -> Result<OutputList> {
         let indent = 2;
         let indent_line = |n| format!("\n{}", " ".repeat(n));
@@ -450,6 +469,7 @@ impl Transformer {
         let mut style_events = OutputList::new();
         if has_svg_element {
             let (styles, defs) = self.build_auto_styles(&mut output_events);
+            style_events.extend(self.library_defs_events());
             style_events.extend(self.autostyle_defs_events(defs)?);
             style_events.extend(self.autostyle_css_events(styles)?);
         }

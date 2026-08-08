@@ -5,9 +5,11 @@ pub use args::parse_value;
 #[cfg(any(feature = "cli", feature = "server"))]
 pub use args::{TransformArgs, common_usage, take_value};
 
+use crate::document::parse_library;
 use crate::errors::{Error, Result};
 use crate::{AutoStyleMode, ThemeType, VarName};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::constants::{
     DEFAULT_BACKGROUND, DEFAULT_BORDER, DEFAULT_DEPTH_LIMIT, DEFAULT_FONT_FAMILY,
@@ -56,6 +58,8 @@ pub struct TransformConfig {
     pub error_mode: ErrorMode,
     /// Set of initial variable values
     pub vars: HashMap<VarName, String>,
+    /// Included library sources
+    pub library_sources: Vec<Arc<String>>,
 }
 
 impl Default for TransformConfig {
@@ -78,7 +82,17 @@ impl Default for TransformConfig {
             svg_style: None,
             error_mode: ErrorMode::default(),
             vars: HashMap::new(),
+            library_sources: Vec::new(),
         }
+    }
+}
+
+impl TransformConfig {
+    pub fn load_library(&mut self, source: impl Into<String>) -> Result<()> {
+        let source = source.into();
+        parse_library(source.clone())?;
+        self.library_sources.push(Arc::new(source));
+        Ok(())
     }
 }
 

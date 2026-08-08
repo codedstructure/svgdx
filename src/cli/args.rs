@@ -53,7 +53,7 @@ pub enum CliAction {
     // stdin is terminal and we have no INPUT arg
     ImplicitStdinTerminal,
     // normal usage
-    Run(Args),
+    Run(Box<Args>),
 }
 
 pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
@@ -101,7 +101,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         }
     }
 
-    Ok(CliAction::Run(parsed))
+    Ok(CliAction::Run(Box::new(parsed)))
 }
 
 #[cfg(test)]

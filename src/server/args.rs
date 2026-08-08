@@ -30,7 +30,7 @@ pub struct Args {
 pub enum CliAction {
     Help,
     Version,
-    Run(Args),
+    Run(Box<Args>),
 }
 
 impl Default for Args {
@@ -97,7 +97,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         }
     }
 
-    Ok(CliAction::Run(parsed))
+    Ok(CliAction::Run(Box::new(parsed)))
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 use crate::TransformConfig;
-use crate::document::InputEvent;
+use crate::document::{InputEvent, Library, parse_library};
 use crate::elements::{SvgElement, is_layout_element};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
@@ -37,9 +37,11 @@ pub struct TransformerContext {
     /// Are we in a `<specs>` block?
     pub in_specs: bool,
     /// The event-representation of the entire input SVG
-    pub events: Vec<InputEvent>,
+    pub events: HashMap<Option<String>, Vec<InputEvent>>,
     /// Config of transformer processing; updated by `<config>` elements
     pub config: TransformConfig,
+    /// Included libraries
+    libraries: Vec<Library>,
     /// Set of custom element names registered via `<specs element="...">`
     named_spec_map: HashSet<String>,
 }
@@ -56,8 +58,9 @@ impl Default for TransformerContext {
             current_depth: 0,
             real_svg: false,
             in_specs: false,
-            events: Vec::new(),
+            events: HashMap::new(),
             config: TransformConfig::default(),
+            libraries: Vec::new(),
             named_spec_map: HashSet::new(),
         }
     }
@@ -96,6 +99,9 @@ impl ElementMap for TransformerContext {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.id_map.get(id).and_then(|oi| self.index_map.get(oi)),
+            ElRef::LibraryId(lib, id) => self
+                .get_library(lib.as_str())
+                .and_then(|library| library.lookup(id)),
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
@@ -246,16 +252,38 @@ impl TransformerContext {
         for (k, v) in &config.vars {
             self.set_var(k.as_str(), v.as_str());
         }
+
+        // clear any existing _library_ events
+        self.events.retain(|key, _| key.is_none());
+        // parse and inject library events into the context
+        self.libraries = config
+            .library_sources
+            .iter()
+            .filter_map(|source| parse_library(source.to_string()).ok())
+            .collect();
+        for library in &self.libraries {
+            self.events
+                .insert(Some(library.name.clone()), library.events.events.clone());
+        }
         self.config = config;
     }
 
     pub fn set_events(&mut self, events: Vec<InputEvent>) {
-        self.events = events;
+        self.events.insert(None, events);
+    }
+
+    pub fn get_library(&self, name: &str) -> Option<&Library> {
+        self.libraries.iter().find(|lib| lib.name == name)
+    }
+
+    pub fn libraries(&self) -> &[Library] {
+        &self.libraries
     }
 
     pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
+            ElRef::LibraryId(..) => self.get_element(elref),
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }

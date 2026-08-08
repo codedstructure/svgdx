@@ -1,3 +1,4 @@
+use std::fs;
 use std::str::FromStr;
 
 use crate::errors::{Error, Result};
@@ -28,6 +29,7 @@ pub struct TransformArgs {
     pub svg_style: Option<String>,
     pub error_mode: ErrorMode,
     pub vars: Vec<VarSpec>,
+    pub include_files: Vec<String>,
 }
 
 impl Default for TransformArgs {
@@ -50,13 +52,16 @@ impl Default for TransformArgs {
             svg_style: None,
             error_mode: ErrorMode::default(),
             vars: vec![],
+            include_files: vec![],
         }
     }
 }
 
-impl From<TransformArgs> for TransformConfig {
-    fn from(args: TransformArgs) -> Self {
-        Self {
+impl TryFrom<TransformArgs> for TransformConfig {
+    type Error = Error;
+
+    fn try_from(args: TransformArgs) -> Result<Self> {
+        let mut config = Self {
             debug: args.debug,
             scale: args.scale,
             border: args.border,
@@ -74,7 +79,16 @@ impl From<TransformArgs> for TransformConfig {
             svg_style: args.svg_style,
             error_mode: args.error_mode,
             vars: args.vars.into_iter().map(|v| (v.key, v.value)).collect(),
+            library_sources: vec![],
+        };
+
+        for file in &args.include_files {
+            let content = fs::read_to_string(file)
+                .map_err(|e| Error::Document(format!("read {file:?}: {e}")))?;
+            config.load_library(&content)?;
         }
+
+        Ok(config)
     }
 }
 
@@ -99,7 +113,8 @@ pub fn common_usage() -> String {
       --theme <THEME>           Select theme to apply ['{default_theme}']
       --svg-style <STYLE>       Optional style to apply to SVG root element
       --error-mode <MODE>       Error handling: strict, warn, ignore ['{default_error_mode}']
-  -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)"#
+  -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
+      --include <FILE>          Include library file (may be repeated)"#
     )
 }
 
@@ -146,6 +161,9 @@ impl TransformArgs {
             }
             "-D" | "--var" => {
                 self.vars.push(take_value(key, embedded, args)?.parse()?);
+            }
+            "--include" => {
+                self.include_files.push(take_value(key, embedded, args)?);
             }
             _ => return Ok(false),
         }
