@@ -440,7 +440,7 @@ mod test {
         assert_eq!(
             parse_el_loc("#ns:thing:1/4").unwrap(),
             (
-                ElRef::Id("ns:thing".to_string()),
+                ElRef::LibraryId("ns".to_string(), "thing".to_string()),
                 Some(ElementLoc::LineOffset(Length::Rational(
                     1,
                     NonZeroU32::new(4).unwrap()

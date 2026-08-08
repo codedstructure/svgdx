@@ -630,6 +630,7 @@ impl<'s> IntoIterator for &'s ClassList {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElRef {
     Id(String),
+    LibraryId(String, String),
     // If zero then selfref which causes circular reference
     Prev(NonZeroU8),
     Next(NonZeroU8),
@@ -651,6 +652,7 @@ impl Display for ElRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ElRef::Id(id) => write!(f, "{ELREF_ID_PREFIX}{id}"),
+            ElRef::LibraryId(lib, id) => write!(f, "{ELREF_ID_PREFIX}{lib}:{id}"),
             ElRef::Prev(num) => write!(
                 f,
                 "{}",
@@ -715,6 +717,9 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
                 && first_char_match(first)
                 && chars.all(subseq_char_match)
             {
+                if let Some((lib, id)) = value.split_once(':') {
+                    return Some(ElRef::LibraryId(lib.to_owned(), id.to_owned()));
+                }
                 return Some(ElRef::Id(value.to_owned()));
             }
             None
@@ -1033,11 +1038,17 @@ mod test {
         );
         assert_eq!(
             extract_elref("#ns:thing:20%").unwrap(),
-            (ElRef::Id("ns:thing".to_string()), ":20%")
+            (
+                ElRef::LibraryId("ns".to_string(), "thing".to_string()),
+                ":20%"
+            )
         );
         assert_eq!(
             extract_elref("#ns:thing@r").unwrap(),
-            (ElRef::Id("ns:thing".to_string()), "@r")
+            (
+                ElRef::LibraryId("ns".to_string(), "thing".to_string()),
+                "@r"
+            )
         );
         assert_eq!(
             extract_elref("#id").unwrap(),

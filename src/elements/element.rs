@@ -129,6 +129,7 @@ impl EventGen for OtherElement<'_> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
     name: String,
+    library: Option<String>,
     pub original: String,
     attrs: AttrMap,
     classes: ClassList,
@@ -201,6 +202,7 @@ impl SvgElement {
         }
         Self {
             name: name.to_string(),
+            library: None,
             original: format!("<{name} {attr_map}>"),
             attrs: attr_map.clone(),
             classes,
@@ -410,8 +412,10 @@ impl SvgElement {
     pub fn inner_events(&self, context: &TransformerContext) -> Option<InputList> {
         if let Some((start, end)) = self.event_range {
             // empty events will have end == start
-            if end > start {
-                return Some(InputList::from(&context.events[start + 1..end]));
+            if end > start
+                && let Some(events) = context.events.get(&self.library)
+            {
+                return Some(InputList::from(&events[start + 1..end]));
             }
         }
         None
@@ -433,7 +437,11 @@ impl SvgElement {
 
     pub fn all_events(&self, context: &TransformerContext) -> InputList {
         if let Some((start, end)) = self.event_range {
-            InputList::from(&context.events[start..end + 1])
+            if let Some(events) = context.events.get(&self.library) {
+                InputList::from(&events[start..end + 1])
+            } else {
+                InputList::new()
+            }
         } else {
             InputList::new()
         }

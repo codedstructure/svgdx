@@ -10,8 +10,8 @@ use crate::document::InputList;
 // TransformConfig being Clone and just clone a subset where required.
 #[derive(Clone)]
 pub struct Library {
-    name: String,
-    defs: Arc<Vec<InputList>>,
+    pub name: String,
+    pub defs: Arc<Vec<InputList>>,
 }
 
 impl std::fmt::Debug for Library {

@@ -1,5 +1,5 @@
 use crate::TransformConfig;
-use crate::document::InputEvent;
+use crate::document::{InputEvent, InputList};
 use crate::elements::{SvgElement, is_layout_element};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
@@ -37,11 +37,15 @@ pub struct TransformerContext {
     /// Are we in a `<specs>` block?
     pub in_specs: bool,
     /// The event-representation of the entire input SVG
-    pub events: Vec<InputEvent>,
+    pub events: HashMap<Option<String>, Vec<InputEvent>>,
     /// Config of transformer processing; updated by `<config>` elements
     pub config: TransformConfig,
     /// Set of custom element names registered via `<specs element="...">`
     named_spec_map: HashSet<String>,
+    /// Library fragments loaded from `<defs>` of included libraries
+    // TODO: this should collect all 'defs' inputlists from libraries when referenced,
+    // for later injection into output.
+    _library_fragments: Vec<InputList>,
 }
 
 impl Default for TransformerContext {
@@ -56,9 +60,10 @@ impl Default for TransformerContext {
             current_depth: 0,
             real_svg: false,
             in_specs: false,
-            events: Vec::new(),
+            events: HashMap::new(),
             config: TransformConfig::default(),
             named_spec_map: HashSet::new(),
+            _library_fragments: Vec::new(),
         }
     }
 }
@@ -96,6 +101,30 @@ impl ElementMap for TransformerContext {
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.id_map.get(id).and_then(|oi| self.index_map.get(oi)),
+            ElRef::LibraryId(lib, id) => {
+                // find library with given name
+                if let Some(library) = self
+                    .config
+                    .libraries
+                    .iter()
+                    .find(|libdef| libdef.name == *lib)
+                {
+                    // find element with id in library defs
+                    for defs in library.defs.iter() {
+                        if let Some(_el) = defs
+                            .find(id, None)
+                            .and_then(|e| SvgElement::try_from(e.clone()).ok())
+                        {
+                            // TODO: mark this defs as used for later injection into output
+                            // (though that might require this to be mut self - could mark in the library?)
+                            // TODO: probably need to have id_map a hashmap on library...
+                            // though I'm keen to defer reifying SvgElement early for library loading.
+                            return None;
+                        }
+                    }
+                }
+                None
+            }
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
@@ -250,12 +279,13 @@ impl TransformerContext {
     }
 
     pub fn set_events(&mut self, events: Vec<InputEvent>) {
-        self.events = events;
+        self.events.insert(None, events);
     }
 
     pub fn get_original_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
             ElRef::Id(id) => self.original_map.get(id),
+            ElRef::LibraryId(..) => self.get_element(elref),
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
