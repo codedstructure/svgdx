@@ -264,6 +264,10 @@ impl TransformerContext {
         for (k, v) in &config.vars {
             self.set_var(k.as_str(), v.as_str());
         }
+        for library in &config.libraries {
+            self.events
+                .insert(Some(library.name.clone()), library.events.events.clone());
+        }
         self.config = config;
     }
 

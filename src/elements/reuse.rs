@@ -1,9 +1,9 @@
 use super::SvgElement;
 use crate::context::TransformerContext;
-use crate::document::{EventKind, InputEvent, InputList, OutputList};
+use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
-use crate::transform::{EventGen, process_events};
+use crate::transform::EventGen;
 use crate::types::{ElRef, strp};
 
 #[derive(Debug, Clone)]
@@ -103,36 +103,7 @@ impl EventGen for ReuseElement<'_> {
                 instance_element = SvgElement::new("g", &[]).with_attrs_from(&instance_element);
             }
 
-            if let (false, Some((start, end))) = (
-                instance_element.is_empty_element(),
-                instance_element.event_range,
-            ) {
-                // we've changed the initial (and possibly closing) tag of the instance element,
-                // so we create a new list including that and process it.
-                let mut new_events = InputList::new();
-                let tag_name = instance_element.name().to_owned();
-                let inner_events = instance_element.inner_events(context);
-                let mut start_ev = InputEvent {
-                    event: EventKind::Start(instance_element.into()),
-                    meta: Default::default(),
-                };
-                start_ev.set_span(start, end);
-                new_events.push(start_ev);
-                if let Some(inner_events) = inner_events {
-                    // need to clone as we may be reusing the same element multiple times
-                    new_events.extend(&inner_events);
-                }
-                let mut end_ev = InputEvent {
-                    event: EventKind::End(tag_name),
-                    meta: Default::default(),
-                };
-                end_ev.set_span(end, start); // note param order for End event
-                new_events.push(end_ev);
-                new_events.rebase_index(reuse_element.order_index);
-                process_events(new_events, context)
-            } else {
-                instance_element.generate_events(context)
-            }
+            instance_element.generate_events(context)
         })
     }
 }

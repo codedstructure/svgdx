@@ -14,6 +14,7 @@ use crate::document::InputList;
 #[derive(Clone)]
 pub struct Library {
     pub name: String,
+    pub events: Arc<InputList>,
     pub defs: Arc<Vec<InputList>>,
     pub id_map: Arc<OnceLock<HashMap<String, SvgElement>>>,
 }
@@ -22,7 +23,6 @@ impl std::fmt::Debug for Library {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Library")
             .field("name", &self.name)
-            .field("defs", &format!("{} entries", self.defs.len()))
             .finish()
     }
 }
@@ -48,6 +48,10 @@ impl Library {
 
                 if let Ok(mut el) = SvgElement::try_from(event.clone()) {
                     el.library = Some(self.name.clone());
+                    el.set_event_range((
+                        event.meta.index,
+                        event.meta.alt_idx.unwrap_or(event.meta.index),
+                    ));
                     id_map.insert(id.clone(), el);
                 }
             }
@@ -87,6 +91,7 @@ fn parse_library(content: String) -> Result<Library> {
 
     Ok(Library {
         name,
+        events: Arc::new(events),
         defs: Arc::new(defs),
         id_map: Arc::new(OnceLock::new()),
     })
@@ -95,6 +100,7 @@ fn parse_library(content: String) -> Result<Library> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{TransformConfig, transform_str};
 
     #[test]
     fn test_parse_library() {
@@ -135,5 +141,34 @@ mod tests {
         assert_eq!(first.name(), "circle");
         assert_eq!(rect.name(), "rect");
         assert!(library.lookup("missing").is_none());
+    }
+
+    #[test]
+    fn test_transform_reuse_from_included_library() {
+        let library = parse_library(
+            r#"
+                <svg name="lib">
+                    <defs>
+                        <g id="tc">
+                            <rect wh="10"/>
+                            <circle cxy="5" r="5"/>
+                        </g>
+                    </defs>
+                </svg>
+            "#
+            .to_string(),
+        )
+        .unwrap();
+        let config = TransformConfig {
+            libraries: vec![library],
+            ..Default::default()
+        };
+
+        let input = r##"<svg><reuse href="#lib:tc"/></svg>"##;
+        let output = transform_str(input, &config).unwrap();
+
+        assert!(output.contains(r#"<g class="tc">"#));
+        assert!(output.contains(r#"<rect width="10" height="10"/>"#));
+        assert!(output.contains(r#"<circle cx="5" cy="5" r="5"/>"#));
     }
 }
