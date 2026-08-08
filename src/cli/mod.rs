@@ -42,7 +42,7 @@ impl Args {
         Ok(Config {
             input_path: self.input,
             output_path: self.output,
-            transform: self.config.into(),
+            transform: self.config.try_into()?,
         })
     }
 }

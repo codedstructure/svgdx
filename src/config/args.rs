@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use crate::document::load_library;
 use crate::errors::{Error, Result};
 use crate::{AutoStyleMode, ErrorMode, ThemeType, TransformConfig, VarName};
 
@@ -56,9 +57,11 @@ impl Default for TransformArgs {
     }
 }
 
-impl From<TransformArgs> for TransformConfig {
-    fn from(args: TransformArgs) -> Self {
-        Self {
+impl TryFrom<TransformArgs> for TransformConfig {
+    type Error = Error;
+
+    fn try_from(args: TransformArgs) -> Result<Self> {
+        Ok(Self {
             debug: args.debug,
             scale: args.scale,
             border: args.border,
@@ -76,7 +79,12 @@ impl From<TransformArgs> for TransformConfig {
             svg_style: args.svg_style,
             error_mode: args.error_mode,
             vars: args.vars.into_iter().map(|v| (v.key, v.value)).collect(),
-        }
+            libraries: args
+                .include_files
+                .into_iter()
+                .filter_map(|f| load_library(&f).ok())
+                .collect(),
+        })
     }
 }
 

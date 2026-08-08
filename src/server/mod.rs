@@ -80,7 +80,10 @@ pub async fn run(config: CliAction, program_name: &str) {
                 Some(&address),
                 tx,
                 args.docs_redirect_url.clone(),
-                Arc::new(args.config.into()),
+                Arc::new(args.config.try_into().unwrap_or_else(|e| {
+                    eprintln!("Failed to create transform config: {e}");
+                    std::process::exit(1);
+                })),
             )
             .await;
         }

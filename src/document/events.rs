@@ -2,6 +2,7 @@ use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
 
 use std::io::{BufReader, Cursor};
+use std::ops::{Index, Range};
 use std::str::FromStr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -22,6 +23,7 @@ pub struct EventMeta {
     pub(super) line: usize,
     pub(super) indent: usize,
     pub(super) alt_idx: Option<usize>,
+    pub(super) depth: usize,
 }
 
 impl Default for EventMeta {
@@ -32,6 +34,7 @@ impl Default for EventMeta {
             line: 0,
             indent: 0,
             alt_idx: None,
+            depth: 0,
         }
     }
 }
@@ -54,6 +57,20 @@ impl InputEvent {
         match &self.event {
             EventKind::CData(content) => Some(content.to_owned()),
             _ => None,
+        }
+    }
+
+    pub fn element(&self) -> Option<&RawElement> {
+        match &self.event {
+            EventKind::Empty(e) | EventKind::Start(e) => Some(e),
+            _ => None,
+        }
+    }
+
+    pub fn event_range(&self) -> Range<usize> {
+        Range {
+            start: self.meta.index,
+            end: self.meta.alt_idx.unwrap_or(self.meta.index) + 1,
         }
     }
 
@@ -128,6 +145,22 @@ impl IntoIterator for InputList {
     }
 }
 
+impl Index<usize> for InputList {
+    type Output = InputEvent;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.events[index]
+    }
+}
+
+impl Index<Range<usize>> for InputList {
+    type Output = [InputEvent];
+
+    fn index(&self, index: Range<usize>) -> &Self::Output {
+        &self.events[index]
+    }
+}
+
 impl FromStr for InputList {
     type Err = Error;
 
@@ -151,6 +184,25 @@ impl InputList {
 
     pub fn len(&self) -> usize {
         self.events.len()
+    }
+
+    pub fn find(&self, name: &str, depth: Option<usize>) -> Option<&InputEvent> {
+        self.events.iter().find(|ev| match &ev.event {
+            EventKind::Start(e) | EventKind::Empty(e) => {
+                e.0 == name && depth.is_none_or(|d| ev.meta.depth == d)
+            }
+            _ => false,
+        })
+    }
+
+    pub fn find_all(&self, name: &str, depth: Option<usize>) -> impl Iterator<Item = &InputEvent> {
+        let n = name.to_string(); // clone for lifetime reasons
+        self.events.iter().filter(move |ev| match &ev.event {
+            EventKind::Start(e) | EventKind::Empty(e) => {
+                e.0 == n && depth.is_none_or(|d| ev.meta.depth == d)
+            }
+            _ => false,
+        })
     }
 
     pub fn push(&mut self, ev: impl Into<InputEvent>) {

@@ -124,6 +124,7 @@ impl InputList {
                 line: src_line,
                 indent,
                 alt_idx: None,
+                depth: event_idx_stack.len(),
             };
 
             let e: EventKind = ev.clone().try_into()?;
