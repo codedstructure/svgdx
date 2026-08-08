@@ -129,7 +129,7 @@ impl EventGen for OtherElement<'_> {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SvgElement {
     name: String,
-    library: Option<String>,
+    pub library: Option<String>,
     pub original: String,
     attrs: AttrMap,
     classes: ClassList,

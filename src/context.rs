@@ -110,18 +110,7 @@ impl ElementMap for TransformerContext {
                     .find(|libdef| libdef.name == *lib)
                 {
                     // find element with id in library defs
-                    for defs in library.defs.iter() {
-                        if let Some(_el) = defs
-                            .find(id, None)
-                            .and_then(|e| SvgElement::try_from(e.clone()).ok())
-                        {
-                            // TODO: mark this defs as used for later injection into output
-                            // (though that might require this to be mut self - could mark in the library?)
-                            // TODO: probably need to have id_map a hashmap on library...
-                            // though I'm keen to defer reifying SvgElement early for library loading.
-                            return None;
-                        }
-                    }
+                    return library.lookup(id);
                 }
                 None
             }
