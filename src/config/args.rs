@@ -28,6 +28,7 @@ pub struct TransformArgs {
     pub svg_style: Option<String>,
     pub error_mode: ErrorMode,
     pub vars: Vec<VarSpec>,
+    pub include_files: Vec<String>,
 }
 
 impl Default for TransformArgs {
@@ -50,6 +51,7 @@ impl Default for TransformArgs {
             svg_style: None,
             error_mode: ErrorMode::default(),
             vars: vec![],
+            include_files: vec![],
         }
     }
 }
@@ -99,7 +101,8 @@ pub fn common_usage() -> String {
       --theme <THEME>           Select theme to apply ['{default_theme}']
       --svg-style <STYLE>       Optional style to apply to SVG root element
       --error-mode <MODE>       Error handling: strict, warn, ignore ['{default_error_mode}']
-  -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)"#
+  -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
+      --include <FILE>          Include library file (may be repeated)"#
     )
 }
 
@@ -146,6 +149,9 @@ impl TransformArgs {
             }
             "-D" | "--var" => {
                 self.vars.push(take_value(key, embedded, args)?.parse()?);
+            }
+            "--include" => {
+                self.include_files.push(take_value(key, embedded, args)?);
             }
             _ => return Ok(false),
         }
