@@ -6,6 +6,6 @@ mod xml;
 
 pub use events::{EventKind, InputEvent, InputList, OutputList};
 use events::{EventMeta, RawElement};
-pub use library::{Library, load_library};
+pub use library::{Library, parse_library};
 pub use style::EventStyleWrapper;
 use xml::RawXmlEvent;

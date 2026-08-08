@@ -1,41 +1,67 @@
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
+use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 use crate::document::InputList;
 
+#[derive(Debug)]
+struct LibraryCache {
+    id_map: HashMap<String, SvgElement>,
+    defs_map: HashMap<String, usize>,
+}
+
 /// Library of reuseable definitions, loaded from the `<defs>` of a source file.
-// TODO: Arc because this (currently) needs to be Clone; should avoid
-// TransformConfig being Clone and just clone a subset where required.
-// TODO: mark used defs as used for later injection into output
-#[derive(Clone)]
 pub struct Library {
     pub name: String,
-    pub events: Arc<InputList>,
-    pub defs: Arc<Vec<InputList>>,
-    pub id_map: Arc<OnceLock<HashMap<String, SvgElement>>>,
+    pub events: InputList,
+    pub defs: Vec<InputList>,
+    cache: OnceLock<LibraryCache>,
+    used_defs: RefCell<Vec<bool>>,
 }
 
 impl std::fmt::Debug for Library {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Library")
-            .field("name", &self.name)
-            .finish()
+        f.debug_struct("Library").field("name", &self.name).finish()
     }
 }
 
 impl Library {
     pub fn lookup(&self, id: &str) -> Option<&SvgElement> {
-        self.id_map.get_or_init(|| self.build_id_map()).get(id)
+        self.cache.get_or_init(|| self.build_cache()).id_map.get(id)
     }
 
-    fn build_id_map(&self) -> HashMap<String, SvgElement> {
-        let mut id_map = HashMap::new();
+    pub fn mark_used(&self, id: &str) -> bool {
+        let Some(defs_idx) = self
+            .cache
+            .get_or_init(|| self.build_cache())
+            .defs_map
+            .get(id)
+        else {
+            return false;
+        };
+        if let Some(used) = self.used_defs.borrow_mut().get_mut(*defs_idx) {
+            *used = true;
+        }
+        true
+    }
 
-        for defs in self.defs.iter() {
+    pub fn used_defs(&self) -> Vec<InputList> {
+        self.used_defs
+            .borrow()
+            .iter()
+            .enumerate()
+            .filter(|(_, used)| **used)
+            .filter_map(|(idx, _)| self.defs.get(idx).cloned())
+            .collect()
+    }
+
+    fn build_cache(&self) -> LibraryCache {
+        let mut id_map = HashMap::new();
+        let mut defs_map = HashMap::new();
+
+        for (defs_idx, defs) in self.defs.iter().enumerate() {
             for event in defs.iter() {
                 let Some(id) = event.element().and_then(|el| {
                     el.get_attrs()
@@ -53,22 +79,16 @@ impl Library {
                         event.meta.alt_idx.unwrap_or(event.meta.index),
                     ));
                     id_map.insert(id.clone(), el);
+                    defs_map.insert(id, defs_idx);
                 }
             }
         }
 
-        id_map
+        LibraryCache { id_map, defs_map }
     }
 }
 
-pub fn load_library(path: impl AsRef<Path>) -> Result<Library> {
-    let path = path.as_ref();
-    let content =
-        fs::read_to_string(path).map_err(|e| Error::Document(format!("read {path:?}: {e}")))?;
-    parse_library(content).map_err(|e| Error::Document(format!("parse {path:?}: {e}")))
-}
-
-fn parse_library(content: String) -> Result<Library> {
+pub fn parse_library(content: String) -> Result<Library> {
     let mut defs = Vec::new();
     let events: InputList = content.parse()?;
 
@@ -91,9 +111,10 @@ fn parse_library(content: String) -> Result<Library> {
 
     Ok(Library {
         name,
-        events: Arc::new(events),
-        defs: Arc::new(defs),
-        id_map: Arc::new(OnceLock::new()),
+        used_defs: RefCell::new(vec![false; defs.len()]),
+        events,
+        defs,
+        cache: OnceLock::new(),
     })
 }
 
@@ -101,6 +122,12 @@ fn parse_library(content: String) -> Result<Library> {
 mod tests {
     use super::*;
     use crate::{TransformConfig, transform_str};
+
+    fn config_with_library(content: &str) -> TransformConfig {
+        let mut config = TransformConfig::default();
+        config.load_library(content).unwrap();
+        config
+    }
 
     #[test]
     fn test_parse_library() {
@@ -145,7 +172,7 @@ mod tests {
 
     #[test]
     fn test_transform_reuse_from_included_library() {
-        let library = parse_library(
+        let config = config_with_library(
             r#"
                 <svg name="lib">
                     <defs>
@@ -155,14 +182,8 @@ mod tests {
                         </g>
                     </defs>
                 </svg>
-            "#
-            .to_string(),
-        )
-        .unwrap();
-        let config = TransformConfig {
-            libraries: vec![library],
-            ..Default::default()
-        };
+            "#,
+        );
 
         let input = r##"<svg><reuse href="#lib:tc"/></svg>"##;
         let output = transform_str(input, &config).unwrap();
@@ -170,5 +191,56 @@ mod tests {
         assert!(output.contains(r#"<g class="tc">"#));
         assert!(output.contains(r#"<rect width="10" height="10"/>"#));
         assert!(output.contains(r#"<circle cx="5" cy="5" r="5"/>"#));
+    }
+
+    #[test]
+    fn test_transform_library_use_rewrites_href_and_injects_defs() {
+        let config = config_with_library(
+            r#"
+                <svg name="lib">
+                    <defs><g id="tc"><rect wh="10"/><circle cxy="5" r="5"/></g></defs>
+                </svg>
+            "#,
+        );
+
+        let output = transform_str(r##"<svg><use href="#lib:tc"/></svg>"##, &config).unwrap();
+
+        assert!(output.contains(r##"<use href="#tc"/>"##));
+        assert!(
+            output
+                .contains(r#"<defs><g id="tc"><rect wh="10"/><circle cxy="5" r="5"/></g></defs>"#)
+        );
+        assert_eq!(output.matches("<defs").count(), 1);
+    }
+
+    #[test]
+    fn test_transform_use_injects_used_defs_in_order() {
+        let config = config_with_library(
+            r#"
+                <svg name="lib">
+                    <defs><g id="first"><rect wh="10"/></g></defs>
+                    <defs><g id="second"><circle cxy="5" r="5"/></g></defs>
+                </svg>
+            "#,
+        );
+
+        let single_output =
+            transform_str(r##"<svg><use href="#lib:second"/></svg>"##, &config).unwrap();
+        assert!(single_output.contains(r##"<use href="#second"/>"##));
+        assert!(
+            single_output.contains(r#"<defs><g id="second"><circle cxy="5" r="5"/></g></defs>"#)
+        );
+        assert!(!single_output.contains(r#"id="first""#));
+        assert_eq!(single_output.matches("<defs").count(), 1);
+
+        let both_output = transform_str(
+            r##"<svg><use href="#lib:second"/><use href="#lib:first"/></svg>"##,
+            &config,
+        )
+        .unwrap();
+        let first_pos = both_output.find(r#"id="first""#).unwrap();
+        let second_pos = both_output.find(r#"id="second""#).unwrap();
+        assert!(first_pos < second_pos);
+        assert_eq!(both_output.matches("<defs").count(), 2);
     }
 }

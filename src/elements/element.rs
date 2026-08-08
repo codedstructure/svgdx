@@ -11,7 +11,7 @@ use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
 use crate::transform::{EventGen, process_events};
-use crate::types::{AttrMap, ClassList, OrderIndex, StyleMap, extract_urlref, fstr, strp};
+use crate::types::{AttrMap, ClassList, ElRef, OrderIndex, StyleMap, extract_urlref, fstr, strp};
 
 use core::fmt::Display;
 
@@ -91,6 +91,19 @@ impl EventGen for OtherElement<'_> {
 
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
+
+        // references to a library (href="#lib:id") are rewritten to href="#id"; the relevant
+        // fragment from the library is marked for inclusion in the output. Note this won't
+        // apply to <reuse> (where the fragment is duplicated for the instance) as that uses a
+        // different generate_events() path.
+        if let Some(ElRef::LibraryId(lib, id)) = e.get_attr("href").and_then(|h| h.parse().ok())
+            && let Some(library) = context.get_library(&lib)
+            && library.lookup(&id).is_some()
+            && library.mark_used(&id)
+        {
+            e.set_attr("href", &format!("#{id}"));
+        }
+
         let events = e.element_events(context)?;
         for svg_ev in events {
             let is_empty = matches!(svg_ev, EventKind::Empty(_));

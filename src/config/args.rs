@@ -1,6 +1,6 @@
+use std::fs;
 use std::str::FromStr;
 
-use crate::document::load_library;
 use crate::errors::{Error, Result};
 use crate::{AutoStyleMode, ErrorMode, ThemeType, TransformConfig, VarName};
 
@@ -61,7 +61,7 @@ impl TryFrom<TransformArgs> for TransformConfig {
     type Error = Error;
 
     fn try_from(args: TransformArgs) -> Result<Self> {
-        Ok(Self {
+        let mut config = Self {
             debug: args.debug,
             scale: args.scale,
             border: args.border,
@@ -79,12 +79,16 @@ impl TryFrom<TransformArgs> for TransformConfig {
             svg_style: args.svg_style,
             error_mode: args.error_mode,
             vars: args.vars.into_iter().map(|v| (v.key, v.value)).collect(),
-            libraries: args
-                .include_files
-                .into_iter()
-                .filter_map(|f| load_library(&f).ok())
-                .collect(),
-        })
+            library_sources: vec![],
+        };
+
+        for file in &args.include_files {
+            let content = fs::read_to_string(file)
+                .map_err(|e| Error::Document(format!("read {file:?}: {e}")))?;
+            config.load_library(&content)?;
+        }
+
+        Ok(config)
     }
 }
 
