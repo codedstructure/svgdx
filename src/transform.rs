@@ -103,33 +103,37 @@ fn process_tags(
 
     while !tags.is_empty() && remain.len() != tags.len() {
         for t in &mut tags.iter_mut() {
-            let el = t.get_element_mut().cloned();
+            // if we are in a specs block, we don't care if there were errors;
+            // a specs entry may have insufficient context until reuse time.
+            // We do still call generate_events for side-effects including registering
+            // elements for reuse.
+            //
+            // TODO: would be nice to avoid generate_events() inside specs and just
+            //       have `if in_specs { continue; }` at the top of the loop...
             let gen_result = t.generate_events(context);
-            if !context.in_specs {
-                let idx = t.get_order_index();
-                // if we *are* in a specs block, we don't care if there were errors;
-                // a specs entry may have insufficient context until reuse time.
-                // We do still call generate_events for side-effects including registering
-                // elements for reuse.
-                if let Ok((events, maybe_bbox)) = gen_result {
-                    if let Some(bbox) = maybe_bbox {
-                        bbb.extend(bbox); // TODO: should this pattern take an Option?
-                    }
-                    if !events.is_empty() {
-                        idx_output.insert(idx, events);
-                    }
-                } else {
-                    if let (Some(el), Err(err)) = (el, gen_result) {
-                        if let Error::Multi(err_list) = err {
-                            for (idx, (el, err)) in err_list {
-                                element_errors.insert(idx, (el, err));
-                            }
-                        } else {
-                            element_errors.insert(idx.clone(), (el, err));
-                        }
-                    }
-                    remain.push(t.clone());
+            if context.in_specs {
+                continue;
+            }
+            let el = t.get_element_mut().cloned();
+            let idx = t.get_order_index();
+            if let Ok((events, maybe_bbox)) = gen_result {
+                if let Some(bbox) = maybe_bbox {
+                    bbb.extend(bbox); // TODO: should this pattern take an Option?
                 }
+                if !events.is_empty() {
+                    idx_output.insert(idx, events);
+                }
+            } else {
+                if let (Some(el), Err(err)) = (el, gen_result) {
+                    if let Error::Multi(err_list) = err {
+                        for (idx, (el, err)) in err_list {
+                            element_errors.insert(idx, (el, err));
+                        }
+                    } else {
+                        element_errors.insert(idx.clone(), (el, err));
+                    }
+                }
+                remain.push(t.clone());
             }
         }
         if tags.len() == remain.len() {

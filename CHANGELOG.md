@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added: support for including library files; elements in `<defs>` and `<specs>`
   blocks within library files are available to svgdx input documents.
 
+- Added: reuse instancing now expands `wh` to `width` and `height` variables
+  available in the template context.
+
 - svgdx-server: Added support for the command line transform options available
   to the `svgdx` binary, e.g. to set theme or initial variables from the command
   line.

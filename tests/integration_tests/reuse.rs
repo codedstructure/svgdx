@@ -905,3 +905,29 @@ fn test_specs_element_with_id_on_usage() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, r#"id="mybox""#);
 }
+
+#[test]
+fn test_reuse_wh_expansion() {
+    // check wh expands to width/height *variables* in reuse context
+    let input = r##"
+<specs>
+<path id="p1" d="M0 0h${width} v${height}"/>
+</specs>
+<reuse id="r1" href="#p1" wh="10 5"/>
+"##;
+    let expected = r##"<path id="r1" d="M0 0h10 v5" class="p1"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // explicit width/height on reuse should override wh expansion
+    let input = r##"
+<specs><path id="p2" d="M0 0h${width} v{{$height / 2}}"/></specs>
+<reuse id="r2" href="#p2" wh="70" width="20"/>
+<reuse id="r3" href="#p2" wh="70" height="20"/>
+"##;
+    let expected1 = r##"<path id="r2" d="M0 0h20 v35" class="p2"/>"##;
+    let expected2 = r##"<path id="r3" d="M0 0h70 v10" class="p2"/>"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

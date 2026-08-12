@@ -15,9 +15,9 @@
         #charles { stroke: red; }
     ]]>
   </style>
-    <reuse id="alice" href="#person" x="0" y="0" height="60" width="20"/>
-    <reuse id="bob" href="#person" x="150" y="0" height="60" width="20"/>
-    <reuse id="charles" href="#person" x="75" y="50" height="60" width="20"/>
+    <reuse id="alice" href="#person" xy="0" wh="20 60"/>
+    <reuse id="bob" href="#person" xy="150 0" wh="20 60"/>
+    <reuse id="charles" href="#person" xy="75 50" wh="20 60"/>
 
     <line start="#alice@c" end="#bob@c" class="d-arrow" />
     <line start="#charles@c" end="#alice@c" class="d-arrow" />
