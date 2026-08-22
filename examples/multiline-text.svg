@@ -1,22 +1,22 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="65mm" height="65mm" viewBox="-5 -5 65 65">
   <style>
     <![CDATA[
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
-      text { stroke-linejoin: round; paint-order: stroke; }
-      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
-      text.d-text-left, tspan.d-text-left { text-anchor: start; }
-      tspan { dominant-baseline: inherit; }
-      text.d-text-right, tspan.d-text-right { text-anchor: end; }
-      text.d-text-bottom, tspan.d-text-bottom { dominant-baseline: text-after-edge; }
-    ]]>
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
+    text { stroke-linejoin: round; paint-order: stroke; }
+    text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
+    text.d-text-left, tspan.d-text-left { text-anchor: start; }
+    tspan { dominant-baseline: inherit; }
+    text.d-text-right, tspan.d-text-right { text-anchor: end; }
+    text.d-text-bottom, tspan.d-text-bottom { dominant-baseline: text-after-edge; }
+  ]]>
   </style>
   <defs>
-   <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
-     <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
-   </marker>
+    <marker id="arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="5" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.5 0 1" style="stroke-width: 0.2;"/>
+    </marker>
   </defs>
   <style>
     <![CDATA[
@@ -38,42 +38,42 @@
   <!-- top row -->
   <rect x="0" y="0" width="15" height="15" class="small"/>
   <text x="1" y="1" class="d-text d-text-top d-text-left small">
-  <tspan x="1" dy="0em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
+    <tspan x="1" dy="0em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
   </text>
   <rect x="20" y="0" width="15" height="15" class="medium"/>
   <text x="27.5" y="1" class="d-text d-text-top medium">
-  <tspan x="27.5" dy="0em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
+    <tspan x="27.5" dy="0em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
   </text>
   <rect x="40" y="0" width="15" height="15" class="large"/>
   <text x="54" y="1" class="d-text d-text-top d-text-right large">
-  <tspan x="54" dy="0em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
+    <tspan x="54" dy="0em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
   </text>
 
   <!-- middle row -->
   <rect x="0" y="20" width="15" height="15" class="small"/>
   <text x="1" y="27.5" class="d-text d-text-left small">
-  <tspan x="1" dy="-1.05em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
+    <tspan x="1" dy="-1.05em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
   </text>
   <rect x="20" y="20" width="15" height="15" class="medium"/>
   <text x="27.5" y="27.5" class="d-text medium">
-  <tspan x="27.5" dy="-1.05em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
+    <tspan x="27.5" dy="-1.05em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
   </text>
   <rect x="40" y="20" width="15" height="15" class="large"/>
   <text x="54" y="27.5" class="d-text d-text-right large">
-  <tspan x="54" dy="-1.05em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
+    <tspan x="54" dy="-1.05em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
   </text>
 
   <!-- bottom row -->
   <rect x="0" y="40" width="15" height="15" class="small"/>
   <text x="1" y="54" class="d-text d-text-bottom d-text-left small">
-  <tspan x="1" dy="-2.1em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
+    <tspan x="1" dy="-2.1em">Multi</tspan><tspan x="1" dy="1.05em">line</tspan><tspan x="1" dy="1.05em">text</tspan>
   </text>
   <rect x="20" y="40" width="15" height="15" class="medium"/>
   <text x="27.5" y="54" class="d-text d-text-bottom medium">
-  <tspan x="27.5" dy="-2.1em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
+    <tspan x="27.5" dy="-2.1em">Multi</tspan><tspan x="27.5" dy="1.05em">line</tspan><tspan x="27.5" dy="1.05em">text</tspan>
   </text>
   <rect x="40" y="40" width="15" height="15" class="large"/>
   <text x="54" y="54" class="d-text d-text-bottom d-text-right large">
-  <tspan x="54" dy="-2.1em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
+    <tspan x="54" dy="-2.1em">Multi</tspan><tspan x="54" dy="1.05em">line</tspan><tspan x="54" dy="1.05em">text</tspan>
   </text>
 </svg>

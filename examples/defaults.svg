@@ -1,24 +1,24 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="80mm" height="40mm" viewBox="-15 -5 80 40">
   <style>
     <![CDATA[
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      .d-fill-gold { fill: gold; }
-      text.d-fill-gold, tspan.d-fill-gold { fill: black; stroke: white; }
-      .d-fill-green { fill: green; }
-      text.d-fill-green, tspan.d-fill-green { fill: white; stroke: black; }
-      .d-fill-lightgrey { fill: lightgrey; }
-      text.d-fill-lightgrey, tspan.d-fill-lightgrey { fill: black; stroke: white; }
-      .d-thin { stroke-width: 0.25; }
-      text { stroke-linejoin: round; paint-order: stroke; }
-      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
-      text.d-text-right, tspan.d-text-right { text-anchor: end; }
-      text.d-text-monospace, tspan.d-text-monospace { font-family: monospace; }
-      text.d-text-small, tspan.d-text-small { font-size: 2px; }
-      .d-dash { stroke-dasharray: 1 1.5; }
-    ]]>
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    .d-fill-gold { fill: gold; }
+    text.d-fill-gold, tspan.d-fill-gold { fill: black; stroke: white; }
+    .d-fill-green { fill: green; }
+    text.d-fill-green, tspan.d-fill-green { fill: white; stroke: black; }
+    .d-fill-lightgrey { fill: lightgrey; }
+    text.d-fill-lightgrey, tspan.d-fill-lightgrey { fill: black; stroke: white; }
+    .d-thin { stroke-width: 0.25; }
+    text { stroke-linejoin: round; paint-order: stroke; }
+    text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
+    text.d-text-right, tspan.d-text-right { text-anchor: end; }
+    text.d-text-monospace, tspan.d-text-monospace { font-family: monospace; }
+    text.d-text-small, tspan.d-text-small { font-size: 2px; }
+    .d-dash { stroke-dasharray: 1 1.5; }
+  ]]>
   </style>
   <rect id="box" width="50" height="30"/>
   <text x="49" y="1" class="d-text d-text-top d-text-right">NAT</text>
@@ -27,7 +27,7 @@
   <rect id="lan" x="40" y="12.5" width="20" height="5" rx="2" class="ip d-fill-green d-thin"/>
   <text x="50" y="15" class="d-text ip d-fill-green d-text-monospace d-text-small">192.168.1.2</text>
   <g>
-   <circle id="w1" cx="20" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
+    <circle id="w1" cx="20" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
     <text x="20" y="6" class="d-text port d-text-small d-fill-lightgrey">1</text><line x1="10" y1="15" x2="18" y2="6" class="d-thin"/>
     <circle id="w2" cx="20" cy="12" r="2" class="port d-thin d-fill-lightgrey"/>
     <text x="20" y="12" class="d-text port d-text-small d-fill-lightgrey">2</text><line x1="10" y1="15" x2="18" y2="12" class="d-thin"/>
@@ -37,7 +37,7 @@
     <text x="20" y="24" class="d-text port d-text-small d-fill-lightgrey">4</text><line x1="10" y1="15" x2="18" y2="24" class="d-thin"/>
   </g>
   <g>
-   <circle id="l1" cx="30" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
+    <circle id="l1" cx="30" cy="6" r="2" class="port d-thin d-fill-lightgrey"/>
     <text x="30" y="6" class="d-text port d-text-small d-fill-lightgrey">5</text><line x1="32" y1="6" x2="40" y2="15" class="d-thin"/>
     <circle id="l2" cx="30" cy="12" r="2" class="port d-thin d-fill-lightgrey"/>
     <text x="30" y="12" class="d-text port d-text-small d-fill-lightgrey">6</text><line x1="32" y1="12" x2="40" y2="15" class="d-thin"/>

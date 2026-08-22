@@ -119,7 +119,7 @@ fn test_error_mode_warn() {
     assert_eq!(
         ignore_output,
         r##"<svg version="1.1" xmlns="http://www.w3.org/2000/svg">
-<rect x="abc"/>
+  <rect x="abc"/>
 </svg>"##
     );
 }

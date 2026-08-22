@@ -14,8 +14,7 @@ fn test_src_line_simple() {
 <rect x="50" y="60" width="70" height="80"/>
 "#;
     // note leading newline; numbering is 1-based
-    let expected = r#"
-<rect x="10" y="20" width="30" height="40" data-src-line="2"/>
+    let expected = r#"<rect x="10" y="20" width="30" height="40" data-src-line="2"/>
 <rect x="50" y="60" width="70" height="80" data-src-line="3"/>
 "#;
     let result = transform_str(input, &meta_config()).unwrap();
@@ -29,10 +28,7 @@ fn test_src_line_simple() {
 
 <rect x="50" y="60" width="70" height="80"/>
 "#;
-    let expected = r#"
-
-<rect x="10" y="20" width="30" height="40" data-src-line="3"/>
-
+    let expected = r#"<rect x="10" y="20" width="30" height="40" data-src-line="3"/>
 
 <rect x="50" y="60" width="70" height="80" data-src-line="6"/>
 "#;
@@ -51,9 +47,8 @@ fn test_src_line_multiline() {
     L 20 20
 "/>
 "#;
-    let expected = r#"
-<rect x="10" y="20" width="30" height="40" data-src-line="2">
-    <set attributeName="width" to="50" begin="0s" dur="1s" data-src-line="3"/>
+    let expected = r#"<rect x="10" y="20" width="30" height="40" data-src-line="2">
+  <set attributeName="width" to="50" begin="0s" dur="1s" data-src-line="3"/>
 </rect>
 <path d="
     M 10 10
@@ -68,12 +63,9 @@ fn test_src_line_multiline() {
 fn test_src_line_text() {
     // Generated text elements retain the original element's source line
     let input = r#"
-<rect x="0" y="0" width="30" height="40" text="Hello world!"/>
-"#;
-    let expected = r#"
-<rect x="0" y="0" width="30" height="40" data-src-line="2"/>
-<text x="15" y="20" class="d-text" data-src-line="2">Hello world!</text>
-"#;
+<rect x="0" y="0" width="30" height="40" text="Hello world!"/>"#;
+    let expected = r#"<rect x="0" y="0" width="30" height="40" data-src-line="2"/>
+<text x="15" y="20" class="d-text" data-src-line="2">Hello world!</text>"#;
     let result = transform_str(input, &meta_config()).unwrap();
     assert_eq!(result, expected);
 }

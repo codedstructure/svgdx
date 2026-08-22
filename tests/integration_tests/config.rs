@@ -80,11 +80,9 @@ fn test_config_auto_style() {
 <rect xy="0" wh="5"/>
 </svg>
 "#;
-    let expected = r#"
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="15mm" height="15mm" viewBox="-5 -5 15 15">
-<rect x="0" y="0" width="5" height="5"/>
-</svg>
-"#;
+    let expected = r#"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="15mm" height="15mm" viewBox="-5 -5 15 15">
+  <rect x="0" y="0" width="5" height="5"/>
+</svg>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }

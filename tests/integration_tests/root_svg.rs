@@ -122,7 +122,7 @@ fn test_internal_svg() {
 </svg>
 "##;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output.trim(), expected.trim());
 }
 
 #[test]

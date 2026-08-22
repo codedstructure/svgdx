@@ -22,11 +22,7 @@ fn test_if_loop() {
 </if></loop>
 "#;
     let expected = r#"<rect x="0" width="5" height="5"/>
-
-
-
-<rect x="20" width="5" height="5"/>
-"#;
+<rect x="20" width="5" height="5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_eq!(output.trim(), expected.trim());
 }

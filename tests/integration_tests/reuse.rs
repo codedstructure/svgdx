@@ -55,19 +55,19 @@ fn test_reuse_group() {
 "##;
     let expected = r#"
 <g id="first" class="a">
-<rect x="0" y="0" width="50" height="40"/>
-<text x="1" y="39" class="d-text d-text-bottom d-text-left">40</text>
-<circle cx="0" cy="40" r="0.5"/>
+  <rect x="0" y="0" width="50" height="40"/>
+  <text x="1" y="39" class="d-text d-text-bottom d-text-left">40</text>
+  <circle cx="0" cy="40" r="0.5"/>
 </g>
 <g class="a">
-<rect x="0" y="0" width="40" height="30"/>
-<text x="1" y="29" class="d-text d-text-bottom d-text-left">30</text>
-<circle cx="0" cy="30" r="0.5"/>
+  <rect x="0" y="0" width="40" height="30"/>
+  <text x="1" y="29" class="d-text d-text-bottom d-text-left">30</text>
+  <circle cx="0" cy="30" r="0.5"/>
 </g>
 <g id="third" class="test-class a">
-<rect x="0" y="0" width="30" height="20"/>
-<text x="1" y="19" class="d-text d-text-bottom d-text-left">20</text>
-<circle cx="0" cy="20" r="0.5"/>
+  <rect x="0" y="0" width="30" height="20"/>
+  <text x="1" y="19" class="d-text d-text-bottom d-text-left">20</text>
+  <circle cx="0" cy="20" r="0.5"/>
 </g>
 "#;
     let output = transform_str_default(input).unwrap();
@@ -245,7 +245,7 @@ fn test_reuse_recursive() {
 <reuse href="#d" t="5"/>
 "##;
     let expected = r#"<g class="d c b a"><rect x="0" y="0" width="5" height="5"/>
-<text x="2.5" y="2.5" class="d-text">5</text></g>"#;
+  <text x="2.5" y="2.5" class="d-text">5</text></g>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output.trim(), expected.trim());
 }
@@ -557,17 +557,17 @@ fn test_use_relspec() {
 "##;
     let expected = r##"
 <defs>
- <g id="zz">
-  <rect id="a" width="5" height="5"/>
-  <rect x="10" y="0" width="5" height="5"/>
-  <line x1="10" y1="1.5" x2="5" y2="1.5"/>
- </g>
+  <g id="zz">
+    <rect id="a" width="5" height="5"/>
+    <rect x="10" y="0" width="5" height="5"/>
+    <line x1="10" y1="1.5" x2="5" y2="1.5"/>
+  </g>
 </defs>
 <circle id="base" cx="25" cy="40" r="10"/>
 <use href="#zz" x="17.5" y="35.5"/>
 "##;
     let output = transform_str_default(input).unwrap();
-    assert_contains!(output, expected);
+    assert_contains!(output, expected.trim());
 }
 
 #[test]

@@ -220,9 +220,7 @@ fn test_rel_size_dwh() {
 <rect cxy="#a@t" wh="10" dwh="10 -5" id="b" text="b"/>
 <rect cxy="#b@br" wh="1" id="z" />
 "##;
-    let expected_rect = r#"
-<rect id="z" x="34.5" y="2" width="1" height="1"/>
-"#;
+    let expected_rect = r#"<rect id="z" x="34.5" y="2" width="1" height="1"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_rect);
 }

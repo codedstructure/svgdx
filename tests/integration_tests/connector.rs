@@ -285,11 +285,9 @@ fn test_connector_previous() {
 <rect xy="^|h 10" wh="^"/>
 <line start="^@l:40%" end="#a-123@r:40%"/>
 "##;
-    let expected = r#"
-<rect id="a-123" width="20" height="20"/>
+    let expected = r#"<rect id="a-123" width="20" height="20"/>
 <rect x="30" y="0" width="20" height="20"/>
-<line x1="30" y1="8" x2="20" y2="8"/>
-"#;
+<line x1="30" y1="8" x2="20" y2="8"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
