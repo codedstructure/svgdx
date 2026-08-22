@@ -30,10 +30,7 @@ impl Args {
             // as high-level as possible to keep the lower level API cleaner.
             let in_path = Path::new(&self.input);
             let out_path = Path::new(&self.output);
-            if out_path.exists()
-                && out_path.canonicalize().map_err(Error::from_err)?
-                    == in_path.canonicalize().map_err(Error::from_err)?
-            {
+            if out_path.exists() && out_path.canonicalize()? == in_path.canonicalize()? {
                 return Err(Error::Document(
                     "Output path must not refer to the same file as the input file.".into(),
                 ));

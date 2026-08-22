@@ -74,10 +74,12 @@ impl TryFrom<BytesStart<'_>> for RawElement {
         let attrs: Result<Vec<(String, String)>> = e
             .attributes()
             .map(move |a| {
-                let aa = a.map_err(Error::from_err)?;
+                let aa = a.map_err(|e| Error::Xml(Box::new(e)))?;
                 let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let raw_value = std::str::from_utf8(aa.value.as_ref()).map_err(Error::from_err)?;
-                let value = unescape(raw_value).map_err(Error::from_err)?.into_owned();
+                let raw_value = std::str::from_utf8(aa.value.as_ref())?;
+                let value = unescape(raw_value)
+                    .map_err(|e| Error::Xml(Box::new(e)))?
+                    .into_owned();
                 Ok((key, value))
             })
             .collect();
@@ -204,15 +206,15 @@ impl OutputList {
                 let content = Self::blank_line_remover(&text_buf);
                 let text_event = EventKind::Text(content);
                 text_buf.clear();
-                writer.write_event(text_event).map_err(Error::from_err)?;
+                writer.write_event(text_event)?;
             }
-            writer.write_event(event).map_err(Error::from_err)?;
+            writer.write_event(event)?;
         }
         // re-add any trailing text
         if !text_buf.is_empty() {
             let content = Self::blank_line_remover(&text_buf);
             let text_event = EventKind::Text(content);
-            writer.write_event(text_event).map_err(Error::from_err)?;
+            writer.write_event(text_event)?;
         }
         Ok(())
     }
