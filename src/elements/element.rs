@@ -1,3 +1,5 @@
+use super::path::{points_to_path, process_path_bearing, process_path_repeat};
+use super::preprocess::preprocess_dpoints;
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
     LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
@@ -5,7 +7,6 @@ use super::{
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList, Spacing};
-use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
@@ -586,7 +587,10 @@ impl SvgElement {
         if self.name == "path"
             && let Some(d) = self.get_attr("d")
         {
-            let mut d = d.to_string();
+            // expressions (must) have already been expanded before `transmute()`
+            // runs, so `//` can be treated as a dpoints comment without conflicting
+            // with integer division operator.
+            let mut d = preprocess_dpoints(d);
             if d.chars().any(|c| c == 'r' || c == 'R') {
                 d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
             }
@@ -604,6 +608,10 @@ impl SvgElement {
             } else {
                 return Ok(false);
             }
+        }
+
+        if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
+            self.set_attr("points", &preprocess_dpoints(points));
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {

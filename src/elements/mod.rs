@@ -6,6 +6,7 @@ mod layout;
 mod line_offset;
 mod loops;
 mod path;
+mod preprocess;
 mod reuse;
 mod special;
 mod text;
