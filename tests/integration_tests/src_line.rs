@@ -50,10 +50,7 @@ fn test_src_line_multiline() {
     let expected = r#"<rect x="10" y="20" width="30" height="40" data-src-line="2">
   <set attributeName="width" to="50" begin="0s" dur="1s" data-src-line="3"/>
 </rect>
-<path d="
-    M 10 10
-    L 20 20
-" data-src-line="5"/>
+<path d="M 10 10 L 20 20" data-src-line="5"/>
 "#;
     let result = transform_str(input, &meta_config()).unwrap();
     assert_eq!(result, expected);

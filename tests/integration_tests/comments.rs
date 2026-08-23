@@ -61,3 +61,21 @@ fn test_commented_xml() {
     let output = transform_str_default(input).unwrap();
     assert_eq!(output.trim(), expected.trim());
 }
+
+#[test]
+fn test_points_line_comments_stripped() {
+    let input = r#"<polyline points="
+        0 0
+        10 10 // midpoint
+        20 0
+    "/>"#;
+    let expected = r#"<polyline points="0 0 10 10 20 0"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+
+    let input = r#"<path d="
+        M {{11 // 4}} 0 // floor division stays inside the expression
+        L 8 0
+    "/>"#;
+    let expected = r#"<path d="M 2 0 L 8 0"/>"#;
+    assert_eq!(transform_str_default(input).unwrap(), expected);
+}

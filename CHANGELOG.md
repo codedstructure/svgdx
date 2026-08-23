@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   will remain as such, multiple blank lines will be compacted to a single blank
   line, and two-space indentation will be applied to nested elements.
 
+- Changed: path 'd' and polyline/polygon 'points' attributes are reformatted to
+  compact whitespace to a single space and support '//'-to-eol style comments.
+  Note that '//' inside expressions is still the integer division operator -
+  expressions are evaluated prior to the reformatting / comment handling.
+
 - Added: support for including library files; elements in `<defs>` and `<specs>`
   blocks within library files are available to svgdx input documents.
 
