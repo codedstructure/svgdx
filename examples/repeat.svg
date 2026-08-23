@@ -1,8 +1,8 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="36mm" height="85mm" viewBox="-5 -5 36 85">
   <style>
     <![CDATA[
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-    ]]>
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+  ]]>
   </style>
   <style>
     <![CDATA[
@@ -23,7 +23,6 @@
   <rect x="0" y="49" width="5" height="5" class="red"/>
   <rect x="0" y="56" width="5" height="5" class="red"/>
   <rect x="0" y="63" width="5" height="5" class="red"/>
-
   <rect x="7" y="0" width="5" height="5" class="amber"/>
   <rect x="7" y="7" width="5" height="5" class="amber"/>
   <rect x="7" y="14" width="5" height="5" class="amber"/>
@@ -31,7 +30,6 @@
   <rect x="7" y="28" width="5" height="5" class="amber"/>
   <rect x="7" y="35" width="5" height="5" class="amber"/>
   <rect x="7" y="42" width="5" height="5" class="amber"/>
-
   <rect x="14" y="0" width="5" height="5" class="yellow"/>
   <rect x="14" y="7" width="5" height="5" class="yellow"/>
   <rect x="14" y="14" width="5" height="5" class="yellow"/>
@@ -40,7 +38,6 @@
   <rect x="14" y="35" width="5" height="5" class="yellow"/>
   <rect x="14" y="42" width="5" height="5" class="yellow"/>
   <rect x="14" y="49" width="5" height="5" class="yellow"/>
-
   <rect x="21" y="0" width="5" height="5" class="green"/>
   <rect x="21" y="7" width="5" height="5" class="green"/>
   <rect x="21" y="14" width="5" height="5" class="green"/>
@@ -52,5 +49,4 @@
   <rect x="21" y="56" width="5" height="5" class="green"/>
   <rect x="21" y="63" width="5" height="5" class="green"/>
   <rect x="21" y="70" width="5" height="5" class="green"/>
-
 </svg>

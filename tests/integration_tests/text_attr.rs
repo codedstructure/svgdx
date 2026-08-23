@@ -70,7 +70,7 @@ fn test_text_multiline() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text">
-<tspan x="5" dy="-0.525em">multi</tspan><tspan x="5" dy="1.05em">line</tspan>
+  <tspan x="5" dy="-0.525em">multi</tspan><tspan x="5" dy="1.05em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -84,7 +84,7 @@ fn test_text_multiline() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="1" class="d-text d-text-top">
-<tspan x="5" dy="0em">multi</tspan><tspan x="5" dy="2em">line</tspan>
+  <tspan x="5" dy="0em">multi</tspan><tspan x="5" dy="2em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -98,7 +98,7 @@ fn test_text_multiline() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="9" y="9" class="d-text d-text-bottom d-text-right">
-<tspan x="9" dy="-1em">multi</tspan><tspan x="9" dy="1em">line</tspan>
+  <tspan x="9" dy="-1em">multi</tspan><tspan x="9" dy="1em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -116,7 +116,7 @@ fn test_text_multiline() {
         r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text">
-<tspan x="5" dy="-1.5em">multi</tspan><tspan x="5" dy="1em">"#,
+  <tspan x="5" dy="-1.5em">multi</tspan><tspan x="5" dy="1em">"#,
         r#"</tspan><tspan x="5" dy="1em">"#,
         r#"</tspan><tspan x="5" dy="1em">line</tspan>
 </text>
@@ -136,7 +136,7 @@ fn test_text_vertical() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="50"/>
 <text x="5" y="25" writing-mode="tb" class="d-text d-text-vertical">
-<tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
+  <tspan y="25" dx="-0.525em">Programming Language</tspan><tspan y="25" dx="1.05em">The Rust</tspan>
 </text>
 "#;
     assert_eq!(
@@ -260,7 +260,7 @@ fn test_text_line_offset_multiline_and_rel() {
     let expected = r#"
 <line x1="0" y1="0" x2="10" y2="0"/>
 <text x="8" y="0" class="d-text">
-<tspan x="8" dy="-0.525em">multi</tspan><tspan x="8" dy="1.05em">line</tspan>
+  <tspan x="8" dy="-0.525em">multi</tspan><tspan x="8" dy="1.05em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -327,7 +327,7 @@ text</rect>
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text">
-<tspan x="5" dy="-0.525em">multi-line</tspan><tspan x="5" dy="1.05em">text</tspan>
+  <tspan x="5" dy="-0.525em">multi-line</tspan><tspan x="5" dy="1.05em">text</tspan>
 </text>
 "#;
     assert_eq!(
@@ -363,7 +363,7 @@ fn test_text_cdata() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text">
-<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print("Hello World!")</tspan>
+  <tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">    def start():</tspan><tspan x="5" dy="1.05em">        print("Hello World!")</tspan>
 </text>
 "#;
     let expected = expected.replace('Z', "\u{200b}");
@@ -392,7 +392,7 @@ fn test_text_cdata_pre() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" class="d-text d-text-pre">
-<tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint("HelloNWorld!")</tspan>
+  <tspan x="5" dy="-1.05em">Z</tspan><tspan x="5" dy="1.05em">NNNNdefNstart():</tspan><tspan x="5" dy="1.05em">NNNNNNNNprint("HelloNWorld!")</tspan>
 </text>
 "#;
     let expected = expected.replace('N', "\u{a0}").replace('Z', "\u{200b}");
@@ -496,7 +496,7 @@ fn test_text_style() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="5" y="5" style="font-size: 2em;" class="d-text">
-<tspan x="5" dy="-0.525em" style="font-size: 2em;">two</tspan><tspan x="5" dy="1.05em" style="font-size: 2em;">lines</tspan>
+  <tspan x="5" dy="-0.525em" style="font-size: 2em;">two</tspan><tspan x="5" dy="1.05em" style="font-size: 2em;">lines</tspan>
 </text>
 "#;
 
@@ -685,7 +685,7 @@ fn test_multiline_outside() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="11" y="11" class="d-text d-text-top d-text-left">
-<tspan x="11" dy="0em">multi</tspan><tspan x="11" dy="1.05em">line</tspan>
+  <tspan x="11" dy="0em">multi</tspan><tspan x="11" dy="1.05em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -700,7 +700,7 @@ fn test_multiline_outside() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="-1" y="-1" class="d-text d-text-bottom d-text-right">
-<tspan x="-1" dy="-1.05em">multi</tspan><tspan x="-1" dy="1.05em">line</tspan>
+  <tspan x="-1" dy="-1.05em">multi</tspan><tspan x="-1" dy="1.05em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -829,7 +829,7 @@ fn test_md() {
     let expected = r#"
 <rect x="0" y="0" width="10" height="10"/>
 <text x="11" y="11" class="d-text d-text-top d-text-left">
-<tspan x="11" dy="0em">m</tspan><tspan class="d-text-italic">ult</tspan><tspan>i</tspan><tspan x="11" dy="1.05em">line</tspan>
+  <tspan x="11" dy="0em">m</tspan><tspan class="d-text-italic">ult</tspan><tspan>i</tspan><tspan x="11" dy="1.05em">line</tspan>
 </text>
 "#;
     assert_eq!(
@@ -842,7 +842,7 @@ fn test_md() {
 "#;
     let expected = r#"<rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
 <text x="20" y="10" class="d-text d-markdown">
-<tspan x="20" dy="-1.05em" class="d-text-monospace">hello</tspan><tspan x="20" dy="1.05em" class="d-text-italic">m</tspan><tspan x="20" dy="1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan>
+  <tspan x="20" dy="-1.05em" class="d-text-monospace">hello</tspan><tspan x="20" dy="1.05em" class="d-text-italic">m</tspan><tspan x="20" dy="1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan>
 </text>
 "#;
     assert_eq!(
@@ -856,7 +856,7 @@ fn test_md() {
     let expected = r#"
 <rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
 <text x="20" y="10" writing-mode="tb" class="d-text d-markdown d-text-vertical">
-<tspan y="10" dx="-1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em" class="d-text-italic">m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
+  <tspan y="10" dx="-1.05em" class="d-text-italic">ark</tspan><tspan> </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em" class="d-text-italic">m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
 </text>
 "#;
     assert_eq!(
@@ -870,7 +870,7 @@ fn test_md() {
     let expected = r#"
 <rect id="proc" x="0" y="0" width="40" height="20" class="d-markdown"/>
 <text x="20" y="10" writing-mode="tb" class="d-text d-markdown d-text-vertical">
-<tspan y="10" dx="-1.05em">ark* </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em">*m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
+  <tspan y="10" dx="-1.05em">ark* </tspan><tspan class="d-text-bold">down</tspan><tspan y="10" dx="1.05em">*m</tspan><tspan y="10" dx="1.05em" class="d-text-monospace">hello</tspan>
 </text>
 "#;
     assert_eq!(

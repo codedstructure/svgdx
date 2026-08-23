@@ -1,6 +1,6 @@
 use crate::context::TransformerContext;
 use crate::document::tag::{Tag, tagify_events};
-use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList};
+use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList, Spacing};
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
@@ -54,40 +54,21 @@ impl EventGen for Tag {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut events = OutputList::new();
-        let mut bbox = None;
-        match self {
-            Tag::Compound(el, tail) => {
-                let mut el = el.clone();
-                context.apply_defaults(&mut el);
-                let (ev, bb) = el.generate_events(context)?;
-                (events, bbox) = (ev, bb);
-                if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(EventKind::Text(tail.to_owned()));
-                }
-                // NOTE: el.content_bbox may be set (e.g. if symbol) while bb is None here.
-            }
-            Tag::Leaf(el, tail) => {
-                let mut el = el.clone();
-                context.apply_defaults(&mut el);
-                let (ev, bb) = el.generate_events(context)?;
-                (events, bbox) = (ev, bb);
-                if let (Some(tail), false) = (tail, events.is_empty()) {
-                    events.push(EventKind::Text(tail.to_owned()));
-                }
-            }
-            Tag::Comment(_, c, tail) => {
-                events.push(EventKind::Comment(c.clone()));
-                if let Some(tail) = tail {
-                    events.push(EventKind::Text(tail.to_owned()));
-                }
-            }
-            Tag::Text(_, t) => {
-                events.push(EventKind::Text(t.clone()));
-            }
-            Tag::CData(_, c) => {
-                events.push(EventKind::CData(c.clone()));
-            }
+        if !matches!(self.spacing(), Spacing::Inline) {
+            events.push(*self.spacing());
         }
+        let (ev, bbox) = match self {
+            Tag::Compound(el, _) | Tag::Leaf(el, _) => {
+                let mut el = el.clone();
+                context.apply_defaults(&mut el);
+                el.generate_events(context)?
+            }
+            Tag::Comment(_, _, c, _) => {
+                (OutputList::from(vec![EventKind::Comment(c.clone())]), None)
+            }
+            _ => (OutputList::new(), None),
+        };
+        events.extend(ev);
         Ok((events, bbox))
     }
 }
@@ -162,14 +143,11 @@ pub fn handle_errors(
         ErrorMode::Warn => {
             for (idx, (el, err)) in element_errors {
                 let mut ev_list = OutputList::from(vec![
-                    EventKind::Text("\n".to_owned()),
                     EventKind::Comment(format!(" Warning: error processing element: {:?} ", err)),
+                    EventKind::Spacing(Spacing::LineBreak),
                 ]);
                 let el_events = el.all_events(context);
                 ev_list.extend(el_events);
-                // TODO: should store tail in SvgElement and include here
-                // rather than just adding a newline...
-                ev_list.push(EventKind::Text("\n".to_owned()));
                 idx_output.insert(idx, ev_list);
             }
             Ok(())
@@ -177,10 +155,7 @@ pub fn handle_errors(
         ErrorMode::Ignore => {
             for (idx, (el, _err)) in element_errors {
                 let el_events = el.all_events(context);
-                let mut ev_list = OutputList::from(el_events);
-                // TODO: should store tail in SvgElement and include here
-                // rather than just adding a newline...
-                ev_list.push(EventKind::Text("\n".to_owned()));
+                let ev_list = OutputList::from(el_events);
                 idx_output.insert(idx, ev_list);
             }
             Ok(())
@@ -209,6 +184,15 @@ pub fn process_events(
 
     for (_idx, events) in idx_output {
         output.extend(events);
+    }
+
+    if context.is_top_level() {
+        // remove leading spacing events; top-level should not start with whitespace.
+        let event_count = output
+            .iter()
+            .take_while(|ev| matches!(ev.event, EventKind::Spacing(_)))
+            .count();
+        output.events.drain(..event_count);
     }
 
     Ok((output, bbox))
@@ -347,29 +331,64 @@ impl Transformer {
         registry.get_state()
     }
 
-    fn autostyle_defs_events(&self, auto_defs: Vec<String>) -> Result<OutputList> {
-        let indent = 2;
-        let indent_line = |n| format!("\n{}", " ".repeat(n));
+    // applies canonical spacing to fragments from library or style sources
+    fn reformat_fragment_events(input: InputList) -> OutputList {
+        let mut output = OutputList::new();
+        let mut el_name_stack: Vec<String> = Vec::new();
+        let mut pending_spacing = Spacing::default();
 
-        if !auto_defs.is_empty() {
-            let mut defs_events = vec![
-                EventKind::Text(indent_line(indent)),
-                EventKind::Start(SvgElement::new("defs", &[]).into()),
-            ];
-            if self.context.config.debug {
-                defs_events.extend([
-                    EventKind::Text(indent_line(indent + 2)),
-                    EventKind::Comment(" svgdx-generated auto-style defs ".to_owned()),
-                ]);
+        for input_ev in input {
+            let parent_name = el_name_stack.last().map(String::as_str);
+            match input_ev.event {
+                // style/text/tspan spacing preserved as-is, else merge into pending_spacing
+                EventKind::Text(content) | EventKind::CData(content)
+                    if !matches!(parent_name, Some("style" | "text" | "tspan"))
+                        && let Some(spacing) = Spacing::from_text(&content) =>
+                {
+                    pending_spacing.merge(spacing);
+                }
+                event => {
+                    output.push(pending_spacing.take());
+
+                    match &event {
+                        EventKind::Start(el) => el_name_stack.push(el.name().to_owned()),
+                        EventKind::End(_) => {
+                            el_name_stack.pop();
+                        }
+                        _ => {}
+                    }
+
+                    output.extend([crate::document::InputEvent {
+                        event,
+                        meta: input_ev.meta,
+                    }]);
+                }
             }
-            defs_events.push(EventKind::Text("\n".to_owned()));
-            let eee = InputList::from_str(&indent_all(auto_defs, indent + 2).join("\n"))?;
-            defs_events.extend(OutputList::from(eee));
-            defs_events.extend(vec![
-                EventKind::Text(indent_line(indent)),
-                EventKind::End("defs".to_owned()),
-            ]);
-            Ok(OutputList::from(defs_events))
+        }
+
+        output.push(pending_spacing);
+        output
+    }
+
+    fn autostyle_defs_events(&self, auto_defs: Vec<String>) -> Result<OutputList> {
+        if !auto_defs.is_empty() {
+            let mut defs_events = OutputList::new();
+            defs_events.push(Spacing::LineBreak);
+            defs_events.push(EventKind::Start(SvgElement::new("defs", &[]).into()));
+            if self.context.config.debug {
+                defs_events.push(Spacing::LineBreak);
+                defs_events.push(EventKind::Comment(
+                    " svgdx-generated auto-style defs ".to_owned(),
+                ));
+            }
+            for def in auto_defs {
+                defs_events.push(Spacing::LineBreak);
+                let eee = InputList::from_str(&def)?;
+                defs_events.extend(Self::reformat_fragment_events(eee));
+            }
+            defs_events.push(Spacing::LineBreak);
+            defs_events.push(EventKind::End("defs".to_owned()));
+            Ok(defs_events)
         } else {
             Ok(OutputList::new())
         }
@@ -377,49 +396,36 @@ impl Transformer {
 
     fn library_defs_events(&self) -> OutputList {
         let mut defs_events = OutputList::new();
-        let mut injected_any = false;
 
         for library in self.context.libraries() {
             for defs in library.output_fragments() {
-                defs_events.push(EventKind::Text("\n  ".to_owned()));
-                defs_events.extend(OutputList::from(defs));
-                injected_any = true;
+                defs_events.push(Spacing::LineBreak);
+                defs_events.extend(Self::reformat_fragment_events(defs));
             }
-        }
-
-        if injected_any {
-            defs_events.push(EventKind::Text("\n".to_owned()));
         }
 
         defs_events
     }
 
     fn autostyle_css_events(&self, auto_styles: Vec<String>) -> Result<OutputList> {
-        let indent = 2;
-        let indent_line = |n| format!("\n{}", " ".repeat(n));
-
         if !auto_styles.is_empty() {
-            let mut style_events = vec![
-                EventKind::Text(indent_line(indent)),
-                EventKind::Start(SvgElement::new("style", &[]).into()),
-            ];
+            let mut style_events = OutputList::new();
+            style_events.push(Spacing::LineBreak);
+            style_events.push(EventKind::Start(SvgElement::new("style", &[]).into()));
             if self.context.config.debug {
-                style_events.extend([
-                    EventKind::Text(indent_line(indent + 2)),
-                    EventKind::Comment(" svgdx-generated auto-style CSS ".to_owned()),
-                ]);
+                style_events.push(Spacing::LineBreak);
+                style_events.push(EventKind::Comment(
+                    " svgdx-generated auto-style CSS ".to_owned(),
+                ));
             }
-            style_events.extend(vec![
-                EventKind::Text(indent_line(indent + 2)),
-                EventKind::CData(format!(
-                    "\n{}\n{}",
-                    indent_all(auto_styles, indent + 4).join("\n"),
-                    " ".repeat(indent + 2)
-                )),
-                EventKind::Text(indent_line(indent)),
-                EventKind::End("style".to_owned()),
-            ]);
-            Ok(OutputList::from(style_events))
+            style_events.push(Spacing::LineBreak);
+            style_events.push(EventKind::CData(format!(
+                "\n{}\n  ",
+                indent_all(auto_styles, 4).join("\n")
+            )));
+            style_events.push(Spacing::LineBreak);
+            style_events.push(EventKind::End("style".to_owned()));
+            Ok(style_events)
         } else {
             Ok(OutputList::new())
         }
@@ -449,16 +455,14 @@ impl Transformer {
         }
 
         if self.context.config.debug {
-            let indent = "\n  ".to_owned();
-
             output_events.extend(vec![
-                EventKind::Text(indent.clone()),
+                EventKind::Spacing(Spacing::LineBreak),
                 EventKind::Comment(format!(
                     " Generated by {} v{} ",
                     env!("CARGO_PKG_NAME"),
                     env!("CARGO_PKG_VERSION")
                 )),
-                EventKind::Text(indent),
+                EventKind::Spacing(Spacing::LineBreak),
                 EventKind::Comment(format!(" Config: {:?} ", self.context.config)),
             ])
         }
@@ -478,13 +482,10 @@ impl Transformer {
             style_events.extend(self.autostyle_css_events(styles)?);
         }
 
-        let (pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");
-
-        pre_style.write_to(writer)?;
-        style_events.write_to(writer)?;
-        post_style.write_to(writer)?;
-
-        Ok(())
+        let (mut pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");
+        pre_style.extend(style_events);
+        pre_style.extend(post_style);
+        pre_style.write_to(writer)
     }
 }
 

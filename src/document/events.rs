@@ -13,6 +13,8 @@ pub enum EventKind {
     Comment(String),
     Text(String),
     CData(String),
+    /// before the next emitted XML event, insert this whitespace type
+    Spacing(Spacing),
     Other(super::RawXmlEvent),
 }
 
@@ -358,6 +360,66 @@ impl IntoIterator for OutputList {
             .map(|ev| ev.event.clone())
             .collect::<Vec<_>>()
             .into_iter()
+    }
+}
+
+/// Kind of spacing to inject in the output event stream.
+///
+/// As `EventKind::Spacing`: before the next emitted XML event, insert this whitespace type.
+/// As `Tag::Spacing`: the leading spacing to emit before that tag's rendered output.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub enum Spacing {
+    /// Directly follow previous element
+    #[default]
+    Inline,
+
+    /// Add line break and indent before this element
+    LineBreak,
+
+    /// Add extra blank line and indent before this element
+    BlankLine,
+}
+
+impl From<Spacing> for EventKind {
+    fn from(value: Spacing) -> Self {
+        Self::Spacing(value)
+    }
+}
+
+impl Spacing {
+    /// Classify a whitespace-only XML text/tail node into the canonical spacing intent.
+    /// Returns `None` for any content-bearing text, so callers can preserve it unchanged.
+    pub fn from_text(content: &str) -> Option<Self> {
+        if !content.chars().all(char::is_whitespace) {
+            return None;
+        }
+
+        let newline_count = content.chars().filter(|c| *c == '\n').count();
+        Some(match newline_count {
+            0 => Spacing::Inline,
+            1 => Spacing::LineBreak,
+            _ => Spacing::BlankLine,
+        })
+    }
+
+    pub fn take(&mut self) -> Self {
+        let current = *self;
+        *self = Spacing::Inline;
+        current
+    }
+
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Spacing::Inline)
+    }
+
+    pub fn merge(&mut self, other: Self) {
+        use Spacing::*;
+
+        *self = match (&self, other) {
+            (BlankLine, _) | (_, BlankLine) => BlankLine,
+            (LineBreak, _) | (_, LineBreak) => LineBreak,
+            _ => Inline,
+        };
     }
 }
 

@@ -3,6 +3,5 @@
     This implements the example from
     https://www.w3.org/TR/2016/CR-SVG2-20160915/paths.html#PathDataBearingCommands
   -->
-  <path fill="#eee" stroke="deeppink" stroke-width="8px" stroke-linejoin="round" d="M150,10
-           l38.024 27.626l-14.524 44.7l-47 0l-14.524 -44.7z"/>
+  <path fill="#eee" stroke="deeppink" stroke-width="8px" stroke-linejoin="round" d="M150,10 l38.024 27.626l-14.524 44.7l-47 0l-14.524 -44.7z"/>
 </svg>

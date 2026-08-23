@@ -1,19 +1,19 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="99mm" height="70mm" viewBox="-5 -5 99 70">
   <style>
     <![CDATA[
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
-      .d-fill-papayawhip { fill: papayawhip; }
-      .d-fill-lightgreen { fill: lightgreen; }
-      .d-fill-red { fill: red; }
-      .d-none { stroke: none; }
-      text { stroke-linejoin: round; paint-order: stroke; }
-      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
-      tspan { dominant-baseline: inherit; }
-      text.d-text-left, tspan.d-text-left { text-anchor: start; }
-      text.d-text-pre, tspan.d-text-pre { font-family: monospace; white-space: pre; }
-    ]]>
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
+    .d-fill-papayawhip { fill: papayawhip; }
+    .d-fill-lightgreen { fill: lightgreen; }
+    .d-fill-red { fill: red; }
+    .d-none { stroke: none; }
+    text { stroke-linejoin: round; paint-order: stroke; }
+    text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+    tspan { dominant-baseline: inherit; }
+    text.d-text-left, tspan.d-text-left { text-anchor: start; }
+    text.d-text-pre, tspan.d-text-pre { font-family: monospace; white-space: pre; }
+  ]]>
   </style>
   <style>
   * { font-size: 6px; }
@@ -28,12 +28,12 @@
 
   <rect x="20" y="30" width="0" height="0" class="d-none"/>
   <text x="20" y="30" class="d-text d-none">
-  <tspan x="20" dy="-1.5em">This is a text</tspan><tspan x="20" dy="1.5em">block across</tspan><tspan x="20" dy="1.5em">multiple lines</tspan>
+    <tspan x="20" dy="-1.5em">This is a text</tspan><tspan x="20" dy="1.5em">block across</tspan><tspan x="20" dy="1.5em">multiple lines</tspan>
   </text>
 
   <rect x="50" y="30" width="0" height="0" class="d-none d-code"/>
   <text x="51" y="30" class="d-text d-text-left d-none d-code d-text-pre">
-  <tspan x="51" dy="-1.8em">​</tspan><tspan x="51" dy="0.9em">def area(w, h):</tspan><tspan x="51" dy="0.9em">  """Return area of thing"""</tspan><tspan x="51" dy="0.9em">  return w * h</tspan><tspan x="51" dy="0.9em">  </tspan>
+    <tspan x="51" dy="-1.8em">​</tspan><tspan x="51" dy="0.9em">def area(w, h):</tspan><tspan x="51" dy="0.9em">  """Return area of thing"""</tspan><tspan x="51" dy="0.9em">  return w * h</tspan><tspan x="51" dy="0.9em">  </tspan>
   </text>
 
 </svg>

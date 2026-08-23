@@ -1,6 +1,6 @@
 use std::io::{BufRead, Write};
 
-use super::{EventKind, EventMeta, InputEvent, InputList, OutputList, RawElement};
+use super::{EventKind, EventMeta, InputEvent, InputList, OutputList, RawElement, Spacing};
 use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
 
@@ -57,6 +57,9 @@ impl<'a> From<EventKind> for XmlEvent<'a> {
             }
             EventKind::CData(content) => XmlEvent::CData(BytesCData::new(content)),
             EventKind::End(name) => XmlEvent::End(BytesEnd::new(name)),
+            // Spacing markers should already have been consumed by `OutputList::write_to`.
+            // If one leaks through, serialize as empty text node.
+            EventKind::Spacing(_) => XmlEvent::Text(BytesText::new("")),
             EventKind::Other(event) => event.0,
         }
     }
@@ -193,51 +196,93 @@ impl InputList {
 impl OutputList {
     pub fn write_to(&self, writer: &mut dyn Write) -> Result<()> {
         let mut writer = Writer::new(writer);
-
-        // Separate buffer for coalescing text events
+        let mut pending_spacing = Spacing::default();
         let mut text_buf = String::new();
+        let mut depth = 0usize;
+        let mut parent_stack: Vec<String> = Vec::new();
 
         for event_pos in &self.events {
-            let event = event_pos.event.clone();
-            if let EventKind::Text(ref content) = event {
-                text_buf.push_str(content);
-                continue;
-            } else if !text_buf.is_empty() {
-                let content = Self::blank_line_remover(&text_buf);
-                let text_event = EventKind::Text(content);
-                text_buf.clear();
-                writer.write_event(text_event)?;
+            match &event_pos.event {
+                EventKind::Spacing(spacing) => {
+                    pending_spacing.merge(*spacing);
+                }
+                EventKind::Text(content) => {
+                    text_buf.push_str(content);
+                }
+                event => {
+                    Self::flush_text_buf(&mut writer, &mut text_buf)?;
+                    Self::write_spacing(
+                        &mut writer,
+                        pending_spacing.take(),
+                        depth,
+                        event,
+                        parent_stack.last().map(String::as_str),
+                    )?;
+
+                    writer.write_event(event.clone())?;
+                    match event {
+                        EventKind::Start(raw) => {
+                            depth += 1;
+                            parent_stack.push(raw.name().to_owned());
+                        }
+                        EventKind::End(_) => {
+                            depth = depth.saturating_sub(1);
+                            parent_stack.pop();
+                        }
+                        _ => {}
+                    }
+                }
             }
-            writer.write_event(event)?;
         }
-        // re-add any trailing text
+
+        Self::flush_text_buf(&mut writer, &mut text_buf)?;
+        Self::write_end_spacing(&mut writer, pending_spacing.take())?;
+        Ok(())
+    }
+
+    fn flush_text_buf(writer: &mut Writer<&mut dyn Write>, text_buf: &mut String) -> Result<()> {
         if !text_buf.is_empty() {
-            let content = Self::blank_line_remover(&text_buf);
-            let text_event = EventKind::Text(content);
+            let text_event = EventKind::Text(std::mem::take(text_buf));
             writer.write_event(text_event)?;
         }
         Ok(())
     }
 
-    fn blank_line_remover(s: &str) -> String {
-        // trim trailing whitespace.
-        // just using `trim_end()` on Text events won't work
-        // as Text event may be followed by a Start/Empty event.
-        // blank lines *within* Text can be trimmed.
-        let mut content = String::new();
-        let mut s = s;
-        while !s.is_empty() {
-            if let Some(idx) = s.find('\n') {
-                let (line, remain) = s.split_at(idx);
-                s = &remain[1..];
-                content.push_str(line.trim_end());
-                content.push('\n');
-            } else {
-                content.push_str(s);
-                break;
-            }
+    /// at EOF, write max of one newline
+    fn write_end_spacing(writer: &mut Writer<&mut dyn Write>, spacing: Spacing) -> Result<()> {
+        if spacing != Spacing::Inline {
+            writer.write_event(EventKind::Text("\n".into()))?;
         }
-        content
+        Ok(())
+    }
+
+    // Insert canonical structural whitespace before the next XML event.
+    // Text under `tspan` is content-bearing, so formatter whitespace must not be injected there.
+    fn write_spacing(
+        writer: &mut Writer<&mut dyn Write>,
+        spacing: Spacing,
+        depth: usize,
+        event: &EventKind,
+        parent_name: Option<&str>,
+    ) -> Result<()> {
+        if matches!(parent_name, Some("tspan")) || matches!(spacing, Spacing::Inline) {
+            return Ok(());
+        }
+
+        let indent_depth = match event {
+            EventKind::End(_) => depth.saturating_sub(1),
+            _ => depth,
+        };
+        let newline_count = match spacing {
+            Spacing::Inline => 0,
+            Spacing::LineBreak => 1,
+            Spacing::BlankLine => 2,
+        };
+
+        let mut content = "\n".repeat(newline_count);
+        content.push_str(&"  ".repeat(indent_depth));
+        writer.write_event(EventKind::Text(content))?;
+        Ok(())
     }
 }
 

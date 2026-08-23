@@ -6,10 +6,10 @@
   </defs>
   <style>
     <![CDATA[
-      line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
-      marker path { fill: inherit; }
-      line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
-    ]]>
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    marker path { fill: inherit; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+  ]]>
   </style>
   <style>
     <![CDATA[
@@ -18,29 +18,11 @@
         #charles { stroke: red; }
     ]]>
   </style>
-    <path id="alice" d="M 0 26.667 h 20
-    M 10 20 v 20
-    M 0 60 l 10 -20 10 20
-    M 10 0
-    A 10 10 0 1 0 10 20
-    A 10 10 0 1 0 10 0
-    " class="person"/>
-    <path id="bob" d="M 0 26.667 h 20
-    M 10 20 v 20
-    M 0 60 l 10 -20 10 20
-    M 10 0
-    A 10 10 0 1 0 10 20
-    A 10 10 0 1 0 10 0
-    " transform="translate(150, 0)" class="person"/>
-    <path id="charles" d="M 0 26.667 h 20
-    M 10 20 v 20
-    M 0 60 l 10 -20 10 20
-    M 10 0
-    A 10 10 0 1 0 10 20
-    A 10 10 0 1 0 10 0
-    " transform="translate(75, 50)" class="person"/>
+  <path id="alice" d="M 0 26.667 h 20 M 10 20 v 20 M 0 60 l 10 -20 10 20 M 10 0 A 10 10 0 1 0 10 20 A 10 10 0 1 0 10 0" class="person"/>
+  <path id="bob" d="M 0 26.667 h 20 M 10 20 v 20 M 0 60 l 10 -20 10 20 M 10 0 A 10 10 0 1 0 10 20 A 10 10 0 1 0 10 0" transform="translate(150, 0)" class="person"/>
+  <path id="charles" d="M 0 26.667 h 20 M 10 20 v 20 M 0 60 l 10 -20 10 20 M 10 0 A 10 10 0 1 0 10 20 A 10 10 0 1 0 10 0" transform="translate(75, 50)" class="person"/>
 
-    <line x1="10" y1="30" x2="160" y2="30" class="d-arrow"/>
-    <line x1="85" y1="80" x2="10" y2="30" class="d-arrow"/>
-    <line x1="160" y1="30" x2="85" y2="80" class="d-arrow"/>
+  <line x1="10" y1="30" x2="160" y2="30" class="d-arrow"/>
+  <line x1="85" y1="80" x2="10" y2="30" class="d-arrow"/>
+  <line x1="160" y1="30" x2="85" y2="80" class="d-arrow"/>
 </svg>

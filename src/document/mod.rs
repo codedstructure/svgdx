@@ -4,7 +4,7 @@ mod style;
 pub mod tag;
 mod xml;
 
-pub use events::{EventKind, InputEvent, InputList, OutputList};
+pub use events::{EventKind, InputEvent, InputList, OutputList, Spacing};
 use events::{EventMeta, RawElement};
 pub use library::{Library, parse_library};
 pub use style::EventStyleWrapper;

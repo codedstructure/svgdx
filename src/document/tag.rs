@@ -1,4 +1,4 @@
-use super::{EventKind, InputEvent, InputList, RawElement};
+use super::{EventKind, InputEvent, InputList, RawElement, Spacing};
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
@@ -6,21 +6,43 @@ use crate::types::OrderIndex;
 #[derive(Debug, Clone)]
 pub enum Tag {
     /// Represents a Start..End block and all events in between
-    Compound(SvgElement, Option<String>), // element, tail
+    Compound(SvgElement, Spacing), // element, leading spacing
     /// Represents a single Empty element
-    Leaf(SvgElement, Option<String>), // element, tail
-    Comment(OrderIndex, String, Option<String>), // comment, tail
-    Text(OrderIndex, String),
-    CData(OrderIndex, String),
+    Leaf(SvgElement, Spacing), // element, leading spacing
+    /// Comment tags need the source line and ordering information because they don't
+    /// have a backing `SvgElement`, but still participate in same/next-line spacing.
+    Comment(OrderIndex, usize, String, Spacing), // comment, line number, leading spacing
+    /// Tag::Spacing only occurs when a sliced event list ends with whitespace after
+    /// its last real tag. We keep it as a tag so containers can still emit that
+    /// spacing before a later outer closing tag such as `</g>` or `</defs>`.
+    Spacing(OrderIndex, Spacing),
 }
 
 impl Tag {
-    fn set_text(&mut self, text: String) {
+    fn set_spacing(&mut self, spacing: Spacing) {
         match self {
-            Tag::Compound(_, tail) => *tail = Some(text),
-            Tag::Leaf(_, tail) => *tail = Some(text),
-            Tag::Comment(_, _, tail) => *tail = Some(text),
-            _ => {}
+            Tag::Compound(_, lead) => lead.merge(spacing),
+            Tag::Leaf(_, lead) => lead.merge(spacing),
+            Tag::Comment(_, _, _, lead) => lead.merge(spacing),
+            Tag::Spacing(_, current) => current.merge(spacing),
+        }
+    }
+
+    pub fn spacing(&self) -> &Spacing {
+        match self {
+            Tag::Compound(_, lead) => lead,
+            Tag::Leaf(_, lead) => lead,
+            Tag::Comment(_, _, _, lead) => lead,
+            Tag::Spacing(_, current) => current,
+        }
+    }
+
+    pub fn src_line(&self) -> usize {
+        match self {
+            Tag::Compound(el, _) => el.src_line,
+            Tag::Leaf(el, _) => el.src_line,
+            Tag::Comment(_, line, _, _) => *line,
+            Tag::Spacing(_, _) => 0,
         }
     }
 
@@ -28,9 +50,8 @@ impl Tag {
         match self {
             Tag::Compound(el, _) => el.order_index.clone(),
             Tag::Leaf(el, _) => el.order_index.clone(),
-            Tag::Comment(oi, _, _) => oi.clone(),
-            Tag::Text(oi, _) => oi.clone(),
-            Tag::CData(oi, _) => oi.clone(),
+            Tag::Comment(oi, _, _, _) => oi.clone(),
+            Tag::Spacing(oi, _) => oi.clone(),
         }
     }
 
@@ -47,6 +68,8 @@ impl Tag {
 pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
     let mut tags = Vec::new();
     let mut ev_idx = 0;
+    let mut pending_spacing = Spacing::default();
+    let mut pending_spacing_order = None;
 
     // we use indexed iteration as we need to skip ahead in some cases
     while ev_idx < events.len() {
@@ -74,7 +97,7 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                         }
                     }
                 } // TODO: else warning message
-                tags.push(Tag::Compound(event_element, None));
+                tags.push(Tag::Compound(event_element, pending_spacing.take()));
             }
             EventKind::Empty(_) => {
                 let mut event_element = SvgElement::try_from(input_ev.clone()).map_err(|_| {
@@ -84,27 +107,20 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
                     ))
                 })?;
                 event_element.set_event_range((input_ev.meta.index, input_ev.meta.index));
-                tags.push(Tag::Leaf(event_element, None));
+                tags.push(Tag::Leaf(event_element, pending_spacing.take()));
             }
             EventKind::Comment(content) => {
                 tags.push(Tag::Comment(
                     input_ev.meta.order.clone(),
+                    input_ev.meta.line,
                     content.clone(),
-                    None,
+                    pending_spacing.take(),
                 ));
             }
-            EventKind::Text(content) => {
-                if let Some(t) = tags.last_mut() {
-                    t.set_text(content.clone())
-                } else {
-                    tags.push(Tag::Text(input_ev.meta.order.clone(), content.clone()));
-                }
-            }
-            EventKind::CData(content) => {
-                if let Some(t) = tags.last_mut() {
-                    t.set_text(content.clone())
-                } else {
-                    tags.push(Tag::CData(input_ev.meta.order.clone(), content.clone()));
+            EventKind::Text(content) | EventKind::CData(content) => {
+                if let Some(spacing) = Spacing::from_text(content) {
+                    pending_spacing.merge(spacing);
+                    pending_spacing_order = Some(input_ev.meta.order.clone());
                 }
             }
             _ => {
@@ -113,6 +129,25 @@ pub fn tagify_events(events: InputList) -> Result<Vec<Tag>> {
             }
         }
     }
+
+    // Update tag spacing based on whether tags are from the same line or not
+    // Skips first tag because needs a previous line to compare.
+    for idx in 1..tags.len() {
+        let prev_line = tags[idx - 1].src_line();
+        let cur_line = tags[idx].src_line();
+        if prev_line == cur_line {
+            tags[idx].set_spacing(Spacing::Inline);
+        } else if prev_line < cur_line {
+            tags[idx].set_spacing(Spacing::LineBreak);
+        }
+    }
+
+    if let Some(order) = pending_spacing_order
+        && !pending_spacing.is_empty()
+    {
+        tags.push(Tag::Spacing(order, pending_spacing));
+    }
+
     Ok(tags)
 }
 

@@ -151,6 +151,33 @@ fn test_style_shadow() {
 }
 
 #[test]
+fn test_style_defs_canonical_indent() {
+    let input = r#"<svg>
+<line xy1="0" xy2="10" class="d-arrow"/>
+<rect wh="10" class="d-softshadow"/>
+</svg>"#;
+    let output = transform_str_default(input).unwrap();
+
+    let marker_block = r#"
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
+    </marker>
+"#;
+    assert_contains!(output, marker_block);
+
+    let filter_block = r#"
+    <filter id="d-softshadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="0.7"/>
+      <feOffset dx="1" dy="1"/>
+      <feComposite in2="SourceGraphic" operator="arithmetic" k1="0" k2="0.4" k3="1" k4="0"/>
+    </filter>
+  </defs>
+"#;
+    assert_contains!(output, filter_block);
+}
+
+#[test]
 fn test_style_flow() {
     let input = r#"<svg><line xy1="0" xy2="0 10"/></svg>"#;
     let output = transform_str_default(input).unwrap();

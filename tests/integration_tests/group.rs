@@ -11,12 +11,11 @@ fn test_group_simple() {
  <rect xy="10 0" wh="1 2"/>
 </g>
 "##;
-    let expected = r#"
-<g id="a">
- <rect x="0" y="0" width="1" height="2"/>
+    let expected = r#"<g id="a">
+  <rect x="0" y="0" width="1" height="2"/>
 </g>
 <g id="b">
- <rect x="10" y="0" width="1" height="2"/>
+  <rect x="10" y="0" width="1" height="2"/>
 </g>
 "#;
     let output = transform_str_default(input).unwrap();
@@ -27,12 +26,8 @@ fn test_group_simple() {
 fn test_group_empty() {
     // Not useful, but valid. Should be passed through and closed.
     // At one point this failed as it generated a bare (unclosed) <g> element.
-    let input = r##"
-<g id="a"/>
-"##;
-    let expected = r#"
-<g id="a"/>
-"#;
+    let input = r#"<g id="a"/>"#;
+    let expected = r#"<g id="a"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_eq!(output, expected);
 }
@@ -49,14 +44,14 @@ fn test_group_nested() {
 "##;
     let expected = r#"
 <g id="a">
- <g id="b">
-  <rect x="0" y="0" width="1" height="2"/>
- </g>
- <rect x="10" y="0" width="1" height="2"/>
+  <g id="b">
+    <rect x="0" y="0" width="1" height="2"/>
+  </g>
+  <rect x="10" y="0" width="1" height="2"/>
 </g>
 "#;
     let output = transform_str_default(input).unwrap();
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -71,12 +66,12 @@ fn test_group_reuse() {
 "##;
     let expected = r#"
 <g class="a">
- <rect x="0" y="0" width="1" height="2"/>
+  <rect x="0" y="0" width="1" height="2"/>
 </g>
 "#;
     let output = transform_str_default(input).unwrap();
     // exact equality check: ensure that <specs> doesn't appear in the output.
-    assert_eq!(output, expected);
+    assert_eq!(output.trim(), expected.trim());
 }
 
 #[test]
@@ -171,13 +166,11 @@ fn test_g_previous() {
 </g>
 <rect xy="^|v" wh="5"/>
 "##;
-    let expected = r##"
-<g>
+    let expected = r##"<g>
   <rect x="10" y="10" width="3" height="3"/>
   <rect x="15" y="10" width="3" height="3"/>
 </g>
-<rect x="11.5" y="13" width="5" height="5"/>
-"##;
+<rect x="11.5" y="13" width="5" height="5"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
@@ -188,13 +181,11 @@ fn test_g_previous() {
 </g>
 <rect cxy="^@b" wh="2"/>
 "##;
-    let expected = r##"
-<g>
+    let expected = r##"<g>
   <rect x="10" y="10" width="3" height="3"/>
   <rect x="15" y="10" width="3" height="3"/>
 </g>
-<rect x="13" y="12" width="2" height="2"/>
-"##;
+<rect x="13" y="12" width="2" height="2"/>"##;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }

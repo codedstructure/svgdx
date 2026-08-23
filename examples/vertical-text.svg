@@ -1,59 +1,59 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="95mm" height="95mm" viewBox="-5 -5 95 95">
   <style>
     <![CDATA[
-      rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
-      text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
-      text { stroke-linejoin: round; paint-order: stroke; }
-      text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
-      text.d-text-top-vertical, tspan.d-text-top-vertical { text-anchor: start; }
-      text.d-text-left-vertical, tspan.d-text-left-vertical { dominant-baseline: text-after-edge; }
-      text.d-text-small, tspan.d-text-small { font-size: 2px; }
-      tspan { dominant-baseline: inherit; }
-      text.d-text-medium, tspan.d-text-medium { font-size: 3px; }
-      text.d-text-right-vertical, tspan.d-text-right-vertical { dominant-baseline: text-before-edge; }
-      text.d-text-large, tspan.d-text-large { font-size: 4.5px; }
-      text.d-text-bottom-vertical, tspan.d-text-bottom-vertical { text-anchor: end; }
-    ]]>
+    rect, circle, ellipse, polygon { stroke-width: 0.5; fill: white; stroke: black; }
+    text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
+    text { stroke-linejoin: round; paint-order: stroke; }
+    text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-top-vertical, tspan.d-text-top-vertical { text-anchor: start; }
+    text.d-text-left-vertical, tspan.d-text-left-vertical { dominant-baseline: text-after-edge; }
+    text.d-text-small, tspan.d-text-small { font-size: 2px; }
+    tspan { dominant-baseline: inherit; }
+    text.d-text-medium, tspan.d-text-medium { font-size: 3px; }
+    text.d-text-right-vertical, tspan.d-text-right-vertical { dominant-baseline: text-before-edge; }
+    text.d-text-large, tspan.d-text-large { font-size: 4.5px; }
+    text.d-text-bottom-vertical, tspan.d-text-bottom-vertical { text-anchor: end; }
+  ]]>
   </style>
   <!-- top row -->
   <rect id="top" x="0" y="0" width="25" height="25"/>
   <text x="1" y="1" writing-mode="tb" class="d-text d-text-top-vertical d-text-left-vertical d-text-vertical d-text-small">
-  <tspan y="1" dx="0em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+    <tspan y="1" dx="0em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="0" width="25" height="25"/>
   <text x="42.5" y="1" writing-mode="tb" class="d-text d-text-top-vertical d-text-vertical d-text-medium">
-  <tspan y="1" dx="-1.05em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+    <tspan y="1" dx="-1.05em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="0" width="25" height="25"/>
   <text x="84" y="1" writing-mode="tb" class="d-text d-text-top-vertical d-text-right-vertical d-text-vertical d-text-large">
-  <tspan y="1" dx="-2.1em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
+    <tspan y="1" dx="-2.1em">vertical</tspan><tspan y="1" dx="1.05em">line</tspan><tspan y="1" dx="1.05em">Multi</tspan>
   </text>
 
   <!-- middle row -->
   <rect id="middle" x="0" y="30" width="25" height="25"/>
   <text x="1" y="42.5" writing-mode="tb" class="d-text d-text-left-vertical d-text-vertical d-text-small">
-  <tspan y="42.5" dx="0em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+    <tspan y="42.5" dx="0em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="30" width="25" height="25"/>
   <text x="42.5" y="42.5" writing-mode="tb" class="d-text d-text-vertical d-text-medium">
-  <tspan y="42.5" dx="-1.05em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+    <tspan y="42.5" dx="-1.05em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="30" width="25" height="25"/>
   <text x="84" y="42.5" writing-mode="tb" class="d-text d-text-right-vertical d-text-vertical d-text-large">
-  <tspan y="42.5" dx="-2.1em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
+    <tspan y="42.5" dx="-2.1em">vertical</tspan><tspan y="42.5" dx="1.05em">line</tspan><tspan y="42.5" dx="1.05em">Multi</tspan>
   </text>
 
   <!-- bottom row -->
   <rect x="0" y="60" width="25" height="25"/>
   <text x="1" y="84" writing-mode="tb" class="d-text d-text-bottom-vertical d-text-left-vertical d-text-vertical d-text-small">
-  <tspan y="84" dx="0em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+    <tspan y="84" dx="0em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
   <rect x="30" y="60" width="25" height="25"/>
   <text x="42.5" y="84" writing-mode="tb" class="d-text d-text-bottom-vertical d-text-vertical d-text-medium">
-  <tspan y="84" dx="-1.05em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+    <tspan y="84" dx="-1.05em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
   <rect x="60" y="60" width="25" height="25"/>
   <text x="84" y="84" writing-mode="tb" class="d-text d-text-bottom-vertical d-text-right-vertical d-text-vertical d-text-large">
-  <tspan y="84" dx="-2.1em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
+    <tspan y="84" dx="-2.1em">vertical</tspan><tspan y="84" dx="1.05em">line</tspan><tspan y="84" dx="1.05em">Multi</tspan>
   </text>
 </svg>

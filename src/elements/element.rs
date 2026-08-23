@@ -1,11 +1,12 @@
+use super::path::{points_to_path, process_path_bearing, process_path_repeat};
+use super::preprocess::preprocess_dpoints;
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
     LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
     VarElement, is_connector, process_text_attr,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
-use crate::document::{EventKind, InputList, OutputList};
-use crate::elements::path::{points_to_path, process_path_bearing, process_path_repeat};
+use crate::document::{EventKind, InputList, OutputList, Spacing};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
@@ -475,7 +476,7 @@ impl SvgElement {
                     .replace('"', "`")
                     .replace(['<', '>'], ""),
             ));
-            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(Spacing::LineBreak);
         }
 
         // Standard comment: expressions & variables are evaluated.
@@ -483,13 +484,13 @@ impl SvgElement {
             // Expressions in comments are evaluated
             let value = eval_attr(comment, ctx)?;
             events.push(EventKind::Comment(format!(" {value} ")));
-            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(Spacing::LineBreak);
         }
 
         // 'Raw' comment: no evaluation of expressions occurs here
         if let Some(comment) = self.get_attr("__") {
             events.push(EventKind::Comment(format!(" {comment} ")));
-            events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+            events.push(Spacing::LineBreak);
         }
 
         // Some elements don't generate text themselves, but can have
@@ -504,7 +505,9 @@ impl SvgElement {
                 // We only care about the original element if it wasn't a text element
                 // (otherwise we generate a useless empty text element for the original)
                 events.push(EventKind::Empty(orig_elem.into()));
-                events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+                if !text_elements.is_empty() {
+                    events.push(Spacing::LineBreak);
+                }
             }
             match text_elements.as_slice() {
                 [] => {}
@@ -523,7 +526,7 @@ impl SvgElement {
                     // Multiple text spans
                     let text_elem = &text_elements[0];
                     events.push(EventKind::Start(text_elem.clone().into()));
-                    events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(Spacing::LineBreak);
                     for elem in &text_elements[1..] {
                         // Note: we can't insert a newline/last_indent here as whitespace
                         // following a tspan is compressed to a single space and causes
@@ -538,7 +541,7 @@ impl SvgElement {
                         }
                         events.push(EventKind::End("tspan".to_string()));
                     }
-                    events.push(EventKind::Text(format!("\n{}", " ".repeat(self.indent))));
+                    events.push(Spacing::LineBreak);
                     events.push(EventKind::End("text".to_string()));
                 }
             }
@@ -584,7 +587,10 @@ impl SvgElement {
         if self.name == "path"
             && let Some(d) = self.get_attr("d")
         {
-            let mut d = d.to_string();
+            // expressions (must) have already been expanded before `transmute()`
+            // runs, so `//` can be treated as a dpoints comment without conflicting
+            // with integer division operator.
+            let mut d = preprocess_dpoints(d);
             if d.chars().any(|c| c == 'r' || c == 'R') {
                 d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
             }
@@ -602,6 +608,10 @@ impl SvgElement {
             } else {
                 return Ok(false);
             }
+        }
+
+        if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
+            self.set_attr("points", &preprocess_dpoints(points));
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {

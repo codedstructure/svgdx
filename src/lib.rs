@@ -108,7 +108,7 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
             Box::new(stdin) as Box<dyn BufRead>
         }
     } else {
-        Box::new(BufReader::new(File::open(input).map_err(Error::Io)?)) as Box<dyn BufRead>
+        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
     };
 
     if output == "-" {
@@ -116,10 +116,10 @@ pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Resul
     } else {
         let temp_output = output_temp_path(output);
         let transform_result = (|| -> Result<()> {
-            let mut out_temp = File::create(&temp_output).map_err(Error::Io)?;
+            let mut out_temp = File::create(&temp_output)?;
             transform_stream(&mut in_reader, &mut out_temp, cfg)?;
-            out_temp.flush().map_err(Error::Io)?;
-            std::fs::rename(&temp_output, output).map_err(Error::Io)?;
+            out_temp.flush()?;
+            std::fs::rename(&temp_output, output)?;
             Ok(())
         })();
 
