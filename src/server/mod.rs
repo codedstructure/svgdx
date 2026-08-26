@@ -13,7 +13,7 @@ use serde_derive::Deserialize;
 use tokio::sync::mpsc::{Sender, channel};
 
 use crate::errors::Error;
-use crate::json_api::{TransformResponse, transform_json_impl};
+use crate::json::{TransformResponse, transform_json_impl};
 use crate::{TransformConfig, VERSION, transform_str};
 
 mod args;
