@@ -21,7 +21,8 @@ pub fn preprocess_dpoints(data: &str) -> String {
             continue;
         }
 
-        if ch.is_ascii_whitespace() {
+        // compact whitespace (potentially including NBSP etc) to single space
+        if ch.is_whitespace() {
             if !prev_was_space && !output.is_empty() {
                 output.push(' ');
                 prev_was_space = true;
