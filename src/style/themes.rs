@@ -6,7 +6,7 @@ use crate::context::TransformerContext;
 use crate::errors::{Error, Result};
 
 /// Auto-style themes for svgdx.
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub enum ThemeType {
     /// The default theme, suitable for line diagrams.
     #[default]

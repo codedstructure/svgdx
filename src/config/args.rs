@@ -10,7 +10,7 @@ use crate::constants::{
     DEFAULT_SCALE, DEFAULT_VAR_LIMIT,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TransformArgs {
     pub debug: bool,
     pub scale: f32,
@@ -171,6 +171,14 @@ impl TransformArgs {
     }
 }
 
+pub fn parse_kv_arg(arg: &str) -> (String, Option<String>) {
+    // Support --flag=value style by splitting on the first '='
+    match arg.split_once('=') {
+        Some((k, v)) if k.starts_with('-') => (k.to_string(), Some(v.to_string())),
+        _ => (arg.to_string(), None),
+    }
+}
+
 pub fn take_value(
     flag: &str,
     embedded: Option<String>,
@@ -194,7 +202,7 @@ where
     v.parse().map_err(|e| Error::Cli(format!("'{flag}': {e}")))
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VarSpec {
     pub key: VarName,
     pub value: String,
@@ -214,5 +222,70 @@ impl FromStr for VarSpec {
             key,
             value: value.to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_var_spec_parse() {
+        let s = "THING=ONE";
+        let var_spec: VarSpec = s.parse().unwrap();
+        assert_eq!(var_spec.key.to_string(), "THING");
+        assert_eq!(var_spec.value, "ONE");
+
+        let s = "THINGONE";
+        let result: Result<VarSpec> = s.parse();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_arg_parse() {
+        for (args, expected) in &[
+            (
+                "--debug --theme fine --add-metadata",
+                TransformArgs {
+                    debug: true,
+                    theme: ThemeType::Fine,
+                    add_metadata: true,
+                    ..Default::default()
+                },
+            ),
+            (
+                "--depth-limit=10 --var-limit 100",
+                TransformArgs {
+                    depth_limit: 10,
+                    var_limit: 100,
+                    ..Default::default()
+                },
+            ),
+            (
+                "-D thing=one -D other=two",
+                TransformArgs {
+                    vars: vec![
+                        VarSpec {
+                            key: "thing".parse().unwrap(),
+                            value: "one".to_string(),
+                        },
+                        VarSpec {
+                            key: "other".parse().unwrap(),
+                            value: "two".to_string(),
+                        },
+                    ],
+                    ..Default::default()
+                },
+            ),
+        ] {
+            let mut args = args.split_whitespace().map(String::from);
+            let mut ta = TransformArgs::default();
+            while let Some(arg) = args.next() {
+                let (key, embedded) = parse_kv_arg(&arg);
+                ta.handle_arg(&key, embedded, &mut args).unwrap();
+            }
+
+            assert_eq!(ta, *expected);
+        }
     }
 }

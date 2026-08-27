@@ -352,4 +352,30 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn test_element_points_to_path() {
+        let el = SvgElement::new(
+            "polyline",
+            &[
+                ("points".into(), "0,0,5,0,5,5".into()),
+                ("corner-radius".into(), "0.".into()),
+            ],
+        );
+        let path = points_to_path(&el).unwrap();
+        assert_eq!(path.get_attr("d").unwrap(), "M 0 0 L 5 0 L 5 5".to_string(),);
+
+        let el = SvgElement::new(
+            "polyline",
+            &[
+                ("points".into(), "0,0,5,0,5,5".into()),
+                ("corner-radius".into(), "0.5".into()),
+            ],
+        );
+        let path = points_to_path(&el).unwrap();
+        assert_eq!(
+            path.get_attr("d").unwrap(),
+            "M 0 0 L 4.5 0 a 0.5 0.5 0 0 1 0.5 0.5 L 5 5".to_string(),
+        );
+    }
 }

@@ -159,6 +159,7 @@ mod tests {
     #[test]
     fn test_ordered_mapping() {
         let mut map = InsertOrderMap::new();
+        assert!(map.is_empty());
         map.insert("a", 1);
         map.insert("b", 2);
         map.insert("c", 3);
@@ -177,5 +178,21 @@ mod tests {
 
         let items: Vec<_> = map.iter().collect();
         assert_eq!(items, vec![(&"a", &1), (&"c", &3),]);
+
+        map.clear();
+        assert!(map.is_empty());
+        assert_eq!(map.len(), 0);
+        assert_eq!(map.get_or_insert_with("a", || 1), &1);
+
+        if let Some(v) = map.get_mut(&"a") {
+            *v += 1;
+        };
+        assert_eq!(map.get(&"a"), Some(&2));
+
+        let other: InsertOrderMap<_, _> = vec![("a", 1), ("z", 26)].into_iter().collect();
+        map.extend(&other);
+
+        let v = map.to_vec();
+        assert_eq!(v, vec![("a", 1), ("z", 26)]);
     }
 }

@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use crate::config::{TransformArgs, common_usage, parse_value, take_value};
+use crate::config::{TransformArgs, common_usage, parse_kv_arg, parse_value, take_value};
 use crate::{Error, Result};
 
 pub const DEFAULT_ADDRESS: &str = "127.0.0.1";
@@ -75,10 +75,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
     let mut parsed = Args::default();
 
     while let Some(arg) = args.next() {
-        let (key, embedded) = match arg.split_once('=') {
-            Some((k, v)) if k.starts_with('-') => (k.to_string(), Some(v.to_string())),
-            _ => (arg, None),
-        };
+        let (key, embedded) = parse_kv_arg(&arg);
 
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),

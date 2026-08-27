@@ -1,4 +1,4 @@
-use crate::config::{TransformArgs, common_usage, take_value};
+use crate::config::{TransformArgs, common_usage, parse_kv_arg, take_value};
 use crate::errors::{Error, Result};
 use std::io::IsTerminal;
 
@@ -57,26 +57,18 @@ pub enum CliAction {
 }
 
 pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
-    let mut args = args.into_iter().peekable();
+    let mut args = args.into_iter();
     let _ = args.next(); // skip argv[0]
 
     let mut parsed = Args::default();
     let mut input_value = None;
 
     while let Some(arg) = args.next() {
-        // Support --flag=value style by splitting on the first '='
-        let (key, embedded): (String, Option<String>) = match arg.split_once('=') {
-            Some((k, v)) if k.starts_with('-') => (k.to_string(), Some(v.to_string())),
-            _ => (arg.clone(), None),
-        };
+        let (key, embedded) = parse_kv_arg(&arg);
 
         match key.as_str() {
-            "-h" | "--help" => {
-                return Ok(CliAction::Help);
-            }
-            "-V" | "--version" => {
-                return Ok(CliAction::Version);
-            }
+            "-h" | "--help" => return Ok(CliAction::Help),
+            "-V" | "--version" => return Ok(CliAction::Version),
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;
             }

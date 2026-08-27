@@ -957,3 +957,49 @@ fn test_string_escape() {
         );
     }
 }
+
+#[test]
+fn test_geometry_functions() {
+    let ctx = TestContext::new();
+    for (expr, expected) in [
+        ("{{x1(12, 3, 25, 6)}}", "12"),
+        ("{{y1(12, 3, 25, 6)}}", "3"),
+        ("{{x2(12, 3, 25, 6)}}", "25"),
+        ("{{y2(12, 3, 25, 6)}}", "6"),
+        ("{{xy(12, 3, 25, 6)}}", "12, 3"),
+        ("{{cx(12, 3, 25, 6)}}", "18.5"),
+        ("{{cy(12, 3, 25, 6)}}", "4.5"),
+        ("{{width(12, 3, 25, 6)}}", "13"),
+        ("{{height(12, 3, 25, 6)}}", "3"),
+        ("{{size(12, 3, 25, 6)}}", "13, 3"),
+        ("{{loc('tr', 12, 3, 25, 6)}}", "25, 3"),
+        ("{{loc('b', 12, 3, 25, 6)}}", "18.5, 6"),
+    ] {
+        assert_eq!(
+            eval_attr(expr, &ctx).unwrap(),
+            expected,
+            "'{expr}' != '{expected}'"
+        );
+    }
+}
+
+#[test]
+fn test_geometry_combination_functions() {
+    let ctx = TestContext::new();
+    for (expr, expected) in [
+        ("{{mid(12, 25)}}", "18.5"),
+        ("{{mid(12, 3, 25, 6)}}", "18.5, 4.5"),
+        ("{{mid(12, 3, 25, 6,  30, 45, 40, 60)}}", "26, 31.5"),
+        (
+            "{{surround(12, 3, 25, 6,  20, 45, 40, 60)}}",
+            "12, 3, 40, 60",
+        ),
+        ("{{inside(12, 3, 25, 6,  20, 45, 4, 60)}}", "12, 6, 20, 45"),
+    ] {
+        assert_eq!(
+            eval_attr(expr, &ctx).unwrap(),
+            expected,
+            "'{expr}' != '{expected}'"
+        );
+    }
+}

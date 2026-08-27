@@ -3,7 +3,7 @@ mod args;
 #[cfg(feature = "server")]
 pub use args::parse_value;
 #[cfg(any(feature = "cli", feature = "server"))]
-pub use args::{TransformArgs, common_usage, take_value};
+pub use args::{TransformArgs, common_usage, parse_kv_arg, take_value};
 
 use crate::document::parse_library;
 use crate::errors::{Error, Result};

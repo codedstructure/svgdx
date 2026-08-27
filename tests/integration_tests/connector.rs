@@ -422,3 +422,28 @@ fn test_connector_overlapping_bboxes() {
     let output = transform_str_default(input).unwrap();
     assert!(!output.contains(r#"id="conn""#));
 }
+
+#[test]
+fn test_fixed_and_closest_target() {
+    // find closest locspec point on the target rectangle
+    let input = r#"<rect xy="20" wh="10"/><line start="40 5" end="^" />"#;
+    let expected_line = r#"<line x1="40" y1="5" x2="30" y2="20"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+    // reverse: fixed endpoint
+    let input = r#"<rect xy="20" wh="10"/><line start="^" end="40 5" />"#;
+    let expected_line = r#"<line x1="30" y1="20" x2="40" y2="5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+
+    // same but polyline, that only considers cardinal points (t/r/b/l)
+    let input = r#"<rect xy="20" wh="10"/><polyline start="40 5" end="^" />"#;
+    let expected_line = r#"<polyline points="40 5, 25 20"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+    // reverse: fixed endpoint
+    let input = r#"<rect xy="20" wh="10"/><polyline start="^" end="40 5" />"#;
+    let expected_line = r#"<polyline points="25 20, 40 5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
