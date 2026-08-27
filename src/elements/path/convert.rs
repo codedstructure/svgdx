@@ -11,7 +11,9 @@ pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
         // chunks_exact to ignore any unpaired final number
         (
             floats
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .map(|a| (a[0], a[1]))
                 .collect::<Vec<_>>(),
             strp(r)?,

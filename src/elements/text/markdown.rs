@@ -401,29 +401,27 @@ fn md_parse_set_delimiter_open_close(result: &[String], delimiters: &mut [Delimi
     // set could open/close
     for i in 0..delimiters.len() {
         // find which char was before and after it
-        let prev_char;
-        let next_char;
-        if i != 0 && delimiters[i - 1].ind == delimiters[i].ind {
-            prev_char = delimiters[i - 1].char_type.to_char();
+        let prev_char = if i != 0 && delimiters[i - 1].ind == delimiters[i].ind {
+            delimiters[i - 1].char_type.to_char()
         } else if delimiters[i].ind == 0 {
-            prev_char = ' ';
+            ' '
         } else {
-            prev_char = result[delimiters[i].ind - 1]
+            result[delimiters[i].ind - 1]
                 .chars()
                 .last()
-                .expect("no 0 len spans");
-        }
+                .expect("no 0 len spans")
+        };
 
-        if i != delimiters.len() - 1 && delimiters[i + 1].ind == delimiters[i].ind {
-            next_char = delimiters[i + 1].char_type.to_char();
+        let next_char = if i != delimiters.len() - 1 && delimiters[i + 1].ind == delimiters[i].ind {
+            delimiters[i + 1].char_type.to_char()
         } else if delimiters[i].ind == result.len() {
-            next_char = ' ';
+            ' '
         } else {
-            next_char = result[delimiters[i].ind]
+            result[delimiters[i].ind]
                 .chars()
                 .next()
-                .expect("no 0 len spans");
-        }
+                .expect("no 0 len spans")
+        };
 
         // if prev is whitespace can't end
         // if next is whitespace can't start

@@ -284,7 +284,7 @@ impl ExprValue {
             ));
         }
         let mut out = Vec::new();
-        for b in args.chunks_exact(4) {
+        for b in args.as_chunks::<4>().0 {
             out.push(BoundingBox::new(b[0], b[1], b[2], b[3]));
         }
         Ok(out)
