@@ -23,6 +23,19 @@ pub enum ThemeType {
     Dark,
 }
 
+impl ThemeType {
+    pub fn variants() -> Vec<String> {
+        vec![
+            ThemeType::Default.to_string(),
+            ThemeType::Bold.to_string(),
+            ThemeType::Fine.to_string(),
+            ThemeType::Glass.to_string(),
+            ThemeType::Light.to_string(),
+            ThemeType::Dark.to_string(),
+        ]
+    }
+}
+
 impl std::str::FromStr for ThemeType {
     type Err = Error;
 

@@ -304,7 +304,7 @@ impl Transformer {
         let mut registry = style::StyleRegistry::new(&theme);
         match self.context.config.auto_style_mode {
             AutoStyleMode::None => {}
-            AutoStyleMode::Inline => {
+            AutoStyleMode::Inline | AutoStyleMode::InlineHtml => {
                 let mut elements: Vec<_> = events
                     .iter_mut()
                     .filter_map(|output_ev| EventStyleWrapper::from_event(&mut output_ev.event))
@@ -312,7 +312,7 @@ impl Transformer {
                 let mut element_refs: Vec<_> = elements.iter_mut().collect();
                 registry.process_inline(&mut element_refs);
             }
-            AutoStyleMode::Css => {
+            AutoStyleMode::Css | AutoStyleMode::CssHtml => {
                 // TODO: use similar EventStyleWrapper approach here?
                 let elements: Vec<_> = events
                     .iter()
@@ -407,7 +407,11 @@ impl Transformer {
         defs_events
     }
 
-    fn autostyle_css_events(&self, auto_styles: Vec<String>) -> Result<OutputList> {
+    fn autostyle_css_events(
+        &self,
+        auto_styles: Vec<String>,
+        use_cdata: bool,
+    ) -> Result<OutputList> {
         if !auto_styles.is_empty() {
             let mut style_events = OutputList::new();
             style_events.push(Spacing::LineBreak);
@@ -419,10 +423,12 @@ impl Transformer {
                 ));
             }
             style_events.push(Spacing::LineBreak);
-            style_events.push(EventKind::CData(format!(
-                "\n{}\n  ",
-                indent_all(auto_styles, 4).join("\n")
-            )));
+            let css_str = indent_all(auto_styles, 4).join("\n");
+            if use_cdata {
+                style_events.push(EventKind::CData(format!("\n{css_str}\n  ")));
+            } else {
+                style_events.push(EventKind::Text(format!("\n{css_str}\n  ")));
+            }
             style_events.push(Spacing::LineBreak);
             style_events.push(EventKind::End("style".to_owned()));
             Ok(style_events)
@@ -479,7 +485,9 @@ impl Transformer {
             let (styles, defs) = self.build_auto_styles(&mut output_events);
             style_events.extend(self.library_defs_events());
             style_events.extend(self.autostyle_defs_events(defs)?);
-            style_events.extend(self.autostyle_css_events(styles)?);
+            style_events.extend(
+                self.autostyle_css_events(styles, self.context.config.auto_style_mode.use_cdata())?,
+            );
         }
 
         let (mut pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");

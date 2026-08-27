@@ -334,3 +334,34 @@ fn test_inline_style_reuse() {
     assert_contains!(line_c, "fill: red;");
     assert_not_contains!(line_c, "fill: blue;");
 }
+
+#[test]
+fn test_style_cdata_use() {
+    // d-arrow injects CSS for `marker path { fill: inherit; }` regardless
+    // of inline vs css; check CDATA presence is as expected, i.e. avoided
+    // for HTML modes.
+    let input = |f: &str| {
+        format!(
+            r#"
+<svg><config auto-style-mode="{f}"/>
+<line xy1="0" xy2="10" class="d-arrow"/>
+</svg>
+"#
+        )
+    };
+
+    for (auto_style_mode, exp_cdata) in [
+        ("inline", true),
+        ("inline-html", false),
+        ("css", true),
+        ("css-html", false),
+    ] {
+        let output = transform_str_default(input(auto_style_mode)).unwrap();
+        assert_contains!(output, r#"marker path {"#);
+        if exp_cdata {
+            assert_contains!(output, r#"CDATA"#);
+        } else {
+            assert_not_contains!(output, r#"CDATA"#);
+        }
+    }
+}

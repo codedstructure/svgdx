@@ -107,6 +107,16 @@ pub enum ErrorMode {
     Ignore,
 }
 
+impl ErrorMode {
+    pub fn variants() -> Vec<String> {
+        vec![
+            ErrorMode::Strict.to_string(),
+            ErrorMode::Warn.to_string(),
+            ErrorMode::Ignore.to_string(),
+        ]
+    }
+}
+
 impl std::str::FromStr for ErrorMode {
     type Err = Error;
 

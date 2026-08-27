@@ -94,13 +94,20 @@ impl TryFrom<TransformArgs> for TransformConfig {
 
 pub fn common_usage() -> String {
     let default_theme = ThemeType::default().to_string();
+    let themes_str = ThemeType::variants().join(", ");
+
     let default_error_mode = ErrorMode::default().to_string();
+    let error_modes_str = ErrorMode::variants().join(", ");
+
     let default_auto_style_mode = AutoStyleMode::default().to_string();
+    let auto_style_modes_str = AutoStyleMode::variants().join(", ");
+
     format!(
         r#"      --debug                   Add debug info (e.g. input source) to output
       --scale <SCALE>           User-units per mm for root SVG element [{DEFAULT_SCALE}]
       --border <BORDER>         Border width around image in user-units [{DEFAULT_BORDER}]
-      --auto-style-mode <MODE>  Auto-style mode: none, inline, css ['{default_auto_style_mode}']
+      --auto-style-mode <MODE>  Auto-style mode ['{default_auto_style_mode}']
+                                ({auto_style_modes_str})
       --background <COLOUR>     Default background colour ['{DEFAULT_BACKGROUND}']
       --seed <SEED>             Seed for RNG functions [{DEFAULT_RNG_SEED}]
       --add-metadata            Include metadata in output
@@ -111,8 +118,10 @@ pub fn common_usage() -> String {
       --font-size <SIZE>        Default font-size in user-units [{DEFAULT_FONT_SIZE}]
       --font-family <FAMILY>    Default font-family for text ['{DEFAULT_FONT_FAMILY}']
       --theme <THEME>           Select theme to apply ['{default_theme}']
+                                ({themes_str})
       --svg-style <STYLE>       Optional style to apply to SVG root element
-      --error-mode <MODE>       Error handling: strict, warn, ignore ['{default_error_mode}']
+      --error-mode <MODE>       Error handling mode ['{default_error_mode}']
+                                ({error_modes_str})
   -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
       --include <FILE>          Include library file (may be repeated)"#
     )

@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Note that '//' inside expressions is still the integer division operator -
   expressions are evaluated prior to the reformatting / comment handling.
 
+- Added: new `inline-html` and `css-html` auto-style modes to avoid wrapping
+  CSS styles in 'CDATA' blocks, improving compatibility when embedded in HTML.
+
 - Added: support for including library files; elements in `<defs>` and `<specs>`
   blocks within library files are available to svgdx input documents.
 
