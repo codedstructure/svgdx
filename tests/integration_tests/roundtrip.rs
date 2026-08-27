@@ -1,4 +1,4 @@
-use assertables::{assert_contains, assert_not_contains};
+use assertables::assert_contains;
 use svgdx::{TransformConfig, transform_str, transform_str_default};
 
 #[test]
@@ -135,8 +135,8 @@ fn test_roundtrip_svg_percent() {
 
 #[test]
 fn test_roundtrip_style() {
-    // tests the partial-escaping used in text events;
-    // quotes should not be escaped, but > should be.
+    // tests the minimal-escaping used in text events;
+    // neither quotes nor '>' should be escaped.
     // CSS styles are just one use of this.
     let inner = r##"<style>
     text { font-family: "Times New Roman", serif; font-size: 12px; }
@@ -152,10 +152,8 @@ fn test_roundtrip_style() {
     );
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, inner);
-    assert_not_contains!(output, "&gt;");
 
-    // if using '>' in CSS, it will be escaped - should really
-    // use CDATA for this.
+    // '>' combinator is not escaped.
     let inner = r##"<style>
     text { font-family: "Times New Roman", serif; font-size: 12px; }
     text > tspan { fill: #0000ff; }
@@ -169,14 +167,14 @@ fn test_roundtrip_style() {
 "##
     );
     let output = transform_str_default(input).unwrap();
-    assert_not_contains!(output, inner);
-    assert_contains!(output, "text &gt; tspan");
+    assert_contains!(output, inner);
 
-    // check CDATA does preserve the '>'
+    // CDATA is essential if using '<' in CSS
     let inner = r##"<style>
     <![CDATA[
     text { font-family: "Times New Roman", serif; font-size: 12px; }
     text > tspan { fill: #0000ff; }
+    [data-x<10] { color: red; }
     .red { fill: #ff0000; }
     ]]>
   </style>"##;

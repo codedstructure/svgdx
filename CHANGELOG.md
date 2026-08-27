@@ -17,6 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Note that '//' inside expressions is still the integer division operator -
   expressions are evaluated prior to the reformatting / comment handling.
 
+- Changed: switch from 'partial_escape' ('<', '>', '&') to 'minimal_esacpe'
+  ('<', '&' only) when writing text nodes. This allows CSS containing the '>'
+  combinator outside a CDATA block.
+
 - Added: new `inline-html` and `css-html` auto-style modes to avoid wrapping
   CSS styles in 'CDATA' blocks, improving compatibility when embedded in HTML.
 

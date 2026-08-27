@@ -4,7 +4,7 @@ use super::{EventKind, EventMeta, InputEvent, InputList, OutputList, RawElement,
 use crate::errors::{Error, Result};
 use crate::types::OrderIndex;
 
-use quick_xml::escape::{partial_escape, unescape};
+use quick_xml::escape::{minimal_escape, unescape};
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event as XmlEvent};
 use quick_xml::{Reader, Writer};
@@ -53,7 +53,7 @@ impl<'a> From<EventKind> for XmlEvent<'a> {
             EventKind::Start(e) => XmlEvent::Start(e.into()),
             EventKind::Comment(content) => XmlEvent::Comment(BytesText::from_escaped(content)),
             EventKind::Text(content) => {
-                XmlEvent::Text(BytesText::from_escaped(partial_escape(content)))
+                XmlEvent::Text(BytesText::from_escaped(minimal_escape(content)))
             }
             EventKind::CData(content) => XmlEvent::CData(BytesCData::new(content)),
             EventKind::End(name) => XmlEvent::End(BytesEnd::new(name)),
