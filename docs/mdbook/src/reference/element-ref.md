@@ -91,8 +91,6 @@ The difference is that `<defs>` remain in the document (and therefore DOM) at re
 
 Elements within a `<specs>` section should generally have an `id` attribute so they can be referenced, otherwise they will have no effect on the rendered document.
 
-Note that `<specs>` elements may not be nested.
-
 ### `reuse`
 
 The `<reuse>` element is analogous to SVG's `<use>` element, in that it takes an `href` attribute referring to another element.

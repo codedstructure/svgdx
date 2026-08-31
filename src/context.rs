@@ -29,8 +29,6 @@ pub struct TransformerContext {
     rng: RefCell<Pcg32>,
     /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
-    /// Are we in a `<specs>` block?
-    pub in_specs: bool,
     /// The event-representation of the entire input SVG
     pub events: HashMap<Option<String>, Vec<InputEvent>>,
     /// Config of transformer processing; updated by `<config>` elements
@@ -51,7 +49,6 @@ impl Default for TransformerContext {
             scope_stack: ScopeStack::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             real_svg: false,
-            in_specs: false,
             events: HashMap::new(),
             config: TransformConfig::default(),
             libraries: Vec::new(),
@@ -290,6 +287,11 @@ impl TransformerContext {
 
     pub fn is_named_spec(&self, name: &str) -> bool {
         self.named_spec_map.contains(name)
+    }
+
+    /// Are we in a `<specs>` block?
+    pub fn in_specs(&self) -> bool {
+        self.scope_stack.in_specs()
     }
 
     pub fn seed_rng(&mut self, seed: u64) {

@@ -80,8 +80,10 @@ struct Scope {
     vars: HashMap<String, String>,
     defaults: Vec<(ElementMatch, SvgElement)>,
     /// indicates whether updates from this scope affect siblings
-    /// rather than descendants, e.g. <var> or <defaults>
+    /// rather than descendants, e.g. `<var>` or `<defaults>`
     pseudo: bool,
+    /// indicates whether this scope is a `<specs>` block
+    is_specs: bool,
 }
 
 impl Scope {
@@ -89,11 +91,13 @@ impl Scope {
         // TODO: Current behaviour causes variables set in <loop> elements
         // to leak beyond '</loop>', not sure if that is ideal...
         let pseudo = matches!(el.name(), "var" | "varDefault" | "defaults" | "loop");
+        let is_specs = el.name() == "specs";
         let vars = el.get_attrs().into_iter().collect();
         Self {
             vars,
             defaults: Vec::new(),
             pseudo,
+            is_specs,
         }
     }
 }
@@ -110,6 +114,10 @@ impl ScopeStack {
             global: Scope::default(),
             stack: Vec::new(),
         }
+    }
+
+    pub fn in_specs(&self) -> bool {
+        self.stack.iter().any(|s| s.is_specs)
     }
 
     fn iter(&self) -> impl DoubleEndedIterator<Item = &Scope> + '_ {

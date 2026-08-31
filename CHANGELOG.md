@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ('<', '&' only) when writing text nodes. This allows CSS containing the '>'
   combinator outside a CDATA block.
 
+- Added: `<specs>` elements may now be nested.
+
 - Added: new `inline-html` and `css-html` auto-style modes to avoid wrapping
   CSS styles in 'CDATA' blocks, improving compatibility when embedded in HTML.
 
