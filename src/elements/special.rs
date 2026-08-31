@@ -74,11 +74,6 @@ impl EventGen for SpecsElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        if context.in_specs {
-            return Err(Error::Document(
-                "nested <specs> elements are not allowed".to_string(),
-            ));
-        }
         // support '<specs element="thing">...</specs>' as a shortcut for defining
         // reuse triggered by an element name rather than an href to an id.
         if let Some(element_name) = self.0.get_attr("element") {
@@ -97,10 +92,8 @@ impl EventGen for SpecsElement<'_> {
             context.register_named_spec(element_name, symbol);
         }
         if let Some(inner_events) = self.0.inner_events(context) {
-            context.in_specs = true;
-            let res = process_events(inner_events, context);
-            context.in_specs = false;
-            res?;
+            // Process inner events, but throw away non-error result.
+            process_events(inner_events, context)?;
         }
         Ok((OutputList::new(), None))
     }

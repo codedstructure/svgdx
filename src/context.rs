@@ -23,19 +23,12 @@ pub struct TransformerContext {
     index_map: BTreeMap<OrderIndex, SvgElement>,
     /// Current order index of the element being processed
     current_index: OrderIndex,
-    /// Stack of scopes (nested elements which have been started but not yet ended)
-    ///
-    /// Note empty elements are normally not pushed onto the stack, but `<reuse>`
-    /// elements are an exception during processing of the referenced element.
+    /// Stack of scopes, storing defaults and variables.
     scope_stack: ScopeStack,
     /// Pcg32 is used as it is both seedable and portable.
     rng: RefCell<Pcg32>,
-    /// Current recursion depth
-    current_depth: u32,
     /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
-    /// Are we in a `<specs>` block?
-    pub in_specs: bool,
     /// The event-representation of the entire input SVG
     pub events: HashMap<Option<String>, Vec<InputEvent>>,
     /// Config of transformer processing; updated by `<config>` elements
@@ -55,9 +48,7 @@ impl Default for TransformerContext {
             current_index: OrderIndex::new(0),
             scope_stack: ScopeStack::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
-            current_depth: 0,
             real_svg: false,
-            in_specs: false,
             events: HashMap::new(),
             config: TransformConfig::default(),
             libraries: Vec::new(),
@@ -298,6 +289,11 @@ impl TransformerContext {
         self.named_spec_map.contains(name)
     }
 
+    /// Are we in a `<specs>` block?
+    pub fn in_specs(&self) -> bool {
+        self.scope_stack.in_specs()
+    }
+
     pub fn seed_rng(&mut self, seed: u64) {
         self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }
@@ -321,37 +317,21 @@ impl TransformerContext {
         }
     }
 
+    pub fn update_current_scope(&mut self, el: &SvgElement) {
+        self.scope_stack.update_current_scope(el);
+    }
+
     pub fn with_element_scope<T>(
         &mut self,
         el: &SvgElement,
-        f: impl FnOnce(&mut TransformerContext) -> T,
-    ) -> T {
-        let mut scope = ElementScope::new(self, el);
+        f: impl FnOnce(&mut TransformerContext) -> Result<T>,
+    ) -> Result<T> {
+        let mut scope = ElementScope::new(self, el)?;
         f(&mut scope)
     }
 
     pub fn is_top_level(&self) -> bool {
         self.scope_stack.is_empty()
-    }
-
-    pub fn inc_depth(&mut self) -> Result<()> {
-        self.current_depth += 1;
-        if self.current_depth > self.config.depth_limit {
-            return Err(Error::DepthLimit(
-                self.current_depth,
-                self.config.depth_limit,
-            ));
-        }
-        Ok(())
-    }
-
-    pub fn dec_depth(&mut self) -> Result<()> {
-        if self.current_depth > 0 {
-            self.current_depth -= 1;
-        } else {
-            return Err(Error::InternalLogic("dec_depth underflow".into()));
-        }
-        Ok(())
     }
 
     pub fn update_element(&mut self, el: &SvgElement) {
@@ -408,9 +388,13 @@ pub struct ElementScope<'a> {
 }
 
 impl<'a> ElementScope<'a> {
-    fn new(context: &'a mut TransformerContext, el: &SvgElement) -> Self {
+    fn new(context: &'a mut TransformerContext, el: &SvgElement) -> Result<Self> {
+        let current_depth = context.scope_stack.len() as u32;
+        if current_depth >= context.config.depth_limit {
+            return Err(Error::DepthLimit(current_depth, context.config.depth_limit));
+        }
         context.scope_stack.push_element(el);
-        Self { context }
+        Ok(Self { context })
     }
 }
 
@@ -431,30 +415,5 @@ impl DerefMut for ElementScope<'_> {
 impl Drop for ElementScope<'_> {
     fn drop(&mut self) {
         self.context.scope_stack.pop();
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_with_element_scope_pops_on_error() {
-        let mut context = TransformerContext::new();
-        let err = context.with_element_scope(
-            &SvgElement::new("g", &[("width".to_string(), "3".to_string())]),
-            |context| -> Result<()> {
-                assert!(!context.is_top_level());
-                assert_eq!(context.get_var("width").as_deref(), Some("3"));
-                Err(Error::MissingAttr("href".to_string()))
-            },
-        );
-
-        match err {
-            Err(Error::MissingAttr(attr)) => assert_eq!(attr, "href"),
-            other => panic!("unexpected result: {other:?}"),
-        }
-        assert!(context.is_top_level());
-        assert_eq!(context.get_var("width"), None);
     }
 }

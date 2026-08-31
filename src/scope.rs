@@ -79,14 +79,25 @@ impl From<&SvgElement> for ElementMatch {
 struct Scope {
     vars: HashMap<String, String>,
     defaults: Vec<(ElementMatch, SvgElement)>,
+    /// indicates whether updates from this scope affect siblings
+    /// rather than descendants, e.g. `<var>` or `<defaults>`
+    pseudo: bool,
+    /// indicates whether this scope is a `<specs>` block
+    is_specs: bool,
 }
 
 impl Scope {
     fn from_element(el: &SvgElement) -> Self {
+        // TODO: Current behaviour causes variables set in <loop> elements
+        // to leak beyond '</loop>', not sure if that is ideal...
+        let pseudo = matches!(el.name(), "var" | "varDefault" | "defaults" | "loop");
+        let is_specs = el.name() == "specs";
         let vars = el.get_attrs().into_iter().collect();
         Self {
             vars,
             defaults: Vec::new(),
+            pseudo,
+            is_specs,
         }
     }
 }
@@ -105,22 +116,30 @@ impl ScopeStack {
         }
     }
 
-    fn ensure_scope(&mut self) -> &mut Scope {
-        self.stack.last_mut().unwrap_or(&mut self.global)
+    pub fn in_specs(&self) -> bool {
+        self.stack.iter().any(|s| s.is_specs)
     }
 
     fn iter(&self) -> impl DoubleEndedIterator<Item = &Scope> + '_ {
-        std::iter::once(&self.global).chain(self.stack.iter())
+        std::iter::once(&self.global).chain(self.stack.iter().filter(|s| !s.pseudo))
+    }
+
+    fn var_scopes(&self) -> impl Iterator<Item = &Scope> + '_ {
+        // Note the element we're currently processing should not be on the stack
+        // so we can access variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
+        // requires that when evaluating `x="$x"` we don't look up `x` in the
+        // `rect` element itself.
+        self.stack
+            .iter()
+            .rev()
+            .skip(1)
+            .chain(std::iter::once(&self.global))
     }
 
     /// Lookup variable in either parent attribute values or global variables
     /// set using the `<var>` element.
     pub fn get_var(&self, name: &str) -> Option<String> {
-        // Note the element we're currently processing should not be on the stack
-        // so we can access variables of the same name, e.g. `<g x="2"/><rect x="$x"/></g>`
-        // requires that when evaluating `x="$x"` we don't look up `x` in the
-        // `rect` element itself.
-        for var_scope in self.iter().rev().map(|s| &s.vars) {
+        for var_scope in self.var_scopes().map(|s| &s.vars) {
             if let Some(value) = var_scope.get(name) {
                 return Some(value.to_string());
             }
@@ -128,16 +147,23 @@ impl ScopeStack {
         None
     }
 
-    pub fn pop(&mut self) {
-        self.stack.pop();
+    pub fn len(&self) -> usize {
+        self.stack.len()
     }
 
     pub fn is_empty(&self) -> bool {
         self.stack.is_empty()
     }
 
+    fn target_scope(&mut self) -> &mut Scope {
+        self.stack
+            .iter_mut()
+            .rfind(|s| !s.pseudo)
+            .unwrap_or(&mut self.global)
+    }
+
     pub fn set_element_default(&mut self, el: &SvgElement) {
-        let scope = self.ensure_scope();
+        let scope = self.target_scope();
         let el_match = ElementMatch::from(el);
         let mut mod_el = el.clone();
         for unwanted in &["id", "match"] {
@@ -230,13 +256,23 @@ impl ScopeStack {
     }
 
     pub fn set_var(&mut self, name: &str, value: &str) {
-        self.ensure_scope()
+        self.target_scope()
             .vars
             .insert(name.to_string(), value.to_string());
+    }
+
+    pub fn update_current_scope(&mut self, el: &SvgElement) {
+        if let Some(scope) = self.stack.last_mut() {
+            *scope = Scope::from_element(el);
+        }
     }
 
     pub fn push_element(&mut self, el: &SvgElement) {
         let scope = Scope::from_element(el);
         self.stack.push(scope);
+    }
+
+    pub fn pop(&mut self) {
+        self.stack.pop();
     }
 }

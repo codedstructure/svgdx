@@ -92,7 +92,7 @@ fn process_tags(
             // TODO: would be nice to avoid generate_events() inside specs and just
             //       have `if in_specs { continue; }` at the top of the loop...
             let gen_result = t.generate_events(context);
-            if context.in_specs {
+            if context.in_specs() {
                 continue;
             }
             let el = t.get_element_mut().cloned();

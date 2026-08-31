@@ -21,10 +21,9 @@ impl EventGen for SvgElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        context.inc_depth()?;
         // early update: may be updated further during processing
         context.update_element(self);
-        let res = match self.name() {
+        let (ol, mut bbox) = context.with_element_scope(self, |context| match self.name() {
             _ if context.is_named_spec(self.name()) => {
                 let reuse_el =
                     SvgElement::new("reuse", &[("href".into(), format!("#{}", self.name()))])
@@ -44,15 +43,10 @@ impl EventGen for SvgElement {
             "linearGradient" => LinearGradient(self).generate_events(context),
             "radialGradient" => RadialGradient(self).generate_events(context),
             _ => match self.event_range {
-                Some((start, end)) if start != end => {
-                    return Container(self).generate_events(context);
-                }
+                Some((start, end)) if start != end => Container(self).generate_events(context),
                 _ => OtherElement(self).generate_events(context),
             },
-        };
-        context.dec_depth()?;
-
-        let (ol, mut bbox) = res?;
+        })?;
 
         if let (Some(el_bbox), Some(clip_id)) =
             (bbox, self.get_attr("clip-path").and_then(extract_urlref))
