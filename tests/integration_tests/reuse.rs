@@ -931,3 +931,34 @@ fn test_reuse_wh_expansion() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_reuse_id_on_usage() {
+    // id on usage site is injected as variable
+    let input = r##"
+<specs>
+  <circle id="c" r="1"/>
+  <g id="socket">
+    <rect wh="18 5"/>
+    <reuse id="${id}1" cxy="^" href="#c"/>
+    <reuse id="${id}2" cxy="^" href="#c"/>
+  </g>
+</specs>
+<reuse id="a" href="#socket"/>
+<reuse id="b" href="#socket" xy="^|v 2"/>
+"##;
+    let expected = r##"
+<g id="a" class="socket">
+  <rect width="18" height="5"/>
+  <circle id="a1" cx="9" cy="2.5" r="1" class="c"/>
+  <circle id="a2" cx="9" cy="2.5" r="1" class="c"/>
+</g>
+<g id="b" transform="translate(0, 7)" class="socket">
+  <rect width="18" height="5"/>
+  <circle id="b1" cx="9" cy="2.5" r="1" class="c"/>
+  <circle id="b2" cx="9" cy="2.5" r="1" class="c"/>
+</g>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_eq!(output.trim(), expected.trim());
+}

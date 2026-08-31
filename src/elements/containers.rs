@@ -76,10 +76,8 @@ impl EventGen for Container<'_> {
                     // inner_text implies no processable events; use as-is
                     (inner_events.into(), None)
                 } else {
-                    context.with_element_scope(self.0, |context| {
-                        self.0
-                            .process_inner_events(new_el.order_index.clone(), context)
-                    })?
+                    self.0
+                        .process_inner_events(new_el.order_index.clone(), context)?
                 };
                 events.extend(evlist);
                 events.push(EventKind::End(self.0.name().to_owned()));
@@ -118,10 +116,9 @@ impl EventGen for GroupElement<'_> {
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
-        let (inner, content_bb) = context.with_element_scope(self.0, |context| {
-            self.0
-                .process_inner_events(new_el.order_index.clone(), context)
-        })?;
+        let (inner, content_bb) = self
+            .0
+            .process_inner_events(new_el.order_index.clone(), context)?;
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;

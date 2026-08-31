@@ -201,15 +201,20 @@ fn test_eval_local_vars() {
                     eval_vars("$this_year: $width.$one$height", ctx),
                     "2024: 3.14"
                 );
-            });
+                Ok(())
+            })
+            .unwrap();
+            Ok(())
         },
-    );
+    )
+    .unwrap();
 
     // Now `this_year` isn't overridden by the local variable should revert to
     // the global value.
     assert_eq!(eval_vars("$this_year", &ctx), "2023");
 
-    // Check multiple levels of override
+    // Check multiple levels of override. Note that the innermost element's attributes
+    // are skipped when evaluating variables.
     ctx.with_element_scope(
         &SvgElement::new("g", &[("level".to_string(), "1".to_string())]),
         |ctx| {
@@ -219,15 +224,26 @@ fn test_eval_local_vars() {
                     ctx.with_element_scope(
                         &SvgElement::new("g", &[("level".to_string(), "3".to_string())]),
                         |ctx| {
-                            assert_eq!(eval_vars("$level", ctx), "3");
+                            ctx.with_element_scope(&SvgElement::new("rect", &[]), |ctx| {
+                                assert_eq!(eval_vars("$level", ctx), "3");
+                                Ok(())
+                            })
+                            .unwrap();
+                            assert_eq!(eval_vars("$level", ctx), "2");
+                            Ok(())
                         },
-                    );
-                    assert_eq!(eval_vars("$level", ctx), "2");
+                    )
+                    .unwrap();
+                    assert_eq!(eval_vars("$level", ctx), "1");
+                    Ok(())
                 },
-            );
-            assert_eq!(eval_vars("$level", ctx), "1");
+            )
+            .unwrap();
+            assert_eq!(eval_vars("$level", ctx), "$level");
+            Ok(())
         },
-    );
+    )
+    .unwrap();
 
     assert_eq!(eval_vars("$level", &ctx), "$level");
 }
