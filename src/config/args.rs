@@ -30,6 +30,7 @@ pub struct TransformArgs {
     pub error_mode: ErrorMode,
     pub vars: Vec<VarSpec>,
     pub include_files: Vec<String>,
+    pub stdlib: bool,
 }
 
 impl Default for TransformArgs {
@@ -53,6 +54,7 @@ impl Default for TransformArgs {
             error_mode: ErrorMode::default(),
             vars: vec![],
             include_files: vec![],
+            stdlib: false,
         }
     }
 }
@@ -81,6 +83,10 @@ impl TryFrom<TransformArgs> for TransformConfig {
             vars: args.vars.into_iter().map(|v| (v.key, v.value)).collect(),
             library_sources: vec![],
         };
+
+        if args.stdlib {
+            config = config.with_stdlib();
+        }
 
         for file in &args.include_files {
             let content = fs::read_to_string(file)
@@ -123,7 +129,8 @@ pub fn common_usage() -> String {
       --error-mode <MODE>       Error handling mode ['{default_error_mode}']
                                 ({error_modes_str})
   -D, --var <KEY=VALUE>         Variable key=value pairs (may be repeated)
-      --include <FILE>          Include library file (may be repeated)"#
+      --include <FILE>          Include library file (may be repeated)
+      --stdlib                  Include built-in standard library ('d' namespace)"#
     )
 }
 
@@ -173,6 +180,9 @@ impl TransformArgs {
             }
             "--include" => {
                 self.include_files.push(take_value(key, embedded, args)?);
+            }
+            "--stdlib" => {
+                self.stdlib = true;
             }
             _ => return Ok(false),
         }

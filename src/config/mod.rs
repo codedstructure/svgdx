@@ -5,6 +5,7 @@ pub use args::parse_value;
 #[cfg(any(feature = "cli", feature = "server"))]
 pub use args::{TransformArgs, common_usage, parse_kv_arg, take_value};
 
+use crate::builtin::stdlib_source;
 use crate::document::parse_library;
 use crate::errors::{Error, Result};
 use crate::{AutoStyleMode, ThemeType, VarName};
@@ -88,6 +89,13 @@ impl Default for TransformConfig {
 }
 
 impl TransformConfig {
+    #[must_use]
+    pub fn with_stdlib(mut self) -> Self {
+        self.load_library(stdlib_source().to_string())
+            .expect("stdlib parse");
+        self
+    }
+
     pub fn load_library(&mut self, source: impl Into<String>) -> Result<()> {
         let source = source.into();
         parse_library(source.clone())?;

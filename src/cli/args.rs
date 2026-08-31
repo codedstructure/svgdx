@@ -16,6 +16,7 @@ Usage:
 Options:
   -i, --input <INPUT>           Input file ('-' for stdin) ['-']
   -o, --output <OUTPUT>         Target output file ('-' for stdout) ['-']
+      --output-stdlib           Write the embedded standard library to stdout and exit
   -h, --help                    Show this help
   -V, --version                 Display program version
 
@@ -50,6 +51,8 @@ pub enum CliAction {
     Help,
     // svgdx -V or --version
     Version,
+    // write the embedded standard library to stdout and exit
+    OutputStdlib,
     // stdin is terminal and we have no INPUT arg
     ImplicitStdinTerminal,
     // normal usage
@@ -69,6 +72,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
+            "--output-stdlib" => return Ok(CliAction::OutputStdlib),
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;
             }
@@ -104,5 +108,8 @@ mod tests {
     fn test_parse_args() {
         let config = parse_args(vec!["svgdx".to_string(), "--help".to_string()]);
         assert!(matches!(config, Ok(CliAction::Help)));
+
+        let config = parse_args(vec!["svgdx".to_string(), "--output-stdlib".to_string()]);
+        assert!(matches!(config, Ok(CliAction::OutputStdlib)));
     }
 }

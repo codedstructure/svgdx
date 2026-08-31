@@ -37,6 +37,7 @@ use std::io::{BufReader, IsTerminal, Read};
 #[cfg(feature = "cli")]
 use std::path::{Path, PathBuf};
 
+mod builtin;
 #[cfg(feature = "cli")]
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;

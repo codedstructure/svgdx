@@ -21,13 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ('<', '&' only) when writing text nodes. This allows CSS containing the '>'
   combinator outside a CDATA block.
 
+- Added: support for including library files; elements in `<defs>` and `<specs>`
+  blocks within library files are available to svgdx input documents.
+
+- Added: built-in 'standard library' of re-usable snippets. Trivially small to
+  begin with, and currently opt-in via `--stdlib` argument. May become opt-out
+  in future. See the [stdlib.xml](examples/stdlib.xml) example, which includes
+  all 3 (!) of the current stdlib elements. The plan is for this to expand over
+  time; note that neither the names nor the generated images are considered
+  stable at this point, the one stable guarantee is the 'd' namespace, which
+  should be avoided in your libraries.
+
 - Added: `<specs>` elements may now be nested.
 
 - Added: new `inline-html` and `css-html` auto-style modes to avoid wrapping
   CSS styles in 'CDATA' blocks, improving compatibility when embedded in HTML.
-
-- Added: support for including library files; elements in `<defs>` and `<specs>`
-  blocks within library files are available to svgdx input documents.
 
 - Added: reuse instancing now expands `wh` to `width` and `height` variables
   available in the template context.

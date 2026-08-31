@@ -1,0 +1,34 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="167mm" height="75mm" viewBox="-5 -5 167 75">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+    <![CDATA[
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    marker path { fill: inherit; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    .d-dash { stroke-dasharray: 1 1.5; }
+  ]]>
+  </style>
+  <!-- requires builtin stdlib -->
+  <g>
+    <g id="d1" class="document">
+      <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20"/>
+    </g>
+    <g id="d2" transform="translate(0, 35)" class="document">
+      <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20"/>
+    </g>
+  </g>
+  <g id="c" transform="translate(58.313885, 17.814152)" class="cloud">
+    <path d="M 8 23.4 C 2 23.4 0 18.6 3.2 15 C 2 8.4 8.8 3.6 15.2 5.4 C 18 0.6 28 0 31.2 5.4 C 37.6 5.4 40 10.2 37.6 14.4 C 40 16.8 38 23.4 31.2 23.4 C 28 30 12 30 8 23.4 Z"/>
+  </g>
+  <g id="s" transform="translate(126.88776, 17.5)" class="store">
+    <path d="M 0 6 a 15 6 0 0 0 30 0 a 15 6 0 0 0 -30 0 v 18 a 15 6 0 0 0 30 0 v -18"/>
+  </g>
+
+  <line x1="20" y1="15" x2="60" y2="27.254" class="d-arrow d-dash"/>
+  <line x1="20" y1="50" x2="60" y2="37.746" class="d-arrow d-dash"/>
+  <line x1="96.888" y1="32.5" x2="126.888" y2="32.5" class="d-arrow d-dash"/>
+</svg>

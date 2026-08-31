@@ -17,7 +17,7 @@ $(SVGDX): $(SRC_FILES)
 	cargo build --release --bin svgdx --no-default-features --features "cli"
 
 serve: svgdx-server
-	$(SVGDX_SERVER) --open
+	$(SVGDX_SERVER) --stdlib --open
 
 check:
 	sh scripts/check.sh

@@ -12,6 +12,7 @@ use hyper::StatusCode;
 use serde_derive::Deserialize;
 use tokio::sync::mpsc::{Sender, channel};
 
+use crate::builtin::stdlib_source;
 use crate::errors::Error;
 use crate::json::{TransformResponse, transform_json_impl};
 use crate::{TransformConfig, VERSION, transform_str};
@@ -58,6 +59,9 @@ pub async fn run(config: CliAction, program_name: &str) {
     match config {
         CliAction::Help => {
             println!("{}", usage(program_name));
+        }
+        CliAction::OutputStdlib => {
+            print!("{}", stdlib_source());
         }
         CliAction::Version => {
             println!("{program_name} v{VERSION}");
