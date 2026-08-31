@@ -1,0 +1,17 @@
+<svg name="d">
+  <specs>
+    <g id="document">
+      <var fold="{{min($width, $height) / 4}}"/>
+      <path d="M 0 0 H {{$width - $fold}} L $width $fold V $height H 0 Z M {{$width - $fold}} 0 V $fold H $width"/>
+    </g>
+
+    <g id="store">
+      <var cap="{{min($height / 5, $width / 4)}}"/>
+      <path d="M 0 $cap a {{$width / 2}} $cap 0 0 0 $width 0 a {{$width / 2}} $cap 0 0 0 {{-$width}} 0 v {{$height - 2 * $cap}} a {{$width / 2}} $cap 0 0 0 $width 0 v {{-($height - 2 * $cap)}}"/>
+    </g>
+
+    <g id="cloud">
+      <path d="M {{$width * 0.2}} {{$height * 0.78}} C {{$width * 0.05}} {{$height * 0.78}} 0 {{$height * 0.62}} {{$width * 0.08}} {{$height * 0.5}} C {{$width * 0.05}} {{$height * 0.28}} {{$width * 0.22}} {{$height * 0.12}} {{$width * 0.38}} {{$height * 0.18}} C {{$width * 0.45}} {{$height * 0.02}} {{$width * 0.7}} 0 {{$width * 0.78}} {{$height * 0.18}} C {{$width * 0.94}} {{$height * 0.18}} $width {{$height * 0.34}} {{$width * 0.94}} {{$height * 0.48}} C $width {{$height * 0.56}} {{$width * 0.95}} {{$height * 0.78}} {{$width * 0.78}} {{$height * 0.78}} C {{$width * 0.7}} $height {{$width * 0.3}} $height {{$width * 0.2}} {{$height * 0.78}} Z"/>
+    </g>
+  </specs>
+</svg>

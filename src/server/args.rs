@@ -30,6 +30,7 @@ pub struct Args {
 pub enum CliAction {
     Help,
     Version,
+    OutputStdlib,
     Run(Box<Args>),
 }
 
@@ -59,6 +60,7 @@ Options:
   -p, --port <PORT>             Port to listen on [{DEFAULT_PORT}]
       --docs-redirect-url <URL> Redirect /docs/ requests to this URL
       --open                    Open browser on startup
+      --output-stdlib           Write the embedded standard library to stdout and exit
   -h, --help                    Show this help
   -V, --version                 Display program version
 
@@ -80,6 +82,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
+            "--output-stdlib" => return Ok(CliAction::OutputStdlib),
             "--address" => parsed.address = parse_value(&key, embedded, &mut args)?,
             "-p" | "--port" => parsed.port = parse_value(&key, embedded, &mut args)?,
             "--docs-redirect-url" => {
@@ -106,6 +109,14 @@ mod tests {
         assert!(matches!(
             parse_args(vec!["svgdx-server".to_string(), "--help".to_string()]),
             Ok(CliAction::Help)
+        ));
+
+        assert!(matches!(
+            parse_args(vec![
+                "svgdx-server".to_string(),
+                "--output-stdlib".to_string()
+            ]),
+            Ok(CliAction::OutputStdlib)
         ));
 
         match parse_args(vec![

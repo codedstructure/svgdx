@@ -1,5 +1,5 @@
 use assertables::{assert_contains, assert_not_contains};
-use svgdx::transform_str_default;
+use svgdx::{TransformConfig, transform_str, transform_str_default};
 
 #[test]
 fn test_reuse_simple() {
@@ -961,4 +961,16 @@ fn test_reuse_id_on_usage() {
 "##;
     let output = transform_str_default(input).unwrap();
     assert_eq!(output.trim(), expected.trim());
+}
+
+#[test]
+fn test_reuse_builtin_standard_library() {
+    let input = r##"<svg><reuse href="#d:document" wh="10 20"/></svg>"##;
+    let output = transform_str(input, &TransformConfig::default().with_stdlib()).unwrap();
+
+    assert_contains!(output, r#"<g class="document">"#);
+    assert_contains!(
+        output,
+        r#"<path d="M 0 0 H 7.5 L 10 2.5 V 20 H 0 Z M 7.5 0 V 2.5 H 10"/>"#
+    );
 }

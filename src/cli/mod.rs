@@ -1,6 +1,7 @@
 mod args;
 use std::path::Path;
 
+use crate::builtin::stdlib_source;
 use crate::{Error, Result, TransformConfig, VERSION, transform_file};
 
 pub use args::{Args, CliAction, NO_INPUT_STDIN_TERMINAL, parse_args, usage};
@@ -48,6 +49,9 @@ pub fn run(config: CliAction, program_name: &str) -> Result<()> {
     match config {
         CliAction::Help => {
             println!("{}", usage(program_name));
+        }
+        CliAction::OutputStdlib => {
+            print!("{}", stdlib_source());
         }
         CliAction::ImplicitStdinTerminal => {
             println!("{program_name} v{VERSION}");
