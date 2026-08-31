@@ -145,3 +145,11 @@ An SVG reproduction of this diagram created using `svgdx` is shown below:
 ![](landscape.svg)
 
 [source](landscape.svg)&nbsp;&nbsp;&nbsp;&nbsp;[input file](landscape.xml)
+
+## Builtin stdlib
+
+(requires `--stdlib` argument)
+
+![](stdlib.svg)
+
+[source](stdlib.svg)&nbsp;&nbsp;&nbsp;&nbsp;[input file](stdlib.xml)
