@@ -25,19 +25,19 @@ impl TryFrom<XmlEvent<'_>> for EventKind {
             XmlEvent::Empty(bs) => EventKind::Empty(bs.try_into()?),
             XmlEvent::Start(bs) => EventKind::Start(bs.try_into()?),
             XmlEvent::End(e) => {
-                let name = String::from_utf8(e.name().into_inner().to_vec()).expect("utf8");
+                let name = e.name().into_inner().to_string();
                 EventKind::End(name)
             }
             XmlEvent::Text(t) => {
-                let content = String::from_utf8(t.into_inner().to_vec()).expect("utf8");
+                let content = t.into_inner().to_string();
                 EventKind::Text(content)
             }
             XmlEvent::CData(c) => {
-                let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
+                let content = c.into_inner().to_string();
                 EventKind::CData(content)
             }
             XmlEvent::Comment(c) => {
-                let content = String::from_utf8(c.into_inner().to_vec()).expect("utf8");
+                let content = c.into_inner().to_string();
                 EventKind::Comment(content)
             }
             other => EventKind::Other(RawXmlEvent(other.into_owned())),
@@ -72,14 +72,14 @@ impl TryFrom<BytesStart<'_>> for RawElement {
     /// XML type errors (e.g. bad attribute names, non-UTF8) rather than anything
     /// semantic about svgdx / svg formats.
     fn try_from(e: BytesStart) -> Result<Self> {
-        let name = String::from_utf8(e.name().into_inner().to_vec()).expect("not UTF8");
+        let name = e.name().into_inner().to_string();
         // TODO: in a non-strict mode, consider .filter_map(|a| { a.ok().and_then(|aa| { ...
         let attrs: Result<Vec<(String, String)>> = e
             .attributes()
             .map(move |a| {
                 let aa = a.map_err(|e| Error::Xml(Box::new(e)))?;
-                let key = String::from_utf8(aa.key.into_inner().to_vec())?;
-                let raw_value = std::str::from_utf8(aa.value.as_ref())?;
+                let key = aa.key.into_inner().to_string();
+                let raw_value = aa.value.as_ref();
                 let value = unescape(raw_value)
                     .map_err(|e| Error::Xml(Box::new(e)))?
                     .into_owned();
@@ -94,7 +94,7 @@ impl From<RawElement> for BytesStart<'static> {
     fn from(e: RawElement) -> Self {
         let mut bs = BytesStart::new(e.0);
         for (k, v) in e.1 {
-            bs.push_attribute(Attribute::from((k.as_bytes(), v.as_bytes())));
+            bs.push_attribute(Attribute::from((k.as_str(), v.as_str())));
         }
         bs
     }
@@ -117,7 +117,7 @@ impl InputList {
         loop {
             let ev = reader.read_event_into(&mut buf);
             let event_lines = if let Ok(ok_ev) = ev.clone() {
-                ok_ev.as_ref().iter().filter(|&c| *c == b'\n').count()
+                ok_ev.as_bytes().iter().filter(|&c| *c == b'\n').count()
             } else {
                 0
             };

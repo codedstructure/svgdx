@@ -18,7 +18,7 @@ server = ["axum", "hyper", "json", "tokio", "open"]
 json = ["serde", "serde_derive", "serde_json"]
 
 [dependencies]
-quick-xml = "0.41"
+quick-xml = "0.42"
 rand = { version = "0.10", default-features = false }
 rand_pcg = "0.10"
 
