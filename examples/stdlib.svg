@@ -17,8 +17,14 @@
     <g id="d1" class="document">
       <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20"/>
     </g>
+    <g transform="translate(10, 13)" class="actor">
+      <path d="M0 0 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6"/>
+    </g>
     <g id="d2" transform="translate(0, 35)" class="document">
       <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20"/>
+    </g>
+    <g transform="translate(10, 48)" class="actor">
+      <path d="M0 0 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6"/>
     </g>
   </g>
   <g id="c" transform="translate(58.313885, 17.814152)" class="cloud">

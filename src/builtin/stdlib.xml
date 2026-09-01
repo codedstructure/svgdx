@@ -13,5 +13,14 @@
     <g id="cloud">
       <path d="M {{$width * 0.2}} {{$height * 0.78}} C {{$width * 0.05}} {{$height * 0.78}} 0 {{$height * 0.62}} {{$width * 0.08}} {{$height * 0.5}} C {{$width * 0.05}} {{$height * 0.28}} {{$width * 0.22}} {{$height * 0.12}} {{$width * 0.38}} {{$height * 0.18}} C {{$width * 0.45}} {{$height * 0.02}} {{$width * 0.7}} 0 {{$width * 0.78}} {{$height * 0.18}} C {{$width * 0.94}} {{$height * 0.18}} $width {{$height * 0.34}} {{$width * 0.94}} {{$height * 0.48}} C $width {{$height * 0.56}} {{$width * 0.95}} {{$height * 0.78}} {{$width * 0.78}} {{$height * 0.78}} C {{$width * 0.7}} $height {{$width * 0.3}} $height {{$width * 0.2}} {{$height * 0.78}} Z"/>
     </g>
+
+    <g id="actor">
+      <var head="{{min(0.4 * $height, 0.9 * $width)}}"/>
+      <var body="{{$height - $head}}"/>
+      <var bby2="{{$body * 0.5}}" bby4="{{$body * 0.25}}" wby2="{{$width / 2}}"/>
+      <path d="M0 0 a 0.1 0.1 0 0 0 0 -$head 0.1 0.1 0 0 0 0 $head // head circle
+          v $bby2 m -$wby2 -$bby4 h$width m-$wby2 $bby4 // body and arms
+          l -$wby2 $bby2 m$wby2-$bby2 l$wby2 $bby2 // legs"/>
+    </g>
   </specs>
 </svg>
