@@ -3,7 +3,9 @@
   <defaults><line class="d-arrow d-dash"/></defaults>
   <g>
     <reuse id="d1" href="#d:document" wh="20 30"/>
-    <reuse id="d2" href="#d:document" wh="20 30" xy="^|v 5"/>
+    <reuse href="#d:actor" wh="10 20" cxy="^"/>
+    <reuse id="d2" href="#d:document" wh="20 30" xy="#d1|v 5"/>
+    <reuse href="#d:actor" wh="10 20" cxy="^"/>
   </g>
   <reuse id="c" href="#d:cloud" wh="40 30" xy="^|h 40"/>
   <reuse id="s" href="#d:store" wh="30" xy="^|h 30"/>
