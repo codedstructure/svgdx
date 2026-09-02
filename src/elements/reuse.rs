@@ -1,5 +1,5 @@
 use super::SvgElement;
-use crate::context::{ElementMap, TransformerContext};
+use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
@@ -46,28 +46,13 @@ impl EventGen for ReuseElement<'_> {
 
         // Evaluate layout with 'duplicated' element scope, since the top
         // (i.e. current) element is normally ignored during scope resolution.
-        let should_include = context.with_element_scope(&reuse_element, |context| {
-            instance_element.eval_attributes(context)?;
-            instance_element.expand_compound_attributes()?;
-            instance_element.expand_relspec_attributes(context);
-            if !instance_element.transmute(context)? {
-                return Ok(false);
-            }
-            instance_element.resolve_position(context)?;
-            if instance_element.name() == "use"
-                && instance_element.content_bbox.is_none()
-                && let Some(content_bbox) = context.get_element_bbox(&instance_element)?
-            {
-                instance_element.content_bbox = Some(content_bbox);
-            }
-            instance_element.handle_rotation()?;
-            Ok(true)
-        })?;
-
-        if !should_include {
+        if !context.with_element_scope(&reuse_element, |context| {
+            instance_element.prepare_element(context)
+        })? {
             // Element should be skipped (e.g. overlapping connectors)
             return Ok((OutputList::new(), None));
         }
+        instance_element.finalize_layout(context)?;
 
         // Override 'default' attr values in the target
         for (attr, value) in reuse_element.get_attrs() {

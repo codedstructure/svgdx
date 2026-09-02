@@ -79,24 +79,11 @@ impl EventGen for OtherElement<'_> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
 
-        e.eval_attributes(context)?;
-        e.expand_compound_attributes()?;
-        e.expand_relspec_attributes(context);
-        if !e.transmute(context)? {
+        if !e.prepare_element(context)? {
             // Element should be skipped (e.g. overlapping connectors)
             return Ok((output, None));
         }
-        e.resolve_position(context)?;
-        // rotation requires a bbox to identify center of rotation; for `<use>`
-        // elements derive from context and inject via `content_bbox`. Allows
-        // handle_rotation to be independent of context.
-        if e.name() == "use"
-            && e.content_bbox.is_none()
-            && let Some(bbox) = context.get_element_bbox(&e)?
-        {
-            e.content_bbox = Some(bbox);
-        }
-        e.handle_rotation()?;
+        e.finalize_layout(context)?;
 
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
@@ -591,7 +578,30 @@ impl SvgElement {
 
 impl SvgElement {
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
-    pub fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
+    pub fn prepare_element<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
+        self.eval_attributes(ctx)?;
+        self.expand_compound_attributes()?;
+        self.expand_relspec_attributes(ctx);
+        self.transmute(ctx)
+    }
+
+    pub fn finalize_layout(&mut self, ctx: &mut impl ContextView) -> Result<()> {
+        self.resolve_position(ctx)?;
+        // rotation requires a bbox to identify center of rotation; for `<use>`
+        // elements derive from context and inject via `content_bbox`. Allows
+        // handle_rotation to be independent of context.
+        if self.name() == "use"
+            && self.content_bbox.is_none()
+            && let Some(bbox) = ctx.get_element_bbox(self)?
+        {
+            self.content_bbox = Some(bbox);
+        }
+        self.handle_rotation()?;
+        Ok(())
+    }
+
+    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
+    fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
         if self.name == "path"
             && let Some(d) = self.get_attr("d")
         {

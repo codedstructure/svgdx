@@ -1,5 +1,5 @@
 use super::SvgElement;
-use crate::context::{ElementMap, TransformerContext};
+use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
@@ -56,23 +56,11 @@ impl EventGen for Container<'_> {
 
                 new_el.eval_attributes(context)?;
                 if is_graphics_element(&new_el) {
-                    // TODO: this duplicates part of the `OtherElement::generate_events`
-                    // logic; should really be based on graphics vs container element
-                    // rather than whether the XML element is empty or not.
-                    new_el.expand_compound_attributes()?;
-                    new_el.expand_relspec_attributes(context);
-                    if !new_el.transmute(context)? {
+                    if !new_el.prepare_element(context)? {
                         // Element should be skipped (e.g. overlapping connectors)
                         return Ok((OutputList::new(), None));
                     }
-                    new_el.resolve_position(context)?;
-                    if new_el.name() == "use"
-                        && new_el.content_bbox.is_none()
-                        && let Some(content_bbox) = context.get_element_bbox(&new_el)?
-                    {
-                        new_el.content_bbox = Some(content_bbox);
-                    }
-                    new_el.handle_rotation()?;
+                    new_el.finalize_layout(context)?;
                     bbox = new_el.bbox()?;
                 }
 
@@ -121,8 +109,7 @@ impl EventGen for GroupElement<'_> {
         // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
-        new_el.expand_compound_attributes()?;
+        new_el.prepare_element(context)?;
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
@@ -132,8 +119,7 @@ impl EventGen for GroupElement<'_> {
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
-        new_el.resolve_position(context)?;
-        new_el.handle_rotation()?;
+        new_el.finalize_layout(context)?;
 
         let mut events = OutputList::new();
         if self.0.is_empty_element() {
