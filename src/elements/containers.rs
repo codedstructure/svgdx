@@ -1,5 +1,5 @@
 use super::SvgElement;
-use crate::context::TransformerContext;
+use crate::context::{ElementMap, TransformerContext};
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
@@ -46,27 +46,36 @@ impl EventGen for Container<'_> {
                 }
                 el.generate_events(context)
             } else {
+                // Special case <svg> elements with an xmlns attribute - passed through
+                // transparently, with no bbox calculation.
+                if self.0.name() == "svg" && self.0.get_attr("xmlns").is_some() {
+                    return Ok((self.0.all_events(context).into(), None));
+                }
                 let mut new_el = self.0.clone();
                 let mut bbox = None;
 
+                new_el.eval_attributes(context)?;
                 if is_graphics_element(&new_el) {
                     // TODO: this duplicates part of the `OtherElement::generate_events`
                     // logic; should really be based on graphics vs container element
                     // rather than whether the XML element is empty or not.
-                    new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
+                    new_el.expand_compound_attributes()?;
+                    new_el.expand_relspec_attributes(context);
                     if !new_el.transmute(context)? {
                         // Element should be skipped (e.g. overlapping connectors)
                         return Ok((OutputList::new(), None));
                     }
+                    new_el.resolve_position(context)?;
+                    if new_el.name() == "use"
+                        && new_el.content_bbox.is_none()
+                        && let Some(content_bbox) = context.get_element_bbox(&new_el)?
+                    {
+                        new_el.content_bbox = Some(content_bbox);
+                    }
+                    new_el.handle_rotation()?;
                     bbox = new_el.bbox()?;
                 }
 
-                // Special case <svg> elements with an xmlns attribute - passed through
-                // transparently, with no bbox calculation.
-                if new_el.name() == "svg" && new_el.get_attr("xmlns").is_some() {
-                    return Ok((self.0.all_events(context).into(), None));
-                }
-                new_el.eval_attributes(context)?;
                 if context.config.add_metadata {
                     new_el.set_attr("data-src-line", &self.0.src_line.to_string());
                 }
@@ -113,6 +122,7 @@ impl EventGen for GroupElement<'_> {
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
         new_el.eval_attributes(context)?;
+        new_el.expand_compound_attributes()?;
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
@@ -122,7 +132,7 @@ impl EventGen for GroupElement<'_> {
 
         // Need bbox to provide center of rotation
         new_el.content_bbox = content_bb;
-        new_el.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
+        new_el.resolve_position(context)?;
         new_el.handle_rotation()?;
 
         let mut events = OutputList::new();

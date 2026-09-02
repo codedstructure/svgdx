@@ -78,11 +78,25 @@ impl EventGen for OtherElement<'_> {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
-        e.resolve_position(context)?; // transmute assumes some of this (e.g. dxy -> dx/dy) has been done
+
+        e.eval_attributes(context)?;
+        e.expand_compound_attributes()?;
+        e.expand_relspec_attributes(context);
         if !e.transmute(context)? {
             // Element should be skipped (e.g. overlapping connectors)
             return Ok((output, None));
         }
+        e.resolve_position(context)?;
+        // rotation requires a bbox to identify center of rotation; for `<use>`
+        // elements derive from context and inject via `content_bbox`. Allows
+        // handle_rotation to be independent of context.
+        if e.name() == "use"
+            && e.content_bbox.is_none()
+            && let Some(bbox) = context.get_element_bbox(&e)?
+        {
+            e.content_bbox = Some(bbox);
+        }
+        e.handle_rotation()?;
 
         context.update_element(&e);
         let mut bb = context.get_element_bbox(&e)?;
@@ -615,20 +629,12 @@ impl SvgElement {
             }
         }
 
-        if self.name() == "use" {
-            // rotation requires a bbox to identify center of rotation; for `<use>`
-            // elements derive from context and inject via `content_bbox`. Allows
-            // handle_rotation to be independent of context.
-            if let Some(bbox) = ctx.get_element_bbox(self)? {
-                self.content_bbox = Some(bbox);
-            }
-        }
-        self.handle_rotation()?;
-
         Ok(true)
     }
 
-    /// Resolve any expressions in attributes.
+    // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
+    // TODO: this is not idempotent in the case of e.g. RNG lookups, so should only
+    // be called once per element; currently a bit ad-hoc.
     pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Resolve any attributes
         for (key, value) in self.attrs.clone() {

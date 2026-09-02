@@ -447,3 +447,23 @@ fn test_fixed_and_closest_target() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
 }
+
+#[test]
+fn test_line_with_dxy() {
+    // test line connectors with dxy offsets
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="^|h 10" wh="10"/>
+<line id="c1"start="#a" end="#b"/>
+<line id="c2" start="#a" end="#b" dx="2"/>
+<line id="c3" start="#a" end="#b" dy="2"/>
+<line id="c4" start="#a" end="#b" dxy="5 3"/>
+<line id="c5" start="#a" end="#b" dxy="2"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line id="c1" x1="10" y1="5" x2="20" y2="5"/>"#);
+    assert_contains!(output, r#"<line id="c2" x1="12" y1="5" x2="22" y2="5"/>"#);
+    assert_contains!(output, r#"<line id="c3" x1="10" y1="7" x2="20" y2="7"/>"#);
+    assert_contains!(output, r#"<line id="c4" x1="15" y1="8" x2="25" y2="8"/>"#);
+    assert_contains!(output, r#"<line id="c5" x1="12" y1="7" x2="22" y2="7"/>"#);
+}

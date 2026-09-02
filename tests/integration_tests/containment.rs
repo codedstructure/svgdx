@@ -378,3 +378,28 @@ fn test_no_intersect() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_nested_surround_with_defaults() {
+    let input = r##"
+<svg>
+  <defaults><rect wh="15 7"/></defaults>
+  <g>
+    <rect id="a1" surround="+" margin="2"/>
+    <g>
+      <rect text="a"/>
+    </g>
+
+    <rect id="a2" surround="+" margin="2"/>
+    <g xy="#a1@tr 4 2">
+      <rect text="b"/>
+    </g>
+  </g>
+</svg>
+"##;
+    let expected1 = r#"<rect id="a2" x="19" y="-2" width="19" height="11" class="d-surround"/>"#;
+    let expected2 = r#"<g transform="translate(21, 0)">"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}

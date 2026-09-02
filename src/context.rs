@@ -135,6 +135,15 @@ impl ElementMap for TransformerContext {
 
     fn get_element_bbox(&self, el: &SvgElement) -> Result<Option<BoundingBox>> {
         let target_el = self.get_target_element(el)?;
+
+        // Elements with unresolved containment derive their geometry from other elements
+        // and must not report a bbox based on additional or default-injected attrs.
+        if target_el.has_attr("surround") || target_el.has_attr("inside") {
+            return Err(Error::MissingBBox(format!(
+                "Unresolved containment: {target_el}"
+            )));
+        }
+
         let mut el_bbox = target_el.bbox()?;
 
         // TODO: move following to element::bbox() ?

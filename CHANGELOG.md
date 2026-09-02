@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: dx/dy/dxy now work with connectors (and potentially other elements
+  that previously ignored them; implemented through more general reordering
+  of the processing steps).
+
 ## [0.32.0 - 2026-08-31]
 
 - Changed: output is now consistently formatted, influenced by input document

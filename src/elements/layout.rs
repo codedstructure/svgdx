@@ -149,38 +149,41 @@ impl SvgElement {
         self.name() == "g"
     }
 
-    pub fn resolve_position(&mut self, ctx: &mut impl ContextView) -> Result<()> {
-        // Ensure relative ElRef offsets are resolved wrt this element
-        ctx.set_current_element(self);
-
-        // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes
-        // TODO: this is not idempotent in the case of e.g. RNG lookups, so should be
-        // moved out of this function and called once per element (or this function
-        // should be called once per element...)
-        self.eval_attributes(ctx)?;
-
-        self.handle_containment(ctx)?;
-
-        // Need size before can evaluate relative position
-        expand_compound_size(self);
-        eval_size_attributes(self, ctx)?;
-        resolve_size_delta(self);
-
-        // ensure relatively-positioned text elements have appropriate anchors
-        if self.name() == "text" && self.has_attr("text") {
-            eval_text_anchor(self, ctx)?;
+    pub fn expand_compound_attributes(&mut self) -> Result<()> {
+        // Ensure relatively-positioned text element text has appropriate
+        // anchors. Must be done before 'xy' gets expanded.
+        if self.name() == "text"
+            && self.has_attr("text")
+            && let Some(xy) = self.get_attr("xy")
+            && let Ok((_, tail)) = extract_elref(xy)
+            && let Some(loc) = eval_text_anchor(tail)?
+        {
+            self.set_default_attr("text-loc", text_loc_anchor(loc));
         }
 
+        expand_compound_size(self);
+        expand_compound_pos(self);
+        Ok(())
+    }
+
+    pub fn expand_relspec_attributes(&mut self, ctx: &impl ElementMap) {
         if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
             self.set_attr("points", &expand_relspec(points, ctx));
         }
         if let ("path", Some(d)) = (self.name(), self.get_attr("d")) {
             self.set_attr("d", &expand_relspec(d, ctx));
         }
+    }
 
-        // Compound attributes, e.g. xy="#o 2" -> x="#o 2", y="#o 2"
-        // Need this even if dirspec used, as may have dxy
-        expand_compound_pos(self);
+    pub fn resolve_position(&mut self, ctx: &mut impl ContextView) -> Result<()> {
+        // Ensure relative ElRef offsets are resolved wrt this element
+        ctx.set_current_element(self);
+
+        self.handle_containment(ctx)?;
+
+        // Need size before can evaluate relative position
+        eval_size_attributes(self, ctx)?;
+        resolve_size_delta(self);
 
         let mut force_origin = false;
         // Special-case xy with relpos, e.g. xy="#elem|h 2" and xy-loc
@@ -906,43 +909,39 @@ fn eval_pos_attributes(
     Ok(())
 }
 
-fn eval_text_anchor(element: &mut SvgElement, ctx: &impl ContextView) -> Result<()> {
-    // we do some of this processing as part of positioning, but don't want
-    // to be tightly coupled to that.
-    let input = element.get_attr("xy");
-    if let Some(input) = input {
-        let (_, rel_loc) = split_relspec(input, ctx)?;
-        let rel_loc = rel_loc.split_whitespace().next().unwrap_or_default();
-        if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
-            match rel.parse()? {
-                DirSpec::Above => element.set_default_attr("text-loc", "t"),
-                DirSpec::Below => element.set_default_attr("text-loc", "b"),
-                DirSpec::InFront => element.set_default_attr("text-loc", "r"),
-                DirSpec::Behind => element.set_default_attr("text-loc", "l"),
-            }
-        } else if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
-            if let Ok(loc_spec) = loc.parse::<LocSpec>() {
-                match loc_spec {
-                    LocSpec::TopLeft => element.set_default_attr("text-loc", "tl"),
-                    LocSpec::Top => element.set_default_attr("text-loc", "t"),
-                    LocSpec::TopRight => element.set_default_attr("text-loc", "tr"),
-                    LocSpec::Right => element.set_default_attr("text-loc", "r"),
-                    LocSpec::BottomRight => element.set_default_attr("text-loc", "br"),
-                    LocSpec::Bottom => element.set_default_attr("text-loc", "b"),
-                    LocSpec::BottomLeft => element.set_default_attr("text-loc", "bl"),
-                    LocSpec::Left => element.set_default_attr("text-loc", "l"),
-                    LocSpec::Center => element.set_default_attr("text-loc", "c"),
-                    LocSpec::TopEdge(_) => element.set_default_attr("text-loc", "t"),
-                    LocSpec::BottomEdge(_) => element.set_default_attr("text-loc", "b"),
-                    LocSpec::LeftEdge(_) => element.set_default_attr("text-loc", "l"),
-                    LocSpec::RightEdge(_) => element.set_default_attr("text-loc", "r"),
-                }
-            } else {
-                return Err(Error::InvalidValue("text-loc".into(), loc.into()));
-            }
-        }
+fn eval_text_anchor(elref_tail: &str) -> Result<Option<LocSpec>> {
+    let rel_loc = elref_tail.split_whitespace().next().unwrap_or_default();
+    if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
+        let dir: DirSpec = rel.parse()?;
+        return Ok(Some(dir.to_locspec()));
     }
-    Ok(())
+    if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
+        return loc
+            .parse::<LocSpec>()
+            .map(Some)
+            .map_err(|_| Error::InvalidValue("text-loc".into(), loc.into()));
+    }
+    Ok(None)
+}
+
+// note this is specific to setting 'text-loc', not a general fmt::Display
+// implementation (because the `*Edge` variants lose info)
+fn text_loc_anchor(loc: LocSpec) -> &'static str {
+    match loc {
+        LocSpec::TopLeft => "tl",
+        LocSpec::Top => "t",
+        LocSpec::TopRight => "tr",
+        LocSpec::Right => "r",
+        LocSpec::BottomRight => "br",
+        LocSpec::Bottom => "b",
+        LocSpec::BottomLeft => "bl",
+        LocSpec::Left => "l",
+        LocSpec::Center => "c",
+        LocSpec::TopEdge(_) => "t",
+        LocSpec::BottomEdge(_) => "b",
+        LocSpec::LeftEdge(_) => "l",
+        LocSpec::RightEdge(_) => "r",
+    }
 }
 
 fn is_pos_attr(name: &str) -> bool {
