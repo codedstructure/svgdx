@@ -412,6 +412,46 @@ fn test_connector_line_offset_prev_next_refspec() {
 }
 
 #[test]
+fn test_connector_line_gap() {
+    let input = r##"
+<rect id="a" wh="10"/>
+<rect id="b" xy="^|h 10" wh="10"/>
+<line id="c1" start="#a" end="#b" gap="2"/>
+<line id="c2" start="#a" end="#b" gap="20% 10%"/>
+<line id="c3" start="#a" end="#b" gap="60%"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line id="c1" x1="12" y1="5" x2="18" y2="5"/>"#);
+    assert_contains!(output, r#"<line id="c2" x1="12" y1="5" x2="19" y2="5"/>"#);
+    assert_contains!(output, r#"<line id="c3" x1="15" y1="5" x2="15" y2="5"/>"#);
+
+    // test non-orthogonal line
+    let input = r#"
+<line id="c1" start="0" end="30 40" gap="20%"/>
+<line id="c2" start="0" end="30 40" gap="5"/>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line id="c1" x1="6" y1="8" x2="24" y2="32"/>"#);
+    assert_contains!(output, r#"<line id="c2" x1="3" y1="4" x2="27" y2="36"/>"#);
+}
+
+#[test]
+fn test_connector_polyline_gap() {
+    let input = format!(
+        r##"{RECT_SVG}
+<polyline id="c1" start="#a@b" end="#d@t" gap="5"/>
+<polyline id="c2" start="#a@b" end="#d@t" gap="80% 10%"/>
+"##
+    );
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(
+        output,
+        r#"<polyline id="c1" points="2.5 10, 2.5 12.5, 22.5 12.5, 22.5 15"/>"#
+    );
+    assert_contains!(output, r#"<polyline id="c2" points="22.5 13, 22.5 16.5"/>"#);
+}
+
+#[test]
 fn test_connector_overlapping_bboxes() {
     // When two bboxes intersect, no line should be rendered
     let input = r##"

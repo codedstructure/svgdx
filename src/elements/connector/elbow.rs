@@ -1,4 +1,5 @@
 use super::corner_route::render_match_corner;
+use super::gap::{GapSpec, points_with_gap};
 use super::line::{LineConnector, ParsedEndpoint};
 use super::{Direction, Endpoint, loc_to_dir};
 use crate::context::ElementMap;
@@ -68,6 +69,7 @@ pub struct ElbowConnector {
     pub start: Endpoint,
     pub end: Endpoint,
     offset: Option<Length>,
+    gap: Option<GapSpec>,
 }
 
 impl ElbowConnector {
@@ -99,6 +101,10 @@ impl ElbowConnector {
 
         let start_ret = LineConnector::parse_element(&mut element, elem_map, "start")?;
         let end_ret = LineConnector::parse_element(&mut element, elem_map, "end")?;
+        let gap = element
+            .pop_attr("gap")
+            .map(|s| s.parse::<GapSpec>())
+            .transpose()?;
 
         let offset = element
             .pop_attr("corner-offset")
@@ -165,6 +171,7 @@ impl ElbowConnector {
             start_el,
             end_el,
             offset,
+            gap,
         })
     }
 
@@ -217,7 +224,7 @@ impl ElbowConnector {
             end_el_bb = el_bb;
         }
 
-        let points = render_match_corner(
+        let mut points = render_match_corner(
             self,
             ratio_offset,
             start_abs_offset,
@@ -226,6 +233,10 @@ impl ElbowConnector {
             end_el_bb,
             abs_offset_set,
         )?;
+
+        if let Some(gap) = &self.gap {
+            points = points_with_gap(&points, gap);
+        }
 
         let points = super::corner_route::filter_points(points);
         Ok(SvgElement::new(
