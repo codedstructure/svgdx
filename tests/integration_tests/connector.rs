@@ -478,14 +478,46 @@ fn test_fixed_and_closest_target() {
 
     // same but polyline, that only considers cardinal points (t/r/b/l)
     let input = r#"<rect xy="20" wh="10"/><polyline start="40 5" end="^" />"#;
-    let expected_line = r#"<polyline points="40 5, 25 20"/>"#;
+    let expected_line = r#"<polyline points="40 5, 25 5, 25 20"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
     // reverse: fixed endpoint
     let input = r#"<rect xy="20" wh="10"/><polyline start="^" end="40 5" />"#;
-    let expected_line = r#"<polyline points="25 20, 40 5"/>"#;
+    let expected_line = r#"<polyline points="25 20, 25 5, 40 5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_polyline_point_refs_match_fixed_points() {
+    let input = r##"
+<rect id="a" wh="20"/>
+<point id="b" xy="70 0"/>
+<polyline id="by-ref" start="#a" end="#b"/>
+<polyline id="by-fixed" start="#a" end="70 0"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"id="by-ref" points="20 10, 45 10, 45 0, 70 0""#);
+    assert_contains!(output, r#"id="by-fixed" points="20 10, 45 10, 45 0, 70 0""#);
+}
+
+#[test]
+fn test_polyline_two_fixed_points_orthogonal() {
+    let input = r##"
+<polyline id="by-point-attrs" start="20 30" end="70 0"/>
+<point id="p0" xy="20 30"/>
+<point id="p1" xy="70 0"/>
+<polyline id="by-point-refs" start="#p0" end="#p1"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(
+        output,
+        r#"id="by-point-attrs" points="20 30, 45 30, 45 0, 70 0""#
+    );
+    assert_contains!(
+        output,
+        r#"id="by-point-refs" points="20 30, 45 30, 45 0, 70 0""#
+    );
 }
 
 #[test]
