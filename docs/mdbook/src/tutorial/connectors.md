@@ -97,8 +97,6 @@ but this is their primary use-case. As with classes in general, these can be com
 Connectors can be defined by the `<polyline>` SVG element in addition to `<line>`.
 With polylines, connectors are restricted to horizontal and vertical segments, with corners at appropriate places.
 
-> Currently svgdx only supports polyline connectors with one or two corners.
-
 ```svgdx
 <svg>
   <rect id="a" wh="20" text="#a@r" text-loc="r"/>
@@ -154,5 +152,35 @@ If the connector is joining things facing the same direction, it requires an abs
 
   <polyline start="#a@t" end="#b@t" corner-offset="12" text='polyline\ncorner-offset="12"' text-loc="t" text-lsp="1.5"/>
   <line xy2="#a@t:80%" height="12" text="12" text-loc="r" class="d-biarrow d-thin d-dash"/>
+</svg>
+```
+
+## End gaps
+
+Providing a small gap between a connector and the objects it is connecting may improve the look of the generated output. This can be achieved using the `gap` attribute on connectors. This takes either one or a pair of length values (absolute, %age, or a rational fraction). If two values are provided, they apply to the start and end of the connector respectively; if a single value is given it applies to both.
+
+Relative (%age and fraction) values relate to the total connector length (including all segments of an elbow connector); if the combined start and end values exceed 100%, the connector will become invisible.
+
+```xml-svgdx
+<svg>
+  <rect id="a" wh="10 30" text="a" />
+  <rect id="b" xy="30 0" wh="10 30" text="b" />
+  <rect id="c" xy="60 0" wh="10 50" text="c" />
+  <rect id="d" xy="0 40" wh="40 10" text="d" />
+
+  <line start="#a@r:10%" end="#b"/>
+  <line start="#a@r:30%" end="#b" gap="2" class="d-arrow"/>
+  <line start="#a@r:50%" end="#b" gap="1 5"/>
+  <line start="#a@r:70%" end="#b" gap="60% 10%"/>
+  <line start="#a@r:90%" end="#b" gap="5%"/>
+
+  <line start="#b@r:10%" end="#c@l:10%"/>
+  <line start="#b@r:30%" end="#c@l:30%" gap="2" />
+  <line start="#b@r:50%" end="#c@l:50%" gap="1 5" class="d-biarrow"/>
+  <line start="#b@r:70%" end="#c@l:70%" gap="60% 10%" class="d-arrow"/>
+  <line start="#b@r:90%" end="#c@l:90%" gap="5%"/>
+
+  <polyline start="#a" end="#d@t:40%" gap="7%" class="d-arrow"/>
+  <polyline start="#b" end="#d@t:60%" gap="5% 15%"/>
 </svg>
 ```

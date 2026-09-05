@@ -1,5 +1,6 @@
 use super::corner_route::render_match_corner;
-use super::line::{LineConnector, ParsedEndpoint};
+use super::gap::{GapSpec, points_with_gap};
+use super::line::{ElementParseData, LineConnector, ParsedEndpoint};
 use super::{Direction, Endpoint, loc_to_dir};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
@@ -60,6 +61,35 @@ struct BBoxResolution {
     end_dir: Option<Direction>,
 }
 
+const BBOX_POINT_EPSILON: f32 = 1e-6;
+
+/// Is this bbox basically a point?
+fn is_degenerate_bbox(bb: &BoundingBox) -> bool {
+    bb.width().abs() <= BBOX_POINT_EPSILON && bb.height().abs() <= BBOX_POINT_EPSILON
+}
+
+/// Major cardinal direction [from -> to] if points are not coincident
+fn dir_towards(from: (f32, f32), to: (f32, f32)) -> Option<Direction> {
+    let dx = to.0 - from.0;
+    let dy = to.1 - from.1;
+
+    if dx.abs() <= BBOX_POINT_EPSILON && dy.abs() <= BBOX_POINT_EPSILON {
+        return None;
+    }
+
+    if dx.abs() >= dy.abs() {
+        if dx >= 0.0 {
+            Some(Direction::Right)
+        } else {
+            Some(Direction::Left)
+        }
+    } else if dy >= 0.0 {
+        Some(Direction::Down)
+    } else {
+        Some(Direction::Up)
+    }
+}
+
 #[derive(Clone)]
 pub struct ElbowConnector {
     source_element: SvgElement,
@@ -68,9 +98,33 @@ pub struct ElbowConnector {
     pub start: Endpoint,
     pub end: Endpoint,
     offset: Option<Length>,
+    gap: Option<GapSpec>,
 }
 
 impl ElbowConnector {
+    fn normalize_endpoint(
+        parsed: &ElementParseData,
+        fixed: Option<(f32, f32, Option<Direction>)>,
+        data: Option<(SvgElement, BoundingBox)>,
+    ) -> ParsedEndpoint {
+        match (parsed, fixed, data) {
+            // A bare element reference with a point-sized bbox should behave
+            // like a literal fixed point for elbow routing.
+            (ElementParseData::El(_), None, Some((_, bb))) if is_degenerate_bbox(&bb) => {
+                (Some((bb.x1(), bb.y1(), None)), None)
+            }
+            (_, fixed, data) => (fixed, data),
+        }
+    }
+
+    fn with_inferred_dir(
+        origin: (f32, f32),
+        dir: Option<Direction>,
+        other: (f32, f32),
+    ) -> Endpoint {
+        Endpoint::new(origin, dir.or_else(|| dir_towards(origin, other)))
+    }
+
     /// Resolve a fixed point against a bbox using cardinal direction.
     fn resolve_point_to_bbox(
         point: (f32, f32),
@@ -99,6 +153,10 @@ impl ElbowConnector {
 
         let start_ret = LineConnector::parse_element(&mut element, elem_map, "start")?;
         let end_ret = LineConnector::parse_element(&mut element, elem_map, "end")?;
+        let gap = element
+            .pop_attr("gap")
+            .map(|s| s.parse::<GapSpec>())
+            .transpose()?;
 
         let offset = element
             .pop_attr("corner-offset")
@@ -110,11 +168,15 @@ impl ElbowConnector {
         let (end_fixed, end_data): ParsedEndpoint =
             LineConnector::to_fixed_or_bbox(&end_ret, elem_map)?;
 
+        let (start_fixed, start_data) =
+            Self::normalize_endpoint(&start_ret, start_fixed, start_data);
+        let (end_fixed, end_data) = Self::normalize_endpoint(&end_ret, end_fixed, end_data);
+
         let (start, end, start_el, end_el) = match (start_fixed, end_fixed) {
             // Both resolved to fixed points
             (Some((x1, y1, dir1)), Some((x2, y2, dir2))) => (
-                Endpoint::new((x1, y1), dir1),
-                Endpoint::new((x2, y2), dir2),
+                Self::with_inferred_dir((x1, y1), dir1, (x2, y2)),
+                Self::with_inferred_dir((x2, y2), dir2, (x1, y1)),
                 start_data.map(|(el, _)| el),
                 end_data.map(|(el, _)| el),
             ),
@@ -124,7 +186,7 @@ impl ElbowConnector {
                 let (end_el, end_bb) = end_data.expect("end must have element if not fixed");
                 let (end_coord, end_dir) = Self::resolve_point_to_bbox((x1, y1), &end_bb);
                 (
-                    Endpoint::new((x1, y1), dir1),
+                    Self::with_inferred_dir((x1, y1), dir1, end_coord),
                     Endpoint::new(end_coord, end_dir),
                     start_data.map(|(el, _)| el),
                     Some(end_el),
@@ -138,7 +200,7 @@ impl ElbowConnector {
                 let (start_coord, start_dir) = Self::resolve_point_to_bbox((x2, y2), &start_bb);
                 (
                     Endpoint::new(start_coord, start_dir),
-                    Endpoint::new((x2, y2), dir2),
+                    Self::with_inferred_dir((x2, y2), dir2, start_coord),
                     Some(start_el),
                     end_data.map(|(el, _)| el),
                 )
@@ -165,6 +227,7 @@ impl ElbowConnector {
             start_el,
             end_el,
             offset,
+            gap,
         })
     }
 
@@ -217,7 +280,7 @@ impl ElbowConnector {
             end_el_bb = el_bb;
         }
 
-        let points = render_match_corner(
+        let mut points = render_match_corner(
             self,
             ratio_offset,
             start_abs_offset,
@@ -226,6 +289,10 @@ impl ElbowConnector {
             end_el_bb,
             abs_offset_set,
         )?;
+
+        if let Some(gap) = &self.gap {
+            points = points_with_gap(&points, gap);
+        }
 
         let points = super::corner_route::filter_points(points);
         Ok(SvgElement::new(

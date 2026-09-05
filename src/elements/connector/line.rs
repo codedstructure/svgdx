@@ -1,4 +1,4 @@
-use super::{Direction, Endpoint, loc_to_dir};
+use super::{Direction, Endpoint, GapSpec, loc_to_dir, points_with_gap};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
@@ -178,6 +178,7 @@ pub struct LineConnector {
     start: Endpoint,
     end: Endpoint,
     overlap: bool,
+    gap: Option<GapSpec>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -313,6 +314,10 @@ impl LineConnector {
 
         let start_ret = Self::parse_element(&mut element, elem_map, "start")?;
         let end_ret = Self::parse_element(&mut element, elem_map, "end")?;
+        let gap = element
+            .pop_attr("gap")
+            .map(|s| s.parse::<GapSpec>())
+            .transpose()?;
 
         let (start_fixed, start_data) = Self::to_fixed_or_bbox(&start_ret, elem_map)?;
         let (end_fixed, end_data) = Self::to_fixed_or_bbox(&end_ret, elem_map)?;
@@ -366,6 +371,7 @@ impl LineConnector {
             start,
             end,
             overlap,
+            gap,
         })
     }
 
@@ -376,17 +382,22 @@ impl LineConnector {
             return Ok(None);
         }
 
-        let (x1, y1) = self.start.origin;
-        let (x2, y2) = self.end.origin;
+        // Apply any gap to ends of connector line
+        let mut points = vec![self.start.origin, self.end.origin];
+        if let Some(gap) = &self.gap {
+            points = points_with_gap(&points, gap);
+        }
+        let (x1, y1) = points.first().unwrap_or(&self.start.origin);
+        let (x2, y2) = points.last().unwrap_or(&self.end.origin);
 
         Ok(Some(
             SvgElement::new(
                 "line",
                 &[
-                    ("x1".to_string(), fstr(x1)),
-                    ("y1".to_string(), fstr(y1)),
-                    ("x2".to_string(), fstr(x2)),
-                    ("y2".to_string(), fstr(y2)),
+                    ("x1".to_string(), fstr(*x1)),
+                    ("y1".to_string(), fstr(*y1)),
+                    ("x2".to_string(), fstr(*x2)),
+                    ("y2".to_string(), fstr(*y2)),
                 ],
             )
             .with_attrs_from(&self.source_element),
