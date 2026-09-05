@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that previously ignored them; implemented through more general reordering
   of the processing steps).
 
+- Added: support for `gap` attribute on connector elements: this omits part of
+  the connector at each end. Specify a length in user-units or a %age of the
+  total connector length. A single or pair of values may be given: a pair
+  indicates (start gap, end gap); a single value applies to both ends.
+
+- Improved consistency for polyline elbow connectors where start, end, or both
+  refer to a point rather than a shape with non-zero size. Note previously
+  a straight line may have been rendered in these cases; now axis-aligned elbow
+  connector segments will be rendered for all polyline connectors.
+
 ## [0.32.0 - 2026-08-31]
 
 - Changed: output is now consistently formatted, influenced by input document
