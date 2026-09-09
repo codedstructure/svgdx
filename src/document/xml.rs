@@ -9,12 +9,30 @@ use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event as XmlEvent};
 use quick_xml::{Reader, Writer};
 
+// Type wrapper to avoid leaking XmlEvent from this module
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RawXmlEvent(XmlEvent<'static>);
+
+// Type wrapper to avoid leaking BytesStart from this module
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RawTag(BytesStart<'static>);
 
 impl EventKind {
     pub fn is_eof(&self) -> bool {
         matches!(self, EventKind::Other ( event ) if matches!(event.0, XmlEvent::Eof))
+    }
+
+    pub fn tag_name(&self) -> Option<String> {
+        match self {
+            EventKind::Start(element) | EventKind::Empty(element) => {
+                Some(element.name().to_owned())
+            }
+            EventKind::RawStart(bs) | EventKind::RawEmpty(bs) => {
+                Some(bs.0.name().into_inner().to_string())
+            }
+            EventKind::End(name) => Some(name.clone()),
+            _ => None,
+        }
     }
 }
 
@@ -46,6 +64,16 @@ impl TryFrom<XmlEvent<'_>> for EventKind {
     }
 }
 
+impl EventKind {
+    pub fn raw_from(xe: XmlEvent<'_>) -> Result<Self> {
+        match xe {
+            XmlEvent::Empty(bs) => Ok(EventKind::RawEmpty(RawTag(normalize_tag(&bs)?))),
+            XmlEvent::Start(bs) => Ok(EventKind::RawStart(RawTag(normalize_tag(&bs)?))),
+            other => other.try_into(),
+        }
+    }
+}
+
 impl<'a> From<EventKind> for XmlEvent<'a> {
     fn from(svg_ev: EventKind) -> XmlEvent<'a> {
         match svg_ev {
@@ -61,6 +89,8 @@ impl<'a> From<EventKind> for XmlEvent<'a> {
             // If one leaks through, serialize as empty text node.
             EventKind::Spacing(_) => XmlEvent::Text(BytesText::new("")),
             EventKind::Other(event) => event.0,
+            EventKind::RawEmpty(bs) => XmlEvent::Empty(bs.0),
+            EventKind::RawStart(bs) => XmlEvent::Start(bs.0),
         }
     }
 }
@@ -102,6 +132,14 @@ impl From<RawElement> for BytesStart<'static> {
 
 impl InputList {
     pub fn from_reader(reader: &mut dyn BufRead) -> Result<Self> {
+        Self::from_reader_impl(reader, false)
+    }
+
+    pub fn from_reformat_reader(reader: &mut dyn BufRead) -> Result<Self> {
+        Self::from_reader_impl(reader, true)
+    }
+
+    fn from_reader_impl(reader: &mut dyn BufRead, raw: bool) -> Result<Self> {
         let mut reader = Reader::from_reader(reader);
 
         let mut events = Vec::new();
@@ -123,6 +161,11 @@ impl InputList {
             };
             let ev =
                 ev.map_err(|e| Error::Document(format!("XML error near line {src_line}: {e:?}")))?;
+
+            if matches!(ev, XmlEvent::Eof) {
+                break;
+            }
+
             let mut meta = EventMeta {
                 index,
                 order: order.clone(),
@@ -132,7 +175,11 @@ impl InputList {
                 depth: event_idx_stack.len(),
             };
 
-            let e: EventKind = ev.clone().try_into()?;
+            let e: EventKind = if raw {
+                EventKind::raw_from(ev)?
+            } else {
+                ev.clone().try_into()?
+            };
             if e.is_eof() {
                 break;
             }
@@ -151,11 +198,8 @@ impl InputList {
                     });
                     order.step();
                 }
-                EventKind::Start(el) => {
-                    events.push(InputEvent {
-                        event: EventKind::Start(el),
-                        meta,
-                    });
+                EventKind::Start(_) | EventKind::RawStart(_) => {
+                    events.push(InputEvent { event: e, meta });
                     event_idx_stack.push(index);
                     order.down();
                 }
@@ -189,8 +233,36 @@ impl InputList {
         // }
         // println!("");
 
+        if let Some(start_idx) = event_idx_stack.last().copied() {
+            let element_name = events[start_idx]
+                .event
+                .tag_name()
+                .unwrap_or_else(|| "unknown".to_owned());
+            return Err(Error::Document(format!(
+                "XML error near line {src_line}: unclosed element <{element_name}>"
+            )));
+        }
+
         Ok(Self { events })
     }
+}
+
+/// re-generate an owned XML tag with normalized inter-attribute spacing
+///
+/// ```xml
+/// <abc
+///    pqr="xyz"   x="1">
+/// ```
+/// ->
+/// ```xml
+/// <abc pqr="xyz" x="1">
+/// ```
+fn normalize_tag(start: &BytesStart<'_>) -> Result<BytesStart<'static>> {
+    let mut norm = BytesStart::new(start.name().into_inner().to_string());
+    for attr in start.attributes().with_checks(false) {
+        norm.push_attribute(attr.map_err(|e| Error::Xml(Box::new(e)))?);
+    }
+    Ok(norm)
 }
 
 impl OutputList {
@@ -221,9 +293,9 @@ impl OutputList {
 
                     writer.write_event(event.clone())?;
                     match event {
-                        EventKind::Start(raw) => {
+                        EventKind::Start(_) | EventKind::RawStart(_) => {
                             depth += 1;
-                            parent_stack.push(raw.name().to_owned());
+                            parent_stack.push(event.tag_name().unwrap_or_default());
                         }
                         EventKind::End(_) => {
                             depth = depth.saturating_sub(1);
@@ -375,5 +447,50 @@ mod tests {
 
         let result = String::from_utf8(cursor.into_inner()).unwrap();
         assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_reformat_reader_preserves_multiline_attrs() {
+        let input = r#"<svg><rect text="
+    line one
+line two
+"/></svg>"#;
+
+        let mut buf_input = Cursor::new(input);
+        let output_list = InputList::from_reformat_reader(&mut buf_input)
+            .unwrap()
+            .reformat();
+
+        let mut cursor = Cursor::new(Vec::new());
+        output_list.write_to(&mut cursor).unwrap();
+
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_reformat_reader_preserves_comments() {
+        let input = r#"<svg><rect wh="2"/>
+<!--
+This is a comment
+  Split over multiple lines
+  -->
+</svg>"#;
+
+        let expected = r#"<!--
+This is a comment
+  Split over multiple lines
+  -->"#;
+
+        let mut buf_input = Cursor::new(input);
+        let output_list = InputList::from_reformat_reader(&mut buf_input)
+            .unwrap()
+            .reformat();
+
+        let mut cursor = Cursor::new(Vec::new());
+        output_list.write_to(&mut cursor).unwrap();
+
+        let result = String::from_utf8(cursor.into_inner()).unwrap();
+        assert!(result.contains(expected));
     }
 }

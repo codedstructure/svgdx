@@ -59,6 +59,7 @@ mod transform;
 mod types;
 
 pub use config::{ErrorMode, TransformConfig};
+use document::InputList;
 pub use errors::{Error, Result};
 #[cfg(feature = "json")]
 pub use json::{TransformResponse, transform_json, transform_json_with_config};
@@ -97,6 +98,13 @@ pub fn transform_stream(
 #[cfg(feature = "cli")]
 pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
     do_io(input, output, |input| transform_str(input, cfg))
+}
+
+/// Read file from `input` ('-' for stdin), reformat the result,
+/// and write to file given by `output` ('-' for stdout).
+#[cfg(feature = "cli")]
+pub fn reformat_file(input: &str, output: &str) -> Result<()> {
+    do_io(input, output, |input| reformat(input))
 }
 
 /// Helper function to handle IO for transforming files & std streams
@@ -163,4 +171,34 @@ pub fn transform_str<T: Into<String>>(input: T, cfg: &TransformConfig) -> Result
 /// Uses default `TransformConfig` settings.
 pub fn transform_str_default<T: Into<String>>(input: T) -> Result<String> {
     transform_str(input, &TransformConfig::default())
+}
+
+/// Reformat the provided XML-like `input` without applying svgdx transforms.
+pub fn reformat<T: Into<String>>(input: T) -> Result<String> {
+    let input = input.into();
+    let mut cursor = Cursor::new(input.as_bytes());
+    let output = InputList::from_reformat_reader(&mut cursor)?.reformat();
+    let mut bytes = Vec::new();
+    output.write_to(&mut bytes)?;
+    Ok(String::from_utf8(bytes).expect("Non-UTF8 output generated"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::reformat;
+
+    #[test]
+    fn test_reformat_normalizes_document_spacing() {
+        let input = "<svg>\n<g>\n  <rect/>\n\n</g>\n</svg>";
+        let output = reformat(input).unwrap();
+
+        assert_eq!(output, "<svg>\n  <g>\n    <rect/>\n\n  </g>\n</svg>");
+    }
+
+    #[test]
+    fn test_reformat_returns_parse_error() {
+        let error = reformat("<svg><g>").unwrap_err().to_string();
+
+        assert!(error.contains("unclosed element <g>"));
+    }
 }
