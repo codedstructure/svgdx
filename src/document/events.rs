@@ -16,6 +16,12 @@ pub enum EventKind {
     /// before the next emitted XML event, insert this whitespace type
     Spacing(Spacing),
     Other(super::RawXmlEvent),
+
+    // RawStart/RawEmpty preserve raw tag content without converting to RawElement.
+    // Used in reformat operations to avoid the encoding / escaping issues around
+    // XML Attribute values.
+    RawStart(super::RawTag),
+    RawEmpty(super::RawTag),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -244,6 +250,47 @@ impl InputList {
         oi.down();
         self.rebase_index(oi);
     }
+
+    pub fn reformat(self) -> OutputList {
+        let mut output = OutputList::new();
+        let mut element_name_stack: Vec<String> = Vec::new();
+        let mut pending_spacing = Spacing::default();
+
+        for input_event in self {
+            let parent_name = element_name_stack.last().map(String::as_str);
+            match input_event.event {
+                EventKind::Text(content) | EventKind::CData(content)
+                    if !matches!(parent_name, Some("style" | "text" | "tspan"))
+                        && let Some(spacing) = Spacing::from_text(&content) =>
+                {
+                    pending_spacing.merge(spacing);
+                }
+                event => {
+                    output.push(pending_spacing.take());
+
+                    match &event {
+                        EventKind::Start(_) | EventKind::RawStart(_) => {
+                            if let Some(name) = event.tag_name() {
+                                element_name_stack.push(name);
+                            }
+                        }
+                        EventKind::End(_) => {
+                            element_name_stack.pop();
+                        }
+                        _ => {}
+                    }
+
+                    output.extend([InputEvent {
+                        event,
+                        meta: input_event.meta,
+                    }]);
+                }
+            }
+        }
+
+        output.push(pending_spacing);
+        output
+    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -427,6 +474,13 @@ impl Spacing {
 mod tests {
     use super::*;
 
+    fn reformat_to_string(input: &str) -> String {
+        let output = InputList::from_str(input).unwrap().reformat();
+        let mut cursor = Cursor::new(Vec::new());
+        output.write_to(&mut cursor).unwrap();
+        String::from_utf8(cursor.into_inner()).unwrap()
+    }
+
     #[test]
     fn test_outputlist_partition_rect() {
         let input = r#"<svg><rect/><circle/><ellipse/></svg>"#;
@@ -497,5 +551,24 @@ mod tests {
         after.write_to(&mut cursor).unwrap();
         let result = String::from_utf8(cursor.into_inner()).unwrap();
         assert_eq!(result, "</svg>");
+    }
+
+    #[test]
+    fn test_inputlist_reformat_normalizes_structure_spacing() {
+        let input = "<svg>\n    <g>\n\n<rect/>\n    </g>\n</svg>\n";
+        let result = reformat_to_string(input);
+
+        assert_eq!(result, "<svg>\n  <g>\n\n    <rect/>\n  </g>\n</svg>\n");
+    }
+
+    #[test]
+    fn test_inputlist_reformat_preserves_text_content_spacing() {
+        let input = "<svg><text>  keep   spacing\nexactly </text><style>\n.a { fill: red; }\n</style></svg>";
+        let result = reformat_to_string(input);
+
+        assert_eq!(
+            result,
+            "<svg><text>  keep   spacing\nexactly </text><style>\n.a { fill: red; }\n</style></svg>"
+        );
     }
 }

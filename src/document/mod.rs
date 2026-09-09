@@ -8,4 +8,4 @@ pub use events::{EventKind, InputEvent, InputList, OutputList, Spacing};
 use events::{EventMeta, RawElement};
 pub use library::{Library, parse_library};
 pub use style::EventStyleWrapper;
-use xml::RawXmlEvent;
+use xml::{RawTag, RawXmlEvent};

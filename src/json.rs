@@ -1,7 +1,7 @@
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use super::{Error, Result, TransformConfig, transform_str};
+use super::{Error, Result, TransformConfig, reformat, transform_str};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -107,6 +107,26 @@ pub fn transform_json_impl(input: &str, cfg: &TransformConfig) -> TransformRespo
     }
 }
 
+/// Reformat input using JSON request/response format.
+pub fn reformat_json_impl(input: &str) -> TransformResponse {
+    match serde_json::from_str::<TransformRequest>(input) {
+        Ok(request) => {
+            if request.version != JSON_API_VERSION {
+                TransformResponse::error(format!(
+                    "Unsupported API version: {} (expected {})",
+                    request.version, JSON_API_VERSION
+                ))
+            } else {
+                match reformat(request.input) {
+                    Ok(output) => TransformResponse::success(output),
+                    Err(e) => TransformResponse::error(e.to_string()),
+                }
+            }
+        }
+        Err(e) => TransformResponse::error(format!("Invalid JSON request: {e}")),
+    }
+}
+
 /// Transform input using JSON request/response format
 ///
 /// Takes a JSON string containing a request object, returns JSON string response.
@@ -126,6 +146,12 @@ pub fn transform_json(input: &str) -> String {
     serde_json::to_string(&result).expect("Failed to serialize response")
 }
 
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub fn reformat_json(input: &str) -> String {
+    let result = reformat_json_impl(input);
+    serde_json::to_string(&result).expect("Failed to serialize response")
+}
+
 // note this is not (currently) exposed to WASM; it's intended to support
 // svgdx-server's transform config options.
 pub fn transform_json_with_config(input: &str, cfg: &TransformConfig) -> String {
@@ -133,9 +159,14 @@ pub fn transform_json_with_config(input: &str, cfg: &TransformConfig) -> String 
     serde_json::to_string(&result).expect("Failed to serialize response")
 }
 
+pub fn reformat_json_with_config(input: &str, _cfg: &TransformConfig) -> String {
+    let result = reformat_json_impl(input);
+    serde_json::to_string(&result).expect("Failed to serialize response")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::transform_json;
+    use super::{reformat_json, transform_json};
 
     #[test]
     fn test_json_transform_success() {
@@ -203,5 +234,61 @@ mod tests {
                 .contains(">howdy world</text>")
         );
         assert!(parsed["error"].is_null());
+    }
+
+    #[test]
+    fn test_json_reformat_success() {
+        let request = r#"{"version": 1, "input": "<svg>\n<rect/>\n</svg>", "config": {}}"#;
+        let response = reformat_json(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert_eq!(parsed["svg"], "<svg>\n  <rect/>\n</svg>");
+        assert!(parsed["error"].is_null());
+    }
+
+    #[test]
+    fn test_json_reformat_error() {
+        let request = r#"{"version": 1, "input": "<svg><g>", "config": {}}"#;
+        let response = reformat_json(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["svg"].is_null());
+        assert!(
+            parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("unclosed element <g>")
+        );
+    }
+
+    #[test]
+    fn test_json_reformat_invalid_version() {
+        let request = r#"{"version": 999, "input": "<svg/>", "config": {}}"#;
+        let response = reformat_json(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(
+            parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("Unsupported API version")
+        );
+    }
+
+    #[test]
+    fn test_json_reformat_invalid_request() {
+        let response = reformat_json("not valid json");
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(
+            parsed["error"]
+                .as_str()
+                .unwrap()
+                .contains("Invalid JSON request")
+        );
     }
 }

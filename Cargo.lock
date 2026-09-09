@@ -695,7 +695,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "shlex",
  "tokio",
  "wasm-bindgen",
  "wasm-bindgen-test",

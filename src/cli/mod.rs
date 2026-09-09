@@ -2,7 +2,7 @@ mod args;
 use std::path::Path;
 
 use crate::builtin::stdlib_source;
-use crate::{Error, Result, TransformConfig, VERSION, transform_file};
+use crate::{Error, Result, TransformConfig, VERSION, reformat_file, transform_file};
 
 pub use args::{Args, CliAction, NO_INPUT_STDIN_TERMINAL, parse_args, usage};
 
@@ -60,6 +60,10 @@ pub fn run(config: CliAction, program_name: &str) -> Result<()> {
         }
         CliAction::Version => {
             println!("{program_name} v{VERSION}");
+        }
+        CliAction::Reformat(args) => {
+            let config = args.into_config()?;
+            reformat_file(&config.input_path, &config.output_path)?;
         }
         CliAction::Run(args) => {
             let config = args.into_config()?;

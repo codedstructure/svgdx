@@ -4,45 +4,7 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-use svgdx::Result;
 use svgdx::cli::{CliAction, parse_args};
-
-static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
-
-struct TestTempFile {
-    path: PathBuf,
-}
-
-impl TestTempFile {
-    fn new() -> Self {
-        let path = std::env::temp_dir().join(format!(
-            "svgdx-test-{}-{}.tmp",
-            std::process::id(),
-            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed),
-        ));
-        File::create(&path).expect("could not create tmpfile");
-        Self { path }
-    }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
-}
-
-impl Drop for TestTempFile {
-    fn drop(&mut self) {
-        let _ = fs::remove_file(&self.path);
-    }
-}
-
-/// Create a `Config` object set up given a command line string.
-///
-/// The string is parsed using `shlex::split()`, so values containing
-/// spaces or quotes should be quoted or escaped appropriately.
-pub fn from_cmdline(args: &str) -> Result<CliAction> {
-    let args = shlex::split(args).unwrap_or_default();
-    parse_args(args)
-}
 
 #[test]
 fn test_cmdline_bad_args() {
@@ -60,28 +22,29 @@ fn test_cmdline_help() {
 
 #[test]
 fn test_cmdline_config() {
-    let config = from_cmdline(&format!("{} --help", pkg_name!()));
+    let config = parse_args([pkg_name!().into(), "--help".into()]);
     assert!(matches!(config, Ok(CliAction::Help)));
 
     let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
-    let config = from_cmdline(&format!(
-        "{} -i {}",
-        pkg_name!(),
-        tmpfile.path().to_str().unwrap(),
-    ))
+    let config = parse_args([
+        pkg_name!().into(),
+        "-i".into(),
+        tmpfile.path().to_str().unwrap().into(),
+    ])
     .expect("cmdline should be valid");
     svgdx::cli::run(config, "test").expect("run failed");
 
     let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let outfile = TestTempFile::new();
-    let config = from_cmdline(&format!(
-        "{} -i {} -o {}",
-        pkg_name!(),
-        tmpfile.path().to_str().unwrap(),
-        outfile.path().to_str().unwrap(),
-    ))
+    let config = parse_args([
+        pkg_name!().into(),
+        "-i".into(),
+        tmpfile.path().to_str().unwrap().into(),
+        "-o".into(),
+        outfile.path().to_str().unwrap().into(),
+    ])
     .expect("cmdline should be valid");
     svgdx::cli::run(config, "test").expect("run failed");
 }
@@ -118,6 +81,91 @@ fn test_cmdline_same_file() {
         .assert()
         .failure()
         .code(1);
+}
+
+#[test]
+fn test_reformat() {
+    let mut tmpfile = TestTempFile::new();
+    write!(
+        tmpfile,
+        r#"
+<svg>
+<g>
+<rect wh="2" text="
+this
+is
+  some
+text"/>
+
+
+     <circle
+
+r="2"/>
+
+
+ </g>
+</svg>
+"#
+    )
+    .expect("tmpfile write failed");
+
+    let expected = r#"
+<svg>
+  <g>
+    <rect wh="2" text="
+this
+is
+  some
+text"/>
+
+    <circle r="2"/>
+
+  </g>
+</svg>
+"#;
+
+    let outfile = TestTempFile::new();
+    let config = parse_args([
+        pkg_name!().into(),
+        "--reformat-only".into(),
+        "-i".into(),
+        tmpfile.path().to_str().unwrap().into(),
+        "-o".into(),
+        outfile.path().to_str().unwrap().into(),
+    ])
+    .expect("cmdline should be valid");
+    svgdx::cli::run(config, "test").expect("run failed");
+
+    let reformatted = std::fs::read_to_string(outfile.path()).expect("could not read outfile");
+    assert_eq!(reformatted, expected);
+}
+
+static TEMP_FILE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+struct TestTempFile {
+    path: PathBuf,
+}
+
+impl TestTempFile {
+    fn new() -> Self {
+        let path = std::env::temp_dir().join(format!(
+            "svgdx-test-{}-{}.tmp",
+            std::process::id(),
+            TEMP_FILE_COUNTER.fetch_add(1, Ordering::Relaxed),
+        ));
+        File::create_new(&path).expect("could not create tmpfile");
+        Self { path }
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TestTempFile {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.path);
+    }
 }
 
 impl Write for TestTempFile {
