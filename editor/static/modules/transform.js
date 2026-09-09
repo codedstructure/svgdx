@@ -9,6 +9,30 @@ import {
 import { statusbar } from './dom.js';
 import { formatStatusError } from './statusbar.js';
 
+function buildRequest(input, config = {}) {
+    return {
+        version: JSON_API_VERSION,
+        input: input,
+        config: config
+    };
+}
+
+function parseJsonResult(result) {
+    if (result.error) {
+        return {
+            ok: false,
+            error: result.error,
+            warnings: result.warnings || []
+        };
+    }
+
+    return {
+        ok: true,
+        svg: result.svg,
+        warnings: result.warnings || []
+    };
+}
+
 /**
  * Create a rate-limited wrapper for a function
  * Prevents excessive calls while ensuring eventual consistency
@@ -66,46 +90,26 @@ export function rateLimited(target, useServer) {
  * Transform input via server API
  * Returns { ok: boolean, svg?: string, error?: string, warnings: string[] }
  */
-async function transformViaServer(input, config) {
+async function callServerJson(path, input, config) {
     try {
         statusbar.style.opacity = '0.3';
 
-        const request = {
-            version: JSON_API_VERSION,
-            input: input,
-            config: config
-        };
-
-        const response = await fetch('api/transform_json', {
+        const response = await fetch(path, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(request)
+            body: JSON.stringify(buildRequest(input, config))
         });
 
         statusbar.style.opacity = null;
         statusbar.style.color = null;
 
-        const result = await response.json();
-
-        if (result.error) {
-            return {
-                ok: false,
-                error: result.error,
-                warnings: result.warnings || []
-            };
-        }
-
-        return {
-            ok: true,
-            svg: result.svg,
-            warnings: result.warnings || []
-        };
+        return parseJsonResult(await response.json());
     } catch (e) {
         statusbar.style.color = 'darkred';
         statusbar.innerText = formatStatusError(e.message);
-        console.error('Error sending data to /api/transform_json', e);
+        console.error(`Error sending data to ${path}`, e);
         return {
             ok: false,
             error: e.message,
@@ -114,13 +118,23 @@ async function transformViaServer(input, config) {
     }
 }
 
+async function transformViaServer(input, config) {
+    return callServerJson('api/transform_json', input, config);
+}
+
+async function reformatViaServer(input) {
+    return callServerJson('api/reformat_json', input, {});
+}
+
 /**
  * Transform input via local WASM
  * Returns { ok: boolean, svg?: string, error?: string, warnings: string[] }
  */
-function transformViaWasm(input, config) {
+function callWasmJson(functionName, input, config) {
     try {
-        if (!window.svgdx_transform_json) {
+        const handler = window[functionName];
+
+        if (!handler) {
             return {
                 ok: false,
                 error: 'loading svgdx...',
@@ -128,28 +142,8 @@ function transformViaWasm(input, config) {
             };
         }
 
-        const request = {
-            version: JSON_API_VERSION,
-            input: input,
-            config: config
-        };
-
-        const resultJson = window.svgdx_transform_json(JSON.stringify(request));
-        const result = JSON.parse(resultJson);
-
-        if (result.error) {
-            return {
-                ok: false,
-                error: result.error,
-                warnings: result.warnings || []
-            };
-        }
-
-        return {
-            ok: true,
-            svg: result.svg,
-            warnings: result.warnings || []
-        };
+        const resultJson = handler(JSON.stringify(buildRequest(input, config)));
+        return parseJsonResult(JSON.parse(resultJson));
     } catch (e) {
         return {
             ok: false,
@@ -157,6 +151,14 @@ function transformViaWasm(input, config) {
             warnings: []
         };
     }
+}
+
+function transformViaWasm(input, config) {
+    return callWasmJson('svgdx_transform_json', input, config);
+}
+
+function reformatViaWasm(input) {
+    return callWasmJson('svgdx_reformat_json', input, {});
 }
 
 /**
@@ -169,6 +171,14 @@ export async function transform(input, config) {
         return await transformViaServer(input, config);
     } else {
         return transformViaWasm(input, config);
+    }
+}
+
+export async function reformat(input) {
+    if (window.svgdx_use_server) {
+        return await reformatViaServer(input);
+    } else {
+        return reformatViaWasm(input);
     }
 }
 

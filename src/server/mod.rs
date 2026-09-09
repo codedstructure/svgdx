@@ -14,7 +14,7 @@ use tokio::sync::mpsc::{Sender, channel};
 
 use crate::builtin::stdlib_source;
 use crate::errors::Error;
-use crate::json::{TransformResponse, transform_json_impl};
+use crate::json::{TransformResponse, reformat_json_impl, transform_json_impl};
 use crate::{TransformConfig, VERSION, transform_str};
 
 mod args;
@@ -111,9 +111,26 @@ async fn transform_json(
     transform_json_handler(input, &config)
 }
 
+async fn reformat_json(
+    State(config): State<Arc<TransformConfig>>,
+    input: String,
+) -> impl IntoResponse {
+    reformat_json_handler(input, &config)
+}
+
 fn transform_json_handler(input: String, config: &TransformConfig) -> Response<Body> {
     let response: TransformResponse = transform_json_impl(&input, config);
 
+    json_response(response)
+}
+
+fn reformat_json_handler(input: String, _config: &TransformConfig) -> Response<Body> {
+    let response: TransformResponse = reformat_json_impl(&input);
+
+    json_response(response)
+}
+
+fn json_response(response: TransformResponse) -> Response<Body> {
     let is_error = response.error.is_some();
     let body = serde_json::to_string(&response).expect("Failed to serialize response");
 
@@ -223,6 +240,7 @@ async fn static_file(Path(path): Path<String>) -> impl IntoResponse {
         "modules/dom.js" => include_js!("static/modules/dom.js"),
         "modules/editor-adapter.js" => include_js!("static/modules/editor-adapter.js"),
         "modules/transform.js" => include_js!("static/modules/transform.js"),
+        "modules/reformat-action.js" => include_js!("static/modules/reformat-action.js"),
         "modules/tabs.js" => include_js!("static/modules/tabs.js"),
         "modules/layout.js" => include_js!("static/modules/layout.js"),
         "modules/viewport.js" => include_js!("static/modules/viewport.js"),
@@ -277,6 +295,7 @@ pub async fn start_server(
         .route("/svgdx-bootstrap.js", get(bootstrap))
         .route("/api/transform", post(transform))
         .route("/api/transform_json", post(transform_json))
+        .route("/api/reformat_json", post(reformat_json))
         .with_state(config)
         .fallback(not_found);
 

@@ -62,7 +62,10 @@ pub use config::{ErrorMode, TransformConfig};
 use document::InputList;
 pub use errors::{Error, Result};
 #[cfg(feature = "json")]
-pub use json::{TransformResponse, transform_json, transform_json_with_config};
+pub use json::{
+    TransformResponse, reformat_json, reformat_json_with_config, transform_json,
+    transform_json_with_config,
+};
 pub use style::{AutoStyleMode, ThemeType};
 use transform::Transformer;
 pub use types::VarName;
