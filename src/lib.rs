@@ -31,9 +31,9 @@ use wasm_bindgen::prelude::*;
 
 #[cfg(feature = "cli")]
 use std::fs::File;
-use std::io::{BufRead, Cursor, Write};
 #[cfg(feature = "cli")]
-use std::io::{BufReader, IsTerminal, Read};
+use std::io::Read;
+use std::io::{BufRead, Cursor, Write};
 #[cfg(feature = "cli")]
 use std::path::{Path, PathBuf};
 
@@ -96,57 +96,52 @@ pub fn transform_stream(
 /// The transform can be modified by providing a suitable `TransformConfig` value.
 #[cfg(feature = "cli")]
 pub fn transform_file(input: &str, output: &str, cfg: &TransformConfig) -> Result<()> {
-    let mut in_reader = if input == "-" {
-        let mut stdin = std::io::stdin().lock();
-        if stdin.is_terminal() {
-            // This is unpleasant; at least on Mac, a single Ctrl-D is not otherwise
-            // enough to signal end-of-input, even when given at the start of a line.
-            // Work around this by reading entire input, then wrapping in a Cursor to
-            // provide a buffered reader.
-            // It would be nice to improve this.
-            let mut buf = Vec::new();
-            stdin
-                .read_to_end(&mut buf)
-                .expect("stdin should be readable to EOF");
-            Box::new(BufReader::new(Cursor::new(buf))) as Box<dyn BufRead>
-        } else {
-            Box::new(stdin) as Box<dyn BufRead>
-        }
+    do_io(input, output, |input| transform_str(input, cfg))
+}
+
+/// Helper function to handle IO for transforming files & std streams
+#[cfg(feature = "cli")]
+fn do_io(
+    input_name: &str,
+    output_name: &str,
+    transform: impl Fn(&str) -> Result<String>,
+) -> Result<()> {
+    let input = if input_name == "-" {
+        let mut buf = String::new();
+        std::io::stdin().read_to_string(&mut buf)?;
+        buf
     } else {
-        Box::new(BufReader::new(File::open(input)?)) as Box<dyn BufRead>
+        std::fs::read_to_string(input_name)?
     };
 
-    if output == "-" {
-        transform_stream(&mut in_reader, &mut std::io::stdout(), cfg)?;
+    let output = transform(&input)?;
+
+    if output_name == "-" {
+        std::io::stdout().write_all(output.as_bytes())?;
     } else {
-        let temp_output = output_temp_path(output);
-        let transform_result = (|| -> Result<()> {
-            let mut out_temp = File::create(&temp_output)?;
-            transform_stream(&mut in_reader, &mut out_temp, cfg)?;
-            out_temp.flush()?;
-            std::fs::rename(&temp_output, output)?;
-            Ok(())
-        })();
-
-        if transform_result.is_err() {
-            let _ = std::fs::remove_file(&temp_output);
+        let (mut out_temp, temp_name) = output_temp_file(output_name)?;
+        if let Err(e) = out_temp
+            .write_all(output.as_bytes())
+            .and_then(|_| std::fs::rename(&temp_name, output_name))
+        {
+            let _ = std::fs::remove_file(&temp_name);
+            return Err(e.into());
         }
-
-        transform_result?;
     }
 
     Ok(())
 }
 
 #[cfg(feature = "cli")]
-fn output_temp_path(output: &str) -> PathBuf {
+fn output_temp_file(output: &str) -> Result<(File, PathBuf)> {
     let output = Path::new(output);
     let parent = output.parent().unwrap_or_else(|| Path::new("."));
     let file_name = output
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("svgdx-output");
-    parent.join(format!("{file_name}.{}.tmp", std::process::id()))
+    let candidate = parent.join(format!("{file_name}.{}.tmp", std::process::id()));
+    Ok((File::create_new(&candidate)?, candidate))
 }
 
 /// Transform `input` provided as a string, returning the result as a string.
