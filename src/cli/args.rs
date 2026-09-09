@@ -17,6 +17,7 @@ Options:
   -i, --input <INPUT>           Input file ('-' for stdin) ['-']
   -o, --output <OUTPUT>         Target output file ('-' for stdout) ['-']
       --output-stdlib           Write the embedded standard library to stdout and exit
+      --reformat-only           Don't transform, only reformat the input file
   -h, --help                    Show this help
   -V, --version                 Display program version
 
@@ -55,6 +56,8 @@ pub enum CliAction {
     OutputStdlib,
     // stdin is terminal and we have no INPUT arg
     ImplicitStdinTerminal,
+    // reformat the input file and write to the output file
+    Reformat(Box<Args>),
     // normal usage
     Run(Box<Args>),
 }
@@ -66,6 +69,8 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
     let mut parsed = Args::default();
     let mut input_value = None;
 
+    let mut reformat = false;
+
     while let Some(arg) = args.next() {
         let (key, embedded) = parse_kv_arg(&arg);
 
@@ -73,6 +78,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
             "--output-stdlib" => return Ok(CliAction::OutputStdlib),
+            "--reformat-only" => reformat = true,
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;
             }
@@ -97,7 +103,10 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         }
     }
 
-    Ok(CliAction::Run(Box::new(parsed)))
+    match reformat {
+        true => Ok(CliAction::Reformat(Box::new(parsed))),
+        false => Ok(CliAction::Run(Box::new(parsed))),
+    }
 }
 
 #[cfg(test)]
