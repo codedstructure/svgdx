@@ -26,7 +26,7 @@ pub fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-pub fn strp(s: impl AsRef<str>) -> Result<f32> {
+pub fn parse_float(s: impl AsRef<str>) -> Result<f32> {
     let s = s.as_ref();
     s.trim()
         .parse::<f32>()
@@ -70,7 +70,7 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
             unit.push(ch);
         }
     }
-    Ok((strp(&value)?, unit))
+    Ok((parse_float(&value)?, unit))
 }
 
 /// Returns iterator over whitespace-or-comma separated values
@@ -969,11 +969,11 @@ mod test {
 
     #[test]
     fn test_strp() {
-        assert_eq!(strp("1").ok(), Some(1.));
-        assert_eq!(strp("100").ok(), Some(100.));
-        assert_eq!(strp("-100").ok(), Some(-100.));
-        assert_eq!(strp("-0.00123").ok(), Some(-0.00123));
-        assert_eq!(strp("1234567.8").ok(), Some(1234567.8));
+        assert_eq!(parse_float("1").ok(), Some(1.));
+        assert_eq!(parse_float("100").ok(), Some(100.));
+        assert_eq!(parse_float("-100").ok(), Some(-100.));
+        assert_eq!(parse_float("-0.00123").ok(), Some(-0.00123));
+        assert_eq!(parse_float("1234567.8").ok(), Some(1234567.8));
     }
 
     #[test]

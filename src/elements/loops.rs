@@ -5,7 +5,7 @@ use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition, eval_list};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::EventGen;
-use crate::types::{parse_int, strp};
+use crate::types::{parse_float, parse_int};
 
 #[derive(Debug, Clone, PartialEq)]
 enum LoopType {
@@ -80,8 +80,8 @@ impl EventGen for LoopElement<'_> {
         }
         if let Some((loop_var, start, step)) = loop_def.loop_spec {
             loop_var_name = eval_attr(&loop_var, context)?;
-            loop_var_value = strp(eval_attr(&start, context)?)?;
-            loop_step = strp(eval_attr(&step, context)?)?;
+            loop_var_value = parse_float(eval_attr(&start, context)?)?;
+            loop_step = parse_float(eval_attr(&step, context)?)?;
         }
 
         loop {

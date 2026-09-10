@@ -5,7 +5,7 @@ use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, Size, TransformAttr};
 use crate::scope::ScopeStack;
-use crate::types::{ElRef, OrderIndex, extract_urlref, strp};
+use crate::types::{ElRef, OrderIndex, extract_urlref, parse_float};
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -155,8 +155,8 @@ impl ElementMap for TransformerContext {
                 && let Some(bbox) = &mut el_bbox
             {
                 el_bbox = Some(bbox.translated(
-                    translate_x.map(strp).unwrap_or(Ok(0.))?,
-                    translate_y.map(strp).unwrap_or(Ok(0.))?,
+                    translate_x.map(parse_float).unwrap_or(Ok(0.))?,
+                    translate_y.map(parse_float).unwrap_or(Ok(0.))?,
                 ));
             }
         }

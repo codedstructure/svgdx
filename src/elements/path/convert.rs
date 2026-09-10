@@ -1,13 +1,13 @@
 use super::SvgElement;
 use crate::errors::{Error, Result};
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split, fstr, parse_float};
 
 pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
     let (mut points, max_radius) = if let (Some(r), Some(p)) = (
         element.get_attr("corner-radius"),
         element.get_attr("points"),
     ) {
-        let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(a).ok()).collect();
+        let floats: Vec<f32> = attr_split(p).filter_map(|a| parse_float(a).ok()).collect();
         // chunks_exact to ignore any unpaired final number
         (
             floats
@@ -16,7 +16,7 @@ pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
                 .iter()
                 .map(|a| (a[0], a[1]))
                 .collect::<Vec<_>>(),
-            strp(r)?,
+            parse_float(r)?,
         )
     } else {
         return Err(Error::InternalLogic(

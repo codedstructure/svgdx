@@ -5,7 +5,7 @@ use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
 use crate::transform::{EventGen, process_events};
-use crate::types::{parse_bool, parse_int, strp};
+use crate::types::{parse_bool, parse_float, parse_int};
 
 #[derive(Debug, Clone)]
 pub struct DefaultsElement<'a>(pub &'a SvgElement);
@@ -39,7 +39,7 @@ impl EventGen for ConfigElement<'_> {
         let mut new_config = context.config.clone();
         for (key, value) in self.0.get_attrs() {
             match key.as_str() {
-                "scale" => new_config.scale = strp(value)?,
+                "scale" => new_config.scale = parse_float(value)?,
                 "debug" => new_config.debug = parse_bool(value)?,
                 "auto-style-mode" => new_config.auto_style_mode = value.parse()?,
                 "border" => new_config.border = parse_int(value)?,
@@ -48,7 +48,7 @@ impl EventGen for ConfigElement<'_> {
                 "var-limit" => new_config.var_limit = parse_int(value)?,
                 "depth-limit" => new_config.depth_limit = parse_int(value)?,
                 "path-repeat-limit" => new_config.path_repeat_limit = parse_int(value)?,
-                "font-size" => new_config.font_size = strp(value)?,
+                "font-size" => new_config.font_size = parse_float(value)?,
                 "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = parse_int(value)?,
                 "theme" => new_config.theme = value.parse()?,

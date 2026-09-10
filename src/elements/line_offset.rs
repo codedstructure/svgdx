@@ -1,7 +1,7 @@
 use super::{SvgElement, path::get_point_along_path};
 use crate::errors::{Error, Result};
 use crate::geometry::{Length, TransformAttr};
-use crate::types::{attr_split, strp};
+use crate::types::{attr_split, parse_float};
 
 fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
     let (is_percent, dist) = match length {
@@ -16,10 +16,10 @@ fn get_point_along_line(el: &SvgElement, length: Length) -> Result<(f32, f32)> {
         el.get_attr("x2"),
         el.get_attr("y2"),
     ) {
-        let x1: f32 = strp(x1)?;
-        let y1: f32 = strp(y1)?;
-        let x2: f32 = strp(x2)?;
-        let y2: f32 = strp(y2)?;
+        let x1: f32 = parse_float(x1)?;
+        let y1: f32 = parse_float(y1)?;
+        let x2: f32 = parse_float(x2)?;
+        let y2: f32 = parse_float(y2)?;
         if x1 == x2 && y1 == y2 {
             return Ok((x1, y1));
         }
@@ -53,8 +53,8 @@ fn get_point_along_polyline(el: &SvgElement, length: Length) -> Result<(f32, f32
         let mut cumulative_dist = 0.0;
         let mut first_point = true;
         while let (Some(x), Some(y)) = (points.next(), points.next()) {
-            let x: f32 = strp(&x)?;
-            let y: f32 = strp(&y)?;
+            let x: f32 = parse_float(x)?;
+            let y: f32 = parse_float(y)?;
 
             if !first_point {
                 let len = (lastx - x).hypot(lasty - y);

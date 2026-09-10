@@ -3,7 +3,7 @@ use crate::context::ElementMap;
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, ElementLoc, LocSpec, parse_elref_suffix};
-use crate::types::{attr_split_cycle, extract_elref, fstr, strp};
+use crate::types::{attr_split_cycle, extract_elref, fstr, parse_float};
 
 /// Returns the midpoint of two 1D ranges if they overlap, None otherwise.
 fn range_overlap(min1: f32, max1: f32, min2: f32, max2: f32) -> Option<f32> {
@@ -238,7 +238,7 @@ impl LineConnector {
             let y = parts.next().ok_or_else(|| {
                 Error::InvalidValue(format!("{attr_name}.y"), this_ref.to_owned())
             })?;
-            Ok(ElementParseData::Point(strp(&x)?, strp(&y)?))
+            Ok(ElementParseData::Point(parse_float(&x)?, parse_float(&y)?))
         }
     }
 

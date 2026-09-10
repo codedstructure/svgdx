@@ -12,7 +12,9 @@ use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, TransformAttr};
 use crate::style::{Selectable, Stylable};
 use crate::transform::{EventGen, process_events};
-use crate::types::{AttrMap, ClassList, ElRef, OrderIndex, StyleMap, extract_urlref, fstr, strp};
+use crate::types::{
+    AttrMap, ClassList, ElRef, OrderIndex, StyleMap, extract_urlref, fstr, parse_float,
+};
 
 use core::fmt::Display;
 
@@ -379,7 +381,7 @@ impl SvgElement {
 
     /// Get a numeric attribute, returning None if absent, Err if not a valid number.
     pub fn get_num_attr(&self, key: &str) -> Result<Option<f32>> {
-        self.get_attr(key).map(strp).transpose()
+        self.get_attr(key).map(parse_float).transpose()
     }
 
     /// Set an attribute to a formatted numeric value.
@@ -396,7 +398,7 @@ impl SvgElement {
 
     /// Pop an attribute and parse as numeric, returning None if absent, Err if not a valid number.
     pub fn pop_num_attr(&mut self, key: &str) -> Result<Option<f32>> {
-        self.pop_attr(key).map(|v| strp(&v)).transpose()
+        self.pop_attr(key).map(|v| parse_float(&v)).transpose()
     }
 
     /// order-preserving attribute list

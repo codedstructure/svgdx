@@ -32,7 +32,7 @@ use crate::document::{EventKind, OutputList, Spacing};
 use crate::errors::Result;
 use crate::geometry::{BoundingBox, Length, strp_length};
 use crate::transform::EventGen;
-use crate::types::{attr_split, fstr, split_compound_attr, strp};
+use crate::types::{attr_split, fstr, parse_float, split_compound_attr};
 
 #[derive(Debug, PartialEq)]
 struct GradStop {
@@ -62,7 +62,7 @@ impl std::str::FromStr for GradStop {
         let opacity = pieces
             .next()
             .map(|o_str| {
-                strp(&o_str).and_then(|o| {
+                parse_float(&o_str).and_then(|o| {
                     (0.0..=1.0).contains(&o).then_some(o).ok_or_else(|| {
                         Error::InvalidValue("Invalid opacity".into(), o_str.to_owned())
                     })
@@ -125,7 +125,7 @@ fn apply_gradient_rotation(el: &mut SvgElement) -> Result<()> {
     let Some(angle) = el.pop_attr("rotate") else {
         return Ok(());
     };
-    let angle = strp(&angle)
+    let angle = parse_float(&angle)
         .map_err(|e| Error::InvalidValue(format!("invalid rotate: {e}"), angle.clone()))?;
     // objectBoundingBox (assumed) gradients are normalised to 0..1, so rotate around 0.5,0.5
     let rot = format!("rotate({}, 0.5, 0.5)", fstr(angle));
@@ -196,7 +196,7 @@ impl EventGen for LinearGradient<'_> {
             .map(|dir| {
                 {
                     // normalize angle to 0-360 range
-                    strp(&dir).map(|a| {
+                    parse_float(&dir).map(|a| {
                         let a = a % 360.0;
                         if a < 0.0 { a + 360.0 } else { a }
                     })
