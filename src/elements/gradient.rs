@@ -28,7 +28,7 @@
 use super::SvgElement;
 use crate::Error;
 use crate::context::TransformerContext;
-use crate::document::{EventKind, OutputList};
+use crate::document::{EventKind, OutputList, Spacing};
 use crate::errors::Result;
 use crate::geometry::{BoundingBox, Length, strp_length};
 use crate::transform::EventGen;
@@ -285,8 +285,10 @@ impl EventGen for LinearGradient<'_> {
             events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
             for el in new_inner {
+                events.push(Spacing::LineBreak);
                 events.extend(el.generate_events(context)?.0);
             }
+            events.push(Spacing::LineBreak);
             events.push(EventKind::End(el_name));
         }
 
@@ -368,8 +370,10 @@ impl EventGen for RadialGradient<'_> {
             events.push(EventKind::Start(new_el.clone().into()));
             events.extend(inner);
             for el in new_inner {
+                events.push(Spacing::LineBreak);
                 events.extend(el.generate_events(context)?.0);
             }
+            events.push(Spacing::LineBreak);
             events.push(EventKind::End(el_name));
         }
 

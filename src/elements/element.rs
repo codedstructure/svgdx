@@ -523,7 +523,7 @@ impl SvgElement {
                     events.push(EventKind::Start(text_elem.clone().into()));
                     events.push(Spacing::LineBreak);
                     for elem in &text_elements[1..] {
-                        // Note: we can't insert a newline/last_indent here as whitespace
+                        // Note: we can't insert a Spacing::LineBreak here as whitespace
                         // following a tspan is compressed to a single space and causes
                         // misalignment - see https://stackoverflow.com/q/41364908
                         events.push(EventKind::Start(elem.clone().into()));

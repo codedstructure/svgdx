@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: `reformat()` library method to reformat an input document without
+  transforming it. Exposed through the CLI as `--reformat-only`, and in the
+  editor via the Input > Reformat menu option.
+
 - Added: dx/dy/dxy now work with connectors (and potentially other elements
   that previously ignored them; implemented through more general reordering
   of the processing steps).
