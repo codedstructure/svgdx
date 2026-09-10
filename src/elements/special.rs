@@ -5,6 +5,7 @@ use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition};
 use crate::geometry::BoundingBox;
 use crate::transform::{EventGen, process_events};
+use crate::types::strp;
 
 #[derive(Debug, Clone)]
 pub struct DefaultsElement<'a>(pub &'a SvgElement);
@@ -38,7 +39,7 @@ impl EventGen for ConfigElement<'_> {
         let mut new_config = context.config.clone();
         for (key, value) in self.0.get_attrs() {
             match key.as_str() {
-                "scale" => new_config.scale = value.parse()?,
+                "scale" => new_config.scale = strp(&value)?,
                 "debug" => new_config.debug = value.parse()?,
                 "auto-style-mode" => new_config.auto_style_mode = value.parse()?,
                 "border" => new_config.border = value.parse()?,
@@ -47,7 +48,7 @@ impl EventGen for ConfigElement<'_> {
                 "var-limit" => new_config.var_limit = value.parse()?,
                 "depth-limit" => new_config.depth_limit = value.parse()?,
                 "path-repeat-limit" => new_config.path_repeat_limit = value.parse()?,
-                "font-size" => new_config.font_size = value.parse()?,
+                "font-size" => new_config.font_size = strp(&value)?,
                 "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = value.parse()?,
                 "theme" => new_config.theme = value.parse()?,

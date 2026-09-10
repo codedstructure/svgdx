@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::num::{ParseFloatError, ParseIntError};
+use std::num::ParseIntError;
 use std::str::{ParseBoolError, Utf8Error};
 use std::string::FromUtf8Error;
 
@@ -138,12 +138,6 @@ impl Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::Io(err)
-    }
-}
-
-impl From<ParseFloatError> for Error {
-    fn from(err: ParseFloatError) -> Error {
-        Error::Parse(format!("float: {err}"))
     }
 }
 
