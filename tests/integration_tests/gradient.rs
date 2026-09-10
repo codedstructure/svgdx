@@ -67,24 +67,38 @@ fn test_gradient_nonempty() {
 #[test]
 fn test_gradient_with_stops() {
     let input = r#"<linearGradient id="grad" stops="0% red; 100% blue"/>"#;
-    let expected = r#"<linearGradient id="grad"><stop offset="0%" stop-color="red"/><stop offset="100%" stop-color="blue"/></linearGradient>"#;
+    let expected = r#"<linearGradient id="grad">
+  <stop offset="0%" stop-color="red"/>
+  <stop offset="100%" stop-color="blue"/>
+</linearGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     let input = r#"<radialGradient id="grad" stops="0% yellow; 50% green; 100% black"/>"#;
-    let expected = r#"<radialGradient id="grad"><stop offset="0%" stop-color="yellow"/><stop offset="50%" stop-color="green"/><stop offset="100%" stop-color="black"/></radialGradient>"#;
+    let expected = r#"<radialGradient id="grad">
+  <stop offset="0%" stop-color="yellow"/>
+  <stop offset="50%" stop-color="green"/>
+  <stop offset="100%" stop-color="black"/>
+</radialGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     // with opacity
     let input = r#"<linearGradient id="grad" stops="0% red 1; 100% blue 0.5"/>"#;
-    let expected = r#"<linearGradient id="grad"><stop offset="0%" stop-color="red" stop-opacity="1"/><stop offset="100%" stop-color="blue" stop-opacity="0.5"/></linearGradient>"#;
+    let expected = r#"<linearGradient id="grad">
+  <stop offset="0%" stop-color="red" stop-opacity="1"/>
+  <stop offset="100%" stop-color="blue" stop-opacity="0.5"/>
+</linearGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     // fraction instead of percentage
     let input = r#"<radialGradient id="grad" stops="0 red; 0.5 green; 1 black"/>"#;
-    let expected = r#"<radialGradient id="grad"><stop offset="0" stop-color="red"/><stop offset="0.5" stop-color="green"/><stop offset="1" stop-color="black"/></radialGradient>"#;
+    let expected = r#"<radialGradient id="grad">
+  <stop offset="0" stop-color="red"/>
+  <stop offset="0.5" stop-color="green"/>
+  <stop offset="1" stop-color="black"/>
+</radialGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -94,13 +108,19 @@ fn test_gradient_compound_attrs() {
     // xy1, xy2 for linearGradient
     let input =
         r#"<linearGradient id="grad" xy1="0,0.5" xy2="80% 90%" stops="0% red; 100% blue"/>"#;
-    let expected = r#"<linearGradient id="grad" x1="0" y1="0.5" x2="80%" y2="90%"><stop offset="0%" stop-color="red"/><stop offset="100%" stop-color="blue"/></linearGradient>"#;
+    let expected = r#"<linearGradient id="grad" x1="0" y1="0.5" x2="80%" y2="90%">
+  <stop offset="0%" stop-color="red"/>
+  <stop offset="100%" stop-color="blue"/>
+</linearGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     // cxy, fxy for radialGradient
     let input = r#"<radialGradient id="grad" cxy="50%,50%" r="1" fxy="0.3 0.5" stops="0% yellow; 100% black"/>"#;
-    let expected = r#"<radialGradient id="grad" cx="50%" cy="50%" r="1" fx="0.3" fy="0.5"><stop offset="0%" stop-color="yellow"/><stop offset="100%" stop-color="black"/></radialGradient>"#;
+    let expected = r#"<radialGradient id="grad" cx="50%" cy="50%" r="1" fx="0.3" fy="0.5">
+  <stop offset="0%" stop-color="yellow"/>
+  <stop offset="100%" stop-color="black"/>
+</radialGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
@@ -160,12 +180,18 @@ fn test_gradient_single_point() {
 #[test]
 fn test_gradient_rotate_attr() {
     let input = r#"<linearGradient id="grad" rotate="90" stops="0% red; 100% blue"/>"#;
-    let expected = r#"<linearGradient id="grad" gradientTransform="rotate(90, 0.5, 0.5)"><stop offset="0%" stop-color="red"/><stop offset="100%" stop-color="blue"/></linearGradient>"#;
+    let expected = r#"<linearGradient id="grad" gradientTransform="rotate(90, 0.5, 0.5)">
+  <stop offset="0%" stop-color="red"/>
+  <stop offset="100%" stop-color="blue"/>
+</linearGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
     let input = r#"<radialGradient id="grad" rotate="-30" stops="0% white; 100% black"/>"#;
-    let expected = r#"<radialGradient id="grad" gradientTransform="rotate(-30, 0.5, 0.5)"><stop offset="0%" stop-color="white"/><stop offset="100%" stop-color="black"/></radialGradient>"#;
+    let expected = r#"<radialGradient id="grad" gradientTransform="rotate(-30, 0.5, 0.5)">
+  <stop offset="0%" stop-color="white"/>
+  <stop offset="100%" stop-color="black"/>
+</radialGradient>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 
