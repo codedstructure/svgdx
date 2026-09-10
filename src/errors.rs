@@ -1,6 +1,5 @@
 use std::collections::HashMap;
-use std::num::ParseIntError;
-use std::str::{ParseBoolError, Utf8Error};
+use std::str::Utf8Error;
 use std::string::FromUtf8Error;
 
 use crate::elements::SvgElement;
@@ -15,6 +14,12 @@ pub enum Error {
     Io(std::io::Error),
     /// A value or part of a value could not be parsed
     Parse(String),
+    /// A value could not be parsed as a float
+    ParseFloat(String),
+    /// A value could not be parsed as a boolean
+    ParseBool(String),
+    /// A value could not be parsed as an integer
+    ParseInt(String),
     /// An attribute has an invalid value
     InvalidValue(String, String), // reason, value
     /// Wrong number of arguments or values
@@ -57,6 +62,9 @@ impl std::fmt::Display for Error {
         match self {
             Error::Io(source) => write!(f, "IO error: {source}"),
             Error::Parse(reason) => write!(f, "Parse error: {reason}"),
+            Error::ParseFloat(value) => write!(f, "Expected a float: {value}"),
+            Error::ParseBool(value) => write!(f, "Expected a bool: {value}"),
+            Error::ParseInt(value) => write!(f, "Expected an integer: {value}"),
             Error::InvalidValue(reason, value) => write!(f, "'{value}' invalid ({reason})"),
             Error::Arity(reason) => write!(f, "Arity error: {reason}"),
             Error::Reference(elref) => write!(f, "Reference error: {elref}"),
@@ -104,6 +112,9 @@ impl std::error::Error for Error {
         match self {
             Error::Io(source) => Some(source),
             Error::Parse(_) => None,
+            Error::ParseFloat(_) => None,
+            Error::ParseBool(_) => None,
+            Error::ParseInt(_) => None,
             Error::InvalidValue(_, _) => None,
             Error::Arity(_) => None,
             Error::Reference(_) => None,
@@ -138,18 +149,6 @@ impl Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::Io(err)
-    }
-}
-
-impl From<ParseBoolError> for Error {
-    fn from(err: ParseBoolError) -> Error {
-        Error::Parse(format!("bool: {err}"))
-    }
-}
-
-impl From<ParseIntError> for Error {
-    fn from(err: ParseIntError) -> Error {
-        Error::Parse(format!("int: {err}"))
     }
 }
 

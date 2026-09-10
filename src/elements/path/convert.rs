@@ -7,7 +7,7 @@ pub fn points_to_path(element: &SvgElement) -> Result<SvgElement> {
         element.get_attr("corner-radius"),
         element.get_attr("points"),
     ) {
-        let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(&a).ok()).collect();
+        let floats: Vec<f32> = attr_split(p).filter_map(|a| strp(a).ok()).collect();
         // chunks_exact to ignore any unpaired final number
         (
             floats

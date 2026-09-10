@@ -610,10 +610,10 @@ impl SvgElement {
         for (key, value) in self.get_attrs() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    new_elem.set_num_attr(&key, strp(&value)? + dx);
+                    new_elem.set_num_attr(&key, strp(value)? + dx);
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    new_elem.set_num_attr(&key, strp(&value)? + dy);
+                    new_elem.set_num_attr(&key, strp(value)? + dy);
                 }
                 _ => (),
             }
@@ -659,7 +659,7 @@ impl SvgElement {
             let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
             let gap = if !remain.is_empty() {
                 let mut parts = attr_split(remain);
-                strp(&parts.next().unwrap_or("0".to_string()))?
+                strp(parts.next().unwrap_or("0".to_string()))?
             } else {
                 0.
             };

@@ -45,17 +45,17 @@ fn get_text_position(
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy);
             if let Some(pdx) = parts.next() {
-                t_dx = strp(&pdx)?;
+                t_dx = strp(pdx)?;
             }
             if let Some(pdy) = parts.next() {
-                t_dy = strp(&pdy)?;
+                t_dy = strp(pdy)?;
             }
         }
         if let Some(dx) = dx {
-            t_dx = strp(&dx)?;
+            t_dx = strp(dx)?;
         }
         if let Some(dy) = dy {
-            t_dy = strp(&dy)?;
+            t_dy = strp(dy)?;
         }
     }
 

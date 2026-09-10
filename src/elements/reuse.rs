@@ -61,7 +61,7 @@ impl EventGen for ReuseElement<'_> {
                 "rotate" | "text-rotate" => {
                     // any existing rotation is built on by the reuse element
                     if let Some(inst_rot) = instance_element.get_num_attr(&attr)? {
-                        let rot = strp(&value)?;
+                        let rot = strp(value)?;
                         instance_element.set_num_attr(&attr, inst_rot + rot);
                     } else {
                         instance_element.set_attr(&attr, &value);

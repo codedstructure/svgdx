@@ -1,6 +1,6 @@
 use super::types::Vec2;
 use crate::errors::{Error, Result};
-use crate::types::strp;
+use crate::types::{parse_int, strp};
 
 // This assumes that any svgdx path extensions ('B'/'b', repeats) have already
 // been resolved, and path data is SVG-compliant.
@@ -113,7 +113,7 @@ pub(super) trait PathSyntax {
             }
         }
         self.skip_wsp_comma();
-        Ok(c.parse()?)
+        parse_int(c)
     }
 
     fn read_number(&mut self) -> Result<f32> {
@@ -163,7 +163,7 @@ pub(super) trait PathSyntax {
             }
         }
         self.skip_wsp_comma();
-        strp(&s)
+        strp(s)
     }
 
     fn read_coord(&mut self) -> Result<Vec2> {
