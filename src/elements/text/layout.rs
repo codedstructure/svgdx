@@ -3,7 +3,7 @@ use crate::elements::SvgElement;
 use crate::elements::line_offset::get_point_along_linelike_el;
 use crate::errors::{Error, Result};
 use crate::geometry::ElementLoc;
-use crate::types::{ElRef, attr_split_cycle, fstr, strp};
+use crate::types::{ElRef, attr_split_cycle, fstr, parse_float};
 
 use super::markdown::{MdSpan, get_md_value};
 
@@ -45,17 +45,17 @@ fn get_text_position(
         if let Some(dxy) = dxy {
             let mut parts = attr_split_cycle(&dxy);
             if let Some(pdx) = parts.next() {
-                t_dx = strp(&pdx)?;
+                t_dx = parse_float(pdx)?;
             }
             if let Some(pdy) = parts.next() {
-                t_dy = strp(&pdy)?;
+                t_dy = parse_float(pdy)?;
             }
         }
         if let Some(dx) = dx {
-            t_dx = strp(&dx)?;
+            t_dx = parse_float(dx)?;
         }
         if let Some(dy) = dy {
-            t_dy = strp(&dy)?;
+            t_dy = parse_float(dy)?;
         }
     }
 

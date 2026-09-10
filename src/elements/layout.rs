@@ -15,7 +15,7 @@ use crate::geometry::{
     TrblLength, parse_elref_suffix, strp_length,
 };
 use crate::types::{
-    attr_split, extract_elref, extract_elref_token, fstr, split_compound_attr, strp,
+    attr_split, extract_elref, extract_elref_token, fstr, parse_float, split_compound_attr,
 };
 
 /// Replace all refspec entries in a string with lookup results
@@ -318,9 +318,9 @@ impl SvgElement {
                 if let Some(r) = self.get_attr("r") {
                     let cx = self.get_attr("cx").unwrap_or(zstr);
                     let cy = self.get_attr("cy").unwrap_or(zstr);
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
-                    let r = strp(r)? * FRAC_1_SQRT_2;
+                    let cx = parse_float(cx)?;
+                    let cy = parse_float(cy)?;
+                    let r = parse_float(r)? * FRAC_1_SQRT_2;
                     Ok(Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r)))
                 } else {
                     Ok(None)
@@ -331,10 +331,10 @@ impl SvgElement {
                 if let (Some(rx), Some(ry)) = (self.get_attr("rx"), self.get_attr("ry")) {
                     let cx = self.get_attr("cx").unwrap_or(zstr);
                     let cy = self.get_attr("cy").unwrap_or(zstr);
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
-                    let rx = strp(rx)? * FRAC_1_SQRT_2;
-                    let ry = strp(ry)? * FRAC_1_SQRT_2;
+                    let cx = parse_float(cx)?;
+                    let cy = parse_float(cy)?;
+                    let rx = parse_float(rx)? * FRAC_1_SQRT_2;
+                    let ry = parse_float(ry)? * FRAC_1_SQRT_2;
                     Ok(Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry)))
                 } else {
                     Ok(None)
@@ -354,10 +354,10 @@ impl SvgElement {
         let mut width = None;
         let mut height = None;
         if let Some(w) = self.get_attr("width") {
-            width = Some(strp(w)?);
+            width = Some(parse_float(w)?);
         }
         if let Some(h) = self.get_attr("height") {
-            height = Some(strp(h)?);
+            height = Some(parse_float(h)?);
         }
         match self.name() {
             "use" | "reuse" => {
@@ -477,7 +477,7 @@ impl SvgElement {
             // if attrs cannot be converted to f32 *and* do not contain '$'/'#'/'^'/'+'
             // (which might be resolved later) then return Ok(None).
             // This will return `true` for things such as "10%" or "40mm".
-            strp(value).is_err()
+            parse_float(value).is_err()
                 && !(value.contains(VAR_PREFIX)
                     || value.contains(ELREF_ID_PREFIX)
                     || value.contains(ELREF_PREVIOUS)
@@ -490,8 +490,8 @@ impl SvgElement {
                 if passthrough(x) || passthrough(y) {
                     return Ok(None);
                 }
-                let x = strp(x)?;
-                let y = strp(y)?;
+                let x = parse_float(x)?;
+                let y = parse_float(y)?;
                 Some(BoundingBox::new(x, y, x, y))
             }
             "box" | "rect" | "image" | "svg" | "foreignObject" => {
@@ -501,10 +501,10 @@ impl SvgElement {
                     if passthrough(x) || passthrough(y) || passthrough(w) || passthrough(h) {
                         return Ok(None);
                     }
-                    let x = strp(x)?;
-                    let y = strp(y)?;
-                    let w = strp(w)?;
-                    let h = strp(h)?;
+                    let x = parse_float(x)?;
+                    let y = parse_float(y)?;
+                    let w = parse_float(w)?;
+                    let h = parse_float(h)?;
                     Some(BoundingBox::new(x, y, x + w, y + h))
                 } else {
                     None
@@ -518,10 +518,10 @@ impl SvgElement {
                 if passthrough(x1) || passthrough(y1) || passthrough(x2) || passthrough(y2) {
                     return Ok(None);
                 }
-                let x1 = strp(x1)?;
-                let y1 = strp(y1)?;
-                let x2 = strp(x2)?;
-                let y2 = strp(y2)?;
+                let x1 = parse_float(x1)?;
+                let y1 = parse_float(y1)?;
+                let x2 = parse_float(x2)?;
+                let y2 = parse_float(y2)?;
                 Some(BoundingBox::new(
                     x1.min(x2),
                     y1.min(y2),
@@ -547,7 +547,7 @@ impl SvgElement {
                             if point.is_empty() {
                                 continue;
                             }
-                            let point: f32 = strp(point)?;
+                            let point: f32 = parse_float(point)?;
                             if idx % 2 == 0 {
                                 min_x = min_x.min(point);
                                 max_x = max_x.max(point);
@@ -577,9 +577,9 @@ impl SvgElement {
                     if passthrough(cx) || passthrough(cy) || passthrough(r) {
                         return Ok(None);
                     }
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
-                    let r = strp(r)?;
+                    let cx = parse_float(cx)?;
+                    let cy = parse_float(cy)?;
+                    let r = parse_float(r)?;
                     Some(BoundingBox::new(cx - r, cy - r, cx + r, cy + r))
                 } else {
                     None
@@ -592,10 +592,10 @@ impl SvgElement {
                     if passthrough(cx) || passthrough(cy) || passthrough(rx) || passthrough(ry) {
                         return Ok(None);
                     }
-                    let cx = strp(cx)?;
-                    let cy = strp(cy)?;
-                    let rx = strp(rx)?;
-                    let ry = strp(ry)?;
+                    let cx = parse_float(cx)?;
+                    let cy = parse_float(cy)?;
+                    let rx = parse_float(rx)?;
+                    let ry = parse_float(ry)?;
                     Some(BoundingBox::new(cx - rx, cy - ry, cx + rx, cy + ry))
                 } else {
                     None
@@ -610,10 +610,10 @@ impl SvgElement {
         for (key, value) in self.get_attrs() {
             match key.as_str() {
                 "x" | "cx" | "x1" | "x2" => {
-                    new_elem.set_num_attr(&key, strp(&value)? + dx);
+                    new_elem.set_num_attr(&key, parse_float(value)? + dx);
                 }
                 "y" | "cy" | "y1" | "y2" => {
-                    new_elem.set_num_attr(&key, strp(&value)? + dy);
+                    new_elem.set_num_attr(&key, parse_float(value)? + dy);
                 }
                 _ => (),
             }
@@ -659,7 +659,7 @@ impl SvgElement {
             let (this_width, this_height) = self.size(ctx)?.unwrap_or(Size::new(0., 0.)).as_wh();
             let gap = if !remain.is_empty() {
                 let mut parts = attr_split(remain);
-                strp(&parts.next().unwrap_or("0".to_string()))?
+                parse_float(parts.next().unwrap_or("0".to_string()))?
             } else {
                 0.
             };
@@ -885,7 +885,7 @@ fn eval_size_attributes(element: &mut SvgElement, ctx: &impl ElementMap) -> Resu
     for (key, value) in element.get_attrs() {
         if is_size_attr(element, &key) {
             let computed = eval_size_attr(&key, &value, ctx)?;
-            if strp(&computed).is_ok() {
+            if parse_float(&computed).is_ok() {
                 element.set_attr(&key, &computed);
             }
         }
@@ -901,7 +901,7 @@ fn eval_pos_attributes(
     for (key, value) in element.get_attrs() {
         if is_pos_attr(&key) {
             let computed = eval_pos_attr(element, &key, &value, ctx, force_origin)?;
-            if strp(&computed).is_ok() {
+            if parse_float(&computed).is_ok() {
                 element.set_attr(&key, &computed);
             }
         }

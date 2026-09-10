@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use crate::constants::{EDGESPEC_SEP, LOCSPEC_SEP};
 use crate::errors::{Error, Result};
-use crate::types::{attr_split, fstr, strp};
+use crate::types::{attr_split, fstr, parse_float};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Size {
@@ -112,7 +112,7 @@ impl FromStr for Length {
     /// Note this deliberately does not clamp to 0..1
     fn from_str(value: &str) -> Result<Self> {
         if let Some(pc) = value.strip_suffix('%') {
-            Ok(Length::Ratio(strp(pc)? * 0.01))
+            Ok(Length::Ratio(parse_float(pc)? * 0.01))
         } else if let Some((numer, denom)) = value.split_once('/') {
             let numer = numer
                 .parse()
@@ -122,7 +122,7 @@ impl FromStr for Length {
             })?;
             Ok(Length::Rational(numer, denom))
         } else {
-            Ok(Length::Absolute(strp(value)?))
+            Ok(Length::Absolute(parse_float(value)?))
         }
     }
 }

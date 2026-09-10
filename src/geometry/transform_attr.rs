@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
-use crate::types::{fstr, strp};
+use crate::types::{fstr, parse_float};
 
 impl BoundingBox {
     pub fn xfrm_scale(&self, sx: f32, sy: f32) -> Self {
@@ -47,7 +47,7 @@ impl FromStr for TransformType {
             .ok_or_else(|| Error::Parse("no closing bracket".to_owned()))?
             .split(&[',', ' ', '\t', '\n', '\r'])
             .filter(|&v| !v.is_empty())
-            .map(strp)
+            .map(parse_float)
             .collect::<Result<Vec<_>>>()?;
         // See https://www.w3.org/TR/SVG11/coords.html#TransformAttribute
         Ok(match name.to_lowercase().as_str() {

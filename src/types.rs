@@ -5,7 +5,7 @@ use crate::constants::{
 use crate::errors::{Error, Result};
 use crate::geometry::Length;
 use std::fmt::{self, Display};
-use std::num::NonZeroU8;
+use std::num::{NonZeroU8, ParseIntError};
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 
@@ -26,10 +26,25 @@ pub fn fstr(x: f32) -> String {
 }
 
 /// Parse a string to an f32
-pub fn strp(s: &str) -> Result<f32> {
+pub fn parse_float(s: impl AsRef<str>) -> Result<f32> {
+    let s = s.as_ref();
     s.trim()
         .parse::<f32>()
-        .map_err(|_| Error::Parse(format!("expected a number: '{s}'")))
+        .map_err(|_| Error::ParseFloat(s.into()))
+}
+
+/// Parse a string to an integer
+pub fn parse_int<N: FromStr<Err = ParseIntError>>(s: impl AsRef<str>) -> Result<N> {
+    let s = s.as_ref();
+    s.trim().parse::<N>().map_err(|_| Error::ParseInt(s.into()))
+}
+
+/// Parse a string to a bool
+pub fn parse_bool(s: impl AsRef<str>) -> Result<bool> {
+    let s = s.as_ref();
+    s.trim()
+        .parse::<bool>()
+        .map_err(|_| Error::ParseBool(s.into()))
 }
 
 /// Parse a string such as "32.5mm" into a value (32.5) and unit ("mm")
@@ -55,7 +70,7 @@ pub fn split_unit(s: &str) -> Result<(f32, String)> {
             unit.push(ch);
         }
     }
-    Ok((strp(&value)?, unit))
+    Ok((parse_float(&value)?, unit))
 }
 
 /// Returns iterator over whitespace-or-comma separated values
@@ -954,11 +969,11 @@ mod test {
 
     #[test]
     fn test_strp() {
-        assert_eq!(strp("1").ok(), Some(1.));
-        assert_eq!(strp("100").ok(), Some(100.));
-        assert_eq!(strp("-100").ok(), Some(-100.));
-        assert_eq!(strp("-0.00123").ok(), Some(-0.00123));
-        assert_eq!(strp("1234567.8").ok(), Some(1234567.8));
+        assert_eq!(parse_float("1").ok(), Some(1.));
+        assert_eq!(parse_float("100").ok(), Some(100.));
+        assert_eq!(parse_float("-100").ok(), Some(-100.));
+        assert_eq!(parse_float("-0.00123").ok(), Some(-0.00123));
+        assert_eq!(parse_float("1234567.8").ok(), Some(1234567.8));
     }
 
     #[test]
