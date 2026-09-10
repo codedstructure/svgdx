@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: new error types - `ParseFloat`, `ParseInt`, `ParseBool` - that
+  report on the value that caused the error (unlike the errors previously
+  converted from standard library e.g. core::num::ParseIntError).
+
 - Added: `reformat()` library method to reformat an input document without
   transforming it. Exposed through the CLI as `--reformat-only`, and in the
   editor via the Input > Reformat menu option.
