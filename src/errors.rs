@@ -48,6 +48,8 @@ pub enum Error {
     MissingBBox(String),
     /// Logic error detected; should not happen in normal operation
     InternalLogic(String),
+    /// Variable is undefined
+    Undefined(String),
     /// Multiple errors, keyed by element OrderIndex
     Multi(HashMap<OrderIndex, (SvgElement, Error)>),
     /// CLI errors - bad arguments / values etc.
@@ -89,6 +91,7 @@ impl std::fmt::Display for Error {
             Error::MissingAttr(attr) => write!(f, "Element missing attribute '{attr}'"),
             Error::MissingBBox(reason) => write!(f, "Missing bounding box: {reason}"),
             Error::InternalLogic(reason) => write!(f, "Internal logic error: {reason}"),
+            Error::Undefined(var_name) => write!(f, "Undefined variable: {var_name}"),
             Error::Multi(errors) => {
                 let mut errs = errors.iter().collect::<Vec<_>>();
                 errs.sort_by(|a, b| a.0.cmp(b.0));
@@ -129,6 +132,7 @@ impl std::error::Error for Error {
             Error::MissingAttr(_) => None,
             Error::MissingBBox(_) => None,
             Error::InternalLogic(_) => None,
+            Error::Undefined(_) => None,
             Error::Multi(_) => None,
             Error::Xml(e) => Some(&**e),
             #[cfg(any(feature = "cli", feature = "server"))]

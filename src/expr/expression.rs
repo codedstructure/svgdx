@@ -647,7 +647,7 @@ impl<'a> EvalState<'a> {
                 }
             }
         } else {
-            return Err(Error::Parse(format!("could not evaluate variable '{v}'")));
+            return Err(Error::Undefined(v.into()));
         };
         // Need this to allow e.g. "$var + $var"
         self.checked_vars.pop();

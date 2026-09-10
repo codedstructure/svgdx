@@ -1,6 +1,7 @@
 use super::expression::{EvalState, ExprValue};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, LocSpec};
+use crate::types::parse_float;
 
 use rand::prelude::*;
 use std::str::FromStr;
@@ -154,6 +155,13 @@ pub enum Function {
     Width,
     /// `height(bb)` -- height of bounding box bb
     Height,
+
+    /// `defined(a)` -- 1 if variable 'a' is defined, 0 otherwise
+    Defined,
+    /// `var(a)` -- value of variable 'a'
+    Var,
+    /// `num(a)` -- numeric value of string 'a'
+    Num,
 }
 
 impl FromStr for Function {
@@ -228,6 +236,9 @@ impl FromStr for Function {
             "cy" => Self::Cy,
             "width" => Self::Width,
             "height" => Self::Height,
+            "defined" => Self::Defined,
+            "var" => Self::Var,
+            "num" => Self::Num,
             _ => return Err(Error::InvalidValue("function name".into(), value.into())),
         })
     }
@@ -660,6 +671,27 @@ pub fn eval_function(
         Function::Height => {
             let bb = args.one_bbox()?;
             bb.height()
+        }
+        Function::Defined => {
+            let var_name = args.one_string()?;
+            if eval_state.context.get_var(&var_name).is_some() {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        Function::Var => {
+            let var_name = args.one_string()?;
+            return Ok(ExprValue::String(
+                eval_state
+                    .context
+                    .get_var(&var_name)
+                    .ok_or(Error::Undefined(var_name))?,
+            ));
+        }
+        Function::Num => {
+            let s = args.one_string()?;
+            return Ok(ExprValue::Number(parse_float(&s)?));
         }
     };
     Ok(e.into())

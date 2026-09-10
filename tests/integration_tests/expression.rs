@@ -240,3 +240,23 @@ fn test_bbox_expr_next_prev() {
         assert_contains!(output, exp);
     }
 }
+
+#[test]
+fn test_var_defined() {
+    let input = r##"
+<var xyz="0" pqr="" ijk="this is a long string"/>
+<text id="z" text="{{ defined('abc') }}:{{ defined('xyz')}}:{{ defined('pqr') }}:{{ defined('ijk') }}"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, ">0:1:1:1</text>");
+}
+
+#[test]
+fn test_var_value() {
+    let input = r##"
+<var a="1" b="2"/>
+<text id="z" text="{{ num(var('a')) }}:{{ num(var('b')) }}"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, ">1:2</text>");
+}
