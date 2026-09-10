@@ -57,6 +57,35 @@ Variables defined in a `<var>` element are updated simultaneously in parallel, a
 </svg>
 ```
 
+There are occasions where having default variable values is useful. This can be achieved using the `<varDefault>` element: this works exactly the same as the `<var>` element with the exception that if a variable is already defined, it is left as-is rather than changed.
+
+For example:
+
+```xml-svgdx-inline
+<svg>
+  <g>
+    <var a="1" b="2"/>
+    <varDefault a="8" b="9" c="10"/>
+    <rect wh="20 15" text="a = $a \n b = $b \n c = $c"/>
+  </g>
+  <g>
+    <var a="7"/>
+    <varDefault a="3" b="4" c="5"/>
+    <rect y="20" wh="20 15" text="a = $a \n b = $b \n c = $c"/>
+  </g>
+</svg>
+```
+
+Note how variables are **scoped**: the variables defined in the first `<g>` element above are not visible in the second `<g>` element (otherwise `$b` and `$c` would still be set, and `<varDefault>` would not set these to 4 / 5.)
+
+### Summary
+
+* Variables are defined using `<var>` and `<varDefault>` elements
+* Variables are referenced using `$name` or `${name}` syntax
+* Variables are updated 'in parallel' in a given `<var>` / `<varDefault>` element.
+* Variables are scoped: they are visible to subsequent sibling elements and descendent elements only.
+* If the value being assigned to a variable cannot be evaluated, that variable will not be set / updated: errors may occur as a result of trying to *use* the variable, depending on context.
+
 ## Expressions
 
 All the examples above treat the variables as simple string substitution. When included in an **expression block**,

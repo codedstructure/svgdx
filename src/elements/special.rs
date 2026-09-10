@@ -104,7 +104,7 @@ fn process_var_attrs<F>(
     element: &SvgElement,
     context: &mut TransformerContext,
     set_fn: F,
-) -> Result<(OutputList, Option<BoundingBox>)>
+) -> Result<()>
 where
     F: Fn(&mut TransformerContext, &str, &str),
 {
@@ -115,8 +115,12 @@ where
     for (key, value) in element.get_attrs() {
         // Note comments in `var` elements are permitted (and encouraged!)
         // in the input, but not propagated to the output.
-        if key != "_" && key != "__" {
-            let value = eval_attr(&value, context)?;
+        // Errors from eval_attr prevent creation of the variable,
+        // but are otherwise ignored.
+        if key != "_"
+            && key != "__"
+            && let Ok(value) = eval_attr(&value, context)
+        {
             // Detect / prevent uncontrolled expansion of variable values
             if value.len() > context.config.var_limit as usize {
                 return Err(Error::VarLimit(
@@ -131,7 +135,7 @@ where
     for (k, v) in new_vars.into_iter() {
         set_fn(context, &k, &v);
     }
-    Ok((OutputList::new(), None))
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -142,7 +146,8 @@ impl EventGen for VarElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var(k, v))
+        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var(k, v))?;
+        Ok((OutputList::new(), None))
     }
 }
 
@@ -154,7 +159,8 @@ impl EventGen for VarDefaultElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var_default(k, v))
+        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var_default(k, v))?;
+        Ok((OutputList::new(), None))
     }
 }
 
