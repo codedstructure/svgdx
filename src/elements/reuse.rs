@@ -104,6 +104,7 @@ impl EventGen for ReuseElement<'_> {
         // `reuse` element, as well as inherit `style` and `class` values.
         instance_element.set_indent(reuse_element.indent);
         instance_element.set_src_line(reuse_element.src_line);
+        instance_element.set_instance_origin_line(reuse_element.src_line);
         instance_element.add_styles_from(&reuse_element);
         instance_element.add_classes_from(&reuse_element);
         instance_element.set_order_index(&reuse_element.order_index);

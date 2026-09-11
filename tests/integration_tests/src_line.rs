@@ -66,3 +66,28 @@ fn test_src_line_text() {
     let result = transform_str(input, &meta_config()).unwrap();
     assert_eq!(result, expected);
 }
+
+#[test]
+fn test_reuse_src_line_propagates() {
+    let input = r##"
+<specs>
+  <g id="outer">
+    <rect wh="4 5"/>
+    <reuse href="#inner"/>
+  </g>
+  <rect id="inner" wh="2 3"/>
+</specs>
+<reuse href="#outer"/>
+"##;
+    let result = transform_str(input, &meta_config()).unwrap();
+    assert_eq!(result.matches("data-src-line=").count(), 2);
+    assert_eq!(result.matches(r#"data-src-line="9""#).count(), 2);
+}
+
+#[test]
+fn test_reuse_stdlib_src_line() {
+    let input = r##"<svg><reuse href="#d:store" wh="20"/></svg>"##;
+    let result = transform_str(input, &meta_config().with_stdlib()).unwrap();
+    assert_eq!(result.matches("data-src-line=").count(), 2);
+    assert_eq!(result.matches(r#"data-src-line="1""#).count(), 2);
+}

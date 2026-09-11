@@ -251,6 +251,13 @@ impl InputList {
         self.rebase_index(oi);
     }
 
+    /// set src-line for all events in this `InputList`
+    pub fn set_common_src_line(&mut self, line: usize) {
+        for ev in &mut self.events {
+            ev.meta.line = line;
+        }
+    }
+
     pub fn reformat(self) -> OutputList {
         let mut output = OutputList::new();
         let mut element_name_stack: Vec<String> = Vec::new();

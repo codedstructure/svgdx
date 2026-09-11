@@ -151,6 +151,9 @@ pub struct SvgElement {
     pub order_index: OrderIndex,
     pub indent: usize,
     pub src_line: usize,
+    /// records the source line of elements instanced (perhaps recursively)
+    /// from a `<reuse>` element.
+    instance_origin_line: Option<usize>,
     pub event_range: Option<(usize, usize)>,
     pub content_bbox: Option<BoundingBox>,
 }
@@ -224,6 +227,7 @@ impl SvgElement {
             order_index: OrderIndex::default(),
             indent: 0,
             src_line: 0,
+            instance_origin_line: None,
             event_range: None,
             content_bbox: None,
         }
@@ -442,6 +446,9 @@ impl SvgElement {
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         if let Some(mut inner_events) = self.inner_events(context) {
             inner_events.rebase_under(oi_base);
+            if let Some(line) = self.instance_origin_line {
+                inner_events.set_common_src_line(line);
+            }
             process_events(inner_events, context)
         } else {
             Ok((OutputList::new(), None))
@@ -561,6 +568,10 @@ impl SvgElement {
 
     pub fn set_src_line(&mut self, line: usize) {
         self.src_line = line;
+    }
+
+    pub fn set_instance_origin_line(&mut self, line: usize) {
+        self.instance_origin_line = Some(line);
     }
 
     pub fn set_order_index(&mut self, order_index: &OrderIndex) {
