@@ -67,7 +67,17 @@ pub struct SpecsElement<'a>(pub &'a SvgElement);
 
 /// Element names reserved by svgdx that cannot be used as custom element names.
 const SPECS_RESERVED_ELEMENT_NAMES: &[&str] = &[
-    "loop", "config", "reuse", "specs", "var", "if", "defaults", "for",
+    "loop",
+    "config",
+    "reuse",
+    "specs",
+    "var",
+    "varDefault",
+    "varTry",
+    "varTryDefault",
+    "if",
+    "defaults",
+    "for",
 ];
 
 impl EventGen for SpecsElement<'_> {
@@ -103,8 +113,9 @@ impl EventGen for SpecsElement<'_> {
 fn process_var_attrs<F>(
     element: &SvgElement,
     context: &mut TransformerContext,
+    ignore_fail: bool,
     set_fn: F,
-) -> Result<(OutputList, Option<BoundingBox>)>
+) -> Result<()>
 where
     F: Fn(&mut TransformerContext, &str, &str),
 {
@@ -115,23 +126,34 @@ where
     for (key, value) in element.get_attrs() {
         // Note comments in `var` elements are permitted (and encouraged!)
         // in the input, but not propagated to the output.
-        if key != "_" && key != "__" {
-            let value = eval_attr(&value, context)?;
-            // Detect / prevent uncontrolled expansion of variable values
-            if value.len() > context.config.var_limit as usize {
-                return Err(Error::VarLimit(
-                    key.clone(),
-                    value.len(),
-                    context.config.var_limit,
-                ));
+        // Errors from eval_attr prevent creation of the variable,
+        // but are otherwise ignored.
+        if key == "_" || key == "__" {
+            continue;
+        }
+        match eval_attr(&value, context) {
+            Ok(value) => {
+                // Detect / prevent uncontrolled expansion of variable values
+                if value.len() > context.config.var_limit as usize {
+                    return Err(Error::VarLimit(
+                        key.clone(),
+                        value.len(),
+                        context.config.var_limit,
+                    ));
+                }
+                new_vars.push((key, value));
             }
-            new_vars.push((key, value));
+            Err(e) => {
+                if !ignore_fail {
+                    return Err(e);
+                }
+            }
         }
     }
     for (k, v) in new_vars.into_iter() {
         set_fn(context, &k, &v);
     }
-    Ok((OutputList::new(), None))
+    Ok(())
 }
 
 #[derive(Debug, Clone)]
@@ -142,7 +164,8 @@ impl EventGen for VarElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var(k, v))
+        process_var_attrs(self.0, context, false, |ctx, k, v| ctx.set_var(k, v))?;
+        Ok((OutputList::new(), None))
     }
 }
 
@@ -154,7 +177,36 @@ impl EventGen for VarDefaultElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, |ctx, k, v| ctx.set_var_default(k, v))
+        process_var_attrs(self.0, context, false, |ctx, k, v| {
+            ctx.set_var_default(k, v)
+        })?;
+        Ok((OutputList::new(), None))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VarTryElement<'a>(pub &'a SvgElement);
+
+impl EventGen for VarTryElement<'_> {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var(k, v))?;
+        Ok((OutputList::new(), None))
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct VarTryDefaultElement<'a>(pub &'a SvgElement);
+
+impl EventGen for VarTryDefaultElement<'_> {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var_default(k, v))?;
+        Ok((OutputList::new(), None))
     }
 }
 

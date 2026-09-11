@@ -18,6 +18,7 @@ use loops::{ForElement, LoopElement};
 use reuse::ReuseElement;
 use special::{
     ConfigElement, DefaultsElement, IfElement, SpecsElement, VarDefaultElement, VarElement,
+    VarTryDefaultElement, VarTryElement,
 };
 use text::process_text_attr;
 

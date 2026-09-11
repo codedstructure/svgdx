@@ -11,12 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report on the value that caused the error (unlike the errors previously
   converted from standard library e.g. core::num::ParseIntError).
 
+- Added: new `<varTry>` and `<varTryDefault>` elements, analogous to the
+  non-try equivalents. if an expression used as a value in `<varTry>` or
+  `<varTryDefault>` cannot be evaluated (e.g. references something undefined),
+  the variable is simple not set or updated.
+
 - Added: new expression functions:
 
   * `defined(v)` - predicate to determine if variable 'v' is defined.
   * `var(v)` - return the (string) value of variable 'v'
   * `num(x)` - convert the string x into a number
-  
+
   The last two of these can throw errors: `Undefined` for `var()` and
   `ParseNumber` for `num()`.
 

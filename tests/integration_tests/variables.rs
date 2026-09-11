@@ -290,3 +290,32 @@ fn test_var_default() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_var_try() {
+    let input = r##"
+<varTry a="{{ sin(30, 0) }}" _="arity error"/>
+<varTry a="{{ sin(30) }}" _="valid, will set value"/>
+<varTry a="{{ notAFunction(0) }}" _="undefined, no change"/>
+<text text="$a"/>
+"##;
+    // The only successful set will be sin(30), i.e., 0.5
+    let expected = r#">0.5</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_var_try_default() {
+    let input = r##"
+<varTryDefault a="{{ sin(30, 0) }}" _="arity error"/>
+<varTryDefault a="{{ sin(30) }}" _="valid, will set value"/>
+<varTryDefault a="{{ notAFunction(0) }}" _="undefined, no change"/>
+<varTryDefault a="{{ sin(90) }}" _="valid, but a is already set"/>
+<text text="$a"/>
+"##;
+    // Will remain at 0.5, not sin(90)
+    let expected = r#">0.5</text>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

@@ -90,7 +90,10 @@ impl Scope {
     fn from_element(el: &SvgElement) -> Self {
         // TODO: Current behaviour causes variables set in <loop> elements
         // to leak beyond '</loop>', not sure if that is ideal...
-        let pseudo = matches!(el.name(), "var" | "varDefault" | "defaults" | "loop");
+        let pseudo = matches!(
+            el.name(),
+            "var" | "varDefault" | "varTry" | "varTryDefault" | "defaults" | "loop"
+        );
         let is_specs = el.name() == "specs";
         let vars = el.get_attrs().into_iter().collect();
         Self {

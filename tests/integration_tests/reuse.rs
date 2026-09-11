@@ -974,3 +974,31 @@ fn test_reuse_builtin_standard_library() {
         r#"<path d="M 0 0 H 7.5 L 10 2.5 V 20 H 0 Z M 7.5 0 V 2.5 H 10"/>"#
     );
 }
+
+#[test]
+fn test_var_fallback() {
+    // variables in varTryDefault are ignored if lookup fails
+    // useful for providing fallback values in reuse.
+    let input = r##"
+<specs>
+<symbol id="tall">
+<varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+<varDefault width="2" height="4"/>
+<rect name="$name" width="$width" height="$height"/>
+</symbol>
+</specs>
+<reuse name="z1" href="#tall"/>
+<reuse name="z2" href="#tall" width="50"/>
+<reuse name="z3" href="#tall" height="60"/>
+<reuse name="z4" href="#tall" width="23" height="45"/>
+"##;
+    let expected1 = r#"<rect width="2" height="4" name="z1"/>"#;
+    let expected2 = r#"<rect width="50" height="100" name="z2"/>"#;
+    let expected3 = r#"<rect width="30" height="60" name="z3"/>"#;
+    let expected4 = r#"<rect width="23" height="45" name="z4"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+    assert_contains!(output, expected4);
+}
