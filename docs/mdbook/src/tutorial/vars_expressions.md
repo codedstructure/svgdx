@@ -57,35 +57,6 @@ Variables defined in a `<var>` element are updated simultaneously in parallel, a
 </svg>
 ```
 
-There are occasions where having default variable values is useful. This can be achieved using the `<varDefault>` element: this works exactly the same as the `<var>` element with the exception that if a variable is already defined, it is left as-is rather than changed.
-
-For example:
-
-```xml-svgdx-inline
-<svg>
-  <g>
-    <var a="1" b="2"/>
-    <varDefault a="8" b="9" c="10"/>
-    <rect wh="20 15" text="a = $a \n b = $b \n c = $c"/>
-  </g>
-  <g>
-    <var a="7"/>
-    <varDefault a="3" b="4" c="5"/>
-    <rect y="20" wh="20 15" text="a = $a \n b = $b \n c = $c"/>
-  </g>
-</svg>
-```
-
-Note how variables are **scoped**: the variables defined in the first `<g>` element above are not visible in the second `<g>` element (otherwise `$b` and `$c` would still be set, and `<varDefault>` would not set these to 4 / 5.)
-
-### Summary
-
-* Variables are defined using `<var>` and `<varDefault>` elements
-* Variables are referenced using `$name` or `${name}` syntax
-* Variables are updated 'in parallel' in a given `<var>` / `<varDefault>` element.
-* Variables are scoped: they are visible to subsequent sibling elements and descendent elements only.
-* If the value being assigned to a variable cannot be evaluated, that variable will not be set / updated: errors may occur as a result of trying to *use* the variable, depending on context.
-
 ## Expressions
 
 All the examples above treat the variables as simple string substitution. When included in an **expression block**,
@@ -168,3 +139,66 @@ a comma separated list.
   <box wh="12 4" xy="^|h" text="{{r2p(p2r(10, -30))}}"/>
 </svg>
 ```
+
+## More Advanced Variables
+
+There are occasions where having default variable values is useful. This can be
+achieved using the `<varDefault>` element: this works exactly the same as the
+`<var>` element with the exception that if a variable is already defined, it is
+left as-is rather than changed.
+
+For example:
+
+```xml-svgdx-inline
+<svg>
+  <g>
+    <var a="1" b="2"/>
+    <varDefault a="8" b="9" c="10"/>
+    <rect wh="20 15" text="a = $a \n b = $b \n c = $c"/>
+  </g>
+  <g>
+    <var a="7"/>
+    <varDefault a="3" b="4" c="5"/>
+    <rect y="20" wh="20 15" text="a = $a \n b = $b \n c = $c"/>
+  </g>
+</svg>
+```
+
+Note how variables are **scoped**: the variables defined in the first `<g>`
+element above are not visible in the second `<g>` element (otherwise `$b` and
+`$c` would still be set, and `<varDefault>` would not set these to 4 / 5.)
+
+When a variable is assigned to the result of an expression, that can fail and
+prevent the document being processed. Issues can include expressions that use an
+undefined variable, or the wrong number of parameters to a function. A special
+pair of elements are provided analogous to `<var>` and `<varDefault>` that allow
+document processing to continue on error, and simply do not set or update a
+variable in that case.
+
+* `<varTry>` - equivalent to `<var>`, but if an error occurs determining the
+  value to set a variable to, that variable is not set or updated.
+* `<varTryDefault>` - equivalent to `<varDefault>`, but a variable is only set
+  if BOTH (a) it hasn't already been defined and (b) the value is evaluated
+  without error.
+
+Note both of these 'Try' variants operate variable by variable - if an error is
+encountered, that attribute is simply ignored, and the next one (if more exist)
+is considered.
+
+```xml-svgdx-inline
+<svg>
+  <varTry a="{{ sin(30, 0) }}" _="arity error"/>
+  <varTry a="{{ sin(30) }}" _="valid, will set 'a' to 0.5"/>
+  <varTry a="{{ notAFunction(0) }}" _="undefined, no change"/>
+  <varTryDefault a="{{ sin(90) }}" _="valid, but 'a' is already defined"/>
+  <text text="$a"/>
+</svg>
+```
+
+### Summary
+
+* Variables are defined using `<var>` and `<varDefault>` elements
+* Variables are referenced using `$name` or `${name}` syntax
+* Variables are updated 'in parallel' in a given `<var>` / `<varDefault>` element.
+* Variables are scoped: they are visible to subsequent sibling elements and descendent elements only.
+* The `<varTry>` and `<varTryDefault>` elements allow expression errors to be managed.

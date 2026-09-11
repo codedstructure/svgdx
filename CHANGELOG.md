@@ -11,9 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   report on the value that caused the error (unlike the errors previously
   converted from standard library e.g. core::num::ParseIntError).
 
-- Changed: if an expression used as a value in `<var>` or `<varDefault>`
-  cannot be evaluated (e.g. references something undefined), that is no
-  longer an error. Instead, the variable is simply not set / updated.
+- Added: new `<varTry>` and `<varTryDefault>` elements, analogous to the
+  non-try equivalents. if an expression used as a value in `<varTry>` or
+  `<varTryDefault>` cannot be evaluated (e.g. references something undefined),
+  the variable is simple not set or updated.
 
 - Added: new expression functions:
 

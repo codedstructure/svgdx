@@ -3,7 +3,7 @@ use super::preprocess::preprocess_dpoints;
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
     LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
-    VarElement, is_connector, process_text_attr,
+    VarElement, VarTryDefaultElement, VarTryElement, is_connector, process_text_attr,
 };
 use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList, Spacing};
@@ -38,6 +38,8 @@ impl EventGen for SvgElement {
             "specs" => SpecsElement(self).generate_events(context),
             "var" => VarElement(self).generate_events(context),
             "varDefault" => VarDefaultElement(self).generate_events(context),
+            "varTry" => VarTryElement(self).generate_events(context),
+            "varTryDefault" => VarTryDefaultElement(self).generate_events(context),
             "if" => IfElement(self).generate_events(context),
             "defaults" => DefaultsElement(self).generate_events(context),
             "for" => ForElement(self).generate_events(context),

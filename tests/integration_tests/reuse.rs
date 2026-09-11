@@ -977,11 +977,12 @@ fn test_reuse_builtin_standard_library() {
 
 #[test]
 fn test_var_fallback() {
-    // Check variables are ignored if lookup fails
+    // variables in varTryDefault are ignored if lookup fails
+    // useful for providing fallback values in reuse.
     let input = r##"
 <specs>
 <symbol id="tall">
-<varDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+<varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
 <varDefault width="2" height="4"/>
 <rect name="$name" width="$width" height="$height"/>
 </symbol>
