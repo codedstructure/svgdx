@@ -1,17 +1,39 @@
 <svg name="d">
   <specs>
     <g id="document">
+      <varTryDefault width="{{ $size * 0.7 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 0.7 }}" height="{{ $width * 10/7 }}"/>
+      <varDefault width="7" height="10"/>
       <var fold="{{min($width, $height) / 4}}"/>
       <path d="M 0 0 H {{$width - $fold}} L $width $fold V $height H 0 Z M {{$width - $fold}} 0 V $fold H $width"/>
     </g>
 
     <g id="store">
+      <varTryDefault width="{{ $size }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height }}" height="{{ $width }}"/>
+      <varDefault width="10" height="10"/>
       <var cap="{{min($height / 5, $width / 4)}}"/>
       <path d="M 0 $cap a {{$width / 2}} $cap 0 0 0 $width 0 a {{$width / 2}} $cap 0 0 0 {{-$width}} 0
         v {{$height - 2 * $cap}} a {{$width / 2}} $cap 0 0 0 $width 0 v {{-($height - 2 * $cap)}}"/>
     </g>
 
+    <g id="pipeline">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 7/15 }}"/>
+      <varTryDefault width="{{ $height }}" height="{{ $width }}"/>
+      <varDefault width="15" height="7"/>
+      <var cap="{{min($width / 5, $height / 4)}}"/>
+      <path d="M $cap 0
+        a $cap {{$height / 2}} 0 0 0 0 $height
+        a $cap {{$height / 2}} 0 0 0 0 {{-$height}}
+        h {{$width - 2 * $cap}}
+        a $cap {{$height / 2}} 0 0 1 0 $height
+        h {{-($width - 2 * $cap)}}"/>
+    </g>
+
     <g id="cloud">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 15/20 }}"/>
+      <varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+      <varDefault width="20" height="15"/>
       <path d="M {{$width * 0.2}} {{$height * 0.78}}
         C {{$width * 0.05}} {{$height * 0.78}} 0 {{$height * 0.62}} {{$width * 0.08}} {{$height * 0.5}}
         C {{$width * 0.05}} {{$height * 0.28}} {{$width * 0.22}} {{$height * 0.12}} {{$width * 0.38}} {{$height * 0.18}}
@@ -22,12 +44,226 @@
     </g>
 
     <g id="actor">
+      <varTryDefault width="{{ $size * 0.5 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+      <varDefault width="5" height="10"/>
       <var head="{{min(0.4 * $height, 0.9 * $width)}}"/>
       <var body="{{$height - $head}}"/>
       <var bhalf="{{$body * 0.5}}" bqtr="{{$body * 0.25}}" whalf="{{$width / 2}}"/>
       <path d="M0 0 a 0.1 0.1 0 0 0 0 -$head 0.1 0.1 0 0 0 0 $head // head circle
           v $bhalf m -$whalf -$bqtr h$width m-$whalf $bqtr // body and arms
           l -$whalf $bhalf m$whalf-$bhalf l$whalf $bhalf // legs"/>
+    </g>
+
+    <g id="house">
+      <var roof="{{$height * 0.34}}" door_l="{{$width * 0.38}}" door_r="{{$width * 0.62}}" door_t="{{$height * 0.58}}"/>
+      <path d="M {{$width / 2}} 0 L $width $roof V $height H 0 V $roof Z
+        M $door_l $height V $door_t H $door_r V $height"/>
+    </g>
+
+    <g id="diamond">
+      <var mid_x="{{$width / 2}}" mid_y="{{$height / 2}}"/>
+      <path d="M $mid_x 0 L $width $mid_y L $mid_x $height L 0 $mid_y Z"/>
+    </g>
+
+    <g id="terminal">
+      <var psz="{{min($width / 3, $height / 4, 5)}}"/>
+      <var psz2="{{$psz * 0.7}}"/>
+      <rect wh="$width $height" rx="2%"/>
+      <path d="m $psz $psz l $psz $psz2 l -$psz $psz2
+               m $psz 0 h $psz"/>
+    </g>
+
+    <g id="shield">
+      <var inset="{{$width * 0.18}}" mid_x="{{$width / 2}}" bend="{{$height * 0.4}}"/>
+      <path d="M $inset 0 H {{$width - $inset}}
+        Q $width 0 $width {{$height * 0.16}} V $bend
+        Q $width {{$height * 0.78}} $mid_x $height
+        Q 0 {{$height * 0.78}} 0 $bend
+        V {{$height * 0.16}} Q 0 0 $inset 0 Z"/>
+    </g>
+
+    <g id="key">
+      <var ring="{{min($width, $height) * 0.22}}" mid_y="{{$height / 2}}"/>
+      <var inner="{{$ring * 0.46}}"/>
+      <path d="M 0 $mid_y
+        a $ring $ring 0 1 0 {{2 * $ring}} 0
+        a $ring $ring 0 1 0 {{-2 * $ring}} 0
+        M {{$ring - $inner}} $mid_y
+        a $inner $inner 0 1 0 {{2 * $inner}} 0
+        a $inner $inner 0 1 0 {{-2 * $inner}} 0
+        M {{2 * $ring}} $mid_y H {{$width * 0.76}}
+        V {{$height * 0.34}} H {{$width * 0.88}} V $mid_y
+        H $width V {{$height * 0.68}}
+        H {{$width * 0.88}} V {{$height * 0.56}}
+        H {{$width * 0.68}} V {{$height * 0.76}}
+        H {{$width * 0.56}}"/>
+    </g>
+
+    <g id="padlock">
+      <var shackle="{{$width * 0.18}}" top="{{$height * 0.42}}" mid_x="{{$width / 2}}" key_r="{{min($width, $height) * 0.11}}"/>
+      <path d="M $shackle $top V {{$height * 0.22}}
+        Q $shackle 0 $mid_x 0
+        Q {{$width - $shackle}} 0 {{$width - $shackle}} {{$height * 0.22}}
+        V $top
+        M 0 $top H $width V $height H 0 Z
+        M {{$mid_x - $key_r}} {{$height * 0.62}}
+        a $key_r $key_r 0 1 0 {{2 * $key_r}} 0
+        a $key_r $key_r 0 1 0 {{-2 * $key_r}} 0
+        M $mid_x {{$height * 0.73}} V {{$height * 0.88}}"/>
+    </g>
+
+    <g id="pipelinething">
+      <var cap="{{min($height / 2, $width / 4)}}" left="{{$width * 0.22}}" right="{{$width * 0.78}}"/>
+      <path d="M $cap 0 H {{$width - $cap}}
+        a $cap $cap 0 0 1 0 $height
+        H $cap
+        a $cap $cap 0 0 1 0 {{-$height}} Z
+        M $left 0 V $height
+        M $right 0 V $height"/>
+    </g>
+
+    <g id="folder">
+      <var tab_y="{{$height * 0.3}}" tab_x="{{$width * 0.2}}" tab_w="{{$width * 0.24}}" lip="{{$height * 0.12}}"/>
+      <path d="M 0 $tab_y H $tab_x L {{$tab_x + $tab_w}} $lip H $width
+        V $height H 0 Z"/>
+    </g>
+
+    <g id="record-card">
+      <var tab_x="{{$width * 0.66}}" tab_h="{{$height * 0.16}}" tab_w="{{$width * 0.18}}" line_l="{{$width * 0.16}}"/>
+      <path d="M 0 0 H $tab_x V $tab_h H {{$tab_x + $tab_w}} V 0 H $width V $height H 0 Z
+        M $line_l {{$height * 0.34}} H {{$width * 0.84}}
+        M $line_l {{$height * 0.54}} H {{$width * 0.74}}
+        M $line_l {{$height * 0.74}} H {{$width * 0.8}}"/>
+    </g>
+
+    <g id="magnifier">
+      <var lens="{{min($width, $height) * 0.28}}" cx="{{$width * 0.38}}" cy="{{$height * 0.38}}"/>
+      <path d="M {{$cx - $lens}} $cy
+        a $lens $lens 0 1 0 {{2 * $lens}} 0
+        a $lens $lens 0 1 0 {{-2 * $lens}} 0
+        M {{$cx + $lens * 0.7}} {{$cy + $lens * 0.7}} L $width $height"/>
+    </g>
+
+    <g id="warehouse">
+      <var roof="{{$height * 0.28}}" dock_l="{{$width * 0.32}}" dock_r="{{$width * 0.68}}" dock_t="{{$height * 0.56}}"/>
+      <path d="M 0 $roof L {{$width * 0.12}} 0 H {{$width * 0.88}} L $width $roof
+        V $height H 0 Z
+        M $dock_l $height V $dock_t H $dock_r V $height
+        M {{$width * 0.18}} {{$height * 0.44}} H {{$width * 0.82}}"/>
+    </g>
+
+    <g id="skyscraper">
+      <var left="{{$width * 0.22}}" step="{{$width * 0.44}}" right="{{$width * 0.78}}"/>
+      <path d="M $left $height V {{$height * 0.16}} H $step V 0 H $right V $height Z
+        M {{$width * 0.38}} {{$height * 0.24}} H {{$width * 0.62}}
+        M {{$width * 0.38}} {{$height * 0.42}} H {{$width * 0.62}}
+        M {{$width * 0.38}} {{$height * 0.6}} H {{$width * 0.62}}
+        M {{$width * 0.38}} {{$height * 0.78}} H {{$width * 0.62}}"/>
+    </g>
+
+    <g id="chip">
+      <var left="{{$width * 0.2}}" right="{{$width * 0.8}}" top="{{$height * 0.2}}" bottom="{{$height * 0.8}}"/>
+      <path d="M $left $top H $right V $bottom H $left Z
+        M {{$width * 0.32}} 0 V $top
+        M {{$width * 0.5}} 0 V $top
+        M {{$width * 0.68}} 0 V $top
+        M {{$width * 0.32}} $bottom V $height
+        M {{$width * 0.5}} $bottom V $height
+        M {{$width * 0.68}} $bottom V $height
+        M 0 {{$height * 0.32}} H $left
+        M 0 {{$height * 0.5}} H $left
+        M 0 {{$height * 0.68}} H $left
+        M $right {{$height * 0.32}} H $width
+        M $right {{$height * 0.5}} H $width
+        M $right {{$height * 0.68}} H $width
+        M {{$width * 0.4}} {{$height * 0.4}} H {{$width * 0.6}} V {{$height * 0.6}} H {{$width * 0.4}} Z"/>
+    </g>
+
+    <g id="server">
+      <var row1="{{$height / 3}}" row2="{{2 * $height / 3}}" light="{{min($width, $height) * 0.04}}"/>
+      <path d="M 0 0 H $width V $height H 0 Z
+        M 0 $row1 H $width
+        M 0 $row2 H $width
+        M {{$width * 0.16}} {{$row1 / 2}} H {{$width * 0.72}}
+        M {{$width * 0.16}} {{$height / 2}} H {{$width * 0.72}}
+        M {{$width * 0.16}} {{$height * 5 / 6}} H {{$width * 0.72}}
+        M {{$width * 0.84}} {{$row1 / 2}}
+        a $light $light 0 1 0 {{2 * $light}} 0
+        a $light $light 0 1 0 {{-2 * $light}} 0
+        M {{$width * 0.84}} {{$height / 2}}
+        a $light $light 0 1 0 {{2 * $light}} 0
+        a $light $light 0 1 0 {{-2 * $light}} 0
+        M {{$width * 0.84}} {{$height * 5 / 6}}
+        a $light $light 0 1 0 {{2 * $light}} 0
+        a $light $light 0 1 0 {{-2 * $light}} 0"/>
+    </g>
+
+    <g id="display">
+      <var screen="{{$height * 0.72}}" base="{{$height * 0.88}}" mid_x="{{$width / 2}}"/>
+      <path d="M 0 0 H $width V $screen H 0 Z
+        M $mid_x $screen V $base
+        M {{$width * 0.24}} $height H {{$width * 0.76}}"/>
+    </g>
+
+    <g id="terminal">
+      <var bar="{{$height * 0.18}}" mid="{{$height * 0.5}}"/>
+      <path d="M 0 0 H $width V $height H 0 Z
+        M 0 $bar H $width
+        M {{$width * 0.18}} {{$height * 0.34}} L {{$width * 0.34}} $mid L {{$width * 0.18}} {{$height * 0.66}}
+        M {{$width * 0.44}} {{$height * 0.66}} H {{$width * 0.78}}"/>
+    </g>
+
+    <g id="router">
+      <var ring="{{min($width, $height) * 0.3}}" mid_x="{{$width / 2}}" mid_y="{{$height / 2}}" head="{{min($width, $height) * 0.08}}"/>
+      <path d="M {{$mid_x - $ring}} $mid_y
+        a $ring $ring 0 1 0 {{2 * $ring}} 0
+        a $ring $ring 0 1 0 {{-2 * $ring}} 0
+        M {{$width * 0.22}} $mid_y H {{$width * 0.78}}
+        M {{$width * 0.3}} {{$mid_y - $head}} L {{$width * 0.22}} $mid_y L {{$width * 0.3}} {{$mid_y + $head}}
+        M {{$width * 0.7}} {{$mid_y - $head}} L {{$width * 0.78}} $mid_y L {{$width * 0.7}} {{$mid_y + $head}}
+        M $mid_x {{$height * 0.22}} V {{$height * 0.78}}
+        M {{$mid_x - $head}} {{$height * 0.3}} L $mid_x {{$height * 0.22}} L {{$mid_x + $head}} {{$height * 0.3}}
+        M {{$mid_x - $head}} {{$height * 0.7}} L $mid_x {{$height * 0.78}} L {{$mid_x + $head}} {{$height * 0.7}}"/>
+    </g>
+
+    <g id="switch">
+      <var radius="{{min($width, $height) * 0.12}}" top="{{$height * 0.34}}" bottom="{{$height * 0.62}}"/>
+      <path d="M $radius 0 H {{$width - $radius}}
+        Q $width 0 $width $radius
+        V {{$height - $radius}}
+        Q $width $height {{$width - $radius}} $height
+        H $radius
+        Q 0 $height 0 {{$height - $radius}}
+        V $radius
+        Q 0 0 $radius 0 Z
+        M {{$width * 0.14}} $top H {{$width * 0.26}} V $bottom H {{$width * 0.14}} Z
+        M {{$width * 0.34}} $top H {{$width * 0.46}} V $bottom H {{$width * 0.34}} Z
+        M {{$width * 0.54}} $top H {{$width * 0.66}} V $bottom H {{$width * 0.54}} Z
+        M {{$width * 0.74}} $top H {{$width * 0.86}} V $bottom H {{$width * 0.74}} Z"/>
+    </g>
+
+
+    <g id="data">
+      <var slant="{{$width * 0.18}}"/>
+      <path d="M $slant 0 H $width L {{$width - $slant}} $height H 0 Z"/>
+    </g>
+
+    <g id="manual-input">
+      <var slant="{{$width * 0.18}}" top="{{$height * 0.18}}"/>
+      <path d="M 0 $top H {{$width - $slant}} L $width 0 V $height H 0 Z"/>
+    </g>
+
+    <g id="delay">
+      <var body="{{$width * 0.58}}" mid_y="{{$height / 2}}"/>
+      <path d="M 0 0 H $body
+        Q $width $mid_y $body $height
+        H 0 Z"/>
+    </g>
+
+    <g id="preparation">
+      <var inset="{{$width * 0.2}}" mid_y="{{$height / 2}}"/>
+      <path d="M $inset 0 H {{$width - $inset}} L $width $mid_y L {{$width - $inset}} $height H $inset L 0 $mid_y Z"/>
     </g>
   </specs>
 </svg>
