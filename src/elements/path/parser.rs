@@ -1,204 +1,134 @@
 use super::command::Command;
+use super::state::PathState;
 use super::{SvgElement, Vec2};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
 
 use super::syntax::{PathSyntax, SvgPathSyntax};
 
+struct ParsedInstruction {
+    command: char,
+    source: String,
+    state_before: PathState,
+    instruction: Command,
+}
+
 #[derive(Clone)]
 pub(super) struct PathParser {
     tokens: SvgPathSyntax, // TODO: ref to make clone cheaper?
-    // current position, updated as commands are processed
-    position: Option<Vec2>,
-    // location to return to for 'Z'/'z' commands
-    subpath_start: Option<Vec2>,
-    // current command being processed; most commands take multiple parameter
-    // sets without repeating the command character
-    command: Option<char>,
-    // previous second control point (if any) for evaluating 'S' and 's'
-    cubic_cp2: Option<Vec2>,
-    // previous control point (if any) for evaluating 'T' and 't'
-    quadratic_cp: Option<Vec2>,
-    // distance along the path so far, for line-offset
-    elapsed_distance: f32,
-    // extrema, updated as path is processed
-    min_x: f32,
-    min_y: f32,
-    max_x: f32,
-    max_y: f32,
+    state: PathState,
 }
 
 impl PathParser {
     pub fn new(data: &str) -> Self {
         PathParser {
             tokens: SvgPathSyntax::new(data),
-            position: None,
-            subpath_start: None,
-            command: None,
-            cubic_cp2: None,
-            quadratic_cp: None,
-            elapsed_distance: 0.,
-            min_x: 0.,
-            min_y: 0.,
-            max_x: 0.,
-            max_y: 0.,
+            state: PathState::new(),
         }
     }
 
     fn reset(&mut self) {
         self.tokens.reset();
-        self.position = None;
-        self.subpath_start = None;
-        self.command = None;
-        self.cubic_cp2 = None;
-        self.quadratic_cp = None;
-        self.elapsed_distance = 0.;
-        self.min_x = 0.;
-        self.min_y = 0.;
-        self.max_x = 0.;
-        self.max_y = 0.;
-    }
-
-    fn extend_extrema(&mut self, pos: Vec2) {
-        let (x, y) = (pos.x, pos.y);
-        if self.position.is_none() {
-            self.min_x = x;
-            self.min_y = y;
-            self.max_x = x;
-            self.max_y = y;
-        } else {
-            self.min_x = self.min_x.min(x);
-            self.min_y = self.min_y.min(y);
-            self.max_x = self.max_x.max(x);
-            self.max_y = self.max_y.max(y);
-        }
-    }
-
-    fn extend_subpath(&mut self, pos: Vec2) {
-        self.extend_extrema(pos);
-
-        let old = self.position.unwrap_or(pos);
-        self.elapsed_distance += pos.distance(old);
-
-        self.position = Some(pos);
-    }
-
-    fn extend_curve<I>(&mut self, end: Vec2, extrema: I, length: f32)
-    where
-        I: IntoIterator<Item = Vec2>,
-    {
-        for point in extrema {
-            self.extend_extrema(point);
-        }
-        self.extend_extrema(end);
-        self.elapsed_distance += length;
-        self.position = Some(end);
-    }
-
-    fn new_subpath(&mut self, pos: Vec2) {
-        self.extend_extrema(pos);
-        // note we don't add to elapsed_distance here; instantly jump to the new position.
-        self.position = Some(pos);
-
-        self.subpath_start = Some(pos);
+        self.state.reset();
     }
 
     pub fn get_bbox(&self) -> Option<BoundingBox> {
-        if self.position.is_some() {
-            Some(BoundingBox::new(
-                self.min_x, self.min_y, self.max_x, self.max_y,
-            ))
-        } else {
-            None // we've never called extend_subpath()
-        }
+        self.state.get_bbox()
     }
 
     pub fn length_so_far(&self) -> f32 {
-        self.elapsed_distance
-    }
-
-    fn read_instruction_command(&mut self) -> Result<char> {
-        if self.command.is_none() || self.tokens.at_command()? {
-            // "The command letter can be eliminated on subsequent commands if the same
-            // command is used multiple times in a row (e.g., you can drop the second
-            // "L" in "M 100 200 L 200 100 L -100 -200" and use "M 100 200 L 200 100
-            // -100 -200" instead)."
-            self.command = Some(self.tokens.read_command()?);
-        } else {
-            // this will only happen for subsequent values to an existing command
-            match self.command {
-                // "If a moveto is followed by multiple pairs of coordinates,
-                // the subsequent pairs are treated as implicit lineto commands."
-                Some('m') => {
-                    self.command = Some('l');
-                }
-                Some('M') => {
-                    self.command = Some('L');
-                }
-                _ => {}
-            }
-        }
-
-        Ok(self.command.expect("Command should be already set"))
+        self.state.length_so_far()
     }
 
     pub fn process_instruction(&mut self) -> Result<()> {
-        let previous_cubic_cp2 = self.cubic_cp2;
-        let previous_quadratic_cp = self.quadratic_cp;
+        let parsed = self.parse_instruction()?;
+        self.apply_instruction(&parsed.instruction);
+        Ok(())
+    }
+
+    fn parse_instruction(&mut self) -> Result<ParsedInstruction> {
+        let source_start = self.tokens.index();
+        let state_before = self.state;
         // Smooth curve reflection only applies when the immediately preceding
         // instruction was the matching bezier type, so every other instruction
         // must clear the stored control points after it is processed.
-        let command = self.read_instruction_command()?;
-        let pos = self.position.unwrap_or_default();
+        let command = self.state.read_instruction_command(&mut self.tokens)?;
 
-        let instruction = Command::from_tokens(
-            &mut self.tokens,
+        let instruction = Command::from_tokens(&mut self.tokens, command, &self.state)?;
+        let source_end = self.tokens.index();
+        let source = self.tokens.slice(source_start, source_end);
+
+        Ok(ParsedInstruction {
             command,
-            pos,
-            self.subpath_start,
-            previous_cubic_cp2,
-            previous_quadratic_cp,
-        )?;
+            source,
+            state_before,
+            instruction,
+        })
+    }
 
+    fn apply_instruction(&mut self, instruction: &Command) {
         let next_cubic_cp2 = instruction.next_cubic_cp2();
         let next_quadratic_cp = instruction.next_quadratic_cp();
 
         match instruction {
+            Command::Bearing(bearing) => {
+                self.state.set_bearing(bearing.bearing());
+            }
             Command::MoveTo(jump) => {
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
                 // the first command) represent the start of a new subpath'
                 // (the first moveto is also the start of a subpath)
-                self.new_subpath(jump.end());
+                self.state.new_subpath(jump.end());
             }
             Command::LineTo(line) => {
-                self.extend_subpath(line.end());
+                self.state.extend_subpath(line.end());
             }
             Command::HorizontalLineTo(line) => {
-                self.extend_subpath(line.end());
+                self.state.extend_subpath(line.end());
             }
             Command::VerticalLineTo(line) => {
-                self.extend_subpath(line.end());
+                self.state.extend_subpath(line.end());
             }
             Command::ClosePath(line) => {
-                self.extend_subpath(line.end());
+                self.state.extend_subpath(line.end());
                 // since this doesn't consume further tokens, we must clear the command
                 // to force getting a new command token, or we could loop forever
-                self.command = None;
+                self.state.clear_command();
             }
             Command::CubicBezier(curve) => {
-                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
+                self.state
+                    .extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             Command::QuadraticBezier(curve) => {
-                self.extend_curve(curve.end(), curve.extrema(), curve.approx_length());
+                self.state
+                    .extend_curve(curve.end(), curve.extrema(), curve.approx_length());
             }
             Command::Arc(arc) => {
-                self.extend_curve(arc.end(), arc.extrema(), arc.approx_length());
+                self.state
+                    .extend_curve(arc.end(), arc.extrema(), arc.approx_length());
             }
         }
 
-        self.cubic_cp2 = next_cubic_cp2;
-        self.quadratic_cp = next_quadratic_cp;
-        Ok(())
+        self.state
+            .set_previous_control_points(next_cubic_cp2, next_quadratic_cp);
+    }
+
+    pub fn evaluate_and_render(&mut self) -> Result<String> {
+        self.reset();
+        self.tokens.skip_whitespace();
+        let mut output = String::new();
+
+        while !self.tokens.at_end() {
+            let parsed = self.parse_instruction()?;
+            output.push_str(&parsed.instruction.render(
+                &parsed.source,
+                parsed.command,
+                &parsed.state_before,
+            ));
+            self.apply_instruction(&parsed.instruction);
+        }
+
+        Ok(output)
     }
 
     pub fn evaluate(&mut self) -> Result<()> {
@@ -216,16 +146,9 @@ impl PathParser {
     }
 
     fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<Vec2> {
-        let command = self.read_instruction_command()?;
+        let command = self.state.read_instruction_command(&mut self.tokens)?;
 
-        let instruction = Command::from_tokens(
-            &mut self.tokens,
-            command,
-            self.position.unwrap_or_default(),
-            self.subpath_start,
-            self.cubic_cp2,
-            self.quadratic_cp,
-        )?;
+        let instruction = Command::from_tokens(&mut self.tokens, command, &self.state)?;
 
         Ok(instruction.point_at_ratio(ratio))
     }
@@ -254,6 +177,12 @@ impl PathParser {
                 break;
             } else if new_length > target_distance {
                 let contribution = new_length - old_length;
+                if contribution <= f32::EPSILON {
+                    // Zero-length command (e.g. move/bearing) can still satisfy
+                    // clamping for negative offsets. Probe this command directly.
+                    *self = snapshot;
+                    return self.probe_instruction_at_ratio(0.);
+                }
                 // how far into the command to reach the target offset
                 let ratio = (target_distance - old_length) / contribution;
                 if ratio < 0. {
@@ -268,17 +197,7 @@ impl PathParser {
             }
         }
 
-        Ok(self.position.unwrap_or_default())
-    }
-}
-
-pub fn path_bbox(element: &SvgElement) -> Result<Option<BoundingBox>> {
-    if let Some(path_data) = element.get_attr("d") {
-        let mut pp = PathParser::new(path_data);
-        pp.evaluate()?;
-        Ok(pp.get_bbox())
-    } else {
-        Ok(None)
+        Ok(self.state.position().unwrap_or_default())
     }
 }
 
@@ -292,6 +211,12 @@ pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32
     }
 }
 
+pub fn process_path_data(data: &str) -> Result<(String, Option<BoundingBox>)> {
+    let mut parser = PathParser::new(data);
+    let d = parser.evaluate_and_render()?;
+    Ok((d, parser.get_bbox()))
+}
+
 #[cfg(test)]
 impl PathParser {
     pub fn at_end(&self) -> bool {
@@ -303,6 +228,6 @@ impl PathParser {
     }
 
     pub fn position(&self) -> Option<Vec2> {
-        self.position
+        self.state.position()
     }
 }

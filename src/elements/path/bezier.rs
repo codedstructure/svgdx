@@ -1,5 +1,6 @@
 use super::Vec2;
 use super::sample::{sample_length, sample_point_at_ratio};
+use super::state::PathState;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
 
@@ -15,8 +16,13 @@ pub(super) struct CubicBezier {
 }
 
 impl CubicBezier {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+    pub fn from_tokens(
+        tokens: &mut SvgPathSyntax,
+        state: &PathState,
+        relative: bool,
+    ) -> Result<Self> {
         // "(x1 y1 x2 y2 x y)+"
+        let start = state.current_position();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -28,11 +34,12 @@ impl CubicBezier {
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: Vec2,
-        previous_cp2: Option<Vec2>,
+        state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x2 y2 x y)+"
+        let start = state.current_position();
+        let previous_cp2 = state.previous_cubic_cp2();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -101,8 +108,13 @@ pub(super) struct QuadraticBezier {
 }
 
 impl QuadraticBezier {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+    pub fn from_tokens(
+        tokens: &mut SvgPathSyntax,
+        state: &PathState,
+        relative: bool,
+    ) -> Result<Self> {
         // "(x1 y1 x y)+"
+        let start = state.current_position();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
@@ -113,11 +125,12 @@ impl QuadraticBezier {
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: Vec2,
-        previous_cp: Option<Vec2>,
+        state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x y)+"
+        let start = state.current_position();
+        let previous_cp = state.previous_quadratic_cp();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };

@@ -1,5 +1,6 @@
 use super::Vec2;
 use super::sample::{sample_length, sample_point_at_ratio};
+use super::state::PathState;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
 
@@ -19,8 +20,13 @@ pub(super) struct Arc {
 }
 
 impl Arc {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+    pub fn from_tokens(
+        tokens: &mut SvgPathSyntax,
+        state: &PathState,
+        relative: bool,
+    ) -> Result<Self> {
         // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
+        let start = state.current_position();
         let rx = tokens.read_non_negative()?;
         let ry = tokens.read_non_negative()?;
         let x_axis_rotation = tokens.read_number()?;

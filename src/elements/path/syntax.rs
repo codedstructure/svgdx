@@ -2,12 +2,12 @@ use super::types::Vec2;
 use crate::errors::{Error, Result};
 use crate::types::{parse_float, parse_int};
 
-// This assumes that any svgdx path extensions ('B'/'b', repeats) have already
-// been resolved, and path data is SVG-compliant.
+// Repeat extensions are resolved before parsing
 // https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
-pub const PATH_COMMANDS: [char; 20] = [
+pub const PATH_COMMANDS: [char; 22] = [
     'M', 'm', 'Z', 'z', 'L', 'l', 'H', 'h', 'V', 'v', // line and move commands
     'C', 'c', 'S', 's', 'Q', 'q', 'T', 't', 'A', 'a', // curve commands
+    'B', 'b', // svgdx-specific bearing commands
 ];
 
 #[derive(Clone)]
@@ -26,6 +26,14 @@ impl SvgPathSyntax {
 
     pub fn reset(&mut self) {
         self.index = 0;
+    }
+
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
+    pub fn slice(&self, start: usize, end: usize) -> String {
+        self.data[start..end].iter().collect()
     }
 }
 

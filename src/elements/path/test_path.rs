@@ -1,8 +1,8 @@
 use crate::geometry::{BoundingBox, Length};
 
-use super::Vec2;
 use super::parser::PathParser;
 use super::syntax::{PathSyntax, SvgPathSyntax};
+use super::{Vec2, process_path_data};
 use std::num::NonZeroU32;
 
 fn assert_point_close(actual: Vec2, expected: Vec2, epsilon: f32) {
@@ -188,6 +188,34 @@ fn test_pp_move() {
     pp.evaluate().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0., 120.)));
     assert!(pp.at_end());
+}
+
+#[test]
+fn test_pp_bearing() {
+    // Absolute bearing on relative line.
+    let mut pp = PathParser::new("M0 0B90l10 0");
+    pp.evaluate().unwrap();
+    assert_point_close(pp.position().unwrap(), Vec2::new(0., 10.), 1e-4);
+
+    // Relative bearing updates should accumulate.
+    let mut pp = PathParser::new("M0 0b60b30l10 0");
+    pp.evaluate().unwrap();
+    assert_point_close(pp.position().unwrap(), Vec2::new(0., 10.), 1e-4);
+
+    // Bearing affects relative h/v.
+    let mut pp = PathParser::new("M0 0B90h10v10");
+    pp.evaluate().unwrap();
+    assert_point_close(pp.position().unwrap(), Vec2::new(10., 10.), 1e-4);
+
+    // Bearing affects relative m as well.
+    let mut pp = PathParser::new("M0 0B45m10 0");
+    pp.evaluate().unwrap();
+    assert_point_close(pp.position().unwrap(), Vec2::new(7.071, 7.071), 1e-3);
+
+    // Absolute commands are unaffected by bearing.
+    let mut pp = PathParser::new("M0 0B90H10V20");
+    pp.evaluate().unwrap();
+    assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 }
 
 #[test]
@@ -443,6 +471,33 @@ fn test_point_at_offset_linear() {
             .unwrap(),
         Vec2::new(0., 5.)
     );
+}
+
+#[test]
+fn test_point_at_offset_with_bearing_command() {
+    // Bearing is a zero-length command and should not affect interpolation.
+    let mut pp = PathParser::new("M 0 0 B 45 l 10 0");
+    assert_point_close(
+        pp.point_at_offset(Length::Ratio(0.5)).unwrap(),
+        Vec2::new(3.536, 3.536),
+        1e-3,
+    );
+}
+
+#[test]
+fn test_process_path_data_with_bearing() {
+    let input = "M0 0 b-45 h2 b90 h2 b90 h2 z";
+    let (output, bbox) = process_path_data(input).unwrap();
+    assert_eq!(output, "M0 0 l1.414 -1.414l1.414 1.414l-1.414 1.414z");
+    assert!(bbox.is_some());
+}
+
+#[test]
+fn test_process_path_data_passthrough_when_unaffected() {
+    let input = "M0 0L1 1";
+    let (output, bbox) = process_path_data(input).unwrap();
+    assert_eq!(output, input);
+    assert!(bbox.is_some());
 }
 
 #[test]
