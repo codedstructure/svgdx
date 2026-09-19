@@ -1,4 +1,5 @@
 use crate::TransformConfig;
+use crate::context::TransformerContext;
 use crate::errors::Result;
 use crate::geometry::{BoundingBox, Length};
 
@@ -7,9 +8,10 @@ use super::syntax::{PathSyntax, SvgPathSyntax};
 use super::{Vec2, process_path_data};
 use std::num::NonZeroU32;
 
-impl PathParser {
+impl PathParser<'static, TransformerContext> {
     pub fn new_default(data: &str) -> Self {
-        PathParser::new(data, &TransformConfig::default())
+        let ctx = Box::leak(Box::new(TransformerContext::default()));
+        PathParser::new(data, ctx)
     }
 }
 
@@ -20,44 +22,57 @@ fn assert_point_close(actual: Vec2, expected: Vec2, epsilon: f32) {
     );
 }
 
+fn process_path_with_config(
+    data: &str,
+    cfg: &TransformConfig,
+) -> Result<(String, Option<BoundingBox>)> {
+    let ctx = TransformerContext::from_config(cfg);
+    process_path_data(data, &ctx)
+}
+
+fn process_path_default(data: &str) -> Result<(String, Option<BoundingBox>)> {
+    process_path_with_config(data, &TransformConfig::default())
+}
+
 fn process_path_with_limit(data: &str, limit: u32) -> Result<(String, Option<BoundingBox>)> {
-    let cfg = crate::TransformConfig {
+    let cfg = TransformConfig {
         path_repeat_limit: limit,
         ..Default::default()
     };
-    process_path_data(data, &cfg)
+    process_path_with_config(data, &cfg)
 }
 
 #[test]
 fn test_ps_number() {
+    let ctx = TransformerContext::default();
     let mut ps = SvgPathSyntax::new("123 4.5  -9.25");
     ps.skip_whitespace();
-    assert_eq!(ps.read_number().unwrap(), 123.);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 123.);
     ps.skip_whitespace();
-    assert_eq!(ps.read_number().unwrap(), 4.5);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 4.5);
     ps.skip_whitespace();
-    assert_eq!(ps.read_number().unwrap(), -9.25);
+    assert_eq!(ps.read_number(&ctx).unwrap(), -9.25);
 
     // should read as little as needed to allow valid parsing,
     // so numbers can be squished together providing the result
     // is unambiguous. See https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
     let mut ps = SvgPathSyntax::new("123-4.5.25+5");
-    assert_eq!(ps.read_number().unwrap(), 123.);
-    assert_eq!(ps.read_number().unwrap(), -4.5);
-    assert_eq!(ps.read_number().unwrap(), 0.25);
-    assert_eq!(ps.read_number().unwrap(), 5.);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 123.);
+    assert_eq!(ps.read_number(&ctx).unwrap(), -4.5);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 0.25);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 5.);
 
     // should support exponents
     let mut ps = SvgPathSyntax::new("1e3 -2E-2 +3.5e+2");
-    assert_eq!(ps.read_number().unwrap(), 1e3);
-    assert_eq!(ps.read_number().unwrap(), -2e-2);
-    assert_eq!(ps.read_number().unwrap(), 3.5e+2);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 1e3);
+    assert_eq!(ps.read_number(&ctx).unwrap(), -2e-2);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 3.5e+2);
     // ... and without spaces; '1e3.5' is '1e3' followed by '.5'
     let mut ps = SvgPathSyntax::new("1e3.5-2E-2+3.5e+2");
-    assert_eq!(ps.read_number().unwrap(), 1e3);
-    assert_eq!(ps.read_number().unwrap(), 0.5);
-    assert_eq!(ps.read_number().unwrap(), -2e-2);
-    assert_eq!(ps.read_number().unwrap(), 3.5e+2);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 1e3);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 0.5);
+    assert_eq!(ps.read_number(&ctx).unwrap(), -2e-2);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 3.5e+2);
 }
 
 #[test]
@@ -84,20 +99,40 @@ fn test_ps_flag() {
 
 #[test]
 fn test_ps_coord() {
+    let ctx = TransformerContext::default();
     let mut ps = SvgPathSyntax::new("123 456");
-    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
+    assert_eq!(ps.read_coord(&ctx).unwrap(), Vec2::new(123., 456.));
 
     let mut ps = SvgPathSyntax::new("123,456");
-    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
+    assert_eq!(ps.read_coord(&ctx).unwrap(), Vec2::new(123., 456.));
 
     let mut ps = SvgPathSyntax::new("123 ,   456");
-    assert_eq!(ps.read_coord().unwrap(), Vec2::new(123., 456.));
+    assert_eq!(ps.read_coord(&ctx).unwrap(), Vec2::new(123., 456.));
 
     // Example from https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
     // 'for the string "M 0.6.5" … the first coordinate will be "0.6" and
     // the second coordinate will be ".5".'
     let mut ps = SvgPathSyntax::new("0.6.5");
-    assert_eq!(ps.read_coord().unwrap(), Vec2::new(0.6, 0.5));
+    assert_eq!(ps.read_coord(&ctx).unwrap(), Vec2::new(0.6, 0.5));
+}
+
+#[test]
+fn test_ps_dynamic_scalars() {
+    let mut ctx = TransformerContext::default();
+    ctx.set_var("dx", "3.5");
+    ctx.set_var("dy", "{{1 + 2}}");
+
+    let mut ps = SvgPathSyntax::new("$dx ${dy} {{1 + 4}}");
+    assert_eq!(ps.read_number(&ctx).unwrap(), 3.5);
+    assert_eq!(ps.read_number(&ctx).unwrap(), 3.0);
+    assert_eq!(ps.read_count(&ctx).unwrap(), 5);
+}
+
+#[test]
+fn test_ps_dynamic_coord_expr() {
+    let ctx = TransformerContext::default();
+    let mut ps = SvgPathSyntax::new("{{p2r(10, 0)}}");
+    assert_eq!(ps.read_coord(&ctx).unwrap(), Vec2::new(10., 0.));
 }
 
 #[test]
@@ -524,7 +559,7 @@ fn test_point_at_offset_with_repeat() {
 #[test]
 fn test_process_path_data_with_bearing() {
     let input = "M0 0 b-45 h2 b90 h2 b90 h2 z";
-    let (output, bbox) = process_path_data(input, &Default::default()).unwrap();
+    let (output, bbox) = process_path_default(input).unwrap();
     assert_eq!(output, "M0 0 l1.414 -1.414l1.414 1.414l-1.414 1.414z");
     assert!(bbox.is_some());
 }
@@ -532,9 +567,20 @@ fn test_process_path_data_with_bearing() {
 #[test]
 fn test_process_path_data_passthrough_when_unaffected() {
     let input = "M0 0L1 1";
-    let (output, bbox) = process_path_data(input, &Default::default()).unwrap();
+    let (output, bbox) = process_path_default(input).unwrap();
     assert_eq!(output, input);
     assert!(bbox.is_some());
+}
+
+#[test]
+fn test_process_path_data_with_dynamic_scalars() {
+    let mut ctx = TransformerContext::default();
+    ctx.set_var("dx", "3");
+    ctx.set_var("dy", "{{1 + 2}}");
+
+    let (output, bbox) = process_path_data("M0 0 l $dx ${dy}", &ctx).unwrap();
+    assert_eq!(output, "M0 0 l 3 3");
+    assert_eq!(bbox, Some(BoundingBox::new(0., 0., 3., 3.)));
 }
 
 #[test]
@@ -574,6 +620,52 @@ fn test_process_path_data_repeat_limit() {
     let input = "M0 0 r10[h1] r10[r2[v1]] r0[h1] h1 r3[v1 h1]";
     assert!(process_path_with_limit(input, 19).is_err());
     assert!(process_path_with_limit(input, 20).is_ok());
+}
+
+#[test]
+fn test_process_path_data_repeat_re_evaluates_expressions() {
+    let cfg = TransformConfig {
+        seed: 1234,
+        path_repeat_limit: 10,
+        ..Default::default()
+    };
+    let input = "M0 0 r5[ l {{random()}} {{random()}} ]";
+
+    let (output1, bbox1) = process_path_with_config(input, &cfg).unwrap();
+    let (output2, bbox2) = process_path_with_config(input, &cfg).unwrap();
+
+    assert_eq!(output1, output2);
+    assert_eq!(bbox1, bbox2);
+    assert!(!output1.contains("{{"));
+
+    let steps: Vec<_> = output1.split('l').skip(1).collect();
+    assert_eq!(steps.len(), 5);
+    assert_ne!(steps[0], steps[1]);
+}
+
+#[test]
+fn test_process_path_data_repeat_re_evaluates_variables() {
+    let cfg = TransformConfig {
+        seed: 1234,
+        path_repeat_limit: 10,
+        ..Default::default()
+    };
+    let input = "M0 0 r5[ l $step 1 ]";
+
+    let mut ctx1 = TransformerContext::from_config(&cfg);
+    ctx1.set_var("step", "{{random()}}");
+    let (output1, bbox1) = process_path_data(input, &ctx1).unwrap();
+
+    let mut ctx2 = TransformerContext::from_config(&cfg);
+    ctx2.set_var("step", "{{random()}}");
+    let (output2, bbox2) = process_path_data(input, &ctx2).unwrap();
+
+    assert_eq!(output1, output2);
+    assert_eq!(bbox1, bbox2);
+
+    let steps: Vec<_> = output1.split('l').skip(1).collect();
+    assert_eq!(steps.len(), 5);
+    assert_ne!(steps[0], steps[1]);
 }
 
 #[test]

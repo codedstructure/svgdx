@@ -3,6 +3,7 @@ use super::sample::{sample_length, sample_point_at_ratio};
 use super::state::PathState;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
+use crate::context::ContextView;
 
 use std::f32::consts::PI;
 
@@ -22,17 +23,18 @@ pub(super) struct Arc {
 impl Arc {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(rx ry x-axis-rotation large-arc-flag sweep-flag x y)+"
         let start = state.current_position();
-        let rx = tokens.read_non_negative()?;
-        let ry = tokens.read_non_negative()?;
-        let x_axis_rotation = tokens.read_number()?;
+        let rx = tokens.read_non_negative(ctx)?;
+        let ry = tokens.read_non_negative(ctx)?;
+        let x_axis_rotation = tokens.read_number(ctx)?;
         let large_arc_flag = tokens.read_flag()? != 0;
         let sweep_flag = tokens.read_flag()? != 0;
-        let end = tokens.read_coord()?;
+        let end = tokens.read_coord(ctx)?;
 
         let end = if relative { start + end } else { end };
 

@@ -620,15 +620,14 @@ impl SvgElement {
         if self.name == "path"
             && let Some(d) = self.get_attr("d")
         {
-            // expressions (must) have already been expanded before `transmute()`
-            // runs, so `//` can be treated as a dpoints comment without conflicting
-            // with integer division operator.
+            // Path expressions are evaluated during path parsing so repeated commands
+            // can resolve dynamic values independently.
             let d = preprocess_dpoints(d);
             // TODO: because this sets content_bbox, it's really a `finalize_layout`
             // operation, but don't want to split it out (keep single pass). Really
             // need to have prepare_element() (i.e. transmute) and finalize_layout()
             // be part of a common per-element-type trait function.
-            let (processed_d, path_bbox) = process_path_data(&d, ctx.config())?;
+            let (processed_d, path_bbox) = process_path_data(&d, ctx)?;
             self.content_bbox = path_bbox;
 
             self.set_attr("d", &processed_d);
@@ -664,8 +663,8 @@ impl SvgElement {
     pub fn eval_attributes(&mut self, ctx: &impl ContextView) -> Result<()> {
         // Resolve any attributes
         for (key, value) in self.attrs.clone() {
-            if key == "__" {
-                // Raw comments are not evaluated
+            if key == "__" || (self.name == "path" && key == "d") {
+                // Raw comments and path 'd' attrs are not evaluated
                 continue;
             }
             let replace = eval_attr(&value, ctx)?;

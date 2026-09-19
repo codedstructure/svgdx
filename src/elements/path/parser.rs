@@ -2,30 +2,42 @@ use super::command::Command;
 use super::repeat::RepeatAction;
 use super::state::PathState;
 use super::{SvgElement, Vec2};
-use crate::TransformConfig;
+use crate::context::{ConfigView, ContextView, TransformerContext};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
 
-use super::syntax::{PathSyntax, SvgPathSyntax};
+use super::syntax::{PathSyntax, SourcePatch, SvgPathSyntax};
 
 struct ParsedInstruction {
     command: char,
     source: String,
+    patches: Vec<SourcePatch>,
     state_before: PathState,
     instruction: Command,
 }
 
-#[derive(Clone)]
-pub(super) struct PathParser {
+pub(super) struct PathParser<'a, C: ContextView + ConfigView> {
     tokens: SvgPathSyntax, // TODO: ref to make clone cheaper?
+    ctx: &'a C,
     state: PathState,
 }
 
-impl PathParser {
-    pub fn new(data: &str, cfg: &TransformConfig) -> Self {
+impl<C: ContextView + ConfigView> Clone for PathParser<'_, C> {
+    fn clone(&self) -> Self {
+        Self {
+            tokens: self.tokens.clone(),
+            ctx: self.ctx,
+            state: self.state.clone(),
+        }
+    }
+}
+
+impl<'a, C: ContextView + ConfigView> PathParser<'a, C> {
+    pub fn new(data: &str, ctx: &'a C) -> Self {
         PathParser {
             tokens: SvgPathSyntax::new(data),
-            state: PathState::new_with_repeat_limit(cfg.path_repeat_limit),
+            ctx,
+            state: PathState::new_with_repeat_limit(ctx.config().path_repeat_limit),
         }
     }
 
@@ -51,19 +63,22 @@ impl PathParser {
     fn parse_instruction(&mut self) -> Result<ParsedInstruction> {
         self.tokens.skip_whitespace();
         let source_start = self.tokens.index();
+        let patch_start = self.tokens.patch_count();
         let state_before = self.state.clone();
         // Smooth curve reflection only applies when the immediately preceding
         // instruction was the matching bezier type, so every other instruction
         // must clear the stored control points after it is processed.
         let command = self.state.read_instruction_command(&mut self.tokens)?;
 
-        let instruction = Command::from_tokens(&mut self.tokens, command, &self.state)?;
+        let instruction = Command::from_tokens(&mut self.tokens, self.ctx, command, &self.state)?;
         let source_end = self.tokens.index();
         let source = self.tokens.slice(source_start, source_end);
+        let patches = self.tokens.patches_since(patch_start, source_start);
 
         Ok(ParsedInstruction {
             command,
             source,
+            patches,
             state_before,
             instruction,
         })
@@ -147,6 +162,7 @@ impl PathParser {
                 &parsed.source,
                 parsed.command,
                 &parsed.state_before,
+                &parsed.patches,
             ));
             self.apply_instruction(&parsed.instruction)?;
         }
@@ -171,7 +187,7 @@ impl PathParser {
     fn probe_instruction_at_ratio(&mut self, ratio: f32) -> Result<Vec2> {
         let command = self.state.read_instruction_command(&mut self.tokens)?;
 
-        let instruction = Command::from_tokens(&mut self.tokens, command, &self.state)?;
+        let instruction = Command::from_tokens(&mut self.tokens, self.ctx, command, &self.state)?;
 
         instruction.point_at_ratio(ratio)
     }
@@ -227,8 +243,8 @@ impl PathParser {
 // TODO: update return type when callers know about Vec2
 pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32, f32)> {
     if let Some(path_data) = element.get_attr("d") {
-        let cfg = &TransformConfig::default();
-        let mut pp = PathParser::new(path_data, cfg);
+        let ctx = TransformerContext::default();
+        let mut pp = PathParser::new(path_data, &ctx);
         pp.point_at_offset(offset).map(|p| (p.x, p.y))
     } else {
         Err(Error::MissingAttr("d".to_string()))
@@ -237,15 +253,15 @@ pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32
 
 pub fn process_path_data(
     data: &str,
-    cfg: &TransformConfig,
+    ctx: &(impl ContextView + ConfigView),
 ) -> Result<(String, Option<BoundingBox>)> {
-    let mut parser = PathParser::new(data, cfg);
+    let mut parser = PathParser::new(data, ctx);
     let d = parser.evaluate_and_render()?;
     Ok((d, parser.get_bbox()))
 }
 
 #[cfg(test)]
-impl PathParser {
+impl PathParser<'_, TransformerContext> {
     pub fn at_end(&self) -> bool {
         self.tokens.at_end()
     }

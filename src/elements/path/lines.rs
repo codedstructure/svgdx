@@ -2,6 +2,7 @@ use super::Vec2;
 use super::state::PathState;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
+use crate::context::ContextView;
 use crate::types::fstr;
 
 // bearing commands only affect lines / moves, hence in this module.
@@ -12,10 +13,11 @@ pub(super) struct Bearing {
 impl Bearing {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
-        let value = tokens.read_number()?;
+        let value = tokens.read_number(ctx)?;
         let bearing = if relative {
             state.bearing().unwrap_or(0.) + value
         } else {
@@ -37,11 +39,12 @@ pub(super) struct MoveTo {
 impl MoveTo {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x y)+"
-        let end = tokens.read_coord()?;
+        let end = tokens.read_coord(ctx)?;
         let end = if relative {
             state.current_position() + state.apply_bearing(end)
         } else {
@@ -72,11 +75,12 @@ pub(super) struct LineTo {
 impl LineTo {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x y)+"
-        let end = tokens.read_coord()?;
+        let end = tokens.read_coord(ctx)?;
         let start = state.current_position();
         let end = if relative {
             start + state.apply_bearing(end)
@@ -112,11 +116,12 @@ pub(super) struct HorizontalLineTo {
 impl HorizontalLineTo {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "x+"
-        let x = tokens.read_number()?;
+        let x = tokens.read_number(ctx)?;
         let start = state.current_position();
         let end = if relative {
             // "When a relative h command is used, the end point of the line is
@@ -150,11 +155,12 @@ pub(super) struct VerticalLineTo {
 impl VerticalLineTo {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "y+"
-        let y = tokens.read_number()?;
+        let y = tokens.read_number(ctx)?;
         let start = state.current_position();
         let end = if relative {
             // "When a relative v command is used, the end point of the line is

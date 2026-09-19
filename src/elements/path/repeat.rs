@@ -14,6 +14,7 @@
 //! Example: `<path d="M 0 0 r 6 [ h 10 b 60 ]"/>`
 
 use super::syntax::SvgPathSyntax;
+use crate::context::ContextView;
 use crate::elements::path::syntax::PathSyntax;
 use crate::errors::{Error, Result};
 
@@ -94,8 +95,8 @@ pub struct Repeat {
 }
 
 impl Repeat {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax) -> Result<Self> {
-        let count = tokens.read_count()?;
+    pub fn from_tokens(tokens: &mut SvgPathSyntax, ctx: &impl ContextView) -> Result<Self> {
+        let count = tokens.read_count(ctx)?;
         tokens.read_expected('[')?;
 
         Ok(Self { count })

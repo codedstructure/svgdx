@@ -4,3 +4,4 @@ mod functions;
 mod tests;
 
 pub use expression::{eval_attr, eval_condition, eval_list};
+pub use expression::{extract_expr, extract_var};

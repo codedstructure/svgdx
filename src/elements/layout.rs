@@ -47,7 +47,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     result
 }
 
-fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
+pub(crate) fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name() == "point" {
             if let Ok(point) = elem.get_element_loc_coord(ctx, ElementLoc::LocSpec(LocSpec::Center))

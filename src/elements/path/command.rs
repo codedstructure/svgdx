@@ -4,7 +4,8 @@ use super::bezier::{CubicBezier, QuadraticBezier};
 use super::lines::{Bearing, HorizontalLineTo, LineTo, MoveTo, VerticalLineTo};
 use super::repeat::Repeat;
 use super::state::PathState;
-use super::syntax::SvgPathSyntax;
+use super::syntax::{SourcePatch, SvgPathSyntax};
+use crate::context::ContextView;
 use crate::errors::{Error, Result};
 
 pub(super) enum Command {
@@ -21,43 +22,80 @@ pub(super) enum Command {
     Arc(Arc),
 }
 
+fn apply_source_patches(source: &str, patches: &[SourcePatch]) -> String {
+    if patches.is_empty() {
+        return source.to_string();
+    }
+
+    let chars: Vec<char> = source.chars().collect();
+    let mut rendered = String::new();
+    let mut start = 0;
+    for patch in patches {
+        for ch in &chars[start..patch.start] {
+            rendered.push(*ch);
+        }
+        rendered.push_str(&patch.replacement);
+        start = patch.end;
+    }
+    for ch in &chars[start..] {
+        rendered.push(*ch);
+    }
+    rendered
+}
+
 impl Command {
     pub fn from_tokens(
         tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
         command: char,
         state: &PathState,
     ) -> Result<Self> {
         let is_relative = command.is_lowercase();
 
         Ok(match command {
-            'B' | 'b' => Self::Bearing(Bearing::from_tokens(tokens, state, is_relative)?),
-            'R' | 'r' => Self::Repeat(Repeat::from_tokens(tokens)?),
+            'B' | 'b' => Self::Bearing(Bearing::from_tokens(tokens, ctx, state, is_relative)?),
+            'R' | 'r' => Self::Repeat(Repeat::from_tokens(tokens, ctx)?),
             ']' => Self::EndRepeat,
-            'M' | 'm' => Self::MoveTo(MoveTo::from_tokens(tokens, state, is_relative)?),
-            'L' | 'l' => Self::LineTo(LineTo::from_tokens(tokens, state, is_relative)?),
-            'H' | 'h' => {
-                Self::HorizontalLineTo(HorizontalLineTo::from_tokens(tokens, state, is_relative)?)
-            }
-            'V' | 'v' => {
-                Self::VerticalLineTo(VerticalLineTo::from_tokens(tokens, state, is_relative)?)
-            }
+            'M' | 'm' => Self::MoveTo(MoveTo::from_tokens(tokens, ctx, state, is_relative)?),
+            'L' | 'l' => Self::LineTo(LineTo::from_tokens(tokens, ctx, state, is_relative)?),
+            'H' | 'h' => Self::HorizontalLineTo(HorizontalLineTo::from_tokens(
+                tokens,
+                ctx,
+                state,
+                is_relative,
+            )?),
+            'V' | 'v' => Self::VerticalLineTo(VerticalLineTo::from_tokens(
+                tokens,
+                ctx,
+                state,
+                is_relative,
+            )?),
             'Z' | 'z' => {
                 let end = state.subpath_start().unwrap_or_default();
                 Self::ClosePath(LineTo::from_endpoints(state.current_position(), end))
             }
-            'C' | 'c' => Self::CubicBezier(CubicBezier::from_tokens(tokens, state, is_relative)?),
-            'S' | 's' => {
-                Self::CubicBezier(CubicBezier::from_smooth_tokens(tokens, state, is_relative)?)
+            'C' | 'c' => {
+                Self::CubicBezier(CubicBezier::from_tokens(tokens, ctx, state, is_relative)?)
             }
-            'Q' | 'q' => {
-                Self::QuadraticBezier(QuadraticBezier::from_tokens(tokens, state, is_relative)?)
-            }
-            'T' | 't' => Self::QuadraticBezier(QuadraticBezier::from_smooth_tokens(
+            'S' | 's' => Self::CubicBezier(CubicBezier::from_smooth_tokens(
                 tokens,
+                ctx,
                 state,
                 is_relative,
             )?),
-            'A' | 'a' => Self::Arc(Arc::from_tokens(tokens, state, is_relative)?),
+            'Q' | 'q' => Self::QuadraticBezier(QuadraticBezier::from_tokens(
+                tokens,
+                ctx,
+                state,
+                is_relative,
+            )?),
+            'T' | 't' => Self::QuadraticBezier(QuadraticBezier::from_smooth_tokens(
+                tokens,
+                ctx,
+                state,
+                is_relative,
+            )?),
+            'A' | 'a' => Self::Arc(Arc::from_tokens(tokens, ctx, state, is_relative)?),
             _ => {
                 return Err(Error::InvalidValue(
                     "path command".to_string(),
@@ -87,7 +125,13 @@ impl Command {
         })
     }
 
-    pub fn render(&self, source: &str, source_command: char, state_before: &PathState) -> String {
+    pub fn render(
+        &self,
+        source: &str,
+        source_command: char,
+        state_before: &PathState,
+        patches: &[SourcePatch],
+    ) -> String {
         // Bearing and repeat commands do not contribute to output
         if matches!(self, Self::Bearing(_) | Self::Repeat(_) | Self::EndRepeat) {
             return String::new();
@@ -108,7 +152,8 @@ impl Command {
                 _ => source.to_string(), // unexpected: relative_line_or_move should be handled above
             };
         }
-        source.to_string()
+
+        apply_source_patches(source, patches)
     }
 
     pub fn next_cubic_cp2(&self) -> Option<Vec2> {
