@@ -607,13 +607,6 @@ fn test_process_path_data_with_set_var_try() {
 }
 
 #[test]
-fn test_process_path_data_set_var_requires_immediate_name() {
-    let ctx = TransformerContext::default();
-    assert!(process_path_data("M0 0 : i 1", &ctx).is_err());
-    assert!(process_path_data("M0 0 :? i 1", &ctx).is_err());
-}
-
-#[test]
 fn test_process_path_data_with_repeat() {
     let input = "M0 0 r3[ l10 0 ] l5 0";
     let (output, bbox) = process_path_with_limit(input, 100).unwrap();

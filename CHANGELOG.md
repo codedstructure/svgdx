@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   included library file - perhaps the builtin standard library. This change
   fixes mouse-over line highlighting for stdlib elements in the editor.
 
+- Changed: `<path>` element evaluation now defers expression and variable
+  lookups, meaning expressions inside 'repeat' commands will be evaluated each
+  iteration. Together with the new path-local variables, this allows more
+  complex paths to be defined.
+
+- Added: path-local variables inside `path d` attributes using `:name value`
+  and `:?name value` commands (the latter being equivalent to `varTry`, i.e.
+  set iff evaluating 'value' is error-free). These are evaluated during path
+  processing, and do not leak outside the path element.
+
 - Added: new `<varTry>` and `<varTryDefault>` elements, analogous to the
   non-try equivalents. if an expression used as a value in `<varTry>` or
   `<varTryDefault>` cannot be evaluated (e.g. references something undefined),

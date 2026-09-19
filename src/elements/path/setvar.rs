@@ -4,11 +4,11 @@ use std::collections::HashMap;
 use rand_pcg::Pcg32;
 
 use super::syntax::{PathSyntax, SvgPathSyntax};
+use crate::Result;
 use crate::context::ContextView;
 use crate::elements::SvgElement;
 use crate::geometry::BoundingBox;
 use crate::types::{VarName, fstr};
-use crate::Result;
 
 pub struct SetVar {
     name: String,
@@ -24,6 +24,7 @@ impl SetVar {
             false
         };
 
+        tokens.skip_whitespace();
         let name = tokens.read_identifier()?;
         tokens.skip_whitespace();
         let value = if set_if_possible {

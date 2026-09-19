@@ -113,7 +113,7 @@ impl SvgPathSyntax {
 
         // Something like `$?abc thing` should just fail anyway, this
         // only attempts to skip failed expressions / variable lookups.
-        Err(Error::Parse(format!("expected expression or variable")))
+        Err(Error::Parse("expected expression or variable".into()))
     }
 
     fn parse_literal_number_value(value: &str) -> Result<f32> {
