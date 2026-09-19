@@ -1,7 +1,9 @@
 use super::Vec2;
 use super::sample::{sample_length, sample_point_at_ratio};
+use super::state::PathState;
 use super::syntax::{PathSyntax, SvgPathSyntax};
 use crate::Result;
+use crate::context::ContextView;
 
 const EPSILON: f32 = 1e-6;
 const QUADRATIC_SAMPLES: usize = 8;
@@ -15,29 +17,37 @@ pub(super) struct CubicBezier {
 }
 
 impl CubicBezier {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+    pub fn from_tokens(
+        tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
+        state: &PathState,
+        relative: bool,
+    ) -> Result<Self> {
         // "(x1 y1 x2 y2 x y)+"
+        let start = state.current_position();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
-        let cp1 = adjust(tokens.read_coord()?);
-        let cp2 = adjust(tokens.read_coord()?);
-        let end = adjust(tokens.read_coord()?);
+        let cp1 = adjust(tokens.read_coord(ctx)?);
+        let cp2 = adjust(tokens.read_coord(ctx)?);
+        let end = adjust(tokens.read_coord(ctx)?);
         Ok(Self::new(start, cp1, cp2, end))
     }
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: Vec2,
-        previous_cp2: Option<Vec2>,
+        ctx: &impl ContextView,
+        state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x2 y2 x y)+"
+        let start = state.current_position();
+        let previous_cp2 = state.previous_cubic_cp2();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
-        let cp2 = adjust(tokens.read_coord()?);
-        let end = adjust(tokens.read_coord()?);
+        let cp2 = adjust(tokens.read_coord(ctx)?);
+        let end = adjust(tokens.read_coord(ctx)?);
         // start and previous_cp2 are always absolute.
         let cp1 = reflect_control_point(start, previous_cp2);
         Ok(Self::new(start, cp1, cp2, end))
@@ -101,27 +111,35 @@ pub(super) struct QuadraticBezier {
 }
 
 impl QuadraticBezier {
-    pub fn from_tokens(tokens: &mut SvgPathSyntax, start: Vec2, relative: bool) -> Result<Self> {
+    pub fn from_tokens(
+        tokens: &mut SvgPathSyntax,
+        ctx: &impl ContextView,
+        state: &PathState,
+        relative: bool,
+    ) -> Result<Self> {
         // "(x1 y1 x y)+"
+        let start = state.current_position();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
-        let cp = adjust(tokens.read_coord()?);
-        let end = adjust(tokens.read_coord()?);
+        let cp = adjust(tokens.read_coord(ctx)?);
+        let end = adjust(tokens.read_coord(ctx)?);
         Ok(Self { start, cp, end })
     }
 
     pub fn from_smooth_tokens(
         tokens: &mut SvgPathSyntax,
-        start: Vec2,
-        previous_cp: Option<Vec2>,
+        ctx: &impl ContextView,
+        state: &PathState,
         relative: bool,
     ) -> Result<Self> {
         // "(x y)+"
+        let start = state.current_position();
+        let previous_cp = state.previous_quadratic_cp();
         let adjust = |p: Vec2| {
             if relative { start + p } else { p }
         };
-        let end = adjust(tokens.read_coord()?);
+        let end = adjust(tokens.read_coord(ctx)?);
         let cp = reflect_control_point(start, previous_cp);
         Ok(Self { start, cp, end })
     }

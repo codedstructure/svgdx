@@ -6,8 +6,8 @@ use rand::prelude::*;
 use rand_pcg::Pcg32;
 
 use super::expression::{
-    EvalState, ExprValue, Token, eval_attr, eval_condition, eval_expr, eval_vars, expr, tokenize,
-    valid_symbol,
+    EvalState, ExprValue, Token, eval_attr, eval_condition, eval_expr, eval_vars, expr,
+    extract_expr, extract_var, tokenize, valid_symbol,
 };
 use crate::context::{ContextView, ElementMap, VariableMap};
 use crate::elements::SvgElement;
@@ -96,6 +96,24 @@ fn test_valid_symbol() {
     for s in ["", "1", "123", "1abc", "1_a", "1a_", "1_"] {
         assert!(!valid_symbol(s));
     }
+}
+
+#[test]
+fn test_extract_expr() {
+    assert_eq!(
+        extract_expr("{{ 1 + 2}} more things").unwrap(),
+        ("1 + 2", " more things")
+    );
+    assert_eq!(
+        extract_expr("{{${a}*${b}}}remain").unwrap(),
+        ("${a}*${b}", "remain")
+    );
+}
+
+#[test]
+fn test_extract_var() {
+    assert_eq!(extract_var("$a+b").unwrap(), ("a", "+b"));
+    assert_eq!(extract_var("${a_b}c").unwrap(), ("a_b", "c"));
 }
 
 #[test]

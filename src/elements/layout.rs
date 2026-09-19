@@ -8,7 +8,6 @@ use crate::constants::{
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_el;
-use crate::elements::path::path_bbox;
 use crate::errors::{Error, Result};
 use crate::geometry::{
     BoundingBox, DirSpec, ElementLoc, LocSpec, Position, ScalarSpec, Size, TransformAttr,
@@ -48,7 +47,7 @@ fn expand_relspec(value: &str, ctx: &impl ElementMap) -> String {
     result
 }
 
-fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
+pub(crate) fn expand_single_relspec(value: &str, ctx: &impl ElementMap) -> String {
     if let Ok((Some(elem), rest)) = split_relspec(value, ctx) {
         if rest.is_empty() && elem.name() == "point" {
             if let Ok(point) = elem.get_element_loc_coord(ctx, ElementLoc::LocSpec(LocSpec::Center))
@@ -450,7 +449,7 @@ impl SvgElement {
             }
         }
         let mut el_bbox = if self.content_bbox.is_some() {
-            // container elements (`g`, `symbol`, `clipPath` etc) set this
+            // container elements (`g`, `symbol`, `clipPath` etc) and paths set this
             // to the bbox of their contents
             self.content_bbox
         } else {
@@ -569,7 +568,6 @@ impl SvgElement {
                     None
                 }
             }
-            "path" => path_bbox(self)?,
             "circle" => {
                 if let Some(r) = self.get_attr("r") {
                     let cx = self.get_attr("cx").unwrap_or(zstr);

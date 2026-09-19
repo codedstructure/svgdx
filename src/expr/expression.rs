@@ -865,15 +865,98 @@ fn primary(eval_state: &mut EvalState) -> Result<ExprValue> {
     }
 }
 
+/// Extract a variable reference from the start of `value`.
+///
+/// Supports both `$name` and `${name}` forms. Returns the variable name without
+/// any delimiters, together with the remaining unconsumed suffix.
+pub fn extract_var(value: &str) -> Result<(&str, &str)> {
+    let tail = value
+        .strip_prefix(VAR_PREFIX)
+        .ok_or_else(|| Error::Parse(format!("expected '{VAR_PREFIX}': '{value}'")))?;
+
+    if let Some(inner) = tail.strip_prefix(VAR_OPEN_BRACE) {
+        if let Some(end_idx) = inner.find(VAR_END_BRACE) {
+            Ok((&inner[..end_idx], &inner[end_idx + 1..]))
+        } else {
+            Err(Error::Parse(format!("missing closing brace in '{value}'")))
+        }
+    } else {
+        let end_idx = tail
+            .find(|c: char| !(c.is_alphanumeric() || c == '_'))
+            .unwrap_or(tail.len());
+        if end_idx == 0 {
+            return Err(Error::Parse(format!("missing variable name in '{value}'")));
+        }
+        Ok((&tail[..end_idx], &tail[end_idx..]))
+    }
+}
+
+/// Extract an expression from the start of `value`.
+///
+/// Returns the inner expression text with surrounding whitespace trimmed,
+/// together with the remaining unconsumed suffix after the closing `}}`.
+pub fn extract_expr(value: &str) -> Result<(&str, &str)> {
+    let inner = value
+        .strip_prefix(EXPR_START)
+        .ok_or_else(|| Error::Parse(format!("expected opening '{EXPR_START}': '{value}'")))?;
+
+    let mut index = 0;
+    let mut in_quote = None;
+    let mut escaped = false;
+
+    while index < inner.len() {
+        let remain = &inner[index..];
+
+        if let Some(quote) = in_quote {
+            let ch = remain
+                .chars()
+                .next()
+                .expect("quoted expression should have a current char");
+            index += ch.len_utf8();
+            match (ch, escaped) {
+                ('\\', false) => escaped = true,
+                (ch, false) if ch == quote => in_quote = None,
+                _ => escaped = false,
+            }
+            continue;
+        }
+
+        if let Some(rest) = remain.strip_prefix(EXPR_END) {
+            return Ok((inner[..index].trim(), rest));
+        }
+
+        if remain.starts_with(VAR_PREFIX)
+            && let Ok((_, var_remain)) = extract_var(remain)
+        {
+            index += remain.len() - var_remain.len();
+            continue;
+        }
+
+        let ch = remain
+            .chars()
+            .next()
+            .expect("expression should have a current char");
+        if ch == '\'' || ch == '"' {
+            in_quote = Some(ch);
+            escaped = false;
+        }
+        index += ch.len_utf8();
+    }
+
+    Err(Error::Parse(format!(
+        "expected closing '{EXPR_END}': '{value}'"
+    )))
+}
+
 /// Convert unescaped '$var' or '${var}' in given input according
 /// to the supplied variables. Missing variables are left as-is.
-pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
+pub fn eval_vars(value: &str, context: &dyn VariableMap) -> String {
     let mut result = String::new();
     let mut value = value;
     while !value.is_empty() {
         if let Some(idx) = value.find(VAR_PREFIX) {
             let (prefix, remain) = value.split_at(idx);
-            if let Some(esc_prefix) = prefix.strip_prefix('\\') {
+            if let Some(esc_prefix) = prefix.strip_suffix('\\') {
                 // Escaped '$'; ignore '\' and add '$' to result
                 result.push_str(esc_prefix);
                 result.push(VAR_PREFIX);
@@ -881,46 +964,23 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
                 continue;
             }
             result.push_str(prefix);
-            let remain = &remain[1..]; // skip '$'
-            if let Some(inner) = remain.strip_prefix(VAR_OPEN_BRACE) {
-                value = inner;
-                if let Some(end_idx) = value.find(VAR_END_BRACE) {
-                    let inner = &value[..end_idx];
-                    if let Some(value) = context.get_var(inner) {
-                        result.push_str(&value);
-                    } else {
-                        result.push(VAR_PREFIX);
-                        result.push(VAR_OPEN_BRACE);
-                        result.push_str(inner);
-                        result.push(VAR_END_BRACE);
-                    }
-                    value = &value[end_idx + 1..]; // skip '}'
+            if let Ok((var_name, remain_tail)) = extract_var(remain) {
+                if let Some(value) = context.get_var(var_name) {
+                    result.push_str(&value);
                 } else {
                     result.push(VAR_PREFIX);
-                    result.push(VAR_OPEN_BRACE);
-                    result.push_str(value);
-                    break;
+                    if remain[1..].starts_with(VAR_OPEN_BRACE) {
+                        result.push(VAR_OPEN_BRACE);
+                        result.push_str(var_name);
+                        result.push(VAR_END_BRACE);
+                    } else {
+                        result.push_str(var_name);
+                    }
                 }
+                value = remain_tail;
             } else {
-                // un-braced reference; consume until non-alphanumeric/_ character
-                if let Some(idx) = remain.find(|c: char| !(c.is_alphanumeric() || c == '_')) {
-                    let (var, remain) = remain.split_at(idx);
-                    if let Some(value) = context.get_var(var) {
-                        result.push_str(&value);
-                    } else {
-                        result.push(VAR_PREFIX);
-                        result.push_str(var);
-                    }
-                    value = remain;
-                } else {
-                    if let Some(value) = context.get_var(remain) {
-                        result.push_str(&value);
-                    } else {
-                        result.push(VAR_PREFIX);
-                        result.push_str(remain);
-                    }
-                    break;
-                }
+                result.push(VAR_PREFIX);
+                value = &remain[1..];
             }
         } else {
             result.push_str(value);
@@ -931,18 +991,17 @@ pub fn eval_vars(value: &str, context: &impl VariableMap) -> String {
 }
 
 /// Expand arithmetic expressions (including numeric variable lookup) in {{...}}
-pub(super) fn eval_expr(value: &str, context: &impl ContextView) -> Result<String> {
+pub fn eval_expr(value: &str, context: &impl ContextView) -> Result<String> {
     // Note - must catch "{{a}} {{b}}" as 'a' & 'b', rather than 'a}} {{b'
     let mut result = String::new();
     let mut value = value;
     loop {
         if let Some(idx) = value.find(EXPR_START) {
             result.push_str(&value[..idx]);
-            value = &value[idx + EXPR_START.len()..];
-            if let Some(end_idx) = value.find(EXPR_END) {
-                let inner = &value[..end_idx];
+            value = &value[idx..];
+            if let Ok((inner, remain)) = extract_expr(value) {
                 result.push_str(&eval_str(inner, context)?);
-                value = &value[end_idx + EXPR_END.len()..];
+                value = remain;
             } else {
                 result.push_str(value);
                 break;
@@ -956,7 +1015,7 @@ pub(super) fn eval_expr(value: &str, context: &impl ContextView) -> Result<Strin
 }
 
 /// Evaluate an expression.
-fn eval_str(value: &str, context: &impl ContextView) -> Result<String> {
+pub fn eval_str(value: &str, context: &impl ContextView) -> Result<String> {
     tokenize(value)
         .and_then(|tokens| evaluate(tokens, context))
         .map(|v| v.to_string())

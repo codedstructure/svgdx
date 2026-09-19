@@ -12,6 +12,7 @@ implemented using the `path` element, and it is often more compact.
 
 * bearing commands, allowing relative and absolute angled lines to be drawn
 * repeated command fragments
+* path-local variables
 * determining points at intervals along a path
 
 These are covered in the following.
@@ -74,6 +75,49 @@ Note that repeat commands may be nested, but there is a configurable limit (`pat
   <line xy="0" width="100"/>
   <line xy="^" dy="10" width="^"/>
   <path d="M0 0 r10[l5 10 5 -10]" class="d-red"/>
+</svg>
+```
+
+## Path Variables
+
+Paths may define variables within their own `d` attribute. These variables are
+local to evaluation of that path, including repeats, and do not leak into
+surrounding elements.
+
+### Syntax
+
+ **:** _name_ _value_
+
+Set `_name_` to the numeric `_value_`.
+
+ **:?** _name_ _value_
+
+Attempt to set `_name_` to `_value_`. If evaluating `_value_` fails, the
+variable is left unchanged and path evaluation continues. This is analogous to
+`<varTry>` compared with `<var>`.
+
+### Example
+
+```xml-svgdx
+<svg>
+  <path d="M 0 0 :i 0 r500[b $i h 1 :i {{$i + 1.2}}]" class="d-red d-thin"/>
+</svg>
+```
+
+The `$i` variable is initially set to the value `0`. At the end of each repeat,
+the `:i {{$i + 1.2}}` command increments the `i` variable by 1.2, so the
+generated path changes as it is being expanded.
+
+If you want a best-effort update, use the `:?` form. If the value corresponding
+to a `:?` command cannot be evaluated - perhaps due to a variable reference
+error - the `:?` is silently ignored. This is useful for providing default
+values in path expansions.
+
+```xml-svgdx-inline
+<svg>
+  <path d="M 0 0 :s 1 :?s {{$step}} l $s 0"/>
+  <var step="3"/>
+  <path d="M 0 2 :s 1 :?s {{$step}} l $s 0"/>
 </svg>
 ```
 
