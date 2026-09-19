@@ -4,25 +4,36 @@ use std::collections::HashMap;
 use rand_pcg::Pcg32;
 
 use super::syntax::{PathSyntax, SvgPathSyntax};
-use crate::Result;
 use crate::context::ContextView;
 use crate::elements::SvgElement;
 use crate::geometry::BoundingBox;
 use crate::types::{VarName, fstr};
+use crate::Result;
 
 pub struct SetVar {
     name: String,
-    value: String,
+    value: Option<String>,
 }
 
 impl SetVar {
     pub fn from_tokens(tokens: &mut SvgPathSyntax, ctx: &impl ContextView) -> Result<Self> {
+        let set_if_possible = if tokens.current() == Some('?') {
+            tokens.advance();
+            true
+        } else {
+            false
+        };
+
         let name = tokens.read_identifier()?;
         tokens.skip_whitespace();
-        let value = tokens.read_number(ctx)?;
+        let value = if set_if_possible {
+            tokens.read_number_if_possible(ctx)?.map(fstr)
+        } else {
+            Some(fstr(tokens.read_number(ctx)?))
+        };
         Ok(Self {
             name: name.parse::<VarName>()?.to_string(),
-            value: fstr(value),
+            value,
         })
     }
 
@@ -30,8 +41,8 @@ impl SetVar {
         &self.name
     }
 
-    pub fn value(&self) -> &str {
-        &self.value
+    pub fn value(&self) -> Option<&str> {
+        self.value.as_deref()
     }
 }
 

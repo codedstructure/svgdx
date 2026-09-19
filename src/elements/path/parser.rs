@@ -92,8 +92,11 @@ impl PathParser {
                 self.state.set_bearing(bearing.bearing());
             }
             Command::SetVar(set_var) => {
-                self.vars
-                    .insert(set_var.name().to_string(), set_var.value().to_string());
+                if let Some(value) = set_var.value() {
+                    self.vars
+                        .insert(set_var.name().to_string(), value.to_string());
+                }
+                self.state.clear_command();
             }
             Command::Repeat(repeat) => {
                 self.state.clear_command();

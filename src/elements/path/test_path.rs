@@ -591,6 +591,29 @@ fn test_process_path_data_with_set_var() {
 }
 
 #[test]
+fn test_process_path_data_with_set_var_try() {
+    let mut ctx = TransformerContext::default();
+    ctx.set_var("i", "7");
+
+    // var lookup error
+    let (output, bbox) = process_path_data("M0 0 :?i {{$missing}} l $i 0", &ctx).unwrap();
+    assert_eq!(output, "M0 0 l 7 0");
+    assert_eq!(bbox, Some(BoundingBox::new(0., 0., 7., 0.)));
+
+    // arity error
+    let (output, bbox) = process_path_data("M0 0 :?i {{ sin(1,2,3) }} l $i 0", &ctx).unwrap();
+    assert_eq!(output, "M0 0 l 7 0");
+    assert_eq!(bbox, Some(BoundingBox::new(0., 0., 7., 0.)));
+}
+
+#[test]
+fn test_process_path_data_set_var_requires_immediate_name() {
+    let ctx = TransformerContext::default();
+    assert!(process_path_data("M0 0 : i 1", &ctx).is_err());
+    assert!(process_path_data("M0 0 :? i 1", &ctx).is_err());
+}
+
+#[test]
 fn test_process_path_data_with_repeat() {
     let input = "M0 0 r3[ l10 0 ] l5 0";
     let (output, bbox) = process_path_with_limit(input, 100).unwrap();

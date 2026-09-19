@@ -84,6 +84,38 @@ impl SvgPathSyntax {
         self.patches.push(patch);
     }
 
+    // Consume one scalar source token without evaluating it. This is used for
+    // `:?name value` recovery so a failing value expression can be skipped while
+    // allowing path parsing to continue from the following command.
+    fn consume_failed_value(&mut self) -> Result<()> {
+        let remaining = self.remaining();
+        if remaining.starts_with(EXPR_START) {
+            let (_, remain) = extract_expr(&remaining)?;
+            let consumed = remaining.len() - remain.len();
+            self.index += consumed;
+            self.skip_wsp_comma();
+            return Ok(());
+        }
+
+        if remaining.starts_with(VAR_PREFIX) {
+            let (_, remain) = extract_var(&remaining)?;
+            let consumed = remaining.len() - remain.len();
+            // support ${abc}@c etc.
+            let suffix_len = Self::relspec_suffix_len(remain);
+            let token = &remaining[..consumed + suffix_len];
+            let token_len = token.chars().count();
+            for _ in 0..token_len {
+                self.advance();
+            }
+            self.skip_wsp_comma();
+            return Ok(());
+        }
+
+        // Something like `$?abc thing` should just fail anyway, this
+        // only attempts to skip failed expressions / variable lookups.
+        Err(Error::Parse(format!("expected expression or variable")))
+    }
+
     fn parse_literal_number_value(value: &str) -> Result<f32> {
         let mut syntax = SvgPathSyntax::new(value);
         let number = syntax.read_number_literal()?;
@@ -333,6 +365,8 @@ pub(super) trait PathSyntax {
 
     fn read_number<T: ContextView>(&mut self, ctx: &T) -> Result<f32>;
 
+    fn read_number_if_possible<T: ContextView>(&mut self, ctx: &T) -> Result<Option<f32>>;
+
     fn read_coord_literal(&mut self) -> Result<Vec2> {
         let x = self.read_number_literal()?;
         self.skip_wsp_comma();
@@ -347,7 +381,10 @@ pub(super) trait PathSyntax {
         if self.at_command()? {
             let command = self.current().unwrap();
             self.advance();
-            self.skip_whitespace();
+            if command != ':' {
+                // if a '?' follows, it needs to be immediate.
+                self.skip_whitespace();
+            }
             Ok(command)
         } else {
             Err(Error::InvalidValue(
@@ -416,6 +453,18 @@ impl PathSyntax for SvgPathSyntax {
             _ => {}
         };
         Ok(mult * self.read_non_negative(ctx)?)
+    }
+
+    fn read_number_if_possible<T: ContextView>(&mut self, ctx: &T) -> Result<Option<f32>> {
+        let snapshot = self.clone();
+        match self.read_number(ctx) {
+            Ok(value) => Ok(Some(value)),
+            Err(_) => {
+                *self = snapshot;
+                self.consume_failed_value()?;
+                Ok(None)
+            }
+        }
     }
 
     fn read_coord<T: ContextView>(&mut self, ctx: &T) -> Result<Vec2> {
