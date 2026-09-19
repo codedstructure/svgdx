@@ -1,4 +1,4 @@
-use super::path::{points_to_path, process_path_data, process_path_repeat};
+use super::path::{points_to_path, process_path_data};
 use super::preprocess::preprocess_dpoints;
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
@@ -623,15 +623,12 @@ impl SvgElement {
             // expressions (must) have already been expanded before `transmute()`
             // runs, so `//` can be treated as a dpoints comment without conflicting
             // with integer division operator.
-            let mut d = preprocess_dpoints(d);
-            if d.chars().any(|c| c == 'r' || c == 'R') {
-                d = process_path_repeat(&d, ctx.config().path_repeat_limit)?;
-            }
+            let d = preprocess_dpoints(d);
             // TODO: because this sets content_bbox, it's really a `finalize_layout`
             // operation, but don't want to split it out (keep single pass). Really
             // need to have prepare_element() (i.e. transmute) and finalize_layout()
             // be part of a common per-element-type trait function.
-            let (processed_d, path_bbox) = process_path_data(&d)?;
+            let (processed_d, path_bbox) = process_path_data(&d, ctx.config())?;
             self.content_bbox = path_bbox;
 
             self.set_attr("d", &processed_d);

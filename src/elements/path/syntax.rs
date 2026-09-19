@@ -2,12 +2,13 @@ use super::types::Vec2;
 use crate::errors::{Error, Result};
 use crate::types::{parse_float, parse_int};
 
-// Repeat extensions are resolved before parsing
 // https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
-pub const PATH_COMMANDS: [char; 22] = [
+// plus svgdx bearing and repeat extensions.
+pub const PATH_COMMANDS: [char; 26] = [
     'M', 'm', 'Z', 'z', 'L', 'l', 'H', 'h', 'V', 'v', // line and move commands
     'C', 'c', 'S', 's', 'Q', 'q', 'T', 't', 'A', 'a', // curve commands
     'B', 'b', // svgdx-specific bearing commands
+    'R', 'r', '[', ']', // svgdx-specific repeat controls
 ];
 
 #[derive(Clone)]
@@ -32,8 +33,32 @@ impl SvgPathSyntax {
         self.index
     }
 
+    pub fn set_index(&mut self, index: usize) {
+        self.index = index;
+    }
+
     pub fn slice(&self, start: usize, end: usize) -> String {
         self.data[start..end].iter().collect()
+    }
+
+    pub fn skip_to_matching_repeat_end(&mut self) -> Result<()> {
+        let mut depth = 0;
+        // TODO: this is fragile, as it will count '[' even outside a
+        // Repeat command (e.g. inside a string etc).
+        // It should probably parse commands as normal but discard both rendered
+        // strings and side effects on PathState.
+        while self.index < self.data.len() {
+            let ch = self.data[self.index];
+            self.advance();
+            match ch {
+                '[' => depth += 1,
+                ']' if depth == 0 => return Ok(()),
+                ']' => depth -= 1,
+                _ => {}
+            }
+        }
+
+        Err(Error::Parse("expected ']' to close repeat block".into()))
     }
 }
 
@@ -138,6 +163,20 @@ pub(super) trait PathSyntax {
             _ => {}
         };
         Ok(mult * self.read_non_negative()?)
+    }
+
+    fn read_expected(&mut self, expected: char) -> Result<()> {
+        self.check_not_end()?;
+        if self.current().unwrap() == expected {
+            self.advance();
+            self.skip_whitespace();
+            Ok(())
+        } else {
+            Err(Error::InvalidValue(
+                format!("expected '{}'", expected),
+                self.current().map(|c| c.to_string()).unwrap_or_default(),
+            ))
+        }
     }
 
     fn read_non_negative(&mut self) -> Result<f32> {

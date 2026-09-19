@@ -1,6 +1,8 @@
 use super::command::Command;
+use super::repeat::RepeatAction;
 use super::state::PathState;
 use super::{SvgElement, Vec2};
+use crate::TransformConfig;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Length};
 
@@ -20,10 +22,10 @@ pub(super) struct PathParser {
 }
 
 impl PathParser {
-    pub fn new(data: &str) -> Self {
+    pub fn new(data: &str, cfg: &TransformConfig) -> Self {
         PathParser {
             tokens: SvgPathSyntax::new(data),
-            state: PathState::new(),
+            state: PathState::new_with_repeat_limit(cfg.path_repeat_limit),
         }
     }
 
@@ -42,13 +44,14 @@ impl PathParser {
 
     pub fn process_instruction(&mut self) -> Result<()> {
         let parsed = self.parse_instruction()?;
-        self.apply_instruction(&parsed.instruction);
+        self.apply_instruction(&parsed.instruction)?;
         Ok(())
     }
 
     fn parse_instruction(&mut self) -> Result<ParsedInstruction> {
+        self.tokens.skip_whitespace();
         let source_start = self.tokens.index();
-        let state_before = self.state;
+        let state_before = self.state.clone();
         // Smooth curve reflection only applies when the immediately preceding
         // instruction was the matching bezier type, so every other instruction
         // must clear the stored control points after it is processed.
@@ -66,13 +69,31 @@ impl PathParser {
         })
     }
 
-    fn apply_instruction(&mut self, instruction: &Command) {
+    fn apply_instruction(&mut self, instruction: &Command) -> Result<()> {
         let next_cubic_cp2 = instruction.next_cubic_cp2();
         let next_quadratic_cp = instruction.next_quadratic_cp();
 
         match instruction {
             Command::Bearing(bearing) => {
                 self.state.set_bearing(bearing.bearing());
+            }
+            Command::Repeat(repeat) => {
+                self.state.clear_command();
+                if !self
+                    .state
+                    .enter_repeat(self.tokens.index(), repeat.count())?
+                {
+                    // skip ahead to the matching closing bracket;
+                    self.tokens.skip_to_matching_repeat_end()?;
+                }
+            }
+            Command::EndRepeat => {
+                self.state.clear_command();
+                match self.state.end_repeat()? {
+                    RepeatAction::Loop(start_index) => self.tokens.set_index(start_index),
+                    RepeatAction::Exit => {} //self.tokens.advance(),
+                }
+                self.state.clear_command();
             }
             Command::MoveTo(jump) => {
                 // 'Subsequent "moveto" commands (i.e., when the "moveto" is not
@@ -111,6 +132,8 @@ impl PathParser {
 
         self.state
             .set_previous_control_points(next_cubic_cp2, next_quadratic_cp);
+
+        Ok(())
     }
 
     pub fn evaluate_and_render(&mut self) -> Result<String> {
@@ -125,7 +148,7 @@ impl PathParser {
                 parsed.command,
                 &parsed.state_before,
             ));
-            self.apply_instruction(&parsed.instruction);
+            self.apply_instruction(&parsed.instruction)?;
         }
 
         Ok(output)
@@ -150,7 +173,7 @@ impl PathParser {
 
         let instruction = Command::from_tokens(&mut self.tokens, command, &self.state)?;
 
-        Ok(instruction.point_at_ratio(ratio))
+        instruction.point_at_ratio(ratio)
     }
 
     pub fn point_at_offset(&mut self, offset: Length) -> Result<Vec2> {
@@ -204,15 +227,19 @@ impl PathParser {
 // TODO: update return type when callers know about Vec2
 pub fn get_point_along_path(element: &SvgElement, offset: Length) -> Result<(f32, f32)> {
     if let Some(path_data) = element.get_attr("d") {
-        let mut pp = PathParser::new(path_data);
+        let cfg = &TransformConfig::default();
+        let mut pp = PathParser::new(path_data, cfg);
         pp.point_at_offset(offset).map(|p| (p.x, p.y))
     } else {
         Err(Error::MissingAttr("d".to_string()))
     }
 }
 
-pub fn process_path_data(data: &str) -> Result<(String, Option<BoundingBox>)> {
-    let mut parser = PathParser::new(data);
+pub fn process_path_data(
+    data: &str,
+    cfg: &TransformConfig,
+) -> Result<(String, Option<BoundingBox>)> {
+    let mut parser = PathParser::new(data, cfg);
     let d = parser.evaluate_and_render()?;
     Ok((d, parser.get_bbox()))
 }

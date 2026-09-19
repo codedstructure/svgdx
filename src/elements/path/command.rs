@@ -2,12 +2,15 @@ use super::Vec2;
 use super::arc::Arc;
 use super::bezier::{CubicBezier, QuadraticBezier};
 use super::lines::{Bearing, HorizontalLineTo, LineTo, MoveTo, VerticalLineTo};
+use super::repeat::Repeat;
 use super::state::PathState;
 use super::syntax::SvgPathSyntax;
 use crate::errors::{Error, Result};
 
 pub(super) enum Command {
     Bearing(Bearing),
+    Repeat(Repeat),
+    EndRepeat,
     MoveTo(MoveTo),
     LineTo(LineTo),
     HorizontalLineTo(HorizontalLineTo),
@@ -28,6 +31,8 @@ impl Command {
 
         Ok(match command {
             'B' | 'b' => Self::Bearing(Bearing::from_tokens(tokens, state, is_relative)?),
+            'R' | 'r' => Self::Repeat(Repeat::from_tokens(tokens)?),
+            ']' => Self::EndRepeat,
             'M' | 'm' => Self::MoveTo(MoveTo::from_tokens(tokens, state, is_relative)?),
             'L' | 'l' => Self::LineTo(LineTo::from_tokens(tokens, state, is_relative)?),
             'H' | 'h' => {
@@ -62,9 +67,8 @@ impl Command {
         })
     }
 
-    pub fn point_at_ratio(&self, ratio: f32) -> Vec2 {
-        match self {
-            Self::Bearing(seg) => seg.point_at_ratio(ratio),
+    pub fn point_at_ratio(&self, ratio: f32) -> Result<Vec2> {
+        Ok(match self {
             Self::MoveTo(seg) => seg.end(),
             Self::LineTo(seg) => seg.point_at_ratio(ratio),
             Self::HorizontalLineTo(seg) => seg.point_at_ratio(ratio),
@@ -73,12 +77,19 @@ impl Command {
             Self::CubicBezier(seg) => seg.point_at_ratio(ratio),
             Self::QuadraticBezier(seg) => seg.point_at_ratio(ratio),
             Self::Arc(seg) => seg.point_at_ratio(ratio),
-        }
+
+            // in practice these commands will already have been resolved
+            Self::Bearing(_) | Self::Repeat(_) | Self::EndRepeat => {
+                return Err(Error::InvalidAttr(
+                    "path extensions must be resolved".into(),
+                ));
+            }
+        })
     }
 
     pub fn render(&self, source: &str, source_command: char, state_before: &PathState) -> String {
-        // Bearing commands do not contribute to output
-        if matches!(self, Self::Bearing(_)) {
+        // Bearing and repeat commands do not contribute to output
+        if matches!(self, Self::Bearing(_) | Self::Repeat(_) | Self::EndRepeat) {
             return String::new();
         }
         // preserve source if possible (bearing == 0), else render as required

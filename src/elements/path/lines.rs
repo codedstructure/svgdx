@@ -6,7 +6,6 @@ use crate::types::fstr;
 
 // bearing commands only affect lines / moves, hence in this module.
 pub(super) struct Bearing {
-    point: Vec2,
     bearing: f32,
 }
 
@@ -22,18 +21,11 @@ impl Bearing {
         } else {
             value
         };
-        Ok(Self {
-            point: state.current_position(),
-            bearing,
-        })
+        Ok(Self { bearing })
     }
 
     pub fn bearing(&self) -> f32 {
         self.bearing
-    }
-
-    pub fn point_at_ratio(&self, _ratio: f32) -> Vec2 {
-        self.point
     }
 }
 

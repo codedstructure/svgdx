@@ -16,6 +16,4 @@ use super::SvgElement;
 
 pub use convert::points_to_path;
 pub use parser::{get_point_along_path, process_path_data};
-pub use repeat::process_path_repeat;
-use syntax::PathSyntax;
 use types::Vec2;

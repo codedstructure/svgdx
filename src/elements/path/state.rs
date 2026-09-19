@@ -1,9 +1,10 @@
 use super::Vec2;
 use super::syntax::{PathSyntax, SvgPathSyntax};
+use crate::elements::path::repeat::RepeatStack;
 use crate::errors::Result;
 use crate::geometry::BoundingBox;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(super) struct PathState {
     // current position, updated as commands are processed
     position: Option<Vec2>,
@@ -18,6 +19,8 @@ pub(super) struct PathState {
     previous_quadratic_cp: Option<Vec2>,
     // active bearing for relative m/l/h/v commands; None == 0 degrees
     bearing: Option<f32>,
+    // active repeat blocks, used to loop repeated content in-line.
+    repeat_stack: RepeatStack,
     // distance along the path so far, for line-offset
     elapsed_distance: f32,
     // extrema, updated as path is processed
@@ -28,7 +31,7 @@ pub(super) struct PathState {
 }
 
 impl PathState {
-    pub fn new() -> Self {
+    pub fn new_with_repeat_limit(repeat_limit: u32) -> Self {
         Self {
             position: None,
             subpath_start: None,
@@ -36,6 +39,7 @@ impl PathState {
             previous_cubic_cp2: None,
             previous_quadratic_cp: None,
             bearing: None,
+            repeat_stack: RepeatStack::new(repeat_limit),
             elapsed_distance: 0.,
             min_x: 0.,
             min_y: 0.,
@@ -45,7 +49,26 @@ impl PathState {
     }
 
     pub fn reset(&mut self) {
-        *self = Self::new();
+        self.position = None;
+        self.subpath_start = None;
+        self.command = None;
+        self.previous_cubic_cp2 = None;
+        self.previous_quadratic_cp = None;
+        self.bearing = None;
+        self.repeat_stack.reset();
+        self.elapsed_distance = 0.;
+        self.min_x = 0.;
+        self.min_y = 0.;
+        self.max_x = 0.;
+        self.max_y = 0.;
+    }
+
+    pub fn enter_repeat(&mut self, start_index: usize, count: u32) -> Result<bool> {
+        self.repeat_stack.enter_repeat(start_index, count)
+    }
+
+    pub fn end_repeat(&mut self) -> Result<super::repeat::RepeatAction> {
+        self.repeat_stack.end_repeat()
     }
 
     pub fn current_position(&self) -> Vec2 {
