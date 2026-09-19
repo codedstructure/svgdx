@@ -72,10 +72,6 @@ pub trait VariableMap {
     fn get_rng(&self) -> &RefCell<Pcg32>;
 }
 
-pub trait ConfigView {
-    fn config(&self) -> &TransformConfig;
-}
-
 pub trait ContextView: ElementMap + VariableMap {}
 
 impl ElementMap for TransformerContext {
@@ -222,12 +218,6 @@ impl VariableMap for TransformerContext {
 
     fn get_rng(&self) -> &RefCell<Pcg32> {
         &self.rng
-    }
-}
-
-impl ConfigView for TransformerContext {
-    fn config(&self) -> &TransformConfig {
-        &self.config
     }
 }
 

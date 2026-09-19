@@ -8,10 +8,9 @@ use super::syntax::{PathSyntax, SvgPathSyntax};
 use super::{Vec2, process_path_data};
 use std::num::NonZeroU32;
 
-impl PathParser<'static, TransformerContext> {
+impl PathParser {
     pub fn new_default(data: &str) -> Self {
-        let ctx = Box::leak(Box::new(TransformerContext::default()));
-        PathParser::new(data, ctx)
+        PathParser::new(data, &TransformConfig::default())
     }
 }
 
@@ -138,32 +137,32 @@ fn test_ps_dynamic_coord_expr() {
 #[test]
 fn test_pp_move() {
     let mut pp = PathParser::new_default("M10 20");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // if the first command is 'm' (relative moveto) it is treated
     // as an absolute moveto.
     let mut pp = PathParser::new_default("m10 20");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new_default("M10 20 100 200");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(100., 200.)));
     assert!(pp.at_end());
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new_default("m10 20 100 200");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(110., 220.)));
     assert!(pp.at_end());
 
     // Example from spec - grammar section.
     let mut pp = PathParser::new_default("M 0.6.5");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0.6, 0.5)));
     assert!(pp.at_end());
 
@@ -171,26 +170,26 @@ fn test_pp_move() {
     // Same again as above, but with lineto (L / l) this time.
     //
     let mut pp = PathParser::new_default("L10 20");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // if the first command is 'm' (relative moveto) it is treated
     // as an absolute moveto.
     let mut pp = PathParser::new_default("l10 20");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new_default("L10 20 100 200");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(100., 200.)));
     assert!(pp.at_end());
 
     // There can be multiple coordinates, in which case subsequent ones
     // are implicit 'line-to' coordinates
     let mut pp = PathParser::new_default("l10 20 100 200");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(110., 220.)));
     assert!(pp.at_end());
 
@@ -198,22 +197,22 @@ fn test_pp_move() {
     // Horizontal lines
     //
     let mut pp = PathParser::new_default("H 10");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("H 10 80 30");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(30., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("h 10");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 0.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("h 10 80 30");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(120., 0.)));
     assert!(pp.at_end());
 
@@ -221,22 +220,22 @@ fn test_pp_move() {
     // Vertical lines
     //
     let mut pp = PathParser::new_default("V 10");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0., 10.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("V 10 80 30");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0., 30.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("v 10");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0., 10.)));
     assert!(pp.at_end());
 
     let mut pp = PathParser::new_default("v 10 80 30");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(0., 120.)));
     assert!(pp.at_end());
 }
@@ -245,34 +244,34 @@ fn test_pp_move() {
 fn test_pp_bearing() {
     // Absolute bearing on relative line.
     let mut pp = PathParser::new_default("M0 0B90l10 0");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_point_close(pp.position().unwrap(), Vec2::new(0., 10.), 1e-4);
 
     // Relative bearing updates should accumulate.
     let mut pp = PathParser::new_default("M0 0b60b30l10 0");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_point_close(pp.position().unwrap(), Vec2::new(0., 10.), 1e-4);
 
     // Bearing affects relative h/v.
     let mut pp = PathParser::new_default("M0 0B90h10v10");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_point_close(pp.position().unwrap(), Vec2::new(10., 10.), 1e-4);
 
     // Bearing affects relative m as well.
     let mut pp = PathParser::new_default("M0 0B45m10 0");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_point_close(pp.position().unwrap(), Vec2::new(7.071, 7.071), 1e-3);
 
     // Absolute commands are unaffected by bearing.
     let mut pp = PathParser::new_default("M0 0B90H10V20");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.position(), Some(Vec2::new(10., 20.)));
 }
 
 #[test]
 fn test_pp_repeat_updates_state_inline() {
     let mut pp = PathParser::new_default("M0 0 r2[ h10 v5 ]");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
 
     assert_eq!(pp.position(), Some(Vec2::new(20., 10.)));
     assert_eq!(pp.get_bbox(), Some(BoundingBox::new(0., 0., 20., 10.)));
@@ -281,15 +280,15 @@ fn test_pp_repeat_updates_state_inline() {
 #[test]
 fn test_pp_bbox() {
     let mut pp = PathParser::new_default("M10 20 100 200 200 150");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.get_bbox(), Some(BoundingBox::new(10., 20., 200., 200.)));
 
     let mut pp = PathParser::new_default("M10 20 M100 200 M200 150");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.get_bbox(), Some(BoundingBox::new(10., 20., 200., 200.)));
 
     let mut pp = PathParser::new_default("M10 20 m100 200 m-1000 150");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(
         pp.get_bbox(),
         Some(BoundingBox::new(-890., 20., 110., 370.))
@@ -341,7 +340,7 @@ fn test_bezier_curve_bbox() {
         ("M 0 0 q 60 120 30 0", [0., 0., 40., 60.]),
     ] {
         let mut pp = PathParser::new_default(pd);
-        pp.evaluate().unwrap();
+        pp.evaluate_default().unwrap();
         let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
         assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
     }
@@ -367,7 +366,7 @@ fn test_smooth_bezier_curve_bbox_state() {
         ("M 0 0 q 10 20 20 0 l 10 0 t 20 0", [0., 0., 50., 10.]),
     ] {
         let mut pp = PathParser::new_default(pd);
-        pp.evaluate().unwrap();
+        pp.evaluate_default().unwrap();
         let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
         assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
     }
@@ -411,7 +410,7 @@ fn test_arc_bbox() {
         ("M 0 0 A 10 5 45 1 1 100 0", [-12.5, -62.5, 100., 0.]),
     ] {
         let mut pp = PathParser::new_default(pd);
-        pp.evaluate().unwrap();
+        pp.evaluate_default().unwrap();
         let exp_bbox = BoundingBox::new(exp[0], exp[1], exp[2], exp[3]);
         assert_eq!(pp.get_bbox(), Some(exp_bbox), "Failed for path: {pd}");
     }
@@ -420,7 +419,7 @@ fn test_arc_bbox() {
 #[test]
 fn test_multiple_subpath_bbox() {
     let mut pp = PathParser::new_default("m0 0 20 20h-10zm 5 -10h20v-10zm20 10l20 30");
-    pp.evaluate().unwrap();
+    pp.evaluate_default().unwrap();
     assert_eq!(pp.get_bbox(), Some(BoundingBox::new(0., -20., 45., 30.)));
 }
 
@@ -428,22 +427,22 @@ fn test_multiple_subpath_bbox() {
 fn test_path_length() {
     // simple linear segments
     let mut pp = PathParser::new_default("m0 0h10v10h-10");
-    assert_eq!(pp.full_length().unwrap(), 30.);
+    assert_eq!(pp.full_length_default().unwrap(), 30.);
 
     // include diagonal line
     let mut pp = PathParser::new_default("m0 0h10v10z");
-    assert!((pp.full_length().unwrap() - (20. + 10. * (2f32).sqrt())).abs() < 1e-4);
+    assert!((pp.full_length_default().unwrap() - (20. + 10. * (2f32).sqrt())).abs() < 1e-4);
 
     // multiple subpaths - should ignore jumps
     let mut pp = PathParser::new_default("m0 0h10m 20 0v10");
-    assert_eq!(pp.full_length().unwrap(), 20.);
+    assert_eq!(pp.full_length_default().unwrap(), 20.);
 
     // multiple subpaths, start off origin
     let mut pp = PathParser::new_default("m12 45h10m 20 0v10");
-    assert_eq!(pp.full_length().unwrap(), 20.);
+    assert_eq!(pp.full_length_default().unwrap(), 20.);
 
     let mut pp = PathParser::new_default("M0 0 r2[ h10 v5 ]");
-    assert_eq!(pp.full_length().unwrap(), 30.);
+    assert_eq!(pp.full_length_default().unwrap(), 30.);
 }
 
 #[test]
@@ -581,6 +580,14 @@ fn test_process_path_data_with_dynamic_scalars() {
     let (output, bbox) = process_path_data("M0 0 l $dx ${dy}", &ctx).unwrap();
     assert_eq!(output, "M0 0 l 3 3");
     assert_eq!(bbox, Some(BoundingBox::new(0., 0., 3., 3.)));
+}
+
+#[test]
+fn test_process_path_data_with_set_var() {
+    let ctx = TransformerContext::default();
+    let (output, bbox) = process_path_data("M0 0 :i 1 r3[l $i 0 :i {{$i + 1}}]", &ctx).unwrap();
+    assert_eq!(output, "M0 0 l 1 0 l 2 0 l 3 0");
+    assert_eq!(bbox, Some(BoundingBox::new(0., 0., 6., 0.)));
 }
 
 #[test]
@@ -725,11 +732,11 @@ fn test_point_at_offset_smooth_curve() {
         measure.skip_whitespace();
 
         for _ in 0..command_index {
-            measure.process_instruction().unwrap();
+            measure.process_instruction_default().unwrap();
         }
 
         let old_length = measure.length_so_far();
-        measure.process_instruction().unwrap();
+        measure.process_instruction_default().unwrap();
         let contribution = measure.length_so_far() - old_length;
 
         PathParser::new_default(path)
@@ -783,7 +790,7 @@ fn test_path_length_curve_approximation() {
         ("M 0 0 A 20 10 0 0 1 40 0", 48.44, 2.0),
     ] {
         let mut pp = PathParser::new_default(pd);
-        let actual = pp.full_length().unwrap();
+        let actual = pp.full_length_default().unwrap();
         assert!(
             (actual - expected).abs() < epsilon,
             "Failed for path: {pd}; got {actual}, expected about {expected}"

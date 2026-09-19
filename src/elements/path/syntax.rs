@@ -8,11 +8,12 @@ use crate::types::{extract_elref_token, parse_float, parse_int};
 
 // https://www.w3.org/TR/SVG11/paths.html#PathDataBNF
 // plus svgdx bearing and repeat extensions.
-pub const PATH_COMMANDS: [char; 26] = [
+pub const PATH_COMMANDS: [char; 27] = [
     'M', 'm', 'Z', 'z', 'L', 'l', 'H', 'h', 'V', 'v', // line and move commands
     'C', 'c', 'S', 's', 'Q', 'q', 'T', 't', 'A', 'a', // curve commands
     'B', 'b', // svgdx-specific bearing commands
     'R', 'r', '[', ']', // svgdx-specific repeat controls
+    ':', // svgdx-specific variable assignment command
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -265,6 +266,33 @@ pub(super) trait PathSyntax {
                 self.current().map(|c| c.to_string()).unwrap_or_default(),
             ))
         }
+    }
+
+    fn read_identifier(&mut self) -> Result<String> {
+        self.check_not_end()?;
+
+        let first = self.current().unwrap();
+        if !(first.is_ascii_alphabetic() || first == '_') {
+            return Err(Error::Parse(format!(
+                "expected identifier, got '{}'",
+                first
+            )));
+        }
+
+        let mut ident = String::new();
+        ident.push(first);
+        self.advance();
+
+        while let Some(ch) = self.current() {
+            if ch.is_ascii_alphanumeric() || ch == '_' {
+                ident.push(ch);
+                self.advance();
+            } else {
+                break;
+            }
+        }
+
+        Ok(ident)
     }
 
     fn read_non_negative_literal(&mut self) -> Result<f32> {

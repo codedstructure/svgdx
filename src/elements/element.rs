@@ -5,7 +5,7 @@ use super::{
     LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
     VarElement, VarTryDefaultElement, VarTryElement, is_connector, process_text_attr,
 };
-use crate::context::{ConfigView, ContextView, ElementMap, TransformerContext};
+use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList, Spacing};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
@@ -593,7 +593,7 @@ impl SvgElement {
 
 impl SvgElement {
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
-    pub fn prepare_element<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
+    pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<bool> {
         self.eval_attributes(ctx)?;
         self.expand_compound_attributes()?;
         self.expand_relspec_attributes(ctx);
@@ -616,7 +616,7 @@ impl SvgElement {
     }
 
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
-    fn transmute<T: ContextView + ConfigView>(&mut self, ctx: &T) -> Result<bool> {
+    fn transmute(&mut self, ctx: &mut TransformerContext) -> Result<bool> {
         if self.name == "path"
             && let Some(d) = self.get_attr("d")
         {

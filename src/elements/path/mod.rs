@@ -6,6 +6,7 @@ mod lines;
 mod parser;
 mod repeat;
 mod sample;
+mod setvar;
 mod state;
 mod syntax;
 #[cfg(test)]

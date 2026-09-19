@@ -3,6 +3,7 @@ use super::arc::Arc;
 use super::bezier::{CubicBezier, QuadraticBezier};
 use super::lines::{Bearing, HorizontalLineTo, LineTo, MoveTo, VerticalLineTo};
 use super::repeat::Repeat;
+use super::setvar::SetVar;
 use super::state::PathState;
 use super::syntax::{SourcePatch, SvgPathSyntax};
 use crate::context::ContextView;
@@ -10,6 +11,7 @@ use crate::errors::{Error, Result};
 
 pub(super) enum Command {
     Bearing(Bearing),
+    SetVar(SetVar),
     Repeat(Repeat),
     EndRepeat,
     MoveTo(MoveTo),
@@ -54,6 +56,7 @@ impl Command {
 
         Ok(match command {
             'B' | 'b' => Self::Bearing(Bearing::from_tokens(tokens, ctx, state, is_relative)?),
+            ':' => Self::SetVar(SetVar::from_tokens(tokens, ctx)?),
             'R' | 'r' => Self::Repeat(Repeat::from_tokens(tokens, ctx)?),
             ']' => Self::EndRepeat,
             'M' | 'm' => Self::MoveTo(MoveTo::from_tokens(tokens, ctx, state, is_relative)?),
@@ -117,7 +120,7 @@ impl Command {
             Self::Arc(seg) => seg.point_at_ratio(ratio),
 
             // in practice these commands will already have been resolved
-            Self::Bearing(_) | Self::Repeat(_) | Self::EndRepeat => {
+            Self::Bearing(_) | Self::SetVar(_) | Self::Repeat(_) | Self::EndRepeat => {
                 return Err(Error::InvalidAttr(
                     "path extensions must be resolved".into(),
                 ));
@@ -133,7 +136,10 @@ impl Command {
         patches: &[SourcePatch],
     ) -> String {
         // Bearing and repeat commands do not contribute to output
-        if matches!(self, Self::Bearing(_) | Self::Repeat(_) | Self::EndRepeat) {
+        if matches!(
+            self,
+            Self::Bearing(_) | Self::SetVar(_) | Self::Repeat(_) | Self::EndRepeat
+        ) {
             return String::new();
         }
         // preserve source if possible (bearing == 0), else render as required

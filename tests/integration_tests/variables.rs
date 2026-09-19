@@ -135,6 +135,18 @@ fn test_var_reuse_recursive() {
 }
 
 #[test]
+fn test_var_path_scope_does_not_leak() {
+    let input = r##"
+<var i="99"/>
+<path d="M0 0 :i 1 l $i 0"/>
+<text text="$i"/>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<path d="M0 0 l 1 0"/>"#);
+    assert_contains!(output, r#">99</text>"#);
+}
+
+#[test]
 fn test_var_swap() {
     let input = r##"
 <var x="1" y="2"/>
