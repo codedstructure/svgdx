@@ -595,6 +595,7 @@ impl SvgElement {
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<bool> {
         self.eval_attributes(ctx)?;
+        self.apply_auto_id(ctx);
         self.expand_compound_attributes()?;
         self.expand_relspec_attributes(ctx);
         self.transmute(ctx)
@@ -686,6 +687,26 @@ impl SvgElement {
         Ok(())
     }
 
+    fn apply_auto_id(&mut self, ctx: &mut TransformerContext) {
+        if !self.pop_class("d-auto-id") || self.has_attr("id") {
+            return;
+        }
+
+        // id is derived from text or markdown attributes if present
+        let Some(text) = self.get_attr("text").or_else(|| self.get_attr("md")) else {
+            return;
+        };
+
+        let Some(candidate) = auto_id_from_text(text) else {
+            return;
+        };
+
+        // TODO: warn or append suffix if ID already exists
+        if ctx.get_element_by_id(&candidate).is_none() {
+            self.set_attr("id", &candidate);
+        }
+    }
+
     pub fn handle_rotation(&mut self) -> Result<()> {
         let angle = self.pop_num_attr("rotate")?;
         // determine center of rotation; default center of bbox
@@ -709,4 +730,41 @@ impl SvgElement {
         }
         Ok(())
     }
+}
+
+fn auto_id_from_text(text: &str) -> Option<String> {
+    // split into non-empty alphanumeric words
+    let mut words = text
+        .split(|ch: char| !ch.is_alphanumeric())
+        .filter(|word| !word.is_empty());
+
+    // convert to camelCase
+    let mut auto_id = String::with_capacity(text.len());
+    auto_id.push_str(&words.next()?.to_lowercase());
+    for word in words {
+        auto_id.push_str(&word[..1].to_uppercase());
+        auto_id.push_str(&word[1..].to_lowercase());
+    }
+    Some(auto_id)
+}
+
+#[test]
+fn test_auto_id_from_text() {
+    assert_eq!(
+        auto_id_from_text("Hello World"),
+        Some("helloWorld".to_string())
+    );
+    assert_eq!(
+        auto_id_from_text("  multiple   spaces "),
+        Some("multipleSpaces".to_string())
+    );
+    assert_eq!(auto_id_from_text(""), None);
+    assert_eq!(
+        auto_id_from_text("123 numbers"),
+        Some("123Numbers".to_string())
+    );
+    assert_eq!(
+        auto_id_from_text("$symbols&punctuation-?."),
+        Some("symbolsPunctuation".to_string())
+    );
 }

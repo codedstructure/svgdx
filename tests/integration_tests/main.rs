@@ -1,4 +1,5 @@
 mod attr_expansion;
+mod auto_id;
 mod auto_styles;
 mod box_element;
 mod clippath;

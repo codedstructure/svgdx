@@ -85,7 +85,7 @@ impl ElementMap for TransformerContext {
 
     fn get_element(&self, elref: &ElRef) -> Option<&SvgElement> {
         match elref {
-            ElRef::Id(id) => self.id_map.get(id).and_then(|oi| self.index_map.get(oi)),
+            ElRef::Id(id) => self.get_element_by_id(id),
             ElRef::LibraryId(lib, id) => self
                 .get_library(lib.as_str())
                 .and_then(|library| library.lookup(id)),
@@ -277,6 +277,10 @@ impl TransformerContext {
             ElRef::Prev(num) => self.get_element_offset(-(num.get() as isize)),
             ElRef::Next(num) => self.get_element_offset(num.get() as isize),
         }
+    }
+
+    pub fn get_element_by_id(&self, id: &str) -> Option<&SvgElement> {
+        self.id_map.get(id).and_then(|oi| self.index_map.get(oi))
     }
 
     pub fn register_named_spec(&mut self, name: String, el: SvgElement) {

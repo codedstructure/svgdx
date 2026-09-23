@@ -23,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   iteration. Together with the new path-local variables, this allows more
   complex paths to be defined.
 
+- Added: a new `"d-auto-id"` class automatically derives a camelCase `id` from
+  an element's `text` or `md` attributes. Note that an explicit `id` always
+  takes precedence, and a value used elsewhere will not be applied.
+
 - Added: path-local variables inside `path d` attributes using `:name value`
   and `:?name value` commands (the latter being equivalent to `varTry`, i.e.
   set iff evaluating 'value' is error-free). These are evaluated during path
