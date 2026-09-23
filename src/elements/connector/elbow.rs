@@ -1,57 +1,13 @@
 use super::corner_route::render_match_corner;
 use super::gap::{GapSpec, points_with_gap};
 use super::line::{ElementParseData, LineConnector, ParsedEndpoint};
+use super::routing::{self, ConnectMode};
 use super::{Direction, Endpoint, loc_to_dir};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
-use crate::geometry::{BoundingBox, Length, LocSpec, strp_length};
+use crate::geometry::{BoundingBox, Length, strp_length};
 use crate::types::fstr;
-
-/// For polyline (elbow) connectors, find the shortest link using cardinal directions only.
-fn shortest_cardinal_link(start_bb: &BoundingBox, end_bb: &BoundingBox) -> (LocSpec, LocSpec) {
-    const CARDINAL_LOCS: [LocSpec; 4] =
-        [LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left];
-
-    let mut min_dist_sq = f32::MAX;
-    let mut start_min_loc = LocSpec::Right;
-    let mut end_min_loc = LocSpec::Left;
-
-    for start_loc in &CARDINAL_LOCS {
-        for end_loc in &CARDINAL_LOCS {
-            let start_coord = start_bb.locspec(*start_loc);
-            let end_coord = end_bb.locspec(*end_loc);
-            let (x1, y1) = start_coord;
-            let (x2, y2) = end_coord;
-            let dist_sq = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
-            if dist_sq < min_dist_sq {
-                min_dist_sq = dist_sq;
-                start_min_loc = *start_loc;
-                end_min_loc = *end_loc;
-            }
-        }
-    }
-    (start_min_loc, end_min_loc)
-}
-
-/// Find the closest cardinal direction from a point to a bbox.
-fn closest_cardinal_loc(point: (f32, f32), bb: &BoundingBox) -> LocSpec {
-    const CARDINAL_LOCS: [LocSpec; 4] =
-        [LocSpec::Top, LocSpec::Right, LocSpec::Bottom, LocSpec::Left];
-
-    let mut min_dist_sq = f32::MAX;
-    let mut min_loc = LocSpec::Right;
-
-    for loc in &CARDINAL_LOCS {
-        let coord = bb.locspec(*loc);
-        let dist_sq = (coord.0 - point.0).powi(2) + (coord.1 - point.1).powi(2);
-        if dist_sq < min_dist_sq {
-            min_dist_sq = dist_sq;
-            min_loc = *loc;
-        }
-    }
-    min_loc
-}
 
 /// Result type for resolving two bboxes.
 struct BBoxResolution {
@@ -127,21 +83,30 @@ impl ElbowConnector {
 
     /// Resolve a fixed point against a bbox using cardinal direction.
     fn resolve_point_to_bbox(
+        connect: ConnectMode,
         point: (f32, f32),
         bb: &BoundingBox,
     ) -> ((f32, f32), Option<Direction>) {
-        let loc = closest_cardinal_loc(point, bb);
-        (bb.locspec(loc), loc_to_dir(loc))
+        let resolution = routing::resolve_point_to_bbox(connect.polyline_strategy(), point, bb);
+        (
+            resolution.target.coord,
+            resolution.target.loc.and_then(loc_to_dir),
+        )
     }
 
     /// Resolve two bboxes using cardinal-direction shortest link.
-    fn resolve_bbox_to_bbox(start_bb: &BoundingBox, end_bb: &BoundingBox) -> BBoxResolution {
-        let (start_loc, end_loc) = shortest_cardinal_link(start_bb, end_bb);
+    fn resolve_bbox_to_bbox(
+        connect: ConnectMode,
+        start_bb: &BoundingBox,
+        end_bb: &BoundingBox,
+    ) -> BBoxResolution {
+        let resolution =
+            routing::resolve_bbox_to_bbox(connect.polyline_strategy(), start_bb, end_bb);
         BBoxResolution {
-            start_coord: start_bb.locspec(start_loc),
-            end_coord: end_bb.locspec(end_loc),
-            start_dir: loc_to_dir(start_loc),
-            end_dir: loc_to_dir(end_loc),
+            start_coord: resolution.start.coord,
+            end_coord: resolution.end.coord,
+            start_dir: resolution.start.loc.and_then(loc_to_dir),
+            end_dir: resolution.end.loc.and_then(loc_to_dir),
         }
     }
 
@@ -157,6 +122,11 @@ impl ElbowConnector {
             .pop_attr("gap")
             .map(|s| s.parse::<GapSpec>())
             .transpose()?;
+        let connect = element
+            .pop_attr("connect")
+            .map(|s| s.parse::<ConnectMode>())
+            .transpose()?
+            .unwrap_or_default();
 
         let offset = element
             .pop_attr("corner-offset")
@@ -184,7 +154,7 @@ impl ElbowConnector {
             // Start is fixed, end needs resolution
             (Some((x1, y1, dir1)), None) => {
                 let (end_el, end_bb) = end_data.expect("end must have element if not fixed");
-                let (end_coord, end_dir) = Self::resolve_point_to_bbox((x1, y1), &end_bb);
+                let (end_coord, end_dir) = Self::resolve_point_to_bbox(connect, (x1, y1), &end_bb);
                 (
                     Self::with_inferred_dir((x1, y1), dir1, end_coord),
                     Endpoint::new(end_coord, end_dir),
@@ -197,7 +167,8 @@ impl ElbowConnector {
             (None, Some((x2, y2, dir2))) => {
                 let (start_el, start_bb) =
                     start_data.expect("start must have element if not fixed");
-                let (start_coord, start_dir) = Self::resolve_point_to_bbox((x2, y2), &start_bb);
+                let (start_coord, start_dir) =
+                    Self::resolve_point_to_bbox(connect, (x2, y2), &start_bb);
                 (
                     Endpoint::new(start_coord, start_dir),
                     Self::with_inferred_dir((x2, y2), dir2, start_coord),
@@ -210,7 +181,7 @@ impl ElbowConnector {
             (None, None) => {
                 let (start_el, start_bb) = start_data.expect("start must have element");
                 let (end_el, end_bb) = end_data.expect("end must have element");
-                let res = Self::resolve_bbox_to_bbox(&start_bb, &end_bb);
+                let res = Self::resolve_bbox_to_bbox(connect, &start_bb, &end_bb);
                 (
                     Endpoint::new(res.start_coord, res.start_dir),
                     Endpoint::new(res.end_coord, res.end_dir),

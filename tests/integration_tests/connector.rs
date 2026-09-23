@@ -35,6 +35,14 @@ fn test_connector_closest() {
 }
 
 #[test]
+fn test_connector_connect_cardinal() {
+    let input = format!(r##"{RECT_SVG}<line start="#a" end="#d" connect="cardinal" />"##);
+    let expected_line = r#"<line x1="5" y1="2.5" x2="22.5" y2="20"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
+
+#[test]
 fn test_connector_fixed_start() {
     let input = format!(r##"{RECT_SVG}<line start="3 7" end="#d@t" />"##);
     let expected_line = r#"<line x1="3" y1="7" x2="22.5" y2="20"/>"#;
@@ -461,6 +469,14 @@ fn test_connector_overlapping_bboxes() {
 "##;
     let output = transform_str_default(input).unwrap();
     assert!(!output.contains(r#"id="conn""#));
+
+    let input = r##"
+<rect id="a" x="0" y="0" width="10" height="10" />
+<rect id="b" x="5" y="5" width="10" height="10" />
+<line id="conn" start="#a" end="#b" connect="cardinal" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert!(!output.contains(r#"id="conn""#));
 }
 
 #[test]
@@ -486,6 +502,38 @@ fn test_fixed_and_closest_target() {
     let expected_line = r#"<polyline points="25 20, 25 5, 40 5"/>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_connector_connect_cardinal_mixed_target() {
+    let input = r#"<rect xy="20" wh="10"/><line start="40 5" end="^" connect="cardinal" />"#;
+    let expected_line = r#"<line x1="40" y1="5" x2="25" y2="20"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+
+    let input = format!(r##"{RECT_SVG}<line start="#a@b" end="#d" connect="cardinal" />"##);
+    let expected_line = r#"<line x1="2.5" y1="5" x2="20" y2="22.5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_connector_connect_polyline_defaults() {
+    let input = r#"<rect xy="20" wh="10"/><polyline start="40 5" end="^" connect="default" />"#;
+    let expected_line = r#"<polyline points="40 5, 25 5, 25 20"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+
+    let input = r#"<rect xy="20" wh="10"/><polyline start="40 5" end="^" connect="cardinal" />"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected_line);
+}
+
+#[test]
+fn test_connector_connect_invalid() {
+    let input = r##"<rect id="a" wh="10"/><rect id="b" xy="20" wh="10"/><line start="#a" end="#b" connect="corners" />"##;
+    let err = transform_str_default(input).unwrap_err().to_string();
+    assert_contains!(err, "'corners' invalid (connect)");
 }
 
 #[test]

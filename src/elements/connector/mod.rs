@@ -2,6 +2,7 @@ mod corner_route;
 mod elbow;
 mod gap;
 mod line;
+mod routing;
 
 pub use elbow::ElbowConnector;
 use gap::{GapSpec, points_with_gap};

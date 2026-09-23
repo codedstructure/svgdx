@@ -42,6 +42,22 @@ This can result in connectors which don't look great, e.g. the following is not 
 </svg>
 ```
 
+If you still want automatic placement but only want the cardinal face centres (`t`, `r`, `b`, `l`)
+to be considered, add `connect="cardinal"`:
+
+```svgdx-xml-inline
+<svg>
+  <rect id="a" wh="20 10" text="input" />
+  <rect id="b" xy="^ 20" wh="^" text="output" />
+
+  <line start="#a" end="#b" connect="cardinal"/>
+</svg>
+```
+
+For straight line connectors, the default mode prefers overlap-aware edge midpoints and then corners.
+For elbow connectors created from `<polyline>`, cardinal faces are already the default; `connect`
+is most useful when you want `<line>` to follow the same target-selection rule.
+
 To counter this, provide more explicit start and(/or) end references, e.g. using explicit locations or edge-specs.
 
 ```svgdx-xml-inline

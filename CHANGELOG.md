@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an element's `text` or `md` attributes. Note that an explicit `id` always
   takes precedence, and a value used elsewhere will not be applied.
 
+- Added: line connectors specifying only bbox reference start and end values
+  can specify `connect="cardinal"` to force routing to and from cardinal points
+  rather than the default axis-aligned on overlap or nearest corner approach.
+
 - Added: path-local variables inside `path d` attributes using `:name value`
   and `:?name value` commands (the latter being equivalent to `varTry`, i.e.
   set iff evaluating 'value' is error-free). These are evaluated during path
