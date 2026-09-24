@@ -1,4 +1,5 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="230mm" height="70mm" viewBox="-5 -16 115 35">
+  <rect x="-5" y="-16" width="115" height="35" style="stroke: none; fill: rgba(200, 230, 220, 0.5);"/>
   <defs>
     <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
       <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
@@ -6,7 +7,6 @@
   </defs>
   <style>
     <![CDATA[
-    svg { background: rgba(200, 230, 220, 0.5); }
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: rgba(0, 30, 50, 0.15); stroke: black; }
     text { stroke-width: 0; font-family: monospace; font-size: 3px; fill: black; stroke: rgba(0, 30, 50, 0.15); }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }

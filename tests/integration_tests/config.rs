@@ -57,7 +57,38 @@ fn test_config_background() {
 <rect xy="0" wh="5"/>
 </svg>
 "#;
-    let expected = r#"svg { background: papayawhip; }"#;
+    let expected =
+        r#"<rect x="-5" y="-5" width="15" height="15" style="stroke: none; fill: papayawhip;"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_config_background_and_border() {
+    let input = r#"
+<svg>
+<config background="papayawhip" border="3"/>
+<rect xy="0" wh="5"/>
+</svg>
+"#;
+    // width/height are 5 (rect) + 2* border
+    let expected =
+        r#"<rect x="-3" y="-3" width="11" height="11" style="stroke: none; fill: papayawhip;"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_theme_background_uses_leading_rect() {
+    let input = r#"
+<svg>
+<config theme="dark"/>
+<rect xy="0" wh="5"/>
+</svg>
+"#;
+    let expected = r#"<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="15mm" height="15mm" viewBox="-5 -5 15 15">
+  <rect x="-5" y="-5" width="15" height="15" style="stroke: none; fill: #073642;"/>
+  <style>"#;
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }

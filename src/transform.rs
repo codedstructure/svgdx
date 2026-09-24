@@ -5,7 +5,7 @@ use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
-use crate::types::{AttrMap, OrderIndex, fstr, split_unit};
+use crate::types::{AttrMap, OrderIndex, attr_split, fstr, split_unit};
 use crate::{AutoStyleMode, ErrorMode, TransformConfig};
 
 use std::collections::{BTreeMap, HashMap};
@@ -297,6 +297,37 @@ impl Transformer {
         Ok(SvgElement::new("svg", &new_svg_attrs.to_vec()))
     }
 
+    fn root_background_rect(&self, root_svg: &SvgElement) -> Option<SvgElement> {
+        let background = ContextTheme::from_context(&self.context)
+            .background()
+            .to_string();
+        if background == "none" {
+            return None;
+        }
+
+        let view_box = root_svg.get_attr("viewBox")?;
+        let values: Vec<_> = attr_split(view_box).collect();
+        let [x, y, width, height] = values.as_slice() else {
+            return None;
+        };
+
+        // Create a background rectangle covering the entire viewBox
+        // with inline style attribute to override any CSS
+        Some(SvgElement::new(
+            "rect",
+            &[
+                ("x".to_string(), x.to_string()),
+                ("y".to_string(), y.to_string()),
+                ("width".to_string(), width.to_string()),
+                ("height".to_string(), height.to_string()),
+                (
+                    "style".to_string(),
+                    format!("stroke: none; fill: {background};"),
+                ),
+            ],
+        ))
+    }
+
     fn build_auto_styles(&self, events: &mut OutputList) -> (Vec<String>, Vec<String>) {
         // Collect the set of elements and classes so relevant styles can be
         // automatically added.
@@ -442,6 +473,9 @@ impl Transformer {
         output: (OutputList, Option<BoundingBox>),
         writer: &mut dyn Write,
     ) -> Result<()> {
+        const BACKGROUND_SENTINEL: &str = "_svgdx_background_sentinel";
+        const STYLE_SENTINEL: &str = "_svgdx_style_sentinel";
+
         let (mut events, bbox) = output;
 
         if self.context.real_svg {
@@ -450,12 +484,21 @@ impl Transformer {
         }
 
         let mut output_events = OutputList::new();
+        let mut background_events = OutputList::new();
 
         let mut has_svg_element = false;
         if let (pre_svg, Some(first_svg), remain) = events.partition("svg") {
             output_events.extend(pre_svg);
             let root_svg = self.make_root_svg(first_svg.event, bbox)?;
+            let background_rect = self.root_background_rect(&root_svg);
             output_events.push(EventKind::Start(root_svg.into()));
+            output_events.push(EventKind::Empty(
+                SvgElement::new(BACKGROUND_SENTINEL, &[]).into(),
+            ));
+            if let Some(background_rect) = background_rect {
+                background_events.push(EventKind::Spacing(Spacing::LineBreak));
+                background_events.push(EventKind::Empty(background_rect.into()));
+            }
             events = remain;
             has_svg_element = true;
         }
@@ -474,7 +517,7 @@ impl Transformer {
         }
 
         output_events.push(EventKind::Empty(
-            SvgElement::new("style_sentinel", &[]).into(),
+            SvgElement::new(STYLE_SENTINEL, &[]).into(),
         ));
         output_events.extend(events);
 
@@ -490,10 +533,14 @@ impl Transformer {
             );
         }
 
-        let (mut pre_style, _sentinel, post_style) = output_events.partition("style_sentinel");
-        pre_style.extend(style_events);
-        pre_style.extend(post_style);
-        pre_style.write_to(writer)
+        let (pre_style, _sentinel, post_style) = output_events.partition(STYLE_SENTINEL);
+        let (mut pre_background, _sentinel, post_background) =
+            pre_style.partition(BACKGROUND_SENTINEL);
+        pre_background.extend(background_events);
+        pre_background.extend(post_background);
+        pre_background.extend(style_events);
+        pre_background.extend(post_style);
+        pre_background.write_to(writer)
     }
 }
 

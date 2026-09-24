@@ -140,6 +140,10 @@ impl ContextTheme {
             theme,
         }
     }
+
+    pub fn background(&self) -> &str {
+        &self.background
+    }
 }
 
 #[derive(Debug, Clone, Default)]

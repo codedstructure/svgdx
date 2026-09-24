@@ -35,15 +35,7 @@ impl StyleProvider for DefaultStyles {
             text_styles.push(Style::new("font-weight", weight));
         }
 
-        let mut rules = Vec::with_capacity(16);
-        if self.theme.background != "none" {
-            rules.push(Rule {
-                selector: Selector::Element(MatchType::Element("svg".to_string())),
-                styles: vec![Style::new("background", self.theme.background.clone())],
-            });
-        }
-
-        rules.extend([
+        vec![
             Rule {
                 selector: Selector::BasicShape(MatchType::Any),
                 styles: vec![
@@ -68,8 +60,7 @@ impl StyleProvider for DefaultStyles {
                 selector: Selector::Class(MatchType::Class("d-surround".to_string())),
                 styles: vec![Style::new("fill", "none")],
             },
-        ]);
-        rules
+        ]
     }
 
     fn on_match(&mut self, _rule: &Rule, selected: &Selected) -> bool {

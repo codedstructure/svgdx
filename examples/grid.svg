@@ -1,4 +1,5 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="110mm" height="110mm" viewBox="-5 -5 110 110">
+  <rect x="-5" y="-5" width="110" height="110" style="stroke: none; fill: #073642;"/>
   <defs>
     <pattern id="grid-10" x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
       <rect width="100%" height="100%" style="stroke: none; fill: none;"/>
@@ -15,7 +16,6 @@
   </defs>
   <style>
     <![CDATA[
-    svg { background: #073642; }
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: #002b36; stroke: #93a1a1; }
     .d-red { stroke: red; }
     .d-blue { stroke: blue; }

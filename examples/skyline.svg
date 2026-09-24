@@ -1,7 +1,7 @@
 <svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="118mm" height="73mm" viewBox="-5 -55 118 73">
+  <rect x="-5" y="-55" width="118" height="73" style="stroke: none; fill: #eee8d5;"/>
   <style>
     <![CDATA[
-    svg { background: #eee8d5; }
     rect, circle, ellipse, polygon { stroke-width: 0.5; fill: #fdf6e3; stroke: #657b83; }
     line, polyline, path { stroke-width: 0.5; fill: none; stroke: #657b83; }
     .d-fill-lightgrey { fill: lightgrey; }
