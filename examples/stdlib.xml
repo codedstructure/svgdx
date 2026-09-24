@@ -1,14 +1,22 @@
 <svg>
   <!-- requires builtin stdlib -->
-  <defaults><line class="d-arrow d-dash"/></defaults>
+  <defaults><line gap="2" class="d-arrow d-dash"/></defaults>
   <g>
     <reuse id="d1" href="#d:document" wh="20 30"/>
-    <reuse id="d2" href="#d:document" wh="20 30" xy="^|v 5"/>
+    <reuse href="#d:actor" wh="10 20" cxy="^"/>
+    <reuse id="d2" href="#d:document" wh="20 30" xy="#d1|v 5"/>
+    <reuse href="#d:actor" wh="10 20" cxy="^"/>
   </g>
-  <reuse id="c" href="#d:cloud" wh="40 30" xy="^|h 40"/>
-  <reuse id="s" href="#d:store" wh="30" xy="^|h 30"/>
+  <reuse id="c" href="#d:cloud" wh="40 30" xy="^|h 30"/>
+  <reuse id="p" href="#d:pipeline" wh="30 10" xy="^|h 15"/>
+  <reuse id="s" href="#d:store" wh="30" xy="^|h 15"/>
 
-  <line start="#d1@r" end="#c@l:30%" class="d-arrow"/>
-  <line start="#d2@r" end="#c@l:70%" class="d-arrow"/>
-  <line start="#c" end="#s" class="d-arrow"/>
+  <line start="#d1@r" end="#c@l:30%"/>
+  <reuse href="#d:message" size="5" cxy="^:50%" dy="-5"/>
+  <reuse href="#d:message" size="5" cxy="^^:90%" dy="-5"/>
+  <line start="#d2@r" end="#c@l:70%"/>
+  <reuse href="#d:document" size="5" cxy="^:20%" dy="-5"/>
+  <reuse href="#d:document" size="5" cxy="^^:60%" dy="-5"/>
+  <line start="#c" end="#p"/>
+  <line start="#p" end="#s"/>
 </svg>

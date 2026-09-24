@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Changed: the `transform_json()` entrypoint (used by the WASM-based editor)
   now includes the builtin standard library.
 
+- Added: new builtin stdlib shapes: `pipeline`, `actor`, `message`. All current
+  stdlib shapes now have default sizes and aspect ratios, allowing a single
+  `size`, `width`, or `height` attribute to control generated shape size.
+
 - Added: a new `"d-auto-id"` class automatically derives a camelCase `id` from
   an element's `text` or `md` attributes. Note that an explicit `id` always
   takes precedence, and a value used elsewhere will not be applied.

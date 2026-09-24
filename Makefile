@@ -1,4 +1,4 @@
-.PHONY: all serve check docs svgdx-server svgdx mdbook wasm clean
+.PHONY: all serve check docs svgdx-server svgdx mdbook wasm examples clean
 
 all: svgdx-server svgdx
 
@@ -30,6 +30,9 @@ mdbook:
 
 wasm:
 	sh scripts/wasm_build.sh
+
+examples:
+	bash scripts/refresh_examples.sh
 
 clean:
 	cargo clean

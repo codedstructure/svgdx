@@ -1,17 +1,66 @@
 <svg name="d">
   <specs>
     <g id="document">
+      <varTryDefault width="{{ $size * 0.7 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 0.7 }}" height="{{ $width * 10/7 }}"/>
+      <varDefault width="7" height="10"/>
       <var fold="{{min($width, $height) / 4}}"/>
       <path d="M 0 0 H {{$width - $fold}} L $width $fold V $height H 0 Z M {{$width - $fold}} 0 V $fold H $width"/>
     </g>
 
     <g id="store">
+      <varTryDefault width="{{ $size }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height }}" height="{{ $width }}"/>
+      <varDefault width="10" height="10"/>
       <var cap="{{min($height / 5, $width / 4)}}"/>
-      <path d="M 0 $cap a {{$width / 2}} $cap 0 0 0 $width 0 a {{$width / 2}} $cap 0 0 0 {{-$width}} 0 v {{$height - 2 * $cap}} a {{$width / 2}} $cap 0 0 0 $width 0 v {{-($height - 2 * $cap)}}"/>
+      <path d="M 0 $cap a {{$width / 2}} $cap 0 0 0 $width 0 a {{$width / 2}} $cap 0 0 0 {{-$width}} 0
+        v {{$height - 2 * $cap}} a {{$width / 2}} $cap 0 0 0 $width 0 v {{-($height - 2 * $cap)}}"/>
+    </g>
+
+    <g id="pipeline">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 7/15 }}"/>
+      <varTryDefault width="{{ $height }}" height="{{ $width }}"/>
+      <varDefault width="15" height="7"/>
+      <var cap="{{min($width / 5, $height / 4)}}"/>
+      <path d="M $cap 0
+        a $cap {{$height / 2}} 0 0 0 0 $height
+        a $cap {{$height / 2}} 0 0 0 0 {{-$height}}
+        h {{$width - 2 * $cap}}
+        a $cap {{$height / 2}} 0 0 1 0 $height
+        h {{-($width - 2 * $cap)}}"/>
     </g>
 
     <g id="cloud">
-      <path d="M {{$width * 0.2}} {{$height * 0.78}} C {{$width * 0.05}} {{$height * 0.78}} 0 {{$height * 0.62}} {{$width * 0.08}} {{$height * 0.5}} C {{$width * 0.05}} {{$height * 0.28}} {{$width * 0.22}} {{$height * 0.12}} {{$width * 0.38}} {{$height * 0.18}} C {{$width * 0.45}} {{$height * 0.02}} {{$width * 0.7}} 0 {{$width * 0.78}} {{$height * 0.18}} C {{$width * 0.94}} {{$height * 0.18}} $width {{$height * 0.34}} {{$width * 0.94}} {{$height * 0.48}} C $width {{$height * 0.56}} {{$width * 0.95}} {{$height * 0.78}} {{$width * 0.78}} {{$height * 0.78}} C {{$width * 0.7}} $height {{$width * 0.3}} $height {{$width * 0.2}} {{$height * 0.78}} Z"/>
+      <varTryDefault width="{{ $size }}" height="{{ $size * 15/20 }}"/>
+      <varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+      <varDefault width="20" height="15"/>
+      <path d="M {{$width * 0.2}} {{$height * 0.78}}
+        C {{$width * 0.05}} {{$height * 0.78}} 0 {{$height * 0.62}} {{$width * 0.08}} {{$height * 0.5}}
+        C {{$width * 0.05}} {{$height * 0.28}} {{$width * 0.22}} {{$height * 0.12}} {{$width * 0.38}} {{$height * 0.18}}
+        C {{$width * 0.45}} {{$height * 0.02}} {{$width * 0.7}} 0 {{$width * 0.78}} {{$height * 0.18}}
+        C {{$width * 0.94}} {{$height * 0.18}} $width {{$height * 0.34}} {{$width * 0.94}} {{$height * 0.48}}
+        C $width {{$height * 0.56}} {{$width * 0.95}} {{$height * 0.78}} {{$width * 0.78}} {{$height * 0.78}}
+        C {{$width * 0.7}} $height {{$width * 0.3}} $height {{$width * 0.2}} {{$height * 0.78}} Z"/>
+    </g>
+
+    <g id="actor">
+      <varTryDefault width="{{ $size * 0.5 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 0.5 }}" height="{{ $width * 2 }}"/>
+      <varDefault width="5" height="10"/>
+      <var head="{{min(0.4 * $height, 0.9 * $width)}}"/>
+      <var body="{{$height - $head}}"/>
+      <var bhalf="{{$body * 0.5}}" bqtr="{{$body * 0.25}}" whalf="{{$width / 2}}"/>
+      <path d="M$whalf $head a 0.1 0.1 0 0 0 0 -$head 0.1 0.1 0 0 0 0 $head // head circle
+          v $bhalf m -$whalf -$bqtr h$width m-$whalf $bqtr // body and arms
+          l -$whalf $bhalf m$whalf-$bhalf l$whalf $bhalf // legs"/>
+    </g>
+
+    <g id="message">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 3/4 }}"/>
+      <varTryDefault width="{{ $height * 4/3 }}" height="{{ $width * 3/4 }}"/>
+      <varDefault width="8" height="6"/>
+      <var wby2="{{ $width / 2 }}" hby2="{{ $height / 2 }}"/>
+      <path d="M0 0 h$width v$height h-${width} v-${height} l$wby2 $hby2 $wby2 -$hby2" style="stroke-linejoin:round"/>
     </g>
   </specs>
 </svg>
