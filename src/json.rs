@@ -141,7 +141,7 @@ pub fn reformat_json_impl(input: &str) -> TransformResponse {
 /// `{"version": 1, "error": "..."}`
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn transform_json(input: &str) -> String {
-    let cfg = TransformConfig::default();
+    let cfg = TransformConfig::default().with_stdlib();
     let result = transform_json_impl(input, &cfg);
     serde_json::to_string(&result).expect("Failed to serialize response")
 }
@@ -177,6 +177,22 @@ mod tests {
         assert_eq!(parsed["version"], 1);
         assert!(parsed["svg"].as_str().unwrap().contains("<svg"));
         assert!(parsed["error"].is_null());
+    }
+
+    #[test]
+    fn test_json_transform_includes_stdlib() {
+        let request = r##"{"version": 1, "input": "<svg><reuse href=\"#d:document\" wh=\"10 20\"/></svg>", "config": {}}"##;
+        let response = transform_json(request);
+        let parsed: serde_json::Value = serde_json::from_str(&response).unwrap();
+
+        assert_eq!(parsed["version"], 1);
+        assert!(parsed["error"].is_null());
+        assert!(
+            parsed["svg"]
+                .as_str()
+                .unwrap()
+                .contains("class=\"document\"")
+        );
     }
 
     #[test]

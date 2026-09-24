@@ -23,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   iteration. Together with the new path-local variables, this allows more
   complex paths to be defined.
 
+- Changed: the `transform_json()` entrypoint (used by the WASM-based editor)
+  now includes the builtin standard library.
+
 - Added: a new `"d-auto-id"` class automatically derives a camelCase `id` from
   an element's `text` or `md` attributes. Note that an explicit `id` always
   takes precedence, and a value used elsewhere will not be applied.
