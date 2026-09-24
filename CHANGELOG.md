@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0 - 2026-09-24]
+
 - Changed: config value 'background' and theme-derived SVG backgrounds are now
   emitted as a leading `<rect>` element matching the root `viewBox`, rather
   than relying on a generated `svg { background: ... }` CSS rule. This gives
