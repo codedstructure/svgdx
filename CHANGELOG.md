@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed: config value 'font-size' was being ignored.
 
+- Fixed (editor): display output text immediately when splitter is dragged away
+  from the edge to reveal the output text window.
+
 ## [0.33.0 - 2026-09-24]
 
 - Changed: config value 'background' and theme-derived SVG backgrounds are now

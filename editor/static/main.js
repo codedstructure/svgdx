@@ -27,6 +27,16 @@ let editor = null;
 let textViewer = null;
 let lastViewbox = null;
 
+function isTextOutputVisible() {
+    return !textOutputContainer.classList.contains('minimized') && textOutputContainer.getClientRects().length > 0;
+}
+
+function refreshTextOutput() {
+    if (textViewer && isTextOutputVisible()) {
+        textViewer.refresh();
+    }
+}
+
 /**
  * Strip metadata attributes from SVG for clean text output
  * Operates on a DOM element and removes attributes in-place
@@ -104,15 +114,11 @@ function updateSvgOutput(svgData) {
  * Update the text output display (raw SVG)
  */
 function updateTextOutput(svgData) {
-    if (textOutputContainer.style.display === 'none') {
-        // Don't update hidden CodeMirror - it's ineffective
-        return;
-    }
-
     outputContainer.classList.remove('error');
     const scrollTop = textViewer.getScrollTop();
     textViewer.setValue(svgData);
     textViewer.setScrollTop(scrollTop);
+    refreshTextOutput();
 }
 
 /**
@@ -189,6 +195,11 @@ function init() {
     textViewer = createCodeMirror5Editor(document.getElementById('text-output'), {
         readOnly: true
     });
+
+    const textOutputResizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(() => refreshTextOutput());
+    });
+    textOutputResizeObserver.observe(textOutputContainer);
 
     // Create rate-limited update function
     const rateLimitedUpdate = rateLimited(update, window.svgdx_use_server);
