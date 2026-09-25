@@ -117,3 +117,44 @@ fn test_config_auto_style() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_config_font_size() {
+    // inline style mode
+    let input = r#"<svg>
+<config font-size="1.5" auto-style-mode="inline"/>
+<rect wh="5" text="Hello"/>
+</svg>"#;
+    let expected = r#"font-size: 1.5px"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // CSS mode
+    let input = r#"<svg>
+<config font-size="5.5" auto-style-mode="css"/>
+<rect wh="5" text="Hello"/>
+</svg>"#;
+    let expected = r#"font-size: 5.5px"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+
+    // inline style mode with class "d-text-larger" - 2x font-size
+    let input = r#"<svg>
+<config font-size="2.5"/>
+<rect wh="5" text="Hello" class="d-text-larger"/>
+</svg>"#;
+    let expected = r#"font-size: 5px"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_config_font_family() {
+    let input = r#"<svg>
+<config font-family="Comic Sans MS, Fantasy" auto-style-mode="inline"/>
+<rect wh="5" text="Hello"/>
+</svg>"#;
+    let expected = r#"font-family: Comic Sans MS, Fantasy"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}

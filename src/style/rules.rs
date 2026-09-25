@@ -27,7 +27,7 @@ impl StyleProvider for DefaultStyles {
         let mut text_styles = vec![
             Style::new("stroke-width", "0"),
             Style::new("font-family", self.theme.font_family.clone()),
-            Style::new("font-size", "3px"),
+            Style::new("font-size", format!("{}px", self.theme.font_size)),
             Style::new("fill", &stroke), // NOTE: text uses stroke as fill
             Style::new("stroke", &fill),
         ];
