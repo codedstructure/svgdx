@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: support attribute evaluation (variables, expressions) in `<config>`
+  element. (Try `<config font-size="{{ $VALUE * 5 }}"/>` in the editor.)
+
 - Fixed: config value 'font-size' was being ignored.
 
 - Fixed (editor): display output text immediately when splitter is dragged away

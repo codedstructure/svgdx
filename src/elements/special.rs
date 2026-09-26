@@ -36,8 +36,10 @@ impl EventGen for ConfigElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
+        let mut el = self.0.clone();
+        el.eval_attributes(context)?;
         let mut new_config = context.config.clone();
-        for (key, value) in self.0.get_attrs() {
+        for (key, value) in el.get_attrs() {
             match key.as_str() {
                 "scale" => new_config.scale = parse_float(value)?,
                 "debug" => new_config.debug = parse_bool(value)?,
