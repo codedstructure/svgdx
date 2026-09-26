@@ -11,6 +11,7 @@ import { initSplitters } from './modules/splitter.js';
 import { initStatusbar, setStatus, getDefaultStatusText, formatStatusError } from './modules/statusbar.js';
 import { initClipboard } from './modules/clipboard.js';
 import { initReformatAction } from './modules/reformat-action.js';
+import { initPopupMenus } from './modules/popup-menus.js';
 import { initToolbar } from './modules/toolbar.js';
 import { initSlider, updateSlider } from './modules/slider.js';
 import {
@@ -205,6 +206,7 @@ function init() {
     const rateLimitedUpdate = rateLimited(update, window.svgdx_use_server);
 
     // Initialize all modules
+    initPopupMenus();
     initToolbar();
     initTabs(state, editor, (tabNum) => {
         updateSlider(state, tabNum);

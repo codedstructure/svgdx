@@ -202,12 +202,11 @@ export function initLayout(state, onUpdate) {
     applyResponsiveLayout(state, null);
 
     // Set up desktop layout button handlers
-    document.querySelectorAll('#layout-popup .popup-button').forEach(el => {
+    document.querySelectorAll('#layout-popup [data-layout-selection]').forEach(el => {
         el.addEventListener('click', (e) => {
             hideAllPopups();
 
-            const id = e.target.id;
-            const selection = id.replace('layout-', '');
+            const selection = e.currentTarget.dataset.layoutSelection;
 
             if (!VALID_LAYOUTS.includes(selection)) {
                 console.error(`Unknown layout: ${selection}`);
@@ -223,12 +222,11 @@ export function initLayout(state, onUpdate) {
     });
 
     // Set up mobile layout button handlers
-    document.querySelectorAll('#mobile-layout-popup .popup-button').forEach(el => {
+    document.querySelectorAll('#mobile-layout-popup [data-mobile-layout-selection]').forEach(el => {
         el.addEventListener('click', (e) => {
             hideAllPopups();
 
-            const id = e.target.id;
-            const selection = id.replace('mobile-layout-', '');
+            const selection = e.currentTarget.dataset.mobileLayoutSelection;
 
             if (!VALID_MOBILE_LAYOUTS.includes(selection)) {
                 console.error(`Unknown mobile layout: ${selection}`);

@@ -31,12 +31,7 @@ export const VALID_LAYOUTS = ['vertical', 'horizontal', 'v-text', 'h-text'];
 export const DEFAULT_LAYOUT = 'vertical';
 
 // PNG export resolutions
-export const PNG_RESOLUTIONS = {
-    'copy-png-big': 2048,
-    'copy-png-medium': 1024,
-    'copy-png-small': 512,
-    'copy-png-tiny': 128
-};
+export const PNG_RESOLUTIONS = [2048, 1024, 512, 128];
 
 // Mobile layout settings
 export const MOBILE_BREAKPOINT = 768;

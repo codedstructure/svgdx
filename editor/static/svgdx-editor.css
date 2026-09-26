@@ -382,6 +382,8 @@ button[data-checked="true"]:active {
     position: fixed;
     z-index: 2000;
     margin: 0;
+    font-size: 13px;
+    color: #222;
     /* Will be positioned by JS */
     visibility: hidden;
     opacity: 0;
@@ -395,13 +397,20 @@ button[data-checked="true"]:active {
 }
 
 /* Hide popup buttons by default */
-.popup-container .popup-button {
+.popup-buttons > .popup-button {
     display: block;
     width: 100%;
     white-space: nowrap;
 }
 
-.popup-buttons button {
+.popup-buttons > .popup-button,
+.popup-menu-button,
+.popup-menu-label {
+    font-size: inherit;
+    font-family: inherit;
+}
+
+.popup-buttons > .popup-button {
     display: block;
     box-shadow: none;
     border-radius: 0;
@@ -410,7 +419,7 @@ button[data-checked="true"]:active {
 }
 
 /* Avoid double border */
-.popup-buttons button + button {
+.popup-buttons > .popup-button + .popup-button {
     border-top: none;
 }
 
@@ -420,6 +429,75 @@ button[data-checked="true"]:active {
 
 .popup-button:active {
     background-color: #bbb;
+}
+
+.popup-menu {
+    min-width: 64px;
+    background: #eee;
+    border: 1px solid #ccc;
+    box-shadow: 1px 1px 3px rgb(0 0 0 / 15%);
+    padding: 2px 0;
+}
+
+.popup-menu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 3px 6px;
+}
+
+.popup-menu-row + .popup-menu-row {
+    border-top: 1px solid #d4d4d4;
+}
+
+.popup-menu-label {
+    flex: 1 1 auto;
+    text-align: left;
+}
+
+.popup-menu-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex: none;
+}
+
+.popup-menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    border-radius: 4px;
+    border: 1px solid #bbb;
+    background: #f8f8f8;
+    box-shadow: none;
+}
+
+.popup-menu-button:hover,
+.popup-menu-button:focus {
+    background: #e5e5e5;
+    box-shadow: none;
+}
+
+.popup-menu-button:active {
+    background: #d3d3d3;
+    box-shadow: inset 1px 1px 2px rgb(0 0 0 / 20%);
+}
+
+.popup-menu-button svg {
+    width: 32px;
+    height: 32px;
+    pointer-events: none;
+}
+.popup-menu-button svg * {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 0.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 /* Header styles */

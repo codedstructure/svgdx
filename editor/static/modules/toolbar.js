@@ -38,11 +38,17 @@ function scrollToolbar(delta) {
  * Position a popup menu below its trigger button, centered
  */
 function positionPopup(container) {
-    const trigger = container.querySelector('button:not(.popup-button)');
+    const trigger = container.querySelector(':scope > button');
     const popup = container.querySelector('.popup-buttons');
     if (!trigger || !popup) return;
 
     const triggerRect = trigger.getBoundingClientRect();
+    const computedMinWidth = Number.parseFloat(getComputedStyle(popup).minWidth);
+    const minWidth = Number.isFinite(computedMinWidth)
+        ? Math.max(triggerRect.width, computedMinWidth)
+        : triggerRect.width;
+
+    popup.style.minWidth = `${minWidth}px`;
 
     // Temporarily show popup to measure its width
     popup.style.visibility = 'hidden';
@@ -62,7 +68,6 @@ function positionPopup(container) {
 
     popup.style.top = `${triggerRect.bottom}px`;
     popup.style.left = `${left}px`;
-    popup.style.minWidth = `${triggerRect.width}px`;
 }
 
 /**
@@ -110,14 +115,19 @@ export function initToolbar() {
 
     // Popup handling - show on click/hover, hide on leave
     document.querySelectorAll('.popup-container').forEach(container => {
-        const trigger = container.querySelector('button:not(.popup-button)');
+        const trigger = container.querySelector(':scope > button');
         if (!trigger) return;
 
         // Show popup on hover (desktop) or click (touch)
         trigger.addEventListener('mouseenter', () => showPopup(container));
         trigger.addEventListener('click', (e) => {
             e.stopPropagation();
+            const isHoverOpen = container.matches(':hover') || popup?.matches(':hover');
+
             if (container.classList.contains('show-popup')) {
+                if (isHoverOpen) {
+                    return;
+                }
                 hidePopup(container);
             } else {
                 showPopup(container);
