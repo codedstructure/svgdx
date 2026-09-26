@@ -1,8 +1,8 @@
 // Clipboard module - handles copy, download, and PNG export
 
-import { PNG_RESOLUTIONS } from './config.js';
 import { statusbar } from './dom.js';
 import { hidePopup } from './layout.js';
+import { getCleanSvgText } from './svg-text.js';
 
 /**
  * Copy data to clipboard
@@ -11,20 +11,31 @@ import { hidePopup } from './layout.js';
  * defeats that, so always use .write() (which takes a ClipboardItem which *can*
  * resolve a Promise) even for text.
  */
-function copyToClipboard(mimeType, dataPromise) {
+async function copyToClipboard(mimeType, dataPromise) {
     try {
-        navigator.clipboard.write([
+        await navigator.clipboard.write([
             new ClipboardItem({
                 [mimeType]: dataPromise
             })
         ]);
         statusbar.style.color = null;
         statusbar.innerText = 'Copied to clipboard';
+        return true;
     } catch (e) {
         console.error('Error copying to clipboard', e);
         statusbar.style.color = 'darkred';
         statusbar.innerText = 'Failed to copy to clipboard';
+        return false;
     }
+}
+
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 /**
@@ -33,6 +44,13 @@ function copyToClipboard(mimeType, dataPromise) {
  */
 function getCleanSvg(textViewer) {
     return cleanText(textViewer.getValue());
+}
+
+function getExportSvg(textViewer) {
+    return getCleanSvgText(getCleanSvg(textViewer), {
+        strict: true,
+        logContext: 'output export'
+    });
 }
 
 /**
@@ -55,9 +73,16 @@ export function getTimestamp() {
 /**
  * Generate PNG from SVG at specified resolution
  */
-async function generatePng(maxDim = 2048) {
+async function generatePng(textViewer, maxDim = 2048) {
+    getExportSvg(textViewer);
+
+    const svgElement = document.querySelector('#svg-output svg');
+    if (!svgElement) {
+        throw new Error('No SVG output available');
+    }
+
     // Clone the SVG to avoid visual glitches
-    const svg = document.querySelector('#svg-output svg').cloneNode(true);
+    const svg = svgElement.cloneNode(true);
 
     // Restore original dimensions
     svg.setAttribute('width', svg.dataset.origWidth);
@@ -84,11 +109,18 @@ async function generatePng(maxDim = 2048) {
     img.width = pxWidth;
     img.height = pxHeight;
 
-    await new Promise(resolve => { img.onload = resolve; });
+    await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error('Failed to load SVG for PNG export'));
+    });
 
     // Draw to canvas
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d');
+    if (!context) {
+        URL.revokeObjectURL(img.src);
+        throw new Error('Failed to create canvas context');
+    }
     canvas.width = img.width;
     canvas.height = img.height;
     context.drawImage(img, 0, 0);
@@ -96,9 +128,60 @@ async function generatePng(maxDim = 2048) {
     URL.revokeObjectURL(img.src);
 
     // Convert to PNG blob
-    return new Promise(resolve => {
-        canvas.toBlob(blob => resolve(blob), 'image/png');
+    return new Promise((resolve, reject) => {
+        canvas.toBlob(blob => {
+            if (blob) {
+                resolve(blob);
+                return;
+            }
+            reject(new Error('Failed to create PNG blob'));
+        }, 'image/png');
     });
+}
+
+function downloadSvg(textViewer) {
+    const svg = getExportSvg(textViewer);
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
+    triggerDownload(blob, `svgdx-output-${getTimestamp()}.svg`);
+}
+
+async function downloadPng(textViewer, resolution) {
+    const blob = await generatePng(textViewer, resolution);
+    triggerDownload(blob, `svgdx-output-${resolution}px-${getTimestamp()}.png`);
+}
+
+async function handleOutputAction(button, textViewer) {
+    const { format, action, resolution } = button.dataset;
+
+    if (format === 'svg') {
+        if (action === 'download') {
+            downloadSvg(textViewer);
+            return;
+        }
+        if (action === 'copy') {
+            await copyToClipboard('text/plain', Promise.resolve(getExportSvg(textViewer)));
+            return;
+        }
+    }
+
+    if (format === 'png') {
+        const px = Number.parseInt(resolution, 10);
+        if (!Number.isFinite(px)) {
+            throw new Error(`Invalid PNG resolution: ${resolution}`);
+        }
+
+        if (action === 'download') {
+            await downloadPng(textViewer, px);
+            return;
+        }
+        if (action === 'copy') {
+            getExportSvg(textViewer);
+            await copyToClipboard('image/png', generatePng(textViewer, px));
+            return;
+        }
+    }
+
+    throw new Error(`Unknown output action: ${format}/${action}`);
 }
 
 /**
@@ -111,56 +194,24 @@ export function initClipboard(editor, textViewer) {
     document.getElementById('save-input').addEventListener('click', () => {
         hidePopup();
         const blob = new Blob([cleanText(editor.getValue())], { type: 'application/xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `svgdx-editor-${getTimestamp()}.xml`;
-        a.click();
-        URL.revokeObjectURL(url);
+        triggerDownload(blob, `svgdx-editor-${getTimestamp()}.xml`);
     });
 
     // Copy input button
     document.getElementById('copy-input').addEventListener('click', () => {
         hidePopup();
-        copyToClipboard('text/plain', Promise.resolve(cleanText(editor.getValue())));
+        void copyToClipboard('text/plain', Promise.resolve(cleanText(editor.getValue())));
     });
 
-    // Save output button
-    document.getElementById('save-output').addEventListener('click', () => {
-        hidePopup();
-        const svg = getCleanSvg(textViewer);
-        const blob = new Blob([svg], { type: 'image/svg+xml' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `svgdx-output-${getTimestamp()}.svg`;
-        a.click();
-        URL.revokeObjectURL(url);
-    });
-
-    // Copy output button
-    document.getElementById('copy-output').addEventListener('click', () => {
-        hidePopup();
-        copyToClipboard('text/plain', Promise.resolve(getCleanSvg(textViewer)));
-    });
-
-    // Copy PNG buttons (now in output popup)
-    document.querySelectorAll('#output-popup .popup-button[id^="copy-png"]').forEach(el => {
+    document.querySelectorAll('#output-popup .popup-output-action').forEach(el => {
         el.addEventListener('click', async (e) => {
             hidePopup();
-            const id = e.target.id;
-            const resolution = PNG_RESOLUTIONS[id];
-
-            if (resolution === undefined) {
-                console.error(`Unknown copy PNG button: ${id}`);
-                return;
-            }
-
             try {
-                copyToClipboard('image/png', generatePng(resolution));
-                console.log(`PNG image copied to clipboard (${resolution}px)`);
+                await handleOutputAction(e.currentTarget, textViewer);
             } catch (error) {
-                console.error('Error copying PNG image to clipboard:', error);
+                console.error('Error handling output action:', error);
+                statusbar.style.color = 'darkred';
+                statusbar.innerText = error.message;
             }
         });
     });

@@ -1,4 +1,4 @@
-.PHONY: all serve check docs svgdx-server svgdx mdbook wasm examples clean
+.PHONY: all serve dev-serve check docs svgdx-server svgdx mdbook wasm examples clean
 
 all: svgdx-server svgdx
 
@@ -18,6 +18,10 @@ $(SVGDX): $(SRC_FILES)
 
 serve: svgdx-server
 	$(SVGDX_SERVER) --stdlib --open
+
+dev-serve:
+	# dev-mode for allowing CSS / JS to be refreshed
+	cargo run --bin svgdx-server -- --stdlib --open
 
 check:
 	sh scripts/check.sh
