@@ -12,6 +12,7 @@ import { initStatusbar, setStatus, getDefaultStatusText, formatStatusError } fro
 import { initClipboard } from './modules/clipboard.js';
 import { initReformatAction } from './modules/reformat-action.js';
 import { initPopupMenus } from './modules/popup-menus.js';
+import { getCleanSvgText } from './modules/svg-text.js';
 import { initToolbar } from './modules/toolbar.js';
 import { initSlider, updateSlider } from './modules/slider.js';
 import {
@@ -36,50 +37,6 @@ function refreshTextOutput() {
     if (textViewer && isTextOutputVisible()) {
         textViewer.refresh();
     }
-}
-
-/**
- * Strip metadata attributes from SVG for clean text output
- * Operates on a DOM element and removes attributes in-place
- * @param {Element} element - Root element to strip metadata from
- */
-function stripMetadata(element) {
-    // List of attributes to strip - add more here as needed
-    const attributesToStrip = ['data-src-line'];
-
-    // Process this element
-    for (const attr of attributesToStrip) {
-        element.removeAttribute(attr);
-    }
-
-    // Recursively process children
-    for (const child of element.children) {
-        stripMetadata(child);
-    }
-}
-
-/**
- * Create a clean SVG string with metadata stripped
- * @param {string} svgData - Raw SVG string with metadata
- * @returns {string} - SVG string with metadata removed
- */
-function getCleanSvgText(svgData) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(svgData, 'image/svg+xml');
-    const svg = doc.documentElement;
-
-    // Check for parse errors
-    const parseError = doc.querySelector('parsererror');
-    if (parseError) {
-        console.error('Error parsing SVG for metadata stripping');
-        return svgData; // Return original if parsing fails
-    }
-
-    stripMetadata(svg);
-
-    // Serialize back to string
-    const serializer = new XMLSerializer();
-    return serializer.serializeToString(svg);
 }
 
 /**

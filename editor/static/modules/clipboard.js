@@ -2,6 +2,7 @@
 
 import { statusbar } from './dom.js';
 import { hidePopup } from './layout.js';
+import { getCleanSvgText } from './svg-text.js';
 
 /**
  * Copy data to clipboard
@@ -45,6 +46,13 @@ function getCleanSvg(textViewer) {
     return cleanText(textViewer.getValue());
 }
 
+function getExportSvg(textViewer) {
+    return getCleanSvgText(getCleanSvg(textViewer), {
+        strict: true,
+        logContext: 'output export'
+    });
+}
+
 /**
  * Clean text by removing trailing whitespace on each line
  * and ensuring it ends with a single newline
@@ -65,7 +73,9 @@ export function getTimestamp() {
 /**
  * Generate PNG from SVG at specified resolution
  */
-async function generatePng(maxDim = 2048) {
+async function generatePng(textViewer, maxDim = 2048) {
+    getExportSvg(textViewer);
+
     const svgElement = document.querySelector('#svg-output svg');
     if (!svgElement) {
         throw new Error('No SVG output available');
@@ -130,13 +140,13 @@ async function generatePng(maxDim = 2048) {
 }
 
 function downloadSvg(textViewer) {
-    const svg = getCleanSvg(textViewer);
+    const svg = getExportSvg(textViewer);
     const blob = new Blob([svg], { type: 'image/svg+xml' });
     triggerDownload(blob, `svgdx-output-${getTimestamp()}.svg`);
 }
 
-async function downloadPng(resolution) {
-    const blob = await generatePng(resolution);
+async function downloadPng(textViewer, resolution) {
+    const blob = await generatePng(textViewer, resolution);
     triggerDownload(blob, `svgdx-output-${resolution}px-${getTimestamp()}.png`);
 }
 
@@ -149,7 +159,7 @@ async function handleOutputAction(button, textViewer) {
             return;
         }
         if (action === 'copy') {
-            await copyToClipboard('text/plain', Promise.resolve(getCleanSvg(textViewer)));
+            await copyToClipboard('text/plain', Promise.resolve(getExportSvg(textViewer)));
             return;
         }
     }
@@ -161,11 +171,12 @@ async function handleOutputAction(button, textViewer) {
         }
 
         if (action === 'download') {
-            await downloadPng(px);
+            await downloadPng(textViewer, px);
             return;
         }
         if (action === 'copy') {
-            await copyToClipboard('image/png', generatePng(px));
+            getExportSvg(textViewer);
+            await copyToClipboard('image/png', generatePng(textViewer, px));
             return;
         }
     }
