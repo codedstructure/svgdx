@@ -681,7 +681,7 @@ dependencies = [
 
 [[package]]
 name = "svgdx"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "assert_cmd",
  "assertables",
