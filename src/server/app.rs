@@ -134,12 +134,7 @@ fn json_response(response: TransformResponse) -> AppResponse {
 }
 
 fn bad_request(err: String) -> AppResponse {
-    respond(
-        err,
-        "text/plain",
-        StatusCode::BAD_REQUEST,
-        false,
-    )
+    respond(err, "text/plain", StatusCode::BAD_REQUEST, false)
 }
 
 // return 200 OK with given body / mime-type
