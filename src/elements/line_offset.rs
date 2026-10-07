@@ -107,7 +107,12 @@ pub fn get_point_along_linelike_el(el: &SvgElement, length: Length) -> Result<(f
 #[cfg(test)]
 mod tests {
 
-    use assertables::assert_abs_diff_le_x;
+    fn assert_nearly_eq(a: f32, b: f32) {
+        const EPSILON: f32 = 0.001;
+        if (a - b).abs() > EPSILON {
+            panic!("assert_nearly_eq failed: {} != {}", a, b);
+        }
+    }
 
     use crate::{
         elements::{SvgElement, line_offset::get_point_along_linelike_el},
@@ -130,29 +135,29 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Absolute(1.0));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.6, 0.001);
-        assert_abs_diff_le_x!(y, -0.3, 0.001);
+        assert_nearly_eq(x, 1.6);
+        assert_nearly_eq(y, -0.3);
 
         // test ratio
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.6));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.45, 0.001);
-        assert_abs_diff_le_x!(y, -0.1, 0.001);
+        assert_nearly_eq(x, 1.45);
+        assert_nearly_eq(y, -0.1);
 
         // negative abs
         let result = get_point_along_linelike_el(&element, Length::Absolute(-0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 0.7, 0.001);
-        assert_abs_diff_le_x!(y, 0.9, 0.001);
+        assert_nearly_eq(x, 0.7);
+        assert_nearly_eq(y, 0.9);
 
         // too big ratio
         let result = get_point_along_linelike_el(&element, Length::Ratio(1.8));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 2.35, 0.001);
-        assert_abs_diff_le_x!(y, -1.3, 0.001);
+        assert_nearly_eq(x, 2.35);
+        assert_nearly_eq(y, -1.3);
     }
 
     #[test]
@@ -167,43 +172,43 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Absolute(1.0));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.6, 0.001);
-        assert_abs_diff_le_x!(y, 2.8, 0.001);
+        assert_nearly_eq(x, 1.6);
+        assert_nearly_eq(y, 2.8);
 
         // test ratio in first section
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.1));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 2.5, 0.001);
-        assert_abs_diff_le_x!(y, 4.0, 0.001);
+        assert_nearly_eq(x, 2.5);
+        assert_nearly_eq(y, 4.0);
 
         // test abs
         let result = get_point_along_linelike_el(&element, Length::Absolute(11.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, -2.0, 0.001);
-        assert_abs_diff_le_x!(y, 3.5, 0.001);
+        assert_nearly_eq(x, -2.0);
+        assert_nearly_eq(y, 3.5);
 
         // test ratio
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.85));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, -4.75, 0.001);
-        assert_abs_diff_le_x!(y, 1.0, 0.001);
+        assert_nearly_eq(x, -4.75);
+        assert_nearly_eq(y, 1.0);
 
         // test abs negative
         let result = get_point_along_linelike_el(&element, Length::Absolute(-0.85));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.0, 0.001);
-        assert_abs_diff_le_x!(y, 2.0, 0.001);
+        assert_nearly_eq(x, 1.0);
+        assert_nearly_eq(y, 2.0);
 
         // test ratio large
         let result = get_point_along_linelike_el(&element, Length::Ratio(2.85));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, -1.0, 0.001);
-        assert_abs_diff_le_x!(y, 1.0, 0.001);
+        assert_nearly_eq(x, -1.0);
+        assert_nearly_eq(y, 1.0);
     }
 
     #[test]
@@ -213,64 +218,64 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Absolute(1.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 0.0, 0.001);
-        assert_abs_diff_le_x!(y, 0.0, 0.001);
+        assert_nearly_eq(x, 0.0);
+        assert_nearly_eq(y, 0.0);
 
         // test only M
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Absolute(1.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.0, 0.001);
-        assert_abs_diff_le_x!(y, 2.0, 0.001);
+        assert_nearly_eq(x, 1.0);
+        assert_nearly_eq(y, 2.0);
 
         // test h
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 h 4".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.75));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 4.0, 0.001);
-        assert_abs_diff_le_x!(y, 2.0, 0.001);
+        assert_nearly_eq(x, 4.0);
+        assert_nearly_eq(y, 2.0);
 
         // test v
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 v 4".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.75));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.0, 0.001);
-        assert_abs_diff_le_x!(y, 5.0, 0.001);
+        assert_nearly_eq(x, 1.0);
+        assert_nearly_eq(y, 5.0);
 
         // test H
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 H 4".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.75));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 3.25, 0.001);
-        assert_abs_diff_le_x!(y, 2.0, 0.001);
+        assert_nearly_eq(x, 3.25);
+        assert_nearly_eq(y, 2.0);
 
         // test V
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 V 4".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.75));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.0, 0.001);
-        assert_abs_diff_le_x!(y, 3.5, 0.001);
+        assert_nearly_eq(x, 1.0);
+        assert_nearly_eq(y, 3.5);
 
         // test l
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 l 3 4".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Absolute(3.0));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 2.8, 0.001);
-        assert_abs_diff_le_x!(y, 4.4, 0.001);
+        assert_nearly_eq(x, 2.8);
+        assert_nearly_eq(y, 4.4);
 
         // test L
         let element = SvgElement::new("path", &[("d".to_string(), "M 1 2 L 7 10".to_string())]);
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.7));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 5.2, 0.001);
-        assert_abs_diff_le_x!(y, 7.6, 0.001);
+        assert_nearly_eq(x, 5.2);
+        assert_nearly_eq(y, 7.6);
 
         // test a
 
@@ -282,8 +287,8 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 3.0, 0.001);
-        assert_abs_diff_le_x!(y, -3.0, 0.001);
+        assert_nearly_eq(x, 3.0);
+        assert_nearly_eq(y, -3.0);
 
         // over extended other direction
         let element = SvgElement::new(
@@ -293,8 +298,8 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, -5.0, 0.001);
-        assert_abs_diff_le_x!(y, 2.0, 0.001);
+        assert_nearly_eq(x, -5.0);
+        assert_nearly_eq(y, 2.0);
 
         // test A
 
@@ -306,8 +311,8 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 1.5 * 2.0f32.sqrt(), 0.001);
-        assert_abs_diff_le_x!(y, 1.5 * 2.0f32.sqrt(), 0.001);
+        assert_nearly_eq(x, 1.5 * 2.0f32.sqrt());
+        assert_nearly_eq(y, 1.5 * 2.0f32.sqrt());
     }
 
     #[test]
@@ -323,7 +328,7 @@ mod tests {
         let result = get_point_along_linelike_el(&element, Length::Ratio(0.5));
         assert!(result.is_ok());
         let (x, y) = result.unwrap();
-        assert_abs_diff_le_x!(x, 15.0, 0.001);
-        assert_abs_diff_le_x!(y, 0.0, 0.001);
+        assert_nearly_eq(x, 15.0);
+        assert_nearly_eq(y, 0.0);
     }
 }

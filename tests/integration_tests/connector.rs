@@ -1,4 +1,4 @@
-use assertables::assert_contains;
+use crate::assert_contains;
 use svgdx::transform_str_default;
 
 const RECT_SVG: &str = r#"

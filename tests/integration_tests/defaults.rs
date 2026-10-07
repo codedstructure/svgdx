@@ -1,4 +1,4 @@
-use assertables::assert_contains;
+use crate::assert_contains;
 use svgdx::transform_str_default;
 
 #[test]
@@ -21,7 +21,7 @@ fn test_defaults_empty() {
     ] {
         let expected = r#"<rect x="10" y="10" width="37" height="37"/>"#;
         let output = transform_str_default(input).unwrap();
-        assert_contains!(output, expected, "input: {}", input);
+        assert_contains!(output, expected);
     }
 }
 

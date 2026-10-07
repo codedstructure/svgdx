@@ -816,7 +816,6 @@ impl Deref for VarName {
 #[cfg(test)]
 mod test {
     use super::*;
-    use assertables::assert_lt;
 
     #[test]
     fn test_split_unit() {
@@ -1011,16 +1010,16 @@ mod test {
         let idx0 = OrderIndex::new(0);
         let idx1 = OrderIndex::new(1);
         let idx2 = OrderIndex::new(2);
-        assert_lt!(idx_default, idx0);
-        assert_lt!(idx1, idx2);
-        assert_lt!(idx1, idx1.with_sub_index(&idx1));
-        assert_lt!(idx1, idx1.with_sub_index(&idx1).with_sub_index(&idx1));
+        assert!(idx_default < idx0);
+        assert!(idx1 < idx2);
+        assert!(idx1 < idx1.with_sub_index(&idx1));
+        assert!(idx1 < idx1.with_sub_index(&idx1).with_sub_index(&idx1));
 
         let subidx1 = OrderIndex::new(101);
         let subidx2 = OrderIndex::new(102);
-        assert_lt!(idx1.with_sub_index(&subidx1), idx1.with_sub_index(&subidx2));
-        assert_lt!(idx1.with_sub_index(&subidx2), idx2);
-        assert_lt!(idx1.with_sub_index(&subidx2), idx2.with_sub_index(&subidx1));
+        assert!(idx1.with_sub_index(&subidx1) < idx1.with_sub_index(&subidx2));
+        assert!(idx1.with_sub_index(&subidx2) < idx2);
+        assert!(idx1.with_sub_index(&subidx2) < idx2.with_sub_index(&subidx1));
     }
 
     #[test]

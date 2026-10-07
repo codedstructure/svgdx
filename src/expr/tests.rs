@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-use assertables::{assert_in_delta, assert_lt};
 use rand::prelude::*;
 use rand_pcg::Pcg32;
 
@@ -14,6 +13,13 @@ use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, Size};
 use crate::types::ElRef;
+
+fn assert_nearly_eq(a: f32, b: f32) {
+    const EPSILON: f32 = 0.001;
+    if (a - b).abs() > EPSILON {
+        panic!("assert_nearly_eq failed: {} != {}", a, b);
+    }
+}
 
 struct TestContext {
     vars: HashMap<String, String>,
@@ -347,12 +353,11 @@ fn test_func_simple() {
         ("pow(2, -1)", 0.5),
         ("pow(9, 0.5)", 3.),
     ] {
-        assert_in_delta!(
+        assert_nearly_eq(
             evaluate_one(tokenize(expr).expect("test"), &ctx)
                 .ok()
                 .unwrap(),
             expected,
-            0.00001
         );
     }
 }
@@ -378,12 +383,11 @@ fn test_func_trig() {
         ("acos(cos(60))", 60.),
         ("atan(tan(60))", 60.),
     ] {
-        assert_in_delta!(
+        assert_nearly_eq(
             evaluate_one(tokenize(expr).expect("test"), &ctx)
                 .ok()
                 .unwrap(),
             expected,
-            0.00001
         );
     }
 }
@@ -410,9 +414,9 @@ fn test_func_random() {
         }
     }
     assert_ne!(count_a, 0);
-    assert_lt!(count_a, 100);
+    assert!(count_a < 100);
     assert_ne!(count_b, 0);
-    assert_lt!(count_b, 100);
+    assert!(count_b < 100);
 
     // Check randint hits different values
     let expr = "randint(1, 6)";
@@ -433,9 +437,9 @@ fn test_func_random() {
         }
     }
     assert_ne!(count_a, 0);
-    assert_lt!(count_a, 100);
+    assert!(count_a < 100);
     assert_ne!(count_b, 0);
-    assert_lt!(count_b, 100);
+    assert!(count_b < 100);
 }
 
 #[test]

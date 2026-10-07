@@ -1,5 +1,5 @@
+use crate::assert_contains;
 use assert_cmd::{Command, cargo, pkg_name};
-use assertables::assert_contains;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
