@@ -1,34 +1,52 @@
 use crate::assert_contains;
-use assert_cmd::{Command, cargo, pkg_name};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use svgdx::cli::{CliAction, parse_args};
 
+fn pkg_name() -> String {
+    std::env::var("CARGO_PKG_NAME").unwrap()
+}
+
+fn cargo_bin() -> String {
+    let env_var = format!("CARGO_BIN_EXE_{}", pkg_name());
+    std::env::var(&env_var).expect("could not get cargo bin exe")
+}
+
+fn run(cmd: &mut Command) -> std::io::Result<(i32, String)> {
+    let output = cmd.output()?;
+    let code = output.status.code().unwrap_or(255);
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    Ok((code, stdout))
+}
+
 #[test]
 fn test_cmdline_bad_args() {
-    let mut cmd = Command::new(cargo::cargo_bin!());
-    cmd.arg("-zyx").assert().failure().code(2);
+    let mut cmd = Command::new(cargo_bin());
+    cmd.arg("-zyx");
+    assert!(matches!(run(&mut cmd), Ok((2, _))));
 }
 
 #[test]
 fn test_cmdline_help() {
-    let mut cmd = Command::new(cargo::cargo_bin!());
-    let output = String::from_utf8(cmd.arg("-h").assert().success().get_output().stdout.clone())
-        .expect("non-UTF8");
-    assert_contains!(output, "Usage");
+    let mut cmd = Command::new(cargo_bin());
+    cmd.arg("-h");
+    let (code, out) = run(&mut cmd).unwrap(); //assert!(matches!(run(&mut cmd), Ok((2, _))));
+    assert_eq!(code, 0);
+    assert_contains!(out, "Usage");
 }
 
 #[test]
 fn test_cmdline_config() {
-    let config = parse_args([pkg_name!().into(), "--help".into()]);
+    let config = parse_args([pkg_name(), "--help".into()]);
     assert!(matches!(config, Ok(CliAction::Help)));
 
     let mut tmpfile = TestTempFile::new();
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let config = parse_args([
-        pkg_name!().into(),
+        pkg_name(),
         "-i".into(),
         tmpfile.path().to_str().unwrap().into(),
     ])
@@ -39,7 +57,7 @@ fn test_cmdline_config() {
     write!(tmpfile, r#"<svg><rect xy="0" wh="1"/></svg>"#).expect("tmpfile write failed");
     let outfile = TestTempFile::new();
     let config = parse_args([
-        pkg_name!().into(),
+        pkg_name(),
         "-i".into(),
         tmpfile.path().to_str().unwrap().into(),
         "-o".into(),
@@ -58,29 +76,26 @@ fn test_cmdline_same_file() {
     let filename = tmpfile.path().file_name().unwrap();
 
     // Different files: should succeed
-    let mut cmd = Command::new(cargo::cargo_bin!());
-    cmd.current_dir(cwd)
-        .args([
-            "-i",
-            filename.to_str().unwrap(),
-            "-o",
-            &format!("./{}x", filename.to_str().unwrap()),
-        ])
-        .assert()
-        .success();
+    let mut cmd = Command::new(cargo_bin());
+    cmd.current_dir(cwd).args([
+        "-i",
+        filename.to_str().unwrap(),
+        "-o",
+        &format!("./{}x", filename.to_str().unwrap()),
+    ]);
+    let (code, _) = run(&mut cmd).unwrap();
+    assert_eq!(code, 0);
 
     // Same file (even with different 'spelling') - should fail.
-    let mut cmd = Command::new(cargo::cargo_bin!());
-    cmd.current_dir(cwd)
-        .args([
-            "-i",
-            filename.to_str().unwrap(),
-            "-o",
-            &format!("./{}", filename.to_str().unwrap()),
-        ])
-        .assert()
-        .failure()
-        .code(1);
+    let mut cmd = Command::new(cargo_bin());
+    cmd.current_dir(cwd).args([
+        "-i",
+        filename.to_str().unwrap(),
+        "-o",
+        &format!("./{}", filename.to_str().unwrap()),
+    ]);
+    let (code, _) = run(&mut cmd).unwrap();
+    assert_eq!(code, 1);
 }
 
 #[test]
@@ -126,7 +141,7 @@ text"/>
 
     let outfile = TestTempFile::new();
     let config = parse_args([
-        pkg_name!().into(),
+        pkg_name(),
         "--reformat-only".into(),
         "-i".into(),
         tmpfile.path().to_str().unwrap().into(),
