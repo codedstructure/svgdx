@@ -1,4 +1,5 @@
 use crate::assert_contains;
+use crate::cli::{cargo_bin, pkg_name, run_cmd};
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -6,34 +7,18 @@ use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use svgdx::cli::{CliAction, parse_args};
 
-fn pkg_name() -> String {
-    std::env::var("CARGO_PKG_NAME").unwrap()
-}
-
-fn cargo_bin() -> String {
-    let env_var = format!("CARGO_BIN_EXE_{}", pkg_name());
-    std::env::var(&env_var).expect("could not get cargo bin exe")
-}
-
-fn run(cmd: &mut Command) -> std::io::Result<(i32, String)> {
-    let output = cmd.output()?;
-    let code = output.status.code().unwrap_or(255);
-    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-    Ok((code, stdout))
-}
-
 #[test]
 fn test_cmdline_bad_args() {
     let mut cmd = Command::new(cargo_bin());
     cmd.arg("-zyx");
-    assert!(matches!(run(&mut cmd), Ok((2, _))));
+    assert!(matches!(run_cmd(&mut cmd), Ok((2, _))));
 }
 
 #[test]
 fn test_cmdline_help() {
     let mut cmd = Command::new(cargo_bin());
     cmd.arg("-h");
-    let (code, out) = run(&mut cmd).unwrap(); //assert!(matches!(run(&mut cmd), Ok((2, _))));
+    let (code, out) = run_cmd(&mut cmd).unwrap(); //assert!(matches!(run(&mut cmd), Ok((2, _))));
     assert_eq!(code, 0);
     assert_contains!(out, "Usage");
 }
@@ -83,7 +68,7 @@ fn test_cmdline_same_file() {
         "-o",
         &format!("./{}x", filename.to_str().unwrap()),
     ]);
-    let (code, _) = run(&mut cmd).unwrap();
+    let (code, _) = run_cmd(&mut cmd).unwrap();
     assert_eq!(code, 0);
 
     // Same file (even with different 'spelling') - should fail.
@@ -94,7 +79,7 @@ fn test_cmdline_same_file() {
         "-o",
         &format!("./{}", filename.to_str().unwrap()),
     ]);
-    let (code, _) = run(&mut cmd).unwrap();
+    let (code, _) = run_cmd(&mut cmd).unwrap();
     assert_eq!(code, 1);
 }
 

@@ -20,6 +20,13 @@ cargo doc --verbose --no-deps --document-private-items --all-features
 cargo clippy --release --verbose --all-targets --no-default-features
 cargo clippy --release --verbose --all-targets --all-features
 
+if command -v pandoc &>/dev/null && command -v rsvg-convert &>/dev/null ; then
+    cargo test -- --ignored pandoc
+else
+    echo
+    echo "  ** skipping pandoc tests: requires 'pandoc' and 'rsvg-convert'."
+fi
+
 if cargo --list | grep -q llvm-cov ; then
     cargo llvm-cov --all-features
 else
