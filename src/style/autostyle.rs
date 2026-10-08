@@ -188,9 +188,18 @@ impl StyleRegistry {
 
 #[cfg(test)]
 mod tests {
-    use assertables::assert_contains;
-
     use super::*;
+
+    macro_rules! assert_contains {
+        ($container:expr, $content:expr) => {
+            if !$container.contains($content) {
+                panic!(
+                    "Failed assert_contains:\n\nContainer:\n```\n{}\n```\nContent:\n```\n{}\n```\n",
+                    $container, $content
+                );
+            }
+        };
+    }
 
     #[derive(Debug, Clone)]
     struct MockElement {

@@ -2,7 +2,7 @@
 use wasm_bindgen::prelude::*;
 
 use super::{Error, Result, TransformConfig, reformat, transform_str};
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub const JSON_API_VERSION: u32 = 1;

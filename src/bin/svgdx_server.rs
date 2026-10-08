@@ -3,10 +3,17 @@ use svgdx::server::{parse_args, run};
 
 const BIN_NAME: &str = env!("CARGO_BIN_NAME");
 
-#[tokio::main]
-async fn main() {
+fn main() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to build tokio runtime: {e}");
+            std::process::exit(1);
+        });
+
     match parse_args(std::env::args()) {
-        Ok(config) => run(config, BIN_NAME).await,
+        Ok(config) => runtime.block_on(run(config, BIN_NAME)),
         Err(msg) => {
             eprintln!("Error: {msg}");
             eprintln!();

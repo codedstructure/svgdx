@@ -31,3 +31,27 @@ mod src_line;
 mod text_attr;
 mod transform_svg;
 mod variables;
+
+macro_rules! assert_contains {
+    ($container:expr, $content:expr) => {
+        if !$container.contains($content) {
+            panic!(
+                "Failed assert_contains:\n\nContainer:\n```\n{}\n```\nContent:\n```\n{}\n```\n",
+                $container, $content
+            );
+        }
+    };
+}
+
+macro_rules! assert_not_contains {
+    ($container:expr, $content:expr) => {
+        if $container.contains($content) {
+            panic!(
+                "Failed assert_not_contains:\n\nContainer:\n```\n{}\n```\nContent:\n```\n{}\n```\n",
+                $container, $content
+            );
+        }
+    };
+}
+
+pub(crate) use {assert_contains, assert_not_contains};

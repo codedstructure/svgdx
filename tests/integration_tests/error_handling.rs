@@ -5,7 +5,7 @@
 // `<!--rect x="-->"/>` will be treated as a comment followed by the
 // Text type containing `"/>`.
 
-use assertables::assert_contains;
+use crate::assert_contains;
 use svgdx::transform_str_default;
 
 #[test]

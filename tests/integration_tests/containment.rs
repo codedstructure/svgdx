@@ -1,5 +1,4 @@
-use assertables::assert_contains;
-use itertools::Itertools;
+use crate::assert_contains;
 use svgdx::transform_str_default;
 
 #[test]
@@ -124,6 +123,29 @@ fn test_surround_bad() {
     assert!(output.is_err());
 }
 
+fn permutations<T, F>(items: &mut [T], mut f: F)
+where
+    F: FnMut(&[T]),
+{
+    fn permute_from<T, F>(items: &mut [T], start: usize, f: &mut F)
+    where
+        F: FnMut(&[T]),
+    {
+        if start == items.len() {
+            f(items);
+            return;
+        }
+
+        for i in start..items.len() {
+            items.swap(start, i);
+            permute_from(items, start + 1, f);
+            items.swap(start, i);
+        }
+    }
+
+    permute_from(items, 0, &mut f);
+}
+
 #[test]
 fn test_surround_connectors_permute() {
     // Now for the tough bit: for every ordering of elements, the result should still work.
@@ -136,9 +158,9 @@ fn test_surround_connectors_permute() {
 <polyline id="ll" start="#s1" end="#s2"/>
 "##;
 
-    let lines: Vec<_> = input.trim().lines().collect();
-    for testcase in lines.iter().permutations(lines.len()) {
-        let input = testcase.iter().join("\n");
+    let mut lines: Vec<_> = input.trim().lines().collect();
+    permutations(&mut lines, |testcase| {
+        let input = testcase.join("\n");
         let output = transform_str_default(input).unwrap();
 
         let expected1 = r#"<rect id="s1" x="-1" y="-1" width="7" height="14" class="d-surround"/>"#;
@@ -149,7 +171,7 @@ fn test_surround_connectors_permute() {
         assert_contains!(output, expected1);
         assert_contains!(output, expected2);
         assert_contains!(output, expected3);
-    }
+    });
 }
 
 #[test]
