@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: a builtin [pandoc](https://pandoc.org) lua filter, available with the
+  `--output-pandoc-filter` command line argument.
+  See [docs/pandoc.md](docs/pandoc.md) for more information.
+
 ## [0.33.1 - 2026-09-27]
 
 - Added: support attribute evaluation (variables, expressions) in `<config>`

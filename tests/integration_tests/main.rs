@@ -18,6 +18,8 @@ mod group;
 mod if_element;
 mod indent;
 mod loops;
+#[cfg(feature = "cli")]
+mod pandoc_filter;
 mod point;
 mod position;
 mod rel_pos;
@@ -55,3 +57,24 @@ macro_rules! assert_not_contains {
 }
 
 pub(crate) use {assert_contains, assert_not_contains};
+
+#[cfg(feature = "cli")]
+mod cli {
+    use std::process::Command;
+
+    pub(crate) fn pkg_name() -> String {
+        std::env::var("CARGO_PKG_NAME").unwrap()
+    }
+
+    pub(crate) fn cargo_bin() -> String {
+        let env_var = format!("CARGO_BIN_EXE_{}", pkg_name());
+        std::env::var(&env_var).expect("could not get cargo bin exe")
+    }
+
+    pub(crate) fn run_cmd(cmd: &mut Command) -> std::io::Result<(i32, String)> {
+        let output = cmd.output()?;
+        let code = output.status.code().unwrap_or(255);
+        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+        Ok((code, stdout))
+    }
+}
