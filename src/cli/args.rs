@@ -16,6 +16,7 @@ Usage:
 Options:
   -i, --input <INPUT>           Input file ('-' for stdin) ['-']
   -o, --output <OUTPUT>         Target output file ('-' for stdout) ['-']
+      --output-pandoc-filter    Write the embedded pandoc Lua filter to stdout and exit
       --output-stdlib           Write the embedded standard library to stdout and exit
       --reformat-only           Don't transform, only reformat the input file
   -h, --help                    Show this help
@@ -52,6 +53,8 @@ pub enum CliAction {
     Help,
     // svgdx -V or --version
     Version,
+    // write the embedded pandoc Lua filter to stdout and exit
+    OutputPandocFilter,
     // write the embedded standard library to stdout and exit
     OutputStdlib,
     // stdin is terminal and we have no INPUT arg
@@ -77,6 +80,7 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
+            "--output-pandoc-filter" => return Ok(CliAction::OutputPandocFilter),
             "--output-stdlib" => return Ok(CliAction::OutputStdlib),
             "--reformat-only" => reformat = true,
             "-o" | "--output" => {
@@ -120,5 +124,11 @@ mod tests {
 
         let config = parse_args(vec!["svgdx".to_string(), "--output-stdlib".to_string()]);
         assert!(matches!(config, Ok(CliAction::OutputStdlib)));
+
+        let config = parse_args(vec![
+            "svgdx".to_string(),
+            "--output-pandoc-filter".to_string(),
+        ]);
+        assert!(matches!(config, Ok(CliAction::OutputPandocFilter)));
     }
 }
