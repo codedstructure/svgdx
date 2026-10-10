@@ -8,7 +8,8 @@
 set -eu
 
 OUT_DIR="cm5"
-URL_BASE="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18"
+LICENSE_URL="https://codemirror.net/5/LICENSE"
+URL_BASE="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.21"
 
 FILE_LIST="\
     codemirror.min.js \
@@ -21,6 +22,9 @@ FILE_LIST="\
     addon/fold/xml-fold.min.js \
 "
 
+echo "Downloading LICENSE..."
+curl -s -o "${OUT_DIR}/LICENSE" "$LICENSE_URL"
+
 for FILE in $FILE_LIST ; do
     FULL_URL="${URL_BASE}/${FILE}"
     FOLDER="$(dirname $FILE)"
@@ -28,4 +32,3 @@ for FILE in $FILE_LIST ; do
     echo "Downloading $FILE..."
     curl -s -o "${OUT_DIR}/${FILE}" "$FULL_URL"
 done
-
