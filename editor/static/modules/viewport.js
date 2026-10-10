@@ -283,14 +283,6 @@ export function resetView() {
 }
 
 /**
- * Get the current viewBox string
- */
-export function getCurrentViewBox() {
-    const svg = svgOutputContainer.querySelector('svg');
-    return svg ? svg.getAttribute('viewBox') : null;
-}
-
-/**
  * Initialize viewport controls (reset view, auto-fit buttons)
  */
 export function initViewportControls(state, onUpdate) {

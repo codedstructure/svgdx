@@ -1,12 +1,12 @@
 // svgdx editor - main entry point
 // Initializes all modules and wires them together
 
-import { loadState, saveState, getTabContent, setTabContent, getTabSliderValue, setTabSliderValue } from './modules/storage.js';
+import { loadState, setTabContent, getTabSliderValue } from './modules/storage.js';
 import { createCodeMirror5Editor } from './modules/editor-adapter.js';
 import { transform, rateLimited, isReady } from './modules/transform.js';
-import { initTabs, saveCurrentTabContent } from './modules/tabs.js';
+import { initTabs } from './modules/tabs.js';
 import { initLayout } from './modules/layout.js';
-import { initViewport, getCurrentViewBox } from './modules/viewport.js';
+import { initViewport } from './modules/viewport.js';
 import { initSplitters } from './modules/splitter.js';
 import { initStatusbar, setStatus, getDefaultStatusText, formatStatusError } from './modules/statusbar.js';
 import { initClipboard } from './modules/clipboard.js';
@@ -176,10 +176,6 @@ function init() {
     initClipboard(editor, textViewer);
     initReformatAction(state, editor);
     initSlider(state, rateLimitedUpdate);
-
-    // Load initial content
-    const initialContent = getTabContent(state, state.activeTab);
-    editor.setValue(initialContent);
 
     // Initialize slider for current tab
     updateSlider(state, state.activeTab);

@@ -2,7 +2,6 @@
 
 import { getTabSliderValue, setTabSliderValue } from './storage.js';
 import { SLIDER_STEP } from './config.js';
-import { hideAllPopups } from './toolbar.js';
 
 let sliderElement = null;
 let labelElement = null;

@@ -128,6 +128,34 @@ export function createCodeMirror5Editor(element, options = {}) {
          */
         lineCount() {
             return cm.lineCount();
+        },
+
+        // The following methods are CodeMirror-specific, and deal with preserving
+        // undo history and cursor position when switching tabs.
+
+        /**
+         * Get the editor cursor position.
+         */
+        getCursor() {
+            return cm.getCursor();
+        },
+
+        /**
+         * Set the editor cursor position.
+         */
+        setCursor(line, ch) {
+            if (typeof line === 'object') {
+                cm.setCursor(line);
+            } else {
+                cm.setCursor(line, ch);
+            }
+        },
+
+        /**
+         * Swap in a different CodeMirror document while preserving that document's history.
+         */
+        swapDoc(doc) {
+            cm.swapDoc(doc);
         }
     };
 }
