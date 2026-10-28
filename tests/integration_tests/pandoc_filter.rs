@@ -12,7 +12,7 @@ const SAMPLE_SVGDX: &str = r#"<svg><rect xy="0" wh="10"/></svg>"#;
 #[test]
 fn test_output_pandoc_filter() {
     let mut cmd = Command::new(cargo_bin());
-    cmd.arg("--output-pandoc-filter");
+    cmd.arg("--output-builtin").arg("pandoc-filter");
     let (code, output) = run_cmd(&mut cmd).unwrap();
     assert_eq!(code, 0);
 
@@ -95,7 +95,7 @@ fn test_pandoc_filter_png_output() {
 fn export_filter(dir: &TestTempDir, name: &str) -> PathBuf {
     let path = dir.path().join(name);
     let mut cmd = Command::new(cargo_bin());
-    cmd.arg("--output-pandoc-filter");
+    cmd.arg("--output-builtin").arg("pandoc-filter");
     let (code, output) = run_cmd(&mut cmd).expect("failed to run pandoc filter command");
     assert_eq!(code, 0);
     fs::write(&path, output).expect("could not write pandoc filter");

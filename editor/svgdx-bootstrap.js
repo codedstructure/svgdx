@@ -1,7 +1,7 @@
 // svgdx bootstrap - WASM mode
 // Loads the WASM module and sets up the transform function
 
-import init, { reformat_json, transform_json, version_label } from "./pkg/svgdx.js";
+import init, { reformat_json, transform_json, version_label, example_document } from "./pkg/svgdx.js";
 
 console.log("svgdx: using local transform (WASM)");
 
@@ -11,6 +11,7 @@ async function run() {
     window.svgdx_reformat_json = reformat_json;
     window.svgdx_use_server = false;
     window.svgdx_version_label = version_label();
+    window.svgdx_example_document = example_document();
     // Dispatch event to notify that svgdx is ready
     window.dispatchEvent(new Event('svgdx-ready'));
 }

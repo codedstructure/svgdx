@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::channel;
 
 use crate::VERSION;
-use crate::builtin::stdlib_source;
+use crate::builtin::builtin_item;
 
 mod app;
 mod args;
@@ -26,8 +26,8 @@ pub async fn run(config: CliAction, program_name: &str) {
         CliAction::Help => {
             println!("{}", usage(program_name));
         }
-        CliAction::OutputStdlib => {
-            print!("{}", stdlib_source());
+        CliAction::OutputBuiltin(item) => {
+            print!("{}", builtin_item(item));
         }
         CliAction::Version => {
             println!("{program_name} v{VERSION}");

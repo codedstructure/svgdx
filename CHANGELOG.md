@@ -12,8 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   link between edges. For partial overlaps, an intersection point is used for
   the zero-length connector element.
 
+- Changed (CLI): for both the `svgdx` and `svgdx-server` CLIs, the
+  `--output-...` options have been unified as `--output-builtin <ITEM>`, so
+  `--output-stdlib` is now `--output-builtin stdlib`. Added an example document
+  for export as `--output-builtin example`, also available via the exported
+  `example_document()` function.
+
 - Added: a builtin [pandoc](https://pandoc.org) lua filter, available with the
-  `--output-pandoc-filter` command line argument.
+  `--output-builtin pandoc-filter` command line argument.
   See [docs/pandoc.md](docs/pandoc.md) for more information.
 
 ## [0.33.1 - 2026-09-27]
