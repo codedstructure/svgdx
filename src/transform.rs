@@ -1,7 +1,7 @@
 use crate::context::TransformerContext;
 use crate::document::tag::{Tag, tagify_events};
 use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList, Spacing};
-use crate::elements::SvgElement;
+use crate::elements::{SvgElement, element_pipeline};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
 use crate::style::{self, ContextTheme};
@@ -59,8 +59,8 @@ impl EventGen for Tag {
         }
         let (ev, bbox) = match self {
             Tag::Compound(el, _) | Tag::Leaf(el, _) => {
-                let mut el = el.clone();
-                context.apply_defaults(&mut el);
+                let el = el.clone();
+                let el = element_pipeline(el, context)?;
                 el.generate_events(context)?
             }
             Tag::Comment(_, _, c, _) => {

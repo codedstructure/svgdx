@@ -15,83 +15,53 @@ impl EventGen for Container<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        if let Some(inner_events) = self.0.inner_events(context) {
-            // If there's only text/cdata events, apply to current element and render
-            let mut inner_text = None;
-            for e in inner_events.iter() {
-                if let Some(t) = e.text_string() {
-                    if inner_text.is_none() {
-                        inner_text = Some(t);
-                    }
-                } else if let Some(c) = e.cdata_string() {
-                    inner_text = Some(c);
-                } else {
-                    // not text or cdata - abandon the effort and mark as such.
-                    inner_text = None;
-                    break;
-                }
-            }
-            if let Some(text) = &inner_text {
-                let mut el = self.0.clone();
-                el.set_attr("text", text);
-                if let Some((start, _end)) = self.0.event_range {
-                    el.event_range = Some((start, start)); // emulate an Empty element
-                }
-            }
-            if let (true, Some(text)) = (is_graphics_element(self.0), &inner_text) {
-                let mut el = self.0.clone();
-                el.set_attr("text", text);
-                if let Some((start, _end)) = self.0.event_range {
-                    el.event_range = Some((start, start)); // emulate an Empty element
-                }
-                el.generate_events(context)
-            } else {
-                // Special case <svg> elements with an xmlns attribute - passed through
-                // transparently, with no bbox calculation.
-                if self.0.name() == "svg" && self.0.get_attr("xmlns").is_some() {
-                    return Ok((self.0.all_events(context).into(), None));
-                }
-                let mut new_el = self.0.clone();
-                let mut bbox = None;
+        let Some(inner_events) = self.0.inner_events(context) else {
+            return Ok((OutputList::new(), None));
+        };
 
-                new_el.eval_attributes(context)?;
-                if is_graphics_element(&new_el) {
-                    new_el.prepare_element(context)?;
-                    new_el.finalize_layout(context)?;
-                    bbox = new_el.bbox()?;
-                }
-
-                if context.config.add_metadata {
-                    new_el.set_attr("data-src-line", &self.0.src_line.to_string());
-                }
-                let mut events = OutputList::new();
-                events.push(EventKind::Start(new_el.clone().into()));
-                let (evlist, inner_bbox) = if inner_text.is_some() {
-                    // inner_text implies no processable events; use as-is
-                    (inner_events.into(), None)
-                } else {
-                    self.0
-                        .process_inner_events(new_el.order_index.clone(), context)?
-                };
-                events.extend(evlist);
-                events.push(EventKind::End(self.0.name().to_owned()));
-
-                if is_container_element(&new_el) {
-                    bbox = inner_bbox;
-                }
-
-                if self.0.name() == "defs" {
-                    bbox = None;
-                } else if bbox.is_some() {
-                    new_el.content_bbox = bbox;
-                    context.update_element(&new_el);
-                }
-
-                Ok((events, bbox))
-            }
-        } else {
-            Ok((OutputList::new(), None))
+        // Special case <svg> elements with an xmlns attribute - passed through
+        // transparently, with no bbox calculation.
+        if self.0.name() == "svg" && self.0.get_attr("xmlns").is_some() {
+            return Ok((self.0.all_events(context).into(), None));
         }
+        let mut new_el = self.0.clone();
+        let mut bbox = None;
+
+        new_el.eval_attributes(context)?;
+        if is_graphics_element(&new_el) {
+            new_el.prepare_element(context)?;
+            new_el.finalize_layout(context)?;
+            bbox = new_el.bbox()?;
+        }
+
+        if context.config.add_metadata {
+            new_el.set_attr("data-src-line", &self.0.src_line.to_string());
+        }
+        let mut events = OutputList::new();
+        events.push(EventKind::Start(new_el.clone().into()));
+        let need_inner_processing = inner_events.iter().any(|e| e.element().is_some());
+        let (evlist, inner_bbox) = if !need_inner_processing {
+            // no inner processing needed - return events as-is
+            (inner_events.into(), None)
+        } else {
+            self.0
+                .process_inner_events(new_el.order_index.clone(), context)?
+        };
+        events.extend(evlist);
+        events.push(EventKind::End(self.0.name().to_owned()));
+
+        if is_container_element(&new_el) {
+            bbox = inner_bbox;
+        }
+
+        if self.0.name() == "defs" {
+            bbox = None;
+        } else if bbox.is_some() {
+            new_el.content_bbox = bbox;
+            context.update_element(&new_el);
+        }
+
+        Ok((events, bbox))
     }
 }
 
@@ -146,7 +116,7 @@ impl EventGen for GroupElement<'_> {
 /// See <https://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement>
 /// Note `reuse` is not a standard SVG element, but is used here in similar
 /// contexts to the `use` element.
-fn is_graphics_element(el: &SvgElement) -> bool {
+pub fn is_graphics_element(el: &SvgElement) -> bool {
     matches!(
         el.name(),
         "circle"

@@ -6,6 +6,7 @@ mod layout;
 mod line_offset;
 mod loops;
 mod path;
+mod pipeline;
 mod preprocess;
 mod reuse;
 mod special;
@@ -24,3 +25,4 @@ use text::process_text_attr;
 
 pub use element::SvgElement;
 pub use layout::is_layout_element;
+pub use pipeline::element_pipeline;
