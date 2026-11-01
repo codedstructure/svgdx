@@ -1,14 +1,18 @@
-use crate::constants::RELPOS_SEP;
+use crate::Error;
+use crate::constants::{LOCSPEC_SEP, RELPOS_SEP};
 use crate::context::TransformerContext;
 use crate::elements::SvgElement;
 use crate::elements::containers::is_graphics_element;
 use crate::errors::Result;
+use crate::geometry::{DirSpec, LocSpec};
+use crate::types::extract_elref;
 
 pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Result<SvgElement> {
     let next = apply_defaults(el, context);
     let next = inner_text_to_attr(next, context);
     let next = apply_auto_id(next, context);
     let next = convert_dirspec(next);
+    let next = set_associated_text_anchor(next)?;
 
     Ok(next)
 }
@@ -92,6 +96,23 @@ fn convert_dirspec(el: SvgElement) -> SvgElement {
     el
 }
 
+// Ensure relatively-positioned text element text has appropriate
+// anchors. Must be done before 'xy' gets expanded.
+fn set_associated_text_anchor(el: SvgElement) -> Result<SvgElement> {
+    if el.name() != "text" || !el.has_attr("text") {
+        return Ok(el);
+    }
+    let mut el = el;
+    if let Some(pos_attr) = el.get_attr("xy").or_else(|| el.get_attr("relpos"))
+        && let Ok((_, tail)) = extract_elref(pos_attr)
+        && let Some(loc) = eval_text_anchor(tail)?
+    {
+        el.set_default_attr("text-loc", text_loc_anchor(loc));
+    }
+
+    Ok(el)
+}
+
 fn auto_id_from_text(text: &str) -> Option<String> {
     // split into non-empty alphanumeric words
     let mut words = text
@@ -106,6 +127,41 @@ fn auto_id_from_text(text: &str) -> Option<String> {
         auto_id.push_str(&word[1..].to_lowercase());
     }
     Some(auto_id)
+}
+
+fn eval_text_anchor(elref_tail: &str) -> Result<Option<LocSpec>> {
+    let rel_loc = elref_tail.split_whitespace().next().unwrap_or_default();
+    if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
+        let dir: DirSpec = rel.parse()?;
+        return Ok(Some(dir.to_locspec()));
+    }
+    if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
+        return loc
+            .parse::<LocSpec>()
+            .map(Some)
+            .map_err(|_| Error::InvalidValue("text-loc".into(), loc.into()));
+    }
+    Ok(None)
+}
+
+// note this is specific to setting 'text-loc', not a general fmt::Display
+// implementation (because the `*Edge` variants lose info)
+fn text_loc_anchor(loc: LocSpec) -> &'static str {
+    match loc {
+        LocSpec::TopLeft => "tl",
+        LocSpec::Top => "t",
+        LocSpec::TopRight => "tr",
+        LocSpec::Right => "r",
+        LocSpec::BottomRight => "br",
+        LocSpec::Bottom => "b",
+        LocSpec::BottomLeft => "bl",
+        LocSpec::Left => "l",
+        LocSpec::Center => "c",
+        LocSpec::TopEdge(_) => "t",
+        LocSpec::BottomEdge(_) => "b",
+        LocSpec::LeftEdge(_) => "l",
+        LocSpec::RightEdge(_) => "r",
+    }
 }
 
 #[cfg(test)]

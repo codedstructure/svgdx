@@ -3,8 +3,7 @@ use std::str::FromStr;
 
 use super::SvgElement;
 use crate::constants::{
-    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
-    VAR_PREFIX,
+    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, RELPOS_SEP, SCALARSPEC_SEP, VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_el;
@@ -142,17 +141,6 @@ impl SvgElement {
     }
 
     pub fn expand_compound_attributes(&mut self) -> Result<()> {
-        // Ensure relatively-positioned text element text has appropriate
-        // anchors. Must be done before 'xy' gets expanded.
-        if self.name() == "text"
-            && self.has_attr("text")
-            && let Some(pos_attr) = self.get_attr("xy").or_else(|| self.get_attr("relpos"))
-            && let Ok((_, tail)) = extract_elref(pos_attr)
-            && let Some(loc) = eval_text_anchor(tail)?
-        {
-            self.set_default_attr("text-loc", text_loc_anchor(loc));
-        }
-
         expand_compound_size(self);
         expand_compound_pos(self);
         Ok(())
@@ -903,41 +891,6 @@ fn eval_pos_attributes(
         }
     }
     Ok(())
-}
-
-fn eval_text_anchor(elref_tail: &str) -> Result<Option<LocSpec>> {
-    let rel_loc = elref_tail.split_whitespace().next().unwrap_or_default();
-    if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
-        let dir: DirSpec = rel.parse()?;
-        return Ok(Some(dir.to_locspec()));
-    }
-    if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
-        return loc
-            .parse::<LocSpec>()
-            .map(Some)
-            .map_err(|_| Error::InvalidValue("text-loc".into(), loc.into()));
-    }
-    Ok(None)
-}
-
-// note this is specific to setting 'text-loc', not a general fmt::Display
-// implementation (because the `*Edge` variants lose info)
-fn text_loc_anchor(loc: LocSpec) -> &'static str {
-    match loc {
-        LocSpec::TopLeft => "tl",
-        LocSpec::Top => "t",
-        LocSpec::TopRight => "tr",
-        LocSpec::Right => "r",
-        LocSpec::BottomRight => "br",
-        LocSpec::Bottom => "b",
-        LocSpec::BottomLeft => "bl",
-        LocSpec::Left => "l",
-        LocSpec::Center => "c",
-        LocSpec::TopEdge(_) => "t",
-        LocSpec::BottomEdge(_) => "b",
-        LocSpec::LeftEdge(_) => "l",
-        LocSpec::RightEdge(_) => "r",
-    }
 }
 
 fn is_pos_attr(name: &str) -> bool {
