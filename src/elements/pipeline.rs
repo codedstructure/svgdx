@@ -13,6 +13,7 @@ pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Res
     let next = apply_auto_id(next, context);
     let next = convert_dirspec(next);
     let next = set_associated_text_anchor(next)?;
+    let next = custom_element_to_reuse(next, context);
 
     Ok(next)
 }
@@ -111,6 +112,13 @@ fn set_associated_text_anchor(el: SvgElement) -> Result<SvgElement> {
     }
 
     Ok(el)
+}
+
+fn custom_element_to_reuse(el: SvgElement, context: &mut TransformerContext) -> SvgElement {
+    if !context.is_named_spec(el.name()) {
+        return el;
+    }
+    SvgElement::new("reuse", &[("href".into(), format!("#{}", el.name()))]).with_attrs_from(&el)
 }
 
 fn auto_id_from_text(text: &str) -> Option<String> {
