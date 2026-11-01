@@ -124,17 +124,10 @@ pub fn is_layout_element(el: &SvgElement) -> bool {
 
 // Elements wh
 impl SvgElement {
-    fn extract_relpos(&mut self) -> Option<String> {
-        if self.get_attr("xy").unwrap_or_default().contains(RELPOS_SEP) {
-            return Some(self.pop_attr("xy").unwrap().to_string());
-        }
-        None
-    }
-
     pub fn has_pos_attrs(&self) -> bool {
         for key in [
             "x", "y", "cx", "cy", "x1", "y1", "x2", "y2", "xy", "cxy", "xy1", "xy2", "dxy", "dx",
-            "dy",
+            "dy", "relpos",
         ] {
             if self.has_attr(key) {
                 return true;
@@ -153,8 +146,8 @@ impl SvgElement {
         // anchors. Must be done before 'xy' gets expanded.
         if self.name() == "text"
             && self.has_attr("text")
-            && let Some(xy) = self.get_attr("xy")
-            && let Ok((_, tail)) = extract_elref(xy)
+            && let Some(pos_attr) = self.get_attr("xy").or_else(|| self.get_attr("relpos"))
+            && let Ok((_, tail)) = extract_elref(pos_attr)
             && let Some(loc) = eval_text_anchor(tail)?
         {
             self.set_default_attr("text-loc", text_loc_anchor(loc));
@@ -186,7 +179,7 @@ impl SvgElement {
 
         let mut force_origin = false;
         // Special-case xy with relpos, e.g. xy="#elem|h 2" and xy-loc
-        if let Some(relpos) = self.extract_relpos() {
+        if let Some(relpos) = self.pop_attr("relpos") {
             // xy won't have been expanded in the relpos case
             if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
                 if let Some(bb) = self.content_bbox {
@@ -433,7 +426,9 @@ impl SvgElement {
         // in which case we may still validly have these other attributes...
         // TODO: avoid overloading different content_bbox uses.
         if !self.has_attr("clip-path") {
-            for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
+            for key in [
+                "xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2", "relpos",
+            ] {
                 if self.has_attr(key) {
                     return Err(Error::MissingBBox(key.to_owned()));
                 }
@@ -468,6 +463,9 @@ impl SvgElement {
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
         // these to be set to have a bounding box.
+        if self.has_attr("relpos") {
+            return Err(Error::MissingBBox("relpos".into()));
+        }
         let zstr = "0";
         // if not a number and not a refspec, pass it through without computing a bbox
         // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
@@ -1006,16 +1004,11 @@ fn expand_pos_from_loc(el: &mut SvgElement, xy_loc: &str) -> Result<()> {
 // xy="#o 2" -> x="#o 2", y="#o 2"
 // xy="#o 2 4" -> x="#o 2", y="#o 4"
 fn expand_compound_pos(el: &mut SvgElement) {
+    // assumes any dirspec has already been extracted from xy attr
     if let Some(xy) = el.pop_attr("xy") {
-        // NOTE: relative positioning (e.g. `xy="#abc|h"`) is not compound
-        if xy.contains(RELPOS_SEP) {
-            // relpos -> re-add attribute
-            el.set_attr("xy", &xy);
-        } else {
-            let (x, y) = split_compound_attr(&xy);
-            el.set_default_attr("x", &x);
-            el.set_default_attr("y", &y);
-        }
+        let (x, y) = split_compound_attr(&xy);
+        el.set_default_attr("x", &x);
+        el.set_default_attr("y", &y);
     }
     if let Some(cxy) = el.pop_attr("cxy") {
         let (cx, cy) = split_compound_attr(&cxy);

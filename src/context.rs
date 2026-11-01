@@ -193,7 +193,7 @@ impl ElementMap for TransformerContext {
                     if el.pos_by_transform() && el.has_pos_attrs() {
                         // hasn't yet been expanded -> reference error.
                         return Err(Error::MissingBBox(format!(
-                            "Element at {} has unexpanded xy attribute",
+                            "Element at {} has unexpanded position attribute",
                             oi
                         )));
                     }
