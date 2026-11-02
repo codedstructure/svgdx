@@ -37,7 +37,7 @@ impl ConnectorType {
         }
     }
 
-    pub fn render(&self, ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
+    pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
         match self {
             Self::Line(c) => c.render(ctx),
             Self::Elbow(c) => c.render(ctx),

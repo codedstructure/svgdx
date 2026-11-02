@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: connectors for shapes with overlapping bounding boxes are no longer
+  omitted; for fully contained objects, a connector is rendered for the shortest
+  link between edges. For partial overlaps, an intersection point is used for
+  the zero-length connector element.
+
 - Added: a builtin [pandoc](https://pandoc.org) lua filter, available with the
   `--output-pandoc-filter` command line argument.
   See [docs/pandoc.md](docs/pandoc.md) for more information.

@@ -57,12 +57,6 @@ pub(super) enum AutoConnectStrategy {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct PointRouting {
-    pub target: ResolvedTarget,
-    pub fully_overlapping: bool,
-}
-
-#[derive(Clone, Copy, Debug)]
 pub(super) struct ResolvedTarget {
     pub loc: Option<LocSpec>,
     pub coord: (f32, f32),
@@ -72,7 +66,6 @@ pub(super) struct ResolvedTarget {
 pub(super) struct BBoxRouting {
     pub start: ResolvedTarget,
     pub end: ResolvedTarget,
-    pub fully_overlapping: bool,
 }
 
 /// Returns the midpoint of two 1D ranges if they overlap, None otherwise.
@@ -157,6 +150,22 @@ fn closest_cardinal_loc(point: (f32, f32), bb: &BoundingBox) -> LocSpec {
     min_loc
 }
 
+fn bbox_side_for_point(bb: &BoundingBox, point: (f32, f32)) -> Option<LocSpec> {
+    const EPS: f32 = 1e-5;
+
+    if (point.1 - bb.y1()).abs() <= EPS {
+        Some(LocSpec::Top)
+    } else if (point.0 - bb.x2()).abs() <= EPS {
+        Some(LocSpec::Right)
+    } else if (point.1 - bb.y2()).abs() <= EPS {
+        Some(LocSpec::Bottom)
+    } else if (point.0 - bb.x1()).abs() <= EPS {
+        Some(LocSpec::Left)
+    } else {
+        None
+    }
+}
+
 /// Axis-agnostic overlap analysis result for one dimension.
 #[derive(Debug, Clone, Copy)]
 enum AxisOverlap {
@@ -174,10 +183,6 @@ impl AxisOverlap {
         } else {
             Self::After
         }
-    }
-
-    fn is_overlapping(&self) -> bool {
-        matches!(self, Self::Overlapping(_))
     }
 }
 
@@ -201,8 +206,61 @@ impl BBoxRelation {
         Self::new(&point_bb, bb)
     }
 
-    fn fully_overlapping(&self) -> bool {
-        self.x_axis.is_overlapping() && self.y_axis.is_overlapping()
+    fn boundary_overlap_point(
+        &self,
+        start_bb: &BoundingBox,
+        end_bb: &BoundingBox,
+    ) -> Option<(LocSpec, (f32, f32))> {
+        let start_contains_end = end_bb.x1() >= start_bb.x1()
+            && end_bb.x2() <= start_bb.x2()
+            && end_bb.y1() >= start_bb.y1()
+            && end_bb.y2() <= start_bb.y2();
+        let end_contains_start = start_bb.x1() >= end_bb.x1()
+            && start_bb.x2() <= end_bb.x2()
+            && start_bb.y1() >= end_bb.y1()
+            && start_bb.y2() <= end_bb.y2();
+        if start_contains_end || end_contains_start {
+            return None;
+        }
+
+        let mut candidates = Vec::new();
+        for &x in &[start_bb.x1(), start_bb.x2(), end_bb.x1(), end_bb.x2()] {
+            for &y in &[start_bb.y1(), start_bb.y2(), end_bb.y1(), end_bb.y2()] {
+                let point = (x, y);
+                let in_start = point.0 >= start_bb.x1()
+                    && point.0 <= start_bb.x2()
+                    && point.1 >= start_bb.y1()
+                    && point.1 <= start_bb.y2();
+                let in_end = point.0 >= end_bb.x1()
+                    && point.0 <= end_bb.x2()
+                    && point.1 >= end_bb.y1()
+                    && point.1 <= end_bb.y2();
+                let on_start = bbox_side_for_point(start_bb, point).is_some();
+                let on_end = bbox_side_for_point(end_bb, point).is_some();
+                if in_start && in_end && on_start && on_end {
+                    candidates.push(point);
+                }
+            }
+        }
+        candidates.dedup();
+        let point = candidates
+            .iter()
+            .copied()
+            .min_by(|a, b| a.1.total_cmp(&b.1).then(a.0.total_cmp(&b.0)))?;
+
+        let loc = if (point.1 - start_bb.y1()).abs() <= 1e-5
+            || (point.1 - end_bb.y1()).abs() <= 1e-5
+        {
+            LocSpec::Top
+        } else if (point.1 - start_bb.y2()).abs() <= 1e-5 || (point.1 - end_bb.y2()).abs() <= 1e-5 {
+            LocSpec::Bottom
+        } else if (point.0 - start_bb.x1()).abs() <= 1e-5 || (point.0 - end_bb.x1()).abs() <= 1e-5 {
+            LocSpec::Left
+        } else {
+            LocSpec::Right
+        };
+
+        Some((loc, point))
     }
 
     fn resolve_overlap_or_corner_bbox_to_bbox(
@@ -210,6 +268,10 @@ impl BBoxRelation {
         start_bb: &BoundingBox,
         end_bb: &BoundingBox,
     ) -> (LocSpec, (f32, f32), LocSpec, (f32, f32)) {
+        if let Some((loc, point)) = self.boundary_overlap_point(start_bb, end_bb) {
+            return (loc, point, loc, point);
+        }
+
         match (&self.x_axis, &self.y_axis) {
             (AxisOverlap::Overlapping(x_mid), AxisOverlap::Before) => {
                 let start_loc = LocSpec::Bottom;
@@ -250,6 +312,58 @@ impl BBoxRelation {
                     end_loc,
                     (end_bb.locspec(end_loc).0, *y_mid),
                 )
+            }
+            (AxisOverlap::Overlapping(x_mid), AxisOverlap::Overlapping(y_mid)) => {
+                let vertical =
+                    if (end_bb.cy() - start_bb.y1()).abs() <= (start_bb.y2() - end_bb.cy()).abs() {
+                        (
+                            LocSpec::Top,
+                            (*x_mid, start_bb.locspec(LocSpec::Top).1),
+                            LocSpec::Top,
+                            (*x_mid, end_bb.locspec(LocSpec::Top).1),
+                        )
+                    } else {
+                        (
+                            LocSpec::Bottom,
+                            (*x_mid, start_bb.locspec(LocSpec::Bottom).1),
+                            LocSpec::Bottom,
+                            (*x_mid, end_bb.locspec(LocSpec::Bottom).1),
+                        )
+                    };
+
+                let horizontal =
+                    if (end_bb.cx() - start_bb.x1()).abs() <= (start_bb.x2() - end_bb.cx()).abs() {
+                        (
+                            LocSpec::Left,
+                            (start_bb.locspec(LocSpec::Left).0, *y_mid),
+                            LocSpec::Left,
+                            (end_bb.locspec(LocSpec::Left).0, *y_mid),
+                        )
+                    } else {
+                        (
+                            LocSpec::Right,
+                            (start_bb.locspec(LocSpec::Right).0, *y_mid),
+                            LocSpec::Right,
+                            (end_bb.locspec(LocSpec::Right).0, *y_mid),
+                        )
+                    };
+
+                let vertical_dist_sq = {
+                    let dx = vertical.1.0 - vertical.3.0;
+                    let dy = vertical.1.1 - vertical.3.1;
+                    dx * dx + dy * dy
+                };
+                let horizontal_dist_sq = {
+                    let dx = horizontal.1.0 - horizontal.3.0;
+                    let dy = horizontal.1.1 - horizontal.3.1;
+                    dx * dx + dy * dy
+                };
+
+                if horizontal_dist_sq <= vertical_dist_sq {
+                    horizontal
+                } else {
+                    vertical
+                }
             }
             _ => {
                 let (start_loc, end_loc) = select_corners(start_bb, end_bb);
@@ -295,20 +409,8 @@ pub fn resolve_bbox_to_bbox(
     end_bb: &BoundingBox,
 ) -> BBoxRouting {
     let relation = BBoxRelation::new(start_bb, end_bb);
-    let fully_overlapping = relation.fully_overlapping();
 
     match strategy {
-        AutoConnectStrategy::OverlapOrCorner if fully_overlapping => BBoxRouting {
-            start: ResolvedTarget {
-                loc: None,
-                coord: start_bb.locspec(LocSpec::Center),
-            },
-            end: ResolvedTarget {
-                loc: None,
-                coord: end_bb.locspec(LocSpec::Center),
-            },
-            fully_overlapping,
-        },
         AutoConnectStrategy::OverlapOrCorner => {
             let (start_loc, start_coord, end_loc, end_coord) =
                 relation.resolve_overlap_or_corner_bbox_to_bbox(start_bb, end_bb);
@@ -321,7 +423,6 @@ pub fn resolve_bbox_to_bbox(
                     loc: Some(end_loc),
                     coord: end_coord,
                 },
-                fully_overlapping,
             }
         }
         AutoConnectStrategy::Cardinal => {
@@ -335,7 +436,6 @@ pub fn resolve_bbox_to_bbox(
                     loc: Some(end_loc),
                     coord: end_bb.locspec(end_loc),
                 },
-                fully_overlapping,
             }
         }
     }
@@ -345,36 +445,22 @@ pub fn resolve_point_to_bbox(
     strategy: AutoConnectStrategy,
     point: (f32, f32),
     bb: &BoundingBox,
-) -> PointRouting {
+) -> ResolvedTarget {
     let relation = BBoxRelation::from_point_and_bbox(point, bb);
-    let fully_overlapping = relation.fully_overlapping();
 
     match strategy {
-        AutoConnectStrategy::OverlapOrCorner if fully_overlapping => PointRouting {
-            target: ResolvedTarget {
-                loc: None,
-                coord: point,
-            },
-            fully_overlapping,
-        },
         AutoConnectStrategy::OverlapOrCorner => {
             let (loc, coord) = relation.resolve_overlap_or_corner_point_to_bbox(point, bb);
-            PointRouting {
-                target: ResolvedTarget {
-                    loc: Some(loc),
-                    coord,
-                },
-                fully_overlapping,
+            ResolvedTarget {
+                loc: Some(loc),
+                coord,
             }
         }
         AutoConnectStrategy::Cardinal => {
             let loc = closest_cardinal_loc(point, bb);
-            PointRouting {
-                target: ResolvedTarget {
-                    loc: Some(loc),
-                    coord: bb.locspec(loc),
-                },
-                fully_overlapping,
+            ResolvedTarget {
+                loc: Some(loc),
+                coord: bb.locspec(loc),
             }
         }
     }

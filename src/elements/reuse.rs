@@ -46,12 +46,9 @@ impl EventGen for ReuseElement<'_> {
 
         // Evaluate layout with 'duplicated' element scope, since the top
         // (i.e. current) element is normally ignored during scope resolution.
-        if !context.with_element_scope(&reuse_element, |context| {
+        context.with_element_scope(&reuse_element, |context| {
             instance_element.prepare_element(context)
-        })? {
-            // Element should be skipped (e.g. overlapping connectors)
-            return Ok((OutputList::new(), None));
-        }
+        })?;
         instance_element.finalize_layout(context)?;
 
         // Override 'default' attr values in the target

@@ -88,10 +88,7 @@ impl ElbowConnector {
         bb: &BoundingBox,
     ) -> ((f32, f32), Option<Direction>) {
         let resolution = routing::resolve_point_to_bbox(connect.polyline_strategy(), point, bb);
-        (
-            resolution.target.coord,
-            resolution.target.loc.and_then(loc_to_dir),
-        )
+        (resolution.coord, resolution.loc.and_then(loc_to_dir))
     }
 
     /// Resolve two bboxes using cardinal-direction shortest link.
@@ -280,7 +277,7 @@ impl ElbowConnector {
         .with_attrs_from(&self.source_element))
     }
 
-    pub fn render(&self, ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
-        self.render_corner(ctx).map(Some)
+    pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
+        self.render_corner(ctx)
     }
 }

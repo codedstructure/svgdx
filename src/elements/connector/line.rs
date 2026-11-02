@@ -1,4 +1,4 @@
-use super::routing::{self, AutoConnectStrategy, ConnectMode};
+use super::routing::{self, ConnectMode};
 use super::{Direction, Endpoint, GapSpec, loc_to_dir, points_with_gap};
 use crate::context::ElementMap;
 use crate::elements::SvgElement;
@@ -11,7 +11,6 @@ pub struct LineConnector {
     source_element: SvgElement,
     start: Endpoint,
     end: Endpoint,
-    suppress_render: bool,
     gap: Option<GapSpec>,
 }
 
@@ -34,13 +33,6 @@ struct BBoxResolution {
     end_coord: (f32, f32),
     start_dir: Option<Direction>,
     end_dir: Option<Direction>,
-    overlapping: bool,
-}
-
-const BBOX_POINT_EPSILON: f32 = 1e-6;
-
-fn is_degenerate_bbox(bb: &BoundingBox) -> bool {
-    bb.width().abs() <= BBOX_POINT_EPSILON && bb.height().abs() <= BBOX_POINT_EPSILON
 }
 
 impl LineConnector {
@@ -113,15 +105,10 @@ impl LineConnector {
         connect: ConnectMode,
         point: (f32, f32),
         bb: &BoundingBox,
-    ) -> ((f32, f32), Option<Direction>, bool) {
+    ) -> ((f32, f32), Option<Direction>) {
         let strategy = connect.line_strategy();
         let resolution = routing::resolve_point_to_bbox(strategy, point, bb);
-        (
-            resolution.target.coord,
-            resolution.target.loc.and_then(loc_to_dir),
-            matches!(strategy, AutoConnectStrategy::OverlapOrCorner)
-                && resolution.fully_overlapping,
-        )
+        (resolution.coord, resolution.loc.and_then(loc_to_dir))
     }
 
     /// Resolve two bboxes using overlap-based strategy.
@@ -136,7 +123,6 @@ impl LineConnector {
             end_coord: resolution.end.coord,
             start_dir: resolution.start.loc.and_then(loc_to_dir),
             end_dir: resolution.end.loc.and_then(loc_to_dir),
-            overlapping: resolution.fully_overlapping,
         }
     }
 
@@ -161,35 +147,30 @@ impl LineConnector {
         let (start_fixed, start_data) = Self::to_fixed_or_bbox(&start_ret, elem_map)?;
         let (end_fixed, end_data) = Self::to_fixed_or_bbox(&end_ret, elem_map)?;
 
-        let (start, end, suppress_render) = match (start_fixed, end_fixed) {
+        let (start, end) = match (start_fixed, end_fixed) {
             // Both resolved to fixed points
-            (Some((x1, y1, dir1)), Some((x2, y2, dir2))) => (
-                Endpoint::new((x1, y1), dir1),
-                Endpoint::new((x2, y2), dir2),
-                false,
-            ),
+            (Some((x1, y1, dir1)), Some((x2, y2, dir2))) => {
+                (Endpoint::new((x1, y1), dir1), Endpoint::new((x2, y2), dir2))
+            }
 
             // Start is fixed, end needs resolution
             (Some((x1, y1, dir1)), None) => {
                 let (_, end_bb) = end_data.expect("end must have element if not fixed");
-                let (end_coord, end_dir, _) =
-                    Self::resolve_point_to_bbox(connect, (x1, y1), &end_bb);
+                let (end_coord, end_dir) = Self::resolve_point_to_bbox(connect, (x1, y1), &end_bb);
                 (
                     Endpoint::new((x1, y1), dir1),
                     Endpoint::new(end_coord, end_dir),
-                    false,
                 )
             }
 
             // End is fixed, start needs resolution
             (None, Some((x2, y2, dir2))) => {
                 let (_, start_bb) = start_data.expect("start must have element if not fixed");
-                let (start_coord, start_dir, _) =
+                let (start_coord, start_dir) =
                     Self::resolve_point_to_bbox(connect, (x2, y2), &start_bb);
                 (
                     Endpoint::new(start_coord, start_dir),
                     Endpoint::new((x2, y2), dir2),
-                    false,
                 )
             }
 
@@ -198,12 +179,9 @@ impl LineConnector {
                 let (_, start_bb) = start_data.expect("start must have element");
                 let (_, end_bb) = end_data.expect("end must have element");
                 let res = Self::resolve_bbox_to_bbox(connect, &start_bb, &end_bb);
-                let suppress_render = res.overlapping
-                    && !(is_degenerate_bbox(&start_bb) && is_degenerate_bbox(&end_bb));
                 (
                     Endpoint::new(res.start_coord, res.start_dir),
                     Endpoint::new(res.end_coord, res.end_dir),
-                    suppress_render,
                 )
             }
         };
@@ -212,18 +190,11 @@ impl LineConnector {
             source_element: element,
             start,
             end,
-            suppress_render,
             gap,
         })
     }
 
-    pub fn render(&self, _ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
-        // Keep zero-length connectors that are explicitly or point-resolved,
-        // but suppress automatically routed links between overlapping bboxes.
-        if self.suppress_render {
-            return Ok(None);
-        }
-
+    pub fn render(&self, _ctx: &impl ElementMap) -> Result<SvgElement> {
         // Apply any gap to ends of connector line
         let mut points = vec![self.start.origin, self.end.origin];
         if let Some(gap) = &self.gap {
@@ -232,17 +203,15 @@ impl LineConnector {
         let (x1, y1) = points.first().unwrap_or(&self.start.origin);
         let (x2, y2) = points.last().unwrap_or(&self.end.origin);
 
-        Ok(Some(
-            SvgElement::new(
-                "line",
-                &[
-                    ("x1".to_string(), fstr(*x1)),
-                    ("y1".to_string(), fstr(*y1)),
-                    ("x2".to_string(), fstr(*x2)),
-                    ("y2".to_string(), fstr(*y2)),
-                ],
-            )
-            .with_attrs_from(&self.source_element),
-        ))
+        Ok(SvgElement::new(
+            "line",
+            &[
+                ("x1".to_string(), fstr(*x1)),
+                ("y1".to_string(), fstr(*y1)),
+                ("x2".to_string(), fstr(*x2)),
+                ("y2".to_string(), fstr(*y2)),
+            ],
+        )
+        .with_attrs_from(&self.source_element))
     }
 }
