@@ -194,7 +194,7 @@ impl LineConnector {
         })
     }
 
-    pub fn render(&self, _ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
+    pub fn render(&self, _ctx: &impl ElementMap) -> Result<SvgElement> {
         // Apply any gap to ends of connector line
         let mut points = vec![self.start.origin, self.end.origin];
         if let Some(gap) = &self.gap {
@@ -203,17 +203,15 @@ impl LineConnector {
         let (x1, y1) = points.first().unwrap_or(&self.start.origin);
         let (x2, y2) = points.last().unwrap_or(&self.end.origin);
 
-        Ok(Some(
-            SvgElement::new(
-                "line",
-                &[
-                    ("x1".to_string(), fstr(*x1)),
-                    ("y1".to_string(), fstr(*y1)),
-                    ("x2".to_string(), fstr(*x2)),
-                    ("y2".to_string(), fstr(*y2)),
-                ],
-            )
-            .with_attrs_from(&self.source_element),
-        ))
+        Ok(SvgElement::new(
+            "line",
+            &[
+                ("x1".to_string(), fstr(*x1)),
+                ("y1".to_string(), fstr(*y1)),
+                ("x2".to_string(), fstr(*x2)),
+                ("y2".to_string(), fstr(*y2)),
+            ],
+        )
+        .with_attrs_from(&self.source_element))
     }
 }

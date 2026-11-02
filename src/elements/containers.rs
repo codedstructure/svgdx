@@ -56,10 +56,7 @@ impl EventGen for Container<'_> {
 
                 new_el.eval_attributes(context)?;
                 if is_graphics_element(&new_el) {
-                    if !new_el.prepare_element(context)? {
-                        // Element should be skipped (e.g. overlapping connectors)
-                        return Ok((OutputList::new(), None));
-                    }
+                    new_el.prepare_element(context)?;
                     new_el.finalize_layout(context)?;
                     bbox = new_el.bbox()?;
                 }

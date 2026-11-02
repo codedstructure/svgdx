@@ -83,10 +83,7 @@ impl EventGen for OtherElement<'_> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
 
-        if !e.prepare_element(context)? {
-            // Element should be skipped (e.g. overlapping connectors)
-            return Ok((output, None));
-        }
+        e.prepare_element(context)?;
         e.finalize_layout(context)?;
 
         context.update_element(&e);
@@ -593,12 +590,13 @@ impl SvgElement {
 
 impl SvgElement {
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
-    pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<bool> {
+    pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<()> {
         self.eval_attributes(ctx)?;
         self.apply_auto_id(ctx);
         self.expand_compound_attributes()?;
         self.expand_relspec_attributes(ctx);
-        self.transmute(ctx)
+        self.transmute(ctx)?;
+        Ok(())
     }
 
     pub fn finalize_layout(&mut self, ctx: &mut impl ContextView) -> Result<()> {
@@ -617,8 +615,9 @@ impl SvgElement {
     }
 
     /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
-    fn transmute(&mut self, ctx: &mut TransformerContext) -> Result<bool> {
-        if self.name == "path"
+    fn transmute(&mut self, ctx: &mut TransformerContext) -> Result<()> {
+        // let mut el = self;
+        if self.name() == "path"
             && let Some(d) = self.get_attr("d")
         {
             // Path expressions are evaluated during path parsing so repeated commands
@@ -636,12 +635,8 @@ impl SvgElement {
 
         if is_connector(self) {
             let conn = ConnectorType::from_element(self, ctx)?;
-            // replace with rendered connection element, or skip if None
-            if let Some(rendered) = conn.render(ctx)? {
-                *self = rendered;
-            } else {
-                return Ok(false);
-            }
+            // replace with rendered connection element
+            *self = conn.render(ctx)?;
         }
 
         if let ("polyline" | "polygon", Some(points)) = (self.name(), self.get_attr("points")) {
@@ -649,13 +644,13 @@ impl SvgElement {
         }
 
         if let (Some(_), Some(_)) = (self.get_attr("corner-radius"), self.get_attr("points")) {
-            let res = points_to_path(self);
-            if let Ok(res) = res {
-                *self = res;
+            let path_el = points_to_path(self);
+            if let Ok(r) = path_el {
+                *self = r;
             }
         }
 
-        Ok(true)
+        Ok(())
     }
 
     // Evaluate any expressions (e.g. var lookups or {{..}} blocks) in attributes

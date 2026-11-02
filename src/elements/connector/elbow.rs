@@ -277,7 +277,7 @@ impl ElbowConnector {
         .with_attrs_from(&self.source_element))
     }
 
-    pub fn render(&self, ctx: &impl ElementMap) -> Result<Option<SvgElement>> {
-        self.render_corner(ctx).map(Some)
+    pub fn render(&self, ctx: &impl ElementMap) -> Result<SvgElement> {
+        self.render_corner(ctx)
     }
 }
