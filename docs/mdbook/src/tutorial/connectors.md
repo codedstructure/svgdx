@@ -200,3 +200,26 @@ Relative (%age and fraction) values relate to the total connector length (includ
   <polyline start="#b" end="#d@t:60%" gap="5% 15%"/>
 </svg>
 ```
+
+## Connectors for overlapping shapes
+
+Connectors between a container and a (fully) contained shape will choose an edge that gives the shortest line by default, in the centre of the overlapping extent.
+
+If a connector is created between two shapes that overlap on an edge (see 'e' in the example below), one of the points of intersection will be chosen as the point of a zero-length connector.
+
+```xml-svgdx
+<svg>
+  <rect id="outer" text="outer" text-loc="tl" wh="35 50"/>
+  <rect id="a" text="a" wh="10" xy="10 5"/>
+  <rect id="b" text="b" wh="10" xy="10 20"/>
+  <rect id="c" text="c" wh="5 20" xy="25 10"/>
+  <rect id="d" text="d" wh="20 10" xy="10 38"/>
+  <rect id="e" text="e" wh="5 25" xy="-2.5 30"/>
+
+  <line start="#outer" end="#a"/>
+  <line start="#outer" end="#b"/>
+  <line start="#outer" end="#c"/>
+  <line start="#outer" end="#d"/>
+  <line start="#outer" end="#e" class="d-arrow"/>
+</svg>
+```

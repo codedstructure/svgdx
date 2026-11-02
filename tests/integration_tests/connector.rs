@@ -460,23 +460,60 @@ fn test_connector_polyline_gap() {
 }
 
 #[test]
-fn test_connector_overlapping_bboxes() {
-    // When two bboxes intersect, no line should be rendered
+fn test_connector_contained_bboxes() {
+    // inner contained by outer: connect middle with shortest link (top)
+    let input = r##"
+<rect id="outer" x="0" y="0" width="100" height="100" />
+<rect id="inner" x="35" y="5" width="10" height="10" />
+<line id="conn" start="#outer" end="#inner" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line id="conn" x1="40" y1="0" x2="40" y2="5"/>"#);
+
+    // b contained by a: connect middle with shortest link (left)
+    let input = r##"
+<rect id="a" x="0" y="0" width="10" height="10" />
+<rect id="b" x="2" y="2" width="4" height="4" />
+<line id="conn" start="#a" end="#b" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<line id="conn" x1="0" y1="4" x2="2" y2="4"/>"#);
+}
+
+#[test]
+fn test_edge_overlap_connectors() {
+    // b overlaps bottom-right corner of a: connector at top of b
     let input = r##"
 <rect id="a" x="0" y="0" width="10" height="10" />
 <rect id="b" x="5" y="5" width="10" height="10" />
 <line id="conn" start="#a" end="#b" />
 "##;
     let output = transform_str_default(input).unwrap();
-    assert!(!output.contains(r#"id="conn""#));
+    assert_contains!(output, r#"<line id="conn" x1="10" y1="5" x2="10" y2="5"/>"#);
 
+    // small overlaps right hand edge of big: connector at top
     let input = r##"
-<rect id="a" x="0" y="0" width="10" height="10" />
-<rect id="b" x="5" y="5" width="10" height="10" />
-<line id="conn" start="#a" end="#b" connect="cardinal" />
+<rect id="big" x="0" y="0" width="100" height="100" />
+<rect id="small" x="95" y="45" width="10" height="10" />
+<line id="conn" start="#big" end="#small" />
 "##;
     let output = transform_str_default(input).unwrap();
-    assert!(!output.contains(r#"id="conn""#));
+    assert_contains!(
+        output,
+        r#"<line id="conn" x1="100" y1="45" x2="100" y2="45"/>"#
+    );
+
+    // small overlaps bottom edge of big: connector at left
+    let input = r##"
+<rect id="big" x="0" y="0" width="100" height="100" />
+<rect id="small" x="45" y="100" width="10" height="10" />
+<line id="conn" start="#big" end="#small" />
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(
+        output,
+        r#"<line id="conn" x1="45" y1="100" x2="45" y2="100"/>"#
+    );
 }
 
 #[test]
