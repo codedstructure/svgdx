@@ -146,7 +146,6 @@ impl EventGen for LinearGradient<'_> {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
         apply_gradient_rotation(&mut new_el)?;
 
         let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
@@ -331,7 +330,6 @@ impl EventGen for RadialGradient<'_> {
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
         let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
         apply_gradient_rotation(&mut new_el)?;
 
         let new_inner = if let Some(stops) = new_el.pop_attr("stops") {

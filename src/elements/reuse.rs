@@ -4,7 +4,7 @@ use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::geometry::BoundingBox;
 use crate::transform::EventGen;
-use crate::types::{ElRef, parse_float, split_compound_attr};
+use crate::types::{ElRef, parse_float};
 
 #[derive(Debug, Clone)]
 pub struct ReuseElement<'a>(pub &'a SvgElement);
@@ -14,23 +14,7 @@ impl EventGen for ReuseElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let mut reuse_element = self.0.clone();
-
-        // first resolve any attributes on the immediate reuse element;
-        // we later resolve those on the target element in the context
-        // of any vars set by this.
-        reuse_element.eval_attributes(context)?;
-        if let Some(wh) = reuse_element.get_attr("wh") {
-            // Size attributes are available as *variables* so the reuse template can
-            // use them to compute internal layout as required.
-            // The actual size and bbox of the instanced element is determined by the
-            // template, and could be wildly different from the `wh` provided here
-            // (though shouldn't be in a well-written template).
-            let (w, h) = split_compound_attr(wh);
-            reuse_element.set_default_attr("width", &w);
-            reuse_element.set_default_attr("height", &h);
-        }
-        context.update_current_scope(&reuse_element);
+        let reuse_element = self.0.clone();
 
         let elref = reuse_element
             .get_attr("href")

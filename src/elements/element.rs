@@ -23,8 +23,6 @@ impl EventGen for SvgElement {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        // early update: may be updated further during processing
-        context.update_element(self);
         let (ol, mut bbox) = context.with_element_scope(self, |context| match self.name() {
             "loop" => LoopElement(self).generate_events(context),
             "config" => ConfigElement(self).generate_events(context),
@@ -77,7 +75,6 @@ impl EventGen for OtherElement<'_> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
 
-        e.prepare_element(context)?;
         e.finalize_layout(context)?;
 
         context.update_element(&e);
@@ -583,7 +580,6 @@ impl SvgElement {
 }
 
 impl SvgElement {
-    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<()> {
         self.eval_attributes(ctx)?;
         self.expand_compound_attributes()?;
@@ -607,7 +603,6 @@ impl SvgElement {
         Ok(())
     }
 
-    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     fn transmute(&mut self, ctx: &mut TransformerContext) -> Result<()> {
         // let mut el = self;
         if self.name() == "path"

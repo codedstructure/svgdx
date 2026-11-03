@@ -27,9 +27,7 @@ impl EventGen for Container<'_> {
         let mut new_el = self.0.clone();
         let mut bbox = None;
 
-        new_el.eval_attributes(context)?;
         if is_graphics_element(&new_el) {
-            new_el.prepare_element(context)?;
             new_el.finalize_layout(context)?;
             bbox = new_el.bbox()?;
         }
@@ -76,7 +74,6 @@ impl EventGen for GroupElement<'_> {
         // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
-        new_el.prepare_element(context)?;
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.

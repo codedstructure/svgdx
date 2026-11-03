@@ -14,6 +14,7 @@ pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Res
     let next = convert_dirspec(next);
     let next = set_associated_text_anchor(next)?;
     let next = custom_element_to_reuse(next, context);
+    let next = prepare_element(next, context)?;
 
     Ok(next)
 }
@@ -119,6 +120,22 @@ fn custom_element_to_reuse(el: SvgElement, context: &mut TransformerContext) -> 
         return el;
     }
     SvgElement::new("reuse", &[("href".into(), format!("#{}", el.name()))]).with_attrs_from(&el)
+}
+
+fn prepare_element(el: SvgElement, context: &mut TransformerContext) -> Result<SvgElement> {
+    // these elements can't pre-evaluate attributes, since they are either
+    // dynamic (for, loop) or handle failure in specific ways (varTry*)
+    let defer_eval = matches!(el.name(), "varTry" | "varTryDefault" | "loop" | "for");
+    if !defer_eval {
+        context.update_element(&el);
+        context.with_element_scope(&el, |context| {
+            let mut el = el.clone();
+            el.prepare_element(context)?;
+            Ok(el)
+        })
+    } else {
+        Ok(el)
+    }
 }
 
 fn auto_id_from_text(text: &str) -> Option<String> {
