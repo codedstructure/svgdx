@@ -983,6 +983,12 @@ fn expand_compound_pos(el: &mut SvgElement) {
         el.set_default_attr("dx", &dx);
         el.set_default_attr("dy", &dy);
     }
+    if let Some(fxy) = el.pop_attr("fxy") {
+        // radialGradient focal point
+        let (fx, fy) = split_compound_attr(&fxy);
+        el.set_default_attr("fx", &fx);
+        el.set_default_attr("fy", &fy);
+    }
 }
 
 #[cfg(test)]

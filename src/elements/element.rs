@@ -1,8 +1,8 @@
 use super::path::{points_to_path, process_path_data};
 use super::preprocess::preprocess_dpoints;
 use super::{
-    ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
-    LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
+    ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GradientElement,
+    GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement, VarDefaultElement,
     VarElement, VarTryDefaultElement, VarTryElement, is_connector, process_text_attr,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
@@ -36,8 +36,7 @@ impl EventGen for SvgElement {
             "defaults" => DefaultsElement(self).generate_events(context),
             "for" => ForElement(self).generate_events(context),
             "g" | "symbol" => GroupElement(self).generate_events(context),
-            "linearGradient" => LinearGradient(self).generate_events(context),
-            "radialGradient" => RadialGradient(self).generate_events(context),
+            "linearGradient" | "radialGradient" => GradientElement(self).generate_events(context),
             _ => match self.event_range {
                 Some((start, end)) if start != end => Container(self).generate_events(context),
                 _ => OtherElement(self).generate_events(context),

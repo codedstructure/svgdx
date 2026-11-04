@@ -14,7 +14,7 @@ mod text;
 
 use connector::{ConnectorType, is_connector};
 use containers::{Container, GroupElement};
-use gradient::{LinearGradient, RadialGradient};
+use gradient::GradientElement;
 use loops::{ForElement, LoopElement};
 use reuse::ReuseElement;
 use special::{
