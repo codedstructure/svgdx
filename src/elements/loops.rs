@@ -186,3 +186,27 @@ impl EventGen for ForElement<'_> {
         Ok((gen_events, bbox.build()))
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct IfElement<'a>(pub &'a SvgElement);
+
+impl EventGen for IfElement<'_> {
+    fn generate_events(
+        &self,
+        context: &mut TransformerContext,
+    ) -> Result<(OutputList, Option<BoundingBox>)> {
+        let test = self
+            .0
+            .get_attr("test")
+            .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
+        if eval_condition(test, context)? {
+            // must rebase inner events under this element's order index
+            // for group transform processing to work
+            return self
+                .0
+                .process_inner_events(self.0.order_index.clone(), context);
+        }
+
+        Ok((OutputList::new(), None))
+    }
+}
