@@ -17,10 +17,7 @@ use containers::{Container, GroupElement};
 use gradient::GradientElement;
 use loops::{ForElement, LoopElement};
 use reuse::ReuseElement;
-use special::{
-    ConfigElement, DefaultsElement, IfElement, SpecsElement, VarDefaultElement, VarElement,
-    VarTryDefaultElement, VarTryElement,
-};
+use special::{ConfigElement, DefaultsElement, IfElement, SpecsElement, VarElement};
 use text::process_text_attr;
 
 pub use element::SvgElement;

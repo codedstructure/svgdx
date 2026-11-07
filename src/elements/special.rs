@@ -164,48 +164,20 @@ impl EventGen for VarElement<'_> {
         &self,
         context: &mut TransformerContext,
     ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, false, |ctx, k, v| ctx.set_var(k, v))?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarDefaultElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarDefaultElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, false, |ctx, k, v| {
-            ctx.set_var_default(k, v)
+        let (ignore_fail, is_default) = match self.0.name() {
+            "var" => (false, false),
+            "varTry" => (true, false),
+            "varDefault" => (false, true),
+            "varTryDefault" => (true, true),
+            _ => (false, false), // shouldn't happen
+        };
+        process_var_attrs(self.0, context, ignore_fail, |ctx, k, v| {
+            if is_default {
+                ctx.set_var_default(k, v);
+            } else {
+                ctx.set_var(k, v)
+            }
         })?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarTryElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarTryElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var(k, v))?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarTryDefaultElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarTryDefaultElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var_default(k, v))?;
         Ok((OutputList::new(), None))
     }
 }

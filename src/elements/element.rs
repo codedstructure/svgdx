@@ -2,8 +2,8 @@ use super::path::{points_to_path, process_path_data};
 use super::preprocess::preprocess_dpoints;
 use super::{
     ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GradientElement,
-    GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement, VarDefaultElement,
-    VarElement, VarTryDefaultElement, VarTryElement, is_connector, process_text_attr,
+    GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement, VarElement, is_connector,
+    process_text_attr,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList, Spacing};
@@ -28,10 +28,9 @@ impl EventGen for SvgElement {
             "config" => ConfigElement(self).generate_events(context),
             "reuse" => ReuseElement(self).generate_events(context),
             "specs" => SpecsElement(self).generate_events(context),
-            "var" => VarElement(self).generate_events(context),
-            "varDefault" => VarDefaultElement(self).generate_events(context),
-            "varTry" => VarTryElement(self).generate_events(context),
-            "varTryDefault" => VarTryDefaultElement(self).generate_events(context),
+            "var" | "varTry" | "varDefault" | "varTryDefault" => {
+                VarElement(self).generate_events(context)
+            }
             "if" => IfElement(self).generate_events(context),
             "defaults" => DefaultsElement(self).generate_events(context),
             "for" => ForElement(self).generate_events(context),
