@@ -146,6 +146,16 @@ mod tests {
         let config = parse_args(vec![
             "svgdx".to_string(),
             "--output-builtin".to_string(),
+            "example".to_string(),
+        ]);
+        assert!(matches!(
+            config,
+            Ok(CliAction::OutputBuiltin(BuiltinItem::Example))
+        ));
+
+        let config = parse_args(vec![
+            "svgdx".to_string(),
+            "--output-builtin".to_string(),
             "pandoc-filter".to_string(),
         ]);
         assert!(matches!(
