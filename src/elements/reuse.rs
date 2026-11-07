@@ -2,7 +2,6 @@ use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
-use crate::geometry::BoundingBox;
 use crate::transform::EventGen;
 use crate::types::{ElRef, parse_float};
 
@@ -10,10 +9,7 @@ use crate::types::{ElRef, parse_float};
 pub struct ReuseElement<'a>(pub &'a SvgElement);
 
 impl EventGen for ReuseElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let reuse_element = self.0.clone();
 
         let elref = reuse_element

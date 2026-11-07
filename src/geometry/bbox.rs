@@ -35,6 +35,18 @@ impl BoundingBoxBuilder {
         self
     }
 
+    pub fn extend_opt(&mut self, bbox: Option<BoundingBox>) -> &Self {
+        if let Some(bbox) = bbox {
+            self.extend(bbox);
+        }
+        self
+    }
+
+    pub fn clear(&mut self) -> &Self {
+        self.bbox = None;
+        self
+    }
+
     pub fn build(self) -> Option<BoundingBox> {
         self.bbox
     }
@@ -264,6 +276,17 @@ impl BoundingBox {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_builder_extend_opt() {
+        let mut builder = BoundingBoxBuilder::new();
+        builder.extend_opt(None);
+        assert_eq!(builder.clone().build(), None);
+        builder.extend_opt(Some(BoundingBox::new(0., 1., 2., 3.)));
+        builder.extend_opt(None);
+        builder.extend_opt(Some(BoundingBox::new(-1., 2., 4., 5.)));
+        assert_eq!(builder.build(), Some(BoundingBox::new(-1., 1., 4., 5.)));
+    }
 
     #[test]
     fn test_bbox() {

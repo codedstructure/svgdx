@@ -19,46 +19,49 @@ use crate::types::{
 use core::fmt::Display;
 
 impl EventGen for SvgElement {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let (ol, mut bbox) = context.with_element_scope(self, |context| match self.name() {
-            "loop" => LoopElement(self).generate_events(context),
-            "config" => ConfigElement(self).generate_events(context),
-            "reuse" => ReuseElement(self).generate_events(context),
-            "specs" => SpecsElement(self).generate_events(context),
-            "var" | "varTry" | "varDefault" | "varTryDefault" => {
-                VarElement(self).generate_events(context)
-            }
-            "if" => IfElement(self).generate_events(context),
-            "defaults" => DefaultsElement(self).generate_events(context),
-            "for" => ForElement(self).generate_events(context),
-            "g" | "symbol" => GroupElement(self).generate_events(context),
-            "linearGradient" | "radialGradient" => GradientElement(self).generate_events(context),
-            _ => match self.event_range {
-                Some((start, end)) if start != end => Container(self).generate_events(context),
-                _ => OtherElement(self).generate_events(context),
-            },
-        })?;
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
+        context.with_bbox_scope(|context| {
+            let ol = context.with_element_scope(self, |context| match self.name() {
+                "loop" => LoopElement(self).generate_events(context),
+                "config" => ConfigElement(self).generate_events(context),
+                "reuse" => ReuseElement(self).generate_events(context),
+                "specs" => SpecsElement(self).generate_events(context),
+                "var" | "varTry" | "varDefault" | "varTryDefault" => {
+                    VarElement(self).generate_events(context)
+                }
+                "if" => IfElement(self).generate_events(context),
+                "defaults" => DefaultsElement(self).generate_events(context),
+                "for" => ForElement(self).generate_events(context),
+                "g" | "symbol" => GroupElement(self).generate_events(context),
+                "linearGradient" | "radialGradient" => {
+                    GradientElement(self).generate_events(context)
+                }
+                _ => match self.event_range {
+                    Some((start, end)) if start != end => Container(self).generate_events(context),
+                    _ => OtherElement(self).generate_events(context),
+                },
+            })?;
 
-        if let (Some(el_bbox), Some(clip_id)) =
-            (bbox, self.get_attr("clip-path").and_then(extract_urlref))
-        {
-            let clip_el = context
-                .get_element(&clip_id)
-                .ok_or_else(|| Error::Reference(clip_id))?;
-            if let ("clipPath", Some(clip_bbox)) =
-                (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
-            {
-                bbox = el_bbox.intersect(&clip_bbox);
-                let mut el = self.clone();
-                el.content_bbox = bbox;
-                context.update_element(&el);
+            if let (Some(el_bbox), Some(clip_id)) = (
+                context.current_bbox(),
+                self.get_attr("clip-path").and_then(extract_urlref),
+            ) {
+                let clip_el = context
+                    .get_element(&clip_id)
+                    .ok_or_else(|| Error::Reference(clip_id))?;
+                if let ("clipPath", Some(clip_bbox)) =
+                    (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
+                {
+                    let bbox = el_bbox.intersect(&clip_bbox);
+                    context.set_bbox(bbox);
+                    let mut el = self.clone();
+                    el.content_bbox = bbox;
+                    context.update_element(&el);
+                }
             }
-        }
 
-        Ok((ol, bbox))
+            Ok(ol)
+        })
     }
 }
 
@@ -66,10 +69,7 @@ impl EventGen for SvgElement {
 struct OtherElement<'a>(pub &'a SvgElement);
 
 impl EventGen for OtherElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
 
@@ -121,7 +121,8 @@ impl EventGen for OtherElement<'_> {
             // (They can generate text though, so not rejected earlier.)
             bb = None;
         }
-        Ok((output, bb))
+        context.extend_bbox(bb);
+        Ok(output)
     }
 }
 
@@ -429,7 +430,7 @@ impl SvgElement {
         &self,
         oi_base: OrderIndex,
         context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    ) -> Result<OutputList> {
         if let Some(mut inner_events) = self.inner_events(context) {
             inner_events.rebase_under(oi_base);
             if let Some(line) = self.instance_origin_line {
@@ -437,7 +438,7 @@ impl SvgElement {
             }
             process_events(inner_events, context)
         } else {
-            Ok((OutputList::new(), None))
+            Ok(OutputList::new())
         }
     }
 

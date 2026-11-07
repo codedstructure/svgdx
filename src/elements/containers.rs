@@ -2,7 +2,6 @@ use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList};
 use crate::errors::Result;
-use crate::geometry::BoundingBox;
 use crate::transform::EventGen;
 
 /// Container will be used for many elements which contain other elements,
@@ -11,25 +10,20 @@ use crate::transform::EventGen;
 pub struct Container<'a>(pub &'a SvgElement);
 
 impl EventGen for Container<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let Some(inner_events) = self.0.inner_events(context) else {
-            return Ok((OutputList::new(), None));
+            return Ok(OutputList::new());
         };
 
         // Special case <svg> elements with an xmlns attribute - passed through
         // transparently, with no bbox calculation.
         if self.0.name() == "svg" && self.0.get_attr("xmlns").is_some() {
-            return Ok((self.0.all_events(context).into(), None));
+            return Ok(self.0.all_events(context).into());
         }
         let mut new_el = self.0.clone();
-        let mut bbox = None;
 
         if is_graphics_element(&new_el) {
             new_el.finalize_layout(context)?;
-            bbox = new_el.bbox()?;
         }
 
         if context.config.add_metadata {
@@ -38,9 +32,9 @@ impl EventGen for Container<'_> {
         let mut events = OutputList::new();
         events.push(EventKind::Start(new_el.clone().into()));
         let need_inner_processing = inner_events.iter().any(|e| e.element().is_some());
-        let (evlist, inner_bbox) = if !need_inner_processing {
+        let evlist = if !need_inner_processing {
             // no inner processing needed - return events as-is
-            (inner_events.into(), None)
+            inner_events.into()
         } else {
             self.0
                 .process_inner_events(new_el.order_index.clone(), context)?
@@ -48,18 +42,14 @@ impl EventGen for Container<'_> {
         events.extend(evlist);
         events.push(EventKind::End(self.0.name().to_owned()));
 
-        if is_container_element(&new_el) {
-            bbox = inner_bbox;
-        }
-
         if self.0.name() == "defs" {
-            bbox = None;
-        } else if bbox.is_some() {
-            new_el.content_bbox = bbox;
+            context.clear_bbox();
+        } else if is_container_element(&new_el) {
+            new_el.content_bbox = context.current_bbox();
             context.update_element(&new_el);
         }
 
-        Ok((events, bbox))
+        Ok(events)
     }
 }
 
@@ -67,22 +57,19 @@ impl EventGen for Container<'_> {
 pub struct GroupElement<'a>(pub &'a SvgElement);
 
 impl EventGen for GroupElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         // since we synthesize the opening element event here, we need to
         // do any required transformations on the <g> itself here.
         let mut new_el = self.0.clone();
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
-        let (inner, content_bb) = self
+        let inner = self
             .0
             .process_inner_events(new_el.order_index.clone(), context)?;
 
         // Need bbox to provide center of rotation
-        new_el.content_bbox = content_bb;
+        new_el.content_bbox = context.current_bbox();
         new_el.finalize_layout(context)?;
 
         let mut events = OutputList::new();
@@ -97,16 +84,16 @@ impl EventGen for GroupElement<'_> {
 
         context.update_element(&new_el);
 
-        let result_bb = if self.0.name() == "symbol" {
+        if self.0.name() == "symbol" {
             // symbols have a size which needs storing in context for evaluating
             // bbox of 'use' elements referencing them, but they don't contribute
             // to the parent bbox.
-            None
+            context.clear_bbox();
         } else {
-            // this handles any `transform` attr. Assumes .content_bbox is set.
-            new_el.bbox()?
+            // `bbox()` handles any `transform` attr. Assumes .content_bbox is set.
+            context.set_bbox(new_el.bbox()?);
         };
-        Ok((events, result_bb))
+        Ok(events)
     }
 }
 

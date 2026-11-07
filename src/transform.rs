@@ -3,7 +3,7 @@ use crate::document::tag::{Tag, tagify_events};
 use crate::document::{EventKind, EventStyleWrapper, InputList, OutputList, Spacing};
 use crate::elements::{SvgElement, element_pipeline};
 use crate::errors::{Error, Result};
-use crate::geometry::{BoundingBox, BoundingBoxBuilder, LocSpec};
+use crate::geometry::{BoundingBox, LocSpec};
 use crate::style::{self, ContextTheme};
 use crate::types::{AttrMap, OrderIndex, attr_split, fstr, split_unit};
 use crate::{AutoStyleMode, ErrorMode, TransformConfig};
@@ -15,13 +15,10 @@ use std::str::FromStr;
 
 pub trait EventGen {
     /// Determine the sequence of (XML-level) events to emit in response
-    /// to a given item, as well as the corresponding bounding box.
+    /// to a given item, accumulating its bounds in the context.
     ///
     /// Note some implementations may mutate the context (e.g. `var` elements).
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)>;
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList>;
 }
 
 /// Check if the input events represent a "real" SVG document
@@ -49,27 +46,22 @@ fn is_real_svg(events: &InputList) -> bool {
 }
 
 impl EventGen for Tag {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut events = OutputList::new();
         if !matches!(self.spacing(), Spacing::Inline) {
             events.push(*self.spacing());
         }
-        let (ev, bbox) = match self {
+        let ev = match self {
             Tag::Compound(el, _) | Tag::Leaf(el, _) => {
                 let el = el.clone();
                 let el = element_pipeline(el, context)?;
                 el.generate_events(context)?
             }
-            Tag::Comment(_, _, c, _) => {
-                (OutputList::from(vec![EventKind::Comment(c.clone())]), None)
-            }
-            _ => (OutputList::new(), None),
+            Tag::Comment(_, _, c, _) => OutputList::from(vec![EventKind::Comment(c.clone())]),
+            _ => OutputList::new(),
         };
         events.extend(ev);
-        Ok((events, bbox))
+        Ok(events)
     }
 }
 
@@ -77,8 +69,7 @@ fn process_tags(
     tags: &mut Vec<Tag>,
     context: &mut TransformerContext,
     idx_output: &mut BTreeMap<OrderIndex, OutputList>,
-    bbb: &mut BoundingBoxBuilder,
-) -> Result<Option<BoundingBox>> {
+) -> Result<()> {
     let mut element_errors: HashMap<OrderIndex, (SvgElement, Error)> = HashMap::new();
     let remain = &mut Vec::new();
 
@@ -97,10 +88,7 @@ fn process_tags(
             }
             let el = t.get_element_mut().cloned();
             let idx = t.get_order_index();
-            if let Ok((events, maybe_bbox)) = gen_result {
-                if let Some(bbox) = maybe_bbox {
-                    bbb.extend(bbox); // TODO: should this pattern take an Option?
-                }
+            if let Ok(events) = gen_result {
                 if !events.is_empty() {
                     idx_output.insert(idx, events);
                 }
@@ -130,7 +118,7 @@ fn process_tags(
     if !element_errors.is_empty() {
         handle_errors(element_errors, context, idx_output)?;
     }
-    Ok(bbb.clone().build())
+    Ok(())
 }
 
 pub fn handle_errors(
@@ -166,27 +154,30 @@ pub fn handle_errors(
 pub fn process_events(
     input: impl Into<InputList>,
     context: &mut TransformerContext,
-) -> Result<(OutputList, Option<BoundingBox>)> {
+) -> Result<OutputList> {
     let input = input.into();
+    let top_level = context.is_top_level();
+    if top_level {
+        context.overall_bbox = Default::default();
+    }
     if is_real_svg(&input) {
-        if context.is_top_level() {
+        if top_level {
             // if this is the outermost SVG element, we mark the entire input as a 'real' SVG document
             context.real_svg = true;
         }
-        return Ok((input.into(), None));
+        return Ok(input.into());
     }
     let mut output = OutputList::new();
     let mut idx_output = BTreeMap::<OrderIndex, OutputList>::new();
 
-    let mut bbb = BoundingBoxBuilder::new();
     let mut tags = tagify_events(input)?;
-    let bbox = process_tags(&mut tags, context, &mut idx_output, &mut bbb)?;
+    context.with_bbox_scope(|context| process_tags(&mut tags, context, &mut idx_output))?;
 
     for (_idx, events) in idx_output {
         output.extend(events);
     }
 
-    if context.is_top_level() {
+    if top_level {
         // remove leading spacing events; top-level should not start with whitespace.
         let event_count = output
             .iter()
@@ -195,7 +186,7 @@ pub fn process_events(
         output.events.drain(..event_count);
     }
 
-    Ok((output, bbox))
+    Ok(output)
 }
 
 pub struct Transformer {
@@ -213,7 +204,8 @@ impl Transformer {
         let input = InputList::from_reader(reader)?;
         self.context.set_events(input.events.clone());
         let output = process_events(input, &mut self.context)?;
-        self.postprocess(output, writer)
+        let bbox = self.context.overall_bbox.clone().build();
+        self.postprocess(output, bbox, writer)
     }
 
     fn make_root_svg(&self, first_svg: EventKind, bbox: Option<BoundingBox>) -> Result<SvgElement> {
@@ -470,13 +462,12 @@ impl Transformer {
 
     fn postprocess(
         &self,
-        output: (OutputList, Option<BoundingBox>),
+        mut events: OutputList,
+        bbox: Option<BoundingBox>,
         writer: &mut dyn Write,
     ) -> Result<()> {
         const BACKGROUND_SENTINEL: &str = "_svgdx_background_sentinel";
         const STYLE_SENTINEL: &str = "_svgdx_style_sentinel";
-
-        let (mut events, bbox) = output;
 
         if self.context.real_svg {
             // We don't do any post-processing on 'real' SVG documents
@@ -619,5 +610,91 @@ mod tests {
         let input = vec!["a".to_string(), "  b".to_string(), "c".to_string()];
         let output = indent_all(input, 2);
         assert_eq!(output, vec!["  a", "    b", "  c"]);
+    }
+
+    #[test]
+    fn test_context_overall_bbox_reset_between_inputs() {
+        let mut context = TransformerContext::default();
+        let input: InputList = r#"<rect xy="10" wh="20"/>"#.parse().unwrap();
+        context.set_events(input.events.clone());
+        process_events(input, &mut context).unwrap();
+        assert_eq!(
+            context.overall_bbox.clone().build(),
+            Some(BoundingBox::new(10., 10., 30., 30.))
+        );
+
+        let input: InputList = r#"<rect xy="50" wh="10"/>"#.parse().unwrap();
+        context.set_events(input.events.clone());
+        process_events(input, &mut context).unwrap();
+        assert_eq!(
+            context.overall_bbox.clone().build(),
+            Some(BoundingBox::new(50., 50., 60., 60.))
+        );
+
+        let input: InputList = r#"<svg xmlns="http://www.w3.org/2000/svg"/>"#.parse().unwrap();
+        process_events(input, &mut context).unwrap();
+        assert_eq!(context.overall_bbox.clone().build(), None);
+    }
+
+    #[test]
+    fn test_nested_bbox_merges_into_parent_scope() {
+        let mut context = TransformerContext::default();
+        let original = BoundingBox::new(100., 100., 110., 110.);
+        context.overall_bbox.extend(original);
+        let input: InputList = r#"<rect xy="10" wh="20"/>"#.parse().unwrap();
+        context.set_events(input.events.clone());
+        let parent = SvgElement::new("g", &[]);
+
+        context
+            .with_element_scope(&parent, |context| {
+                context.with_bbox_scope(|context| {
+                    process_events(input, context)?;
+                    assert_eq!(
+                        context.current_bbox(),
+                        Some(BoundingBox::new(10., 10., 30., 30.))
+                    );
+                    assert_eq!(context.overall_bbox.clone().build(), Some(original));
+                    Ok(())
+                })
+            })
+            .unwrap();
+        assert_eq!(
+            context.overall_bbox.clone().build(),
+            Some(BoundingBox::new(10., 10., 110., 110.))
+        );
+    }
+
+    #[test]
+    fn test_failed_nested_bbox_scope_is_removed() {
+        let mut context = TransformerContext::default();
+        let original = BoundingBox::new(100., 100., 110., 110.);
+        context.overall_bbox.extend(original);
+        let parent = SvgElement::new("g", &[]);
+        let input: InputList = r#"<rect xy="10" wh="20"/><rect wh="bad"/>"#.parse().unwrap();
+        context.set_events(input.events.clone());
+        context
+            .with_element_scope(&parent, |context| {
+                assert!(process_events(input, context).is_err());
+                assert_eq!(context.overall_bbox.clone().build(), Some(original));
+                Ok(())
+            })
+            .unwrap();
+
+        let input: InputList = r#"<rect xy="20" wh="10"/>"#.parse().unwrap();
+        context.set_events(input.events.clone());
+        context
+            .with_element_scope(&parent, |context| {
+                process_events(input, context)?;
+                assert_eq!(
+                    context.current_bbox(),
+                    Some(BoundingBox::new(20., 20., 110., 110.))
+                );
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(
+            context.overall_bbox.clone().build(),
+            Some(BoundingBox::new(20., 20., 110., 110.))
+        );
     }
 }

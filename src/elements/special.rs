@@ -3,7 +3,6 @@ use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
-use crate::geometry::BoundingBox;
 use crate::transform::{EventGen, process_events};
 use crate::types::{parse_bool, parse_float, parse_int};
 
@@ -11,10 +10,7 @@ use crate::types::{parse_bool, parse_float, parse_int};
 pub struct DefaultsElement<'a>(pub &'a SvgElement);
 
 impl EventGen for DefaultsElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         // both the `defaults` element itself and any inner elements
         // are used to set default attr values.
         context.set_element_default(self.0);
@@ -24,7 +20,7 @@ impl EventGen for DefaultsElement<'_> {
                 context.set_element_default(&el);
             }
         }
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -32,10 +28,7 @@ impl EventGen for DefaultsElement<'_> {
 pub struct ConfigElement<'a>(pub &'a SvgElement);
 
 impl EventGen for ConfigElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut new_config = context.config.clone();
         for (key, value) in self.0.get_attrs() {
             match key.as_str() {
@@ -58,7 +51,7 @@ impl EventGen for ConfigElement<'_> {
             }
         }
         context.set_config(new_config);
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -81,10 +74,7 @@ const SPECS_RESERVED_ELEMENT_NAMES: &[&str] = &[
 ];
 
 impl EventGen for SpecsElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         // support '<specs element="thing">...</specs>' as a shortcut for defining
         // reuse triggered by an element name rather than an href to an id.
         if let Some(element_name) = self.0.get_attr("element") {
@@ -106,7 +96,7 @@ impl EventGen for SpecsElement<'_> {
             // Process inner events, but throw away non-error result.
             process_events(inner_events, context)?;
         }
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -160,10 +150,7 @@ where
 pub struct VarElement<'a>(pub &'a SvgElement);
 
 impl EventGen for VarElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let (ignore_fail, is_default) = match self.0.name() {
             "var" => (false, false),
             "varTry" => (true, false),
@@ -178,6 +165,6 @@ impl EventGen for VarElement<'_> {
                 ctx.set_var(k, v)
             }
         })?;
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }

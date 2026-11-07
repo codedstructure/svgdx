@@ -30,7 +30,7 @@ use crate::Error;
 use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList, Spacing};
 use crate::errors::Result;
-use crate::geometry::{BoundingBox, Length, strp_length};
+use crate::geometry::{Length, strp_length};
 use crate::transform::EventGen;
 use crate::types::{attr_split, fstr, parse_float};
 
@@ -141,10 +141,7 @@ fn apply_gradient_rotation(el: &mut SvgElement) -> Result<()> {
 pub struct GradientElement<'a>(pub &'a SvgElement);
 
 impl EventGen for GradientElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut new_el = self.0.clone();
         apply_gradient_rotation(&mut new_el)?;
 
@@ -160,7 +157,7 @@ impl EventGen for GradientElement<'_> {
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
-        let (inner, _) = self
+        let inner = self
             .0
             .process_inner_events(new_el.order_index.clone(), context)?;
 
@@ -173,7 +170,7 @@ impl EventGen for GradientElement<'_> {
             events.extend(inner);
             for el in new_inner {
                 events.push(Spacing::LineBreak);
-                events.extend(el.generate_events(context)?.0);
+                events.extend(el.generate_events(context)?);
             }
             events.push(Spacing::LineBreak);
             events.push(EventKind::End(el_name));
@@ -181,7 +178,7 @@ impl EventGen for GradientElement<'_> {
 
         context.update_element(&new_el);
 
-        Ok((events, None))
+        Ok(events)
     }
 }
 
