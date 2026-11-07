@@ -1,3 +1,4 @@
+use crate::builtin::BuiltinItem;
 use crate::config::{TransformArgs, common_usage, parse_kv_arg, take_value};
 use crate::errors::{Error, Result};
 use std::io::IsTerminal;
@@ -8,6 +9,11 @@ Use '-h' or '--help' for usage.";
 
 pub fn usage(program_name: &str) -> String {
     let common_usage = common_usage();
+    let builtin_list = crate::builtin::BuiltinItem::variants()
+        .into_iter()
+        .map(|(name, desc)| format!("  {name} - {desc}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     format!(
         r#"
 Usage:
@@ -16,8 +22,7 @@ Usage:
 Options:
   -i, --input <INPUT>           Input file ('-' for stdin) ['-']
   -o, --output <OUTPUT>         Target output file ('-' for stdout) ['-']
-      --output-pandoc-filter    Write the embedded pandoc Lua filter to stdout and exit
-      --output-stdlib           Write the embedded standard library to stdout and exit
+      --output-builtin <ITEM>   Write the embedded item to stdout and exit.
       --reformat-only           Don't transform, only reformat the input file
   -h, --help                    Show this help
   -V, --version                 Display program version
@@ -25,6 +30,9 @@ Options:
 Note:
   INPUT only defaults to stdin when not a terminal; use explicit `-i -` to read
   from stdin on a terminal.
+
+Builtin items:
+{builtin_list}
 
 Transform Options:
 {common_usage}
@@ -53,10 +61,8 @@ pub enum CliAction {
     Help,
     // svgdx -V or --version
     Version,
-    // write the embedded pandoc Lua filter to stdout and exit
-    OutputPandocFilter,
-    // write the embedded standard library to stdout and exit
-    OutputStdlib,
+    // write the selected builtin item to stdout and exit
+    OutputBuiltin(BuiltinItem),
     // stdin is terminal and we have no INPUT arg
     ImplicitStdinTerminal,
     // reformat the input file and write to the output file
@@ -80,8 +86,13 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
-            "--output-pandoc-filter" => return Ok(CliAction::OutputPandocFilter),
-            "--output-stdlib" => return Ok(CliAction::OutputStdlib),
+            "--output-builtin" => {
+                let item = take_value(&key, embedded, &mut args)?;
+                let item = item
+                    .parse()
+                    .map_err(|_| Error::Cli(format!("unknown builtin: '{item}'")))?;
+                return Ok(CliAction::OutputBuiltin(item));
+            }
             "--reformat-only" => reformat = true,
             "-o" | "--output" => {
                 parsed.output = take_value(&key, embedded, &mut args)?;
@@ -122,13 +133,34 @@ mod tests {
         let config = parse_args(vec!["svgdx".to_string(), "--help".to_string()]);
         assert!(matches!(config, Ok(CliAction::Help)));
 
-        let config = parse_args(vec!["svgdx".to_string(), "--output-stdlib".to_string()]);
-        assert!(matches!(config, Ok(CliAction::OutputStdlib)));
+        let config = parse_args(vec![
+            "svgdx".to_string(),
+            "--output-builtin".to_string(),
+            "stdlib".to_string(),
+        ]);
+        assert!(matches!(
+            config,
+            Ok(CliAction::OutputBuiltin(BuiltinItem::Stdlib))
+        ));
 
         let config = parse_args(vec![
             "svgdx".to_string(),
-            "--output-pandoc-filter".to_string(),
+            "--output-builtin".to_string(),
+            "example".to_string(),
         ]);
-        assert!(matches!(config, Ok(CliAction::OutputPandocFilter)));
+        assert!(matches!(
+            config,
+            Ok(CliAction::OutputBuiltin(BuiltinItem::Example))
+        ));
+
+        let config = parse_args(vec![
+            "svgdx".to_string(),
+            "--output-builtin".to_string(),
+            "pandoc-filter".to_string(),
+        ]);
+        assert!(matches!(
+            config,
+            Ok(CliAction::OutputBuiltin(BuiltinItem::PandocFilter))
+        ));
     }
 }

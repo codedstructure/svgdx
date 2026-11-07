@@ -58,6 +58,8 @@ mod style;
 mod transform;
 mod types;
 
+// expose builtin example svgdx document for library users
+pub use builtin::example_document;
 pub use config::{ErrorMode, TransformConfig};
 use document::InputList;
 pub use errors::{Error, Result};

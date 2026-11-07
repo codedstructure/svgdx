@@ -1,5 +1,6 @@
 use std::net::IpAddr;
 
+use crate::builtin::BuiltinItem;
 use crate::config::{TransformArgs, common_usage, parse_kv_arg, parse_value, take_value};
 use crate::{Error, Result};
 
@@ -30,7 +31,7 @@ pub struct Args {
 pub enum CliAction {
     Help,
     Version,
-    OutputStdlib,
+    OutputBuiltin(BuiltinItem),
     Run(Box<Args>),
 }
 
@@ -50,6 +51,11 @@ impl Default for Args {
 
 pub fn usage(program_name: &str) -> String {
     let common_usage = common_usage();
+    let builtin_list = crate::builtin::BuiltinItem::variants()
+        .into_iter()
+        .map(|(name, desc)| format!("  {name} - {desc}"))
+        .collect::<Vec<_>>()
+        .join("\n");
     format!(
         r#"
 Usage:
@@ -60,9 +66,12 @@ Options:
   -p, --port <PORT>             Port to listen on [{DEFAULT_PORT}]
       --docs-redirect-url <URL> Redirect /docs/ requests to this URL
       --open                    Open browser on startup
-      --output-stdlib           Write the embedded standard library to stdout and exit
+      --output-builtin <ITEM>   Write the embedded item to stdout and exit.
   -h, --help                    Show this help
   -V, --version                 Display program version
+
+Builtin items:
+{builtin_list}
 
 Transform Options:
 {common_usage}
@@ -82,7 +91,13 @@ pub fn parse_args(args: impl IntoIterator<Item = String>) -> Result<CliAction> {
         match key.as_str() {
             "-h" | "--help" => return Ok(CliAction::Help),
             "-V" | "--version" => return Ok(CliAction::Version),
-            "--output-stdlib" => return Ok(CliAction::OutputStdlib),
+            "--output-builtin" => {
+                let item = take_value(&key, embedded, &mut args)?;
+                let item = item
+                    .parse()
+                    .map_err(|_| Error::Cli(format!("unknown builtin: '{item}'")))?;
+                return Ok(CliAction::OutputBuiltin(item));
+            }
             "--address" => parsed.address = parse_value(&key, embedded, &mut args)?,
             "-p" | "--port" => parsed.port = parse_value(&key, embedded, &mut args)?,
             "--docs-redirect-url" => {
@@ -114,9 +129,10 @@ mod tests {
         assert!(matches!(
             parse_args(vec![
                 "svgdx-server".to_string(),
-                "--output-stdlib".to_string()
+                "--output-builtin".to_string(),
+                "stdlib".to_string()
             ]),
-            Ok(CliAction::OutputStdlib)
+            Ok(CliAction::OutputBuiltin(BuiltinItem::Stdlib))
         ));
 
         match parse_args(vec![

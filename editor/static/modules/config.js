@@ -14,17 +14,8 @@ export const ZOOM_DELAY_MS = 50;
 export const ZOOM_SPEED = 0.15;
 export const MAX_ZOOM_OUT = 10;
 
-// Default content for new tabs
-export const DEFAULT_CONTENT = `<svg>
-  <!-- Example svgdx document -->
-  <rect id="in" wh="20 10" text="input" class="d-softshadow d-fill-azure"/>
-  <!-- Try changing the '|h 10' below to '|v 30' or '|V 5' -->
-  <rect id="proc" xy="^|h 10" wh="^" text="process" class="d-softshadow d-fill-silver"/>
-  <rect id="out" xy="^|h 10" wh="^" text="output" class="d-softshadow d-fill-skyblue"/>
-
-  <line start="#in" end="#proc" class="d-arrow"/>
-  <line start="#proc" end="#out" class="d-arrow"/>
-</svg>`;
+// Default content for new tabs, loaded from svgdx-bootstrap.js
+export const DEFAULT_CONTENT = window.svgdx_example_document;
 
 // Valid layout options
 export const VALID_LAYOUTS = ['vertical', 'horizontal', 'v-text', 'h-text'];

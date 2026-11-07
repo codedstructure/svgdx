@@ -1,4 +1,4 @@
-use svgdx::transform_str_default;
+use svgdx::{example_document, transform_str_default};
 
 #[test]
 fn test_transform_full_svg() {
@@ -9,4 +9,10 @@ fn test_transform_full_svg() {
         transform_str_default(input).unwrap().trim(),
         expected.trim()
     );
+}
+
+#[test]
+fn test_transform_example() {
+    let input = example_document();
+    assert!(transform_str_default(input).is_ok());
 }

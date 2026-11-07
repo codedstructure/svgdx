@@ -5,7 +5,7 @@ use http::{Method, Response, StatusCode};
 
 use super::http::HttpRequest;
 use crate::json::{TransformResponse, reformat_json_impl, transform_json_impl};
-use crate::{TransformConfig, VERSION};
+use crate::{TransformConfig, VERSION, example_document};
 
 pub(crate) type AppResponse = Response<Vec<u8>>;
 
@@ -236,11 +236,13 @@ async fn favicon() -> AppResponse {
 async fn bootstrap() -> AppResponse {
     // server mode bootstrap; hardcoded here rather than loaded
     // from file to allow version string to be injected.
+    let example = example_document();
     let content = format!(
         r#"
 console.log("svgdx: using server transform");
 window.svgdx_use_server = true;
 window.svgdx_version_label = "svgdx v{VERSION}";
+window.svgdx_example_document = `{example}`;
 window.dispatchEvent(new Event('svgdx-ready'));
 "#
     );
