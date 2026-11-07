@@ -154,6 +154,114 @@ fn test_root_svg_bbox_out_of_order() {
 }
 
 #[test]
+fn test_root_svg_bbox_isolated_nested_elements() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs>
+    <clipPath id="clip"><rect xy="10 5" wh="10"/></clipPath>
+    <rect xy="-100" wh="1000"/>
+  </defs>
+  <specs><rect id="unused" xy="-200" wh="1000"/></specs>
+  <g transform="translate(10 5)" clip-path="url(#clip)">
+    <rect wh="100"/>
+  </g>
+  <rect xy="40 5" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="10 5 40 10""#);
+}
+
+#[test]
+fn test_root_svg_bbox_ignores_failed_group() {
+    let input = r##"
+<svg>
+  <config border="0" error-mode="warn"/>
+  <g rotate="invalid"><rect xy="-100" wh="10"/></g>
+  <rect xy="20" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="20 20 10 10""#);
+    assert_contains!(output, "Warning: error processing element");
+}
+
+#[test]
+fn test_root_svg_bbox_control_flow() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <loop count="3" var="i">
+    <if test="1"><rect xy="{{$i * 20}} 10" wh="10"/></if>
+  </loop>
+  <for var="x" data="100, 120"><rect xy="$x 10" wh="10"/></for>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="0 10 130 10""#);
+}
+
+#[test]
+fn test_root_svg_bbox_reuse_clipped_group() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs><clipPath id="clip"><rect xy="10" wh="10"/></clipPath></defs>
+  <specs><g id="shape"><rect wh="100"/></g></specs>
+  <reuse href="#shape" clip-path="url(#clip)"/>
+  <rect xy="30" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="10 10 30 30""#);
+}
+
+#[test]
+fn test_root_svg_bbox_failed_loop_does_not_contribute() {
+    let input = r##"
+<svg>
+  <config border="0" error-mode="warn" loop-limit="1"/>
+  <loop count="3"><rect xy="-100" wh="10"/></loop>
+  <rect xy="20" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="20 20 10 10""#);
+    assert_contains!(output, "Warning: error processing element");
+}
+
+#[test]
+fn test_root_svg_bbox_clip_scope_preserves_siblings() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <defs><clipPath id="clip"><rect xy="50" wh="10"/></clipPath></defs>
+  <rect wh="10"/>
+  <g clip-path="url(#clip)"><rect xy="100" wh="10"/></g>
+  <g clip-path="url(#clip)"><rect wh="100"/></g>
+  <rect xy="80" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="0 0 90 90""#);
+}
+
+#[test]
+fn test_root_svg_bbox_clipped_group_forward_reference() {
+    let input = r##"
+<svg>
+  <config border="0"/>
+  <g clip-path="url(#clip)"><rect xy="-100" wh="200"/></g>
+  <defs><clipPath id="clip"><rect xy="10" wh="10"/></clipPath></defs>
+  <rect xy="30" wh="10"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"viewBox="10 10 30 30""#);
+}
+
+#[test]
 fn test_root_svg_preserve_attrs() {
     let input = r##"
 <svg id="abc123" class="svgdx-a blob" data-attr="arbitrary" style="border: 1px solid red;">

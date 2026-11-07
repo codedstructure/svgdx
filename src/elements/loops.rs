@@ -3,7 +3,6 @@ use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::{eval_attr, eval_condition, eval_list};
-use crate::geometry::{BoundingBox, BoundingBoxBuilder};
 use crate::transform::EventGen;
 use crate::types::{parse_float, parse_int};
 
@@ -63,13 +62,9 @@ impl TryFrom<&SvgElement> for LoopDef {
 pub struct LoopElement<'a>(pub &'a SvgElement);
 
 impl EventGen for LoopElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let loop_def = LoopDef::try_from(self.0)?;
         let mut gen_events = OutputList::new();
-        let mut bbox = BoundingBoxBuilder::new();
         let mut iteration = 0;
         let mut loop_var_name = String::new();
         let mut loop_count = 0;
@@ -102,11 +97,8 @@ impl EventGen for LoopElement<'_> {
             // Each iteration needs different order indices on elements, so e.g.
             // ElRef::Prev isn't identical for each iteration.
             let iter_oi = self.0.order_index.with_index(iteration as usize);
-            let (ev_list, ev_bbox) = self.0.process_inner_events(iter_oi, context)?;
+            let ev_list = self.0.process_inner_events(iter_oi, context)?;
             gen_events.extend(ev_list);
-            if let Some(bb) = ev_bbox {
-                bbox.extend(bb);
-            }
 
             if let LoopType::Until(expr) = &loop_def.loop_type
                 && eval_condition(expr, context)?
@@ -119,7 +111,7 @@ impl EventGen for LoopElement<'_> {
                 return Err(Error::LoopLimit(iteration, context.config.loop_limit));
             }
         }
-        Ok((gen_events, bbox.build()))
+        Ok(gen_events)
     }
 }
 
@@ -155,14 +147,10 @@ impl TryFrom<&SvgElement> for ForDef {
 pub struct ForElement<'a>(pub &'a SvgElement);
 
 impl EventGen for ForElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let for_def = ForDef::try_from(self.0)?;
         let data_list: Vec<_> = eval_list(&for_def.data, context)?;
         let mut gen_events = OutputList::new();
-        let mut bbox = BoundingBoxBuilder::new();
         let mut idx = 0;
 
         // TODO: should a new context be created for for loops, so
@@ -173,16 +161,34 @@ impl EventGen for ForElement<'_> {
                 context.set_var(idx_name, &idx.to_string());
             }
             let iter_oi = self.0.order_index.with_index(idx as usize);
-            let (ev_list, ev_bbox) = self.0.process_inner_events(iter_oi, context)?;
+            let ev_list = self.0.process_inner_events(iter_oi, context)?;
             gen_events.extend(ev_list);
-            if let Some(bb) = ev_bbox {
-                bbox.extend(bb);
-            }
             idx += 1;
             if idx > context.config.loop_limit {
                 return Err(Error::LoopLimit(idx, context.config.loop_limit));
             }
         }
-        Ok((gen_events, bbox.build()))
+        Ok(gen_events)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct IfElement<'a>(pub &'a SvgElement);
+
+impl EventGen for IfElement<'_> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
+        let test = self
+            .0
+            .get_attr("test")
+            .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
+        if eval_condition(test, context)? {
+            // must rebase inner events under this element's order index
+            // for group transform processing to work
+            return self
+                .0
+                .process_inner_events(self.0.order_index.clone(), context);
+        }
+
+        Ok(OutputList::new())
     }
 }

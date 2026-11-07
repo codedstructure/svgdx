@@ -2,8 +2,7 @@ use super::SvgElement;
 use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
-use crate::expr::{eval_attr, eval_condition};
-use crate::geometry::BoundingBox;
+use crate::expr::eval_attr;
 use crate::transform::{EventGen, process_events};
 use crate::types::{parse_bool, parse_float, parse_int};
 
@@ -11,10 +10,7 @@ use crate::types::{parse_bool, parse_float, parse_int};
 pub struct DefaultsElement<'a>(pub &'a SvgElement);
 
 impl EventGen for DefaultsElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         // both the `defaults` element itself and any inner elements
         // are used to set default attr values.
         context.set_element_default(self.0);
@@ -24,7 +20,7 @@ impl EventGen for DefaultsElement<'_> {
                 context.set_element_default(&el);
             }
         }
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -32,14 +28,9 @@ impl EventGen for DefaultsElement<'_> {
 pub struct ConfigElement<'a>(pub &'a SvgElement);
 
 impl EventGen for ConfigElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let mut el = self.0.clone();
-        el.eval_attributes(context)?;
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut new_config = context.config.clone();
-        for (key, value) in el.get_attrs() {
+        for (key, value) in self.0.get_attrs() {
             match key.as_str() {
                 "scale" => new_config.scale = parse_float(value)?,
                 "debug" => new_config.debug = parse_bool(value)?,
@@ -60,7 +51,7 @@ impl EventGen for ConfigElement<'_> {
             }
         }
         context.set_config(new_config);
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -83,10 +74,7 @@ const SPECS_RESERVED_ELEMENT_NAMES: &[&str] = &[
 ];
 
 impl EventGen for SpecsElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         // support '<specs element="thing">...</specs>' as a shortcut for defining
         // reuse triggered by an element name rather than an href to an id.
         if let Some(element_name) = self.0.get_attr("element") {
@@ -108,7 +96,7 @@ impl EventGen for SpecsElement<'_> {
             // Process inner events, but throw away non-error result.
             process_events(inner_events, context)?;
         }
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }
 
@@ -162,76 +150,21 @@ where
 pub struct VarElement<'a>(pub &'a SvgElement);
 
 impl EventGen for VarElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, false, |ctx, k, v| ctx.set_var(k, v))?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarDefaultElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarDefaultElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, false, |ctx, k, v| {
-            ctx.set_var_default(k, v)
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
+        let (ignore_fail, is_default) = match self.0.name() {
+            "var" => (false, false),
+            "varTry" => (true, false),
+            "varDefault" => (false, true),
+            "varTryDefault" => (true, true),
+            _ => (false, false), // shouldn't happen
+        };
+        process_var_attrs(self.0, context, ignore_fail, |ctx, k, v| {
+            if is_default {
+                ctx.set_var_default(k, v);
+            } else {
+                ctx.set_var(k, v)
+            }
         })?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarTryElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarTryElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var(k, v))?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarTryDefaultElement<'a>(pub &'a SvgElement);
-
-impl EventGen for VarTryDefaultElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        process_var_attrs(self.0, context, true, |ctx, k, v| ctx.set_var_default(k, v))?;
-        Ok((OutputList::new(), None))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct IfElement<'a>(pub &'a SvgElement);
-
-impl EventGen for IfElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let test = self
-            .0
-            .get_attr("test")
-            .ok_or_else(|| Error::MissingAttr("test".to_owned()))?;
-        if eval_condition(test, context)? {
-            // must rebase inner events under this element's order index
-            // for group transform processing to work
-            return self
-                .0
-                .process_inner_events(self.0.order_index.clone(), context);
-        }
-
-        Ok((OutputList::new(), None))
+        Ok(OutputList::new())
     }
 }

@@ -30,9 +30,9 @@ use crate::Error;
 use crate::context::TransformerContext;
 use crate::document::{EventKind, OutputList, Spacing};
 use crate::errors::Result;
-use crate::geometry::{BoundingBox, Length, strp_length};
+use crate::geometry::{Length, strp_length};
 use crate::transform::EventGen;
-use crate::types::{attr_split, fstr, parse_float, split_compound_attr};
+use crate::types::{attr_split, fstr, parse_float};
 
 #[derive(Debug, PartialEq)]
 struct GradStop {
@@ -138,15 +138,11 @@ fn apply_gradient_rotation(el: &mut SvgElement) -> Result<()> {
     Ok(())
 }
 
-pub struct LinearGradient<'a>(pub &'a SvgElement);
+pub struct GradientElement<'a>(pub &'a SvgElement);
 
-impl EventGen for LinearGradient<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+impl EventGen for GradientElement<'_> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
         apply_gradient_rotation(&mut new_el)?;
 
         let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
@@ -155,125 +151,13 @@ impl EventGen for LinearGradient<'_> {
             Vec::new()
         };
 
-        // expand any provided compound attributes
-        if let Some(xy1) = new_el.pop_attr("xy1") {
-            let (x1, y1) = split_compound_attr(&xy1);
-            new_el.set_default_attr("x1", &x1);
-            new_el.set_default_attr("y1", &y1);
-        }
-        let origin: Option<(f32, f32)> = {
-            let x1 = new_el.get_attr("x1").map(strp_length).transpose()?;
-            let y1 = new_el.get_attr("y1").map(strp_length).transpose()?;
-            match (x1, y1) {
-                (Some(x1), Some(y1)) => Some((x1.evaluate(1.), y1.evaluate(1.))),
-                _ => None,
-            }
-        };
-        if let Some(xy2) = new_el.pop_attr("xy2") {
-            let (x2, y2) = split_compound_attr(&xy2);
-            new_el.set_default_attr("x2", &x2);
-            new_el.set_default_attr("y2", &y2);
-        }
-        let endpoint: Option<(f32, f32)> = {
-            let x2 = new_el.get_attr("x2").map(strp_length).transpose()?;
-            let y2 = new_el.get_attr("y2").map(strp_length).transpose()?;
-            match (x2, y2) {
-                (Some(x2), Some(y2)) => Some((x2.evaluate(1.), y2.evaluate(1.))),
-                _ => None,
-            }
-        };
-
-        let length = new_el
-            .pop_attr("length")
-            .map(|length| {
-                strp_length(&length)
-                    .map_err(|e| Error::InvalidValue(format!("invalid length: {e}"), length))
-            })
-            .transpose()?;
-
-        let dir = new_el
-            .pop_attr("dir")
-            .map(|dir| {
-                {
-                    // normalize angle to 0-360 range
-                    parse_float(&dir).map(|a| {
-                        let a = a % 360.0;
-                        if a < 0.0 { a + 360.0 } else { a }
-                    })
-                }
-                .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))
-            })
-            .transpose()?;
-
-        match (origin, endpoint, length, dir) {
-            (_, Some(_), None, None) | (Some(_), None, None, None) | (None, None, None, None) => {
-                // no-op; one or zero coord pairs with no further constraints,
-                // leave to SVG's defaults.
-            }
-            (Some(_), None, maybe_len, maybe_dir)
-            | (None, Some(_), maybe_len, maybe_dir)
-            | (None, None, maybe_len, maybe_dir) => {
-                let dir = maybe_dir.unwrap_or(0.0);
-
-                // Determine fixed coord
-                let fixed = if let Some(xy1) = origin {
-                    xy1
-                } else if let Some(xy2) = endpoint {
-                    xy2
-                } else {
-                    // Select corner based on angle quadrant
-                    match dir {
-                        d if (0.0..=90.0).contains(&d) => (0.0, 0.0),
-                        d if (90.0..180.0).contains(&d) => (1.0, 0.0),
-                        d if (180.0..=270.0).contains(&d) => (1.0, 1.0),
-                        _ => (0.0, 1.0),
-                    }
-                };
-
-                let (x_fixed, y_fixed) = fixed;
-                let rad = dir.to_radians();
-
-                // Calculate the other endpoint
-                let (x_calc, y_calc) = if let Some(length) = maybe_len {
-                    let icept = intercept_unit_square(fixed, dir);
-                    let dist = ((icept.0 - x_fixed).powi(2) + (icept.1 - y_fixed).powi(2)).sqrt();
-                    (
-                        x_fixed + length.evaluate(dist) * rad.cos(),
-                        y_fixed + length.evaluate(dist) * rad.sin(),
-                    )
-                } else {
-                    intercept_unit_square(fixed, dir)
-                };
-
-                // Set the appropriate missing coordinate pair(s)
-                if origin.is_none() && endpoint.is_none() {
-                    // No coordinates provided - set all four
-                    new_el.set_default_num_attr("x1", x_fixed);
-                    new_el.set_default_num_attr("y1", y_fixed);
-                    new_el.set_default_num_attr("x2", x_calc);
-                    new_el.set_default_num_attr("y2", y_calc);
-                } else if endpoint.is_none() {
-                    // Have origin, set endpoint
-                    new_el.set_default_num_attr("x2", x_calc);
-                    new_el.set_default_num_attr("y2", y_calc);
-                } else {
-                    // Have endpoint, set origin
-                    new_el.set_default_num_attr("x1", x_calc);
-                    new_el.set_default_num_attr("y1", y_calc);
-                }
-            }
-            (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {
-                // origin + endpoint together with either length or dir is over-constrained
-                return Err(Error::InvalidValue(
-                    "Over-constrained linearGradient definition".into(),
-                    self.0.to_string(),
-                ));
-            }
+        if self.0.name() == "linearGradient" {
+            new_el = linear_gradient_line(&new_el)?;
         }
 
         // get the inner events / bbox first, as some outer element attrs
         // (e.g. `transform` via rotate) may depend on the bbox.
-        let (inner, _) = self
+        let inner = self
             .0
             .process_inner_events(new_el.order_index.clone(), context)?;
 
@@ -286,7 +170,7 @@ impl EventGen for LinearGradient<'_> {
             events.extend(inner);
             for el in new_inner {
                 events.push(Spacing::LineBreak);
-                events.extend(el.generate_events(context)?.0);
+                events.extend(el.generate_events(context)?);
             }
             events.push(Spacing::LineBreak);
             events.push(EventKind::End(el_name));
@@ -294,8 +178,117 @@ impl EventGen for LinearGradient<'_> {
 
         context.update_element(&new_el);
 
-        Ok((events, None))
+        Ok(events)
     }
+}
+
+fn linear_gradient_line(el: &SvgElement) -> Result<SvgElement> {
+    let mut new_el = el.clone();
+    let origin: Option<(f32, f32)> = {
+        let x1 = new_el.get_attr("x1").map(strp_length).transpose()?;
+        let y1 = new_el.get_attr("y1").map(strp_length).transpose()?;
+        match (x1, y1) {
+            (Some(x1), Some(y1)) => Some((x1.evaluate(1.), y1.evaluate(1.))),
+            _ => None,
+        }
+    };
+    let endpoint: Option<(f32, f32)> = {
+        let x2 = new_el.get_attr("x2").map(strp_length).transpose()?;
+        let y2 = new_el.get_attr("y2").map(strp_length).transpose()?;
+        match (x2, y2) {
+            (Some(x2), Some(y2)) => Some((x2.evaluate(1.), y2.evaluate(1.))),
+            _ => None,
+        }
+    };
+
+    let length = new_el
+        .pop_attr("length")
+        .map(|length| {
+            strp_length(&length)
+                .map_err(|e| Error::InvalidValue(format!("invalid length: {e}"), length))
+        })
+        .transpose()?;
+
+    let dir = new_el
+        .pop_attr("dir")
+        .map(|dir| {
+            {
+                // normalize angle to 0-360 range
+                parse_float(&dir).map(|a| {
+                    let a = a % 360.0;
+                    if a < 0.0 { a + 360.0 } else { a }
+                })
+            }
+            .map_err(|e| Error::InvalidValue(format!("invalid dir: {e}"), dir))
+        })
+        .transpose()?;
+
+    match (origin, endpoint, length, dir) {
+        (_, Some(_), None, None) | (Some(_), None, None, None) | (None, None, None, None) => {
+            // no-op; one or zero coord pairs with no further constraints,
+            // leave to SVG's defaults.
+        }
+        (Some(_), None, maybe_len, maybe_dir)
+        | (None, Some(_), maybe_len, maybe_dir)
+        | (None, None, maybe_len, maybe_dir) => {
+            let dir = maybe_dir.unwrap_or(0.0);
+
+            // Determine fixed coord
+            let fixed = if let Some(xy1) = origin {
+                xy1
+            } else if let Some(xy2) = endpoint {
+                xy2
+            } else {
+                // Select corner based on angle quadrant
+                match dir {
+                    d if (0.0..=90.0).contains(&d) => (0.0, 0.0),
+                    d if (90.0..180.0).contains(&d) => (1.0, 0.0),
+                    d if (180.0..=270.0).contains(&d) => (1.0, 1.0),
+                    _ => (0.0, 1.0),
+                }
+            };
+
+            let (x_fixed, y_fixed) = fixed;
+            let rad = dir.to_radians();
+
+            // Calculate the other endpoint
+            let (x_calc, y_calc) = if let Some(length) = maybe_len {
+                let icept = intercept_unit_square(fixed, dir);
+                let dist = ((icept.0 - x_fixed).powi(2) + (icept.1 - y_fixed).powi(2)).sqrt();
+                (
+                    x_fixed + length.evaluate(dist) * rad.cos(),
+                    y_fixed + length.evaluate(dist) * rad.sin(),
+                )
+            } else {
+                intercept_unit_square(fixed, dir)
+            };
+
+            // Set the appropriate missing coordinate pair(s)
+            if origin.is_none() && endpoint.is_none() {
+                // No coordinates provided - set all four
+                new_el.set_default_num_attr("x1", x_fixed);
+                new_el.set_default_num_attr("y1", y_fixed);
+                new_el.set_default_num_attr("x2", x_calc);
+                new_el.set_default_num_attr("y2", y_calc);
+            } else if endpoint.is_none() {
+                // Have origin, set endpoint
+                new_el.set_default_num_attr("x2", x_calc);
+                new_el.set_default_num_attr("y2", y_calc);
+            } else {
+                // Have endpoint, set origin
+                new_el.set_default_num_attr("x1", x_calc);
+                new_el.set_default_num_attr("y1", y_calc);
+            }
+        }
+        (Some(_), Some(_), Some(_), _) | (Some(_), Some(_), _, Some(_)) => {
+            // origin + endpoint together with either length or dir is over-constrained
+            return Err(Error::InvalidValue(
+                "Over-constrained linearGradient definition".into(),
+                el.to_string(),
+            ));
+        }
+    }
+    Ok(new_el)
 }
 
 // given an origin (assumed inside unit square) and direction (in degrees),
@@ -321,66 +314,6 @@ fn intercept_unit_square(origin: (f32, f32), dir: f32) -> (f32, f32) {
     }
 
     (ox + t * dx, oy + t * dy)
-}
-
-pub struct RadialGradient<'a>(pub &'a SvgElement);
-
-impl EventGen for RadialGradient<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        let mut new_el = self.0.clone();
-        new_el.eval_attributes(context)?;
-        apply_gradient_rotation(&mut new_el)?;
-
-        let new_inner = if let Some(stops) = new_el.pop_attr("stops") {
-            stop_elements(&stops)?
-        } else {
-            Vec::new()
-        };
-
-        // outermost circle is defined by cx,cy,r, and corresponding to a
-        // stop at offset 1.0; defaults to 50%/50%/50%
-        if let Some(cxy) = new_el.pop_attr("cxy") {
-            let (cx, cy) = split_compound_attr(&cxy);
-            new_el.set_default_attr("cx", &cx);
-            new_el.set_default_attr("cy", &cy);
-        }
-
-        // focal point of radial gradient; corresponds to stop at offset 0
-        // and defaults to cx,cy
-        if let Some(cxy) = new_el.pop_attr("fxy") {
-            let (cx, cy) = split_compound_attr(&cxy);
-            new_el.set_default_attr("fx", &cx);
-            new_el.set_default_attr("fy", &cy);
-        }
-
-        // get the inner events / bbox first, as some outer element attrs
-        // (e.g. `transform` via rotate) may depend on the bbox.
-        let (inner, _) = self
-            .0
-            .process_inner_events(new_el.order_index.clone(), context)?;
-
-        let mut events = OutputList::new();
-        if self.0.is_empty_element() && new_inner.is_empty() {
-            events.push(EventKind::Empty(new_el.clone().into()));
-        } else {
-            let el_name = new_el.name().to_owned();
-            events.push(EventKind::Start(new_el.clone().into()));
-            events.extend(inner);
-            for el in new_inner {
-                events.push(Spacing::LineBreak);
-                events.extend(el.generate_events(context)?.0);
-            }
-            events.push(Spacing::LineBreak);
-            events.push(EventKind::End(el_name));
-        }
-
-        context.update_element(&new_el);
-
-        Ok((events, None))
-    }
 }
 
 #[cfg(test)]

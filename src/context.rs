@@ -3,7 +3,7 @@ use crate::document::{InputEvent, Library, parse_library};
 use crate::elements::{SvgElement, is_layout_element};
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
-use crate::geometry::{BoundingBox, Size, TransformAttr};
+use crate::geometry::{BoundingBox, BoundingBoxBuilder, Size, TransformAttr};
 use crate::scope::ScopeStack;
 use crate::types::{ElRef, OrderIndex, extract_urlref, parse_float};
 
@@ -29,6 +29,10 @@ pub struct TransformerContext {
     rng: RefCell<Pcg32>,
     /// Is this a 'real' SVG doc, or just a fragment?
     pub real_svg: bool,
+    /// Bounding box accumulated for the overall output.
+    pub overall_bbox: BoundingBoxBuilder,
+    /// Local bounds for nested event processing, before parent transforms and clipping.
+    bbox_scopes: Vec<BoundingBoxBuilder>,
     /// The event-representation of the entire input SVG
     pub events: HashMap<Option<String>, Vec<InputEvent>>,
     /// Config of transformer processing; updated by `<config>` elements
@@ -49,6 +53,8 @@ impl Default for TransformerContext {
             scope_stack: ScopeStack::new(),
             rng: RefCell::new(Pcg32::seed_from_u64(0)),
             real_svg: false,
+            overall_bbox: BoundingBoxBuilder::new(),
+            bbox_scopes: Vec::new(),
             events: HashMap::new(),
             config: TransformConfig::default(),
             libraries: Vec::new(),
@@ -193,7 +199,7 @@ impl ElementMap for TransformerContext {
                     if el.pos_by_transform() && el.has_pos_attrs() {
                         // hasn't yet been expanded -> reference error.
                         return Err(Error::MissingBBox(format!(
-                            "Element at {} has unexpanded xy attribute",
+                            "Element at {} has unexpanded position attribute",
                             oi
                         )));
                     }
@@ -381,6 +387,52 @@ impl TransformerContext {
                 .nth((-offset - 1) as usize)
                 .map(|(_, value)| value)
         }
+    }
+}
+
+impl TransformerContext {
+    pub fn with_bbox_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> Result<T>) -> Result<T> {
+        self.bbox_scopes.push(BoundingBoxBuilder::new());
+        let result = f(self);
+        let bbox = self
+            .bbox_scopes
+            .pop()
+            .expect("bounding box scope must exist")
+            .build();
+        if result.is_ok() {
+            self.extend_bbox(bbox);
+        }
+        result
+    }
+
+    fn current_bbox_builder(&mut self) -> &mut BoundingBoxBuilder {
+        self.bbox_scopes
+            .last_mut()
+            .unwrap_or(&mut self.overall_bbox)
+    }
+
+    pub fn current_bbox(&self) -> Option<BoundingBox> {
+        self.bbox_scopes
+            .last()
+            .unwrap_or(&self.overall_bbox)
+            .clone()
+            .build()
+    }
+
+    pub fn extend_bbox(&mut self, bbox: Option<BoundingBox>) {
+        if !self.in_specs() {
+            self.current_bbox_builder().extend_opt(bbox);
+        }
+    }
+
+    pub fn clear_bbox(&mut self) {
+        self.current_bbox_builder().clear();
+    }
+
+    pub fn set_bbox(&mut self, bbox: Option<BoundingBox>) {
+        let builder = self.current_bbox_builder();
+        *builder = BoundingBoxBuilder::new();
+        builder.extend_opt(bbox);
     }
 }
 

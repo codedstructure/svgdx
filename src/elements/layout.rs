@@ -3,8 +3,7 @@ use std::str::FromStr;
 
 use super::SvgElement;
 use crate::constants::{
-    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
-    VAR_PREFIX,
+    ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, RELPOS_SEP, SCALARSPEC_SEP, VAR_PREFIX,
 };
 use crate::context::{ContextView, ElementMap};
 use crate::elements::line_offset::get_point_along_linelike_el;
@@ -124,17 +123,10 @@ pub fn is_layout_element(el: &SvgElement) -> bool {
 
 // Elements wh
 impl SvgElement {
-    fn extract_relpos(&mut self) -> Option<String> {
-        if self.get_attr("xy").unwrap_or_default().contains(RELPOS_SEP) {
-            return Some(self.pop_attr("xy").unwrap().to_string());
-        }
-        None
-    }
-
     pub fn has_pos_attrs(&self) -> bool {
         for key in [
             "x", "y", "cx", "cy", "x1", "y1", "x2", "y2", "xy", "cxy", "xy1", "xy2", "dxy", "dx",
-            "dy",
+            "dy", "relpos",
         ] {
             if self.has_attr(key) {
                 return true;
@@ -149,17 +141,6 @@ impl SvgElement {
     }
 
     pub fn expand_compound_attributes(&mut self) -> Result<()> {
-        // Ensure relatively-positioned text element text has appropriate
-        // anchors. Must be done before 'xy' gets expanded.
-        if self.name() == "text"
-            && self.has_attr("text")
-            && let Some(xy) = self.get_attr("xy")
-            && let Ok((_, tail)) = extract_elref(xy)
-            && let Some(loc) = eval_text_anchor(tail)?
-        {
-            self.set_default_attr("text-loc", text_loc_anchor(loc));
-        }
-
         expand_compound_size(self);
         expand_compound_pos(self);
         Ok(())
@@ -186,7 +167,7 @@ impl SvgElement {
 
         let mut force_origin = false;
         // Special-case xy with relpos, e.g. xy="#elem|h 2" and xy-loc
-        if let Some(relpos) = self.extract_relpos() {
+        if let Some(relpos) = self.pop_attr("relpos") {
             // xy won't have been expanded in the relpos case
             if let Some(mut pos) = self.pos_from_dirspec(&relpos, ctx)? {
                 if let Some(bb) = self.content_bbox {
@@ -433,7 +414,9 @@ impl SvgElement {
         // in which case we may still validly have these other attributes...
         // TODO: avoid overloading different content_bbox uses.
         if !self.has_attr("clip-path") {
-            for key in ["xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2"] {
+            for key in [
+                "xy", "cxy", "wh", "dwh", "dw", "dh", "rxy", "xy1", "xy2", "relpos",
+            ] {
                 if self.has_attr(key) {
                     return Err(Error::MissingBBox(key.to_owned()));
                 }
@@ -468,6 +451,9 @@ impl SvgElement {
         // "If the attribute is not specified, the effect is as if a value of "0" were specified."
         // The same is not specified for 'size' attributes (width/height/r etc), so we require
         // these to be set to have a bounding box.
+        if self.has_attr("relpos") {
+            return Err(Error::MissingBBox("relpos".into()));
+        }
         let zstr = "0";
         // if not a number and not a refspec, pass it through without computing a bbox
         // this is needed to ultimately pass through e.g. "10cm" or "5%" as-is without
@@ -907,41 +893,6 @@ fn eval_pos_attributes(
     Ok(())
 }
 
-fn eval_text_anchor(elref_tail: &str) -> Result<Option<LocSpec>> {
-    let rel_loc = elref_tail.split_whitespace().next().unwrap_or_default();
-    if let Some(rel) = rel_loc.strip_prefix(RELPOS_SEP) {
-        let dir: DirSpec = rel.parse()?;
-        return Ok(Some(dir.to_locspec()));
-    }
-    if let Some(loc) = rel_loc.strip_prefix(LOCSPEC_SEP) {
-        return loc
-            .parse::<LocSpec>()
-            .map(Some)
-            .map_err(|_| Error::InvalidValue("text-loc".into(), loc.into()));
-    }
-    Ok(None)
-}
-
-// note this is specific to setting 'text-loc', not a general fmt::Display
-// implementation (because the `*Edge` variants lose info)
-fn text_loc_anchor(loc: LocSpec) -> &'static str {
-    match loc {
-        LocSpec::TopLeft => "tl",
-        LocSpec::Top => "t",
-        LocSpec::TopRight => "tr",
-        LocSpec::Right => "r",
-        LocSpec::BottomRight => "br",
-        LocSpec::Bottom => "b",
-        LocSpec::BottomLeft => "bl",
-        LocSpec::Left => "l",
-        LocSpec::Center => "c",
-        LocSpec::TopEdge(_) => "t",
-        LocSpec::BottomEdge(_) => "b",
-        LocSpec::LeftEdge(_) => "l",
-        LocSpec::RightEdge(_) => "r",
-    }
-}
-
 fn is_pos_attr(name: &str) -> bool {
     // Position attributes are identical for all element types
     matches!(name, "x" | "y" | "x1" | "y1" | "x2" | "y2" | "cx" | "cy")
@@ -1006,16 +957,11 @@ fn expand_pos_from_loc(el: &mut SvgElement, xy_loc: &str) -> Result<()> {
 // xy="#o 2" -> x="#o 2", y="#o 2"
 // xy="#o 2 4" -> x="#o 2", y="#o 4"
 fn expand_compound_pos(el: &mut SvgElement) {
+    // assumes any dirspec has already been extracted from xy attr
     if let Some(xy) = el.pop_attr("xy") {
-        // NOTE: relative positioning (e.g. `xy="#abc|h"`) is not compound
-        if xy.contains(RELPOS_SEP) {
-            // relpos -> re-add attribute
-            el.set_attr("xy", &xy);
-        } else {
-            let (x, y) = split_compound_attr(&xy);
-            el.set_default_attr("x", &x);
-            el.set_default_attr("y", &y);
-        }
+        let (x, y) = split_compound_attr(&xy);
+        el.set_default_attr("x", &x);
+        el.set_default_attr("y", &y);
     }
     if let Some(cxy) = el.pop_attr("cxy") {
         let (cx, cy) = split_compound_attr(&cxy);
@@ -1036,6 +982,12 @@ fn expand_compound_pos(el: &mut SvgElement) {
         let (dx, dy) = split_compound_attr(&dxy);
         el.set_default_attr("dx", &dx);
         el.set_default_attr("dy", &dy);
+    }
+    if let Some(fxy) = el.pop_attr("fxy") {
+        // radialGradient focal point
+        let (fx, fy) = split_compound_attr(&fxy);
+        el.set_default_attr("fx", &fx);
+        el.set_default_attr("fy", &fy);
     }
 }
 

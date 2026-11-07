@@ -1,9 +1,9 @@
 use super::path::{points_to_path, process_path_data};
 use super::preprocess::preprocess_dpoints;
 use super::{
-    ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GroupElement, IfElement,
-    LinearGradient, LoopElement, RadialGradient, ReuseElement, SpecsElement, VarDefaultElement,
-    VarElement, VarTryDefaultElement, VarTryElement, is_connector, process_text_attr,
+    ConfigElement, ConnectorType, Container, DefaultsElement, ForElement, GradientElement,
+    GroupElement, IfElement, LoopElement, ReuseElement, SpecsElement, VarElement, is_connector,
+    process_text_attr,
 };
 use crate::context::{ContextView, ElementMap, TransformerContext};
 use crate::document::{EventKind, InputList, OutputList, Spacing};
@@ -19,56 +19,49 @@ use crate::types::{
 use core::fmt::Display;
 
 impl EventGen for SvgElement {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
-        // early update: may be updated further during processing
-        context.update_element(self);
-        let (ol, mut bbox) = context.with_element_scope(self, |context| match self.name() {
-            _ if context.is_named_spec(self.name()) => {
-                let reuse_el =
-                    SvgElement::new("reuse", &[("href".into(), format!("#{}", self.name()))])
-                        .with_attrs_from(self);
-                ReuseElement(&reuse_el).generate_events(context)
-            }
-            "loop" => LoopElement(self).generate_events(context),
-            "config" => ConfigElement(self).generate_events(context),
-            "reuse" => ReuseElement(self).generate_events(context),
-            "specs" => SpecsElement(self).generate_events(context),
-            "var" => VarElement(self).generate_events(context),
-            "varDefault" => VarDefaultElement(self).generate_events(context),
-            "varTry" => VarTryElement(self).generate_events(context),
-            "varTryDefault" => VarTryDefaultElement(self).generate_events(context),
-            "if" => IfElement(self).generate_events(context),
-            "defaults" => DefaultsElement(self).generate_events(context),
-            "for" => ForElement(self).generate_events(context),
-            "g" | "symbol" => GroupElement(self).generate_events(context),
-            "linearGradient" => LinearGradient(self).generate_events(context),
-            "radialGradient" => RadialGradient(self).generate_events(context),
-            _ => match self.event_range {
-                Some((start, end)) if start != end => Container(self).generate_events(context),
-                _ => OtherElement(self).generate_events(context),
-            },
-        })?;
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
+        context.with_bbox_scope(|context| {
+            let ol = context.with_element_scope(self, |context| match self.name() {
+                "loop" => LoopElement(self).generate_events(context),
+                "config" => ConfigElement(self).generate_events(context),
+                "reuse" => ReuseElement(self).generate_events(context),
+                "specs" => SpecsElement(self).generate_events(context),
+                "var" | "varTry" | "varDefault" | "varTryDefault" => {
+                    VarElement(self).generate_events(context)
+                }
+                "if" => IfElement(self).generate_events(context),
+                "defaults" => DefaultsElement(self).generate_events(context),
+                "for" => ForElement(self).generate_events(context),
+                "g" | "symbol" => GroupElement(self).generate_events(context),
+                "linearGradient" | "radialGradient" => {
+                    GradientElement(self).generate_events(context)
+                }
+                _ => match self.event_range {
+                    Some((start, end)) if start != end => Container(self).generate_events(context),
+                    _ => OtherElement(self).generate_events(context),
+                },
+            })?;
 
-        if let (Some(el_bbox), Some(clip_id)) =
-            (bbox, self.get_attr("clip-path").and_then(extract_urlref))
-        {
-            let clip_el = context
-                .get_element(&clip_id)
-                .ok_or_else(|| Error::Reference(clip_id))?;
-            if let ("clipPath", Some(clip_bbox)) =
-                (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
-            {
-                bbox = el_bbox.intersect(&clip_bbox);
-                let mut el = self.clone();
-                el.content_bbox = bbox;
-                context.update_element(&el);
+            if let (Some(el_bbox), Some(clip_id)) = (
+                context.current_bbox(),
+                self.get_attr("clip-path").and_then(extract_urlref),
+            ) {
+                let clip_el = context
+                    .get_element(&clip_id)
+                    .ok_or_else(|| Error::Reference(clip_id))?;
+                if let ("clipPath", Some(clip_bbox)) =
+                    (clip_el.name.as_str(), context.get_element_bbox(clip_el)?)
+                {
+                    let bbox = el_bbox.intersect(&clip_bbox);
+                    context.set_bbox(bbox);
+                    let mut el = self.clone();
+                    el.content_bbox = bbox;
+                    context.update_element(&el);
+                }
             }
-        }
 
-        Ok((ol, bbox))
+            Ok(ol)
+        })
     }
 }
 
@@ -76,14 +69,10 @@ impl EventGen for SvgElement {
 struct OtherElement<'a>(pub &'a SvgElement);
 
 impl EventGen for OtherElement<'_> {
-    fn generate_events(
-        &self,
-        context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
         let mut output = OutputList::new();
         let mut e = self.0.clone();
 
-        e.prepare_element(context)?;
         e.finalize_layout(context)?;
 
         context.update_element(&e);
@@ -132,7 +121,8 @@ impl EventGen for OtherElement<'_> {
             // (They can generate text though, so not rejected earlier.)
             bb = None;
         }
-        Ok((output, bb))
+        context.extend_bbox(bb);
+        Ok(output)
     }
 }
 
@@ -440,7 +430,7 @@ impl SvgElement {
         &self,
         oi_base: OrderIndex,
         context: &mut TransformerContext,
-    ) -> Result<(OutputList, Option<BoundingBox>)> {
+    ) -> Result<OutputList> {
         if let Some(mut inner_events) = self.inner_events(context) {
             inner_events.rebase_under(oi_base);
             if let Some(line) = self.instance_origin_line {
@@ -448,7 +438,7 @@ impl SvgElement {
             }
             process_events(inner_events, context)
         } else {
-            Ok((OutputList::new(), None))
+            Ok(OutputList::new())
         }
     }
 
@@ -589,10 +579,8 @@ impl SvgElement {
 }
 
 impl SvgElement {
-    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     pub fn prepare_element(&mut self, ctx: &mut TransformerContext) -> Result<()> {
         self.eval_attributes(ctx)?;
-        self.apply_auto_id(ctx);
         self.expand_compound_attributes()?;
         self.expand_relspec_attributes(ctx);
         self.transmute(ctx)?;
@@ -614,7 +602,6 @@ impl SvgElement {
         Ok(())
     }
 
-    /// Returns Ok(true) if element should be included, Ok(false) if it should be skipped
     fn transmute(&mut self, ctx: &mut TransformerContext) -> Result<()> {
         // let mut el = self;
         if self.name() == "path"
@@ -682,26 +669,6 @@ impl SvgElement {
         Ok(())
     }
 
-    fn apply_auto_id(&mut self, ctx: &mut TransformerContext) {
-        if !self.pop_class("d-auto-id") || self.has_attr("id") {
-            return;
-        }
-
-        // id is derived from text or markdown attributes if present
-        let Some(text) = self.get_attr("text").or_else(|| self.get_attr("md")) else {
-            return;
-        };
-
-        let Some(candidate) = auto_id_from_text(text) else {
-            return;
-        };
-
-        // TODO: warn or append suffix if ID already exists
-        if ctx.get_element_by_id(&candidate).is_none() {
-            self.set_attr("id", &candidate);
-        }
-    }
-
     pub fn handle_rotation(&mut self) -> Result<()> {
         let angle = self.pop_num_attr("rotate")?;
         // determine center of rotation; default center of bbox
@@ -725,41 +692,4 @@ impl SvgElement {
         }
         Ok(())
     }
-}
-
-fn auto_id_from_text(text: &str) -> Option<String> {
-    // split into non-empty alphanumeric words
-    let mut words = text
-        .split(|ch: char| !ch.is_alphanumeric())
-        .filter(|word| !word.is_empty());
-
-    // convert to camelCase
-    let mut auto_id = String::with_capacity(text.len());
-    auto_id.push_str(&words.next()?.to_lowercase());
-    for word in words {
-        auto_id.push_str(&word[..1].to_uppercase());
-        auto_id.push_str(&word[1..].to_lowercase());
-    }
-    Some(auto_id)
-}
-
-#[test]
-fn test_auto_id_from_text() {
-    assert_eq!(
-        auto_id_from_text("Hello World"),
-        Some("helloWorld".to_string())
-    );
-    assert_eq!(
-        auto_id_from_text("  multiple   spaces "),
-        Some("multipleSpaces".to_string())
-    );
-    assert_eq!(auto_id_from_text(""), None);
-    assert_eq!(
-        auto_id_from_text("123 numbers"),
-        Some("123Numbers".to_string())
-    );
-    assert_eq!(
-        auto_id_from_text("$symbols&punctuation-?."),
-        Some("symbolsPunctuation".to_string())
-    );
 }
