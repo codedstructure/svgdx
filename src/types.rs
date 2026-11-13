@@ -2,8 +2,9 @@ use crate::constants::{
     EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
     SCALARSPEC_SEP,
 };
+use crate::context::ElementMap;
 use crate::errors::{Error, Result};
-use crate::geometry::Length;
+use crate::geometry::{BoundingBox, ElementLoc, Length};
 use std::fmt::{self, Display};
 use std::num::{NonZeroU8, ParseIntError};
 use std::ops::{Deref, DerefMut};
@@ -781,6 +782,98 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
     Err(Error::Parse(format!("invalid elref format '{s}'")))
 }
 
+/// A reference to something with a layout (bounding box), which is not
+/// necessarily a single element.
+///
+/// Use `ElRef` directly where an actual element is needed (e.g. `reuse`);
+/// use `LayoutRef` where only a bounding box is required.
+#[derive(Clone, Debug, PartialEq)]
+pub enum LayoutRef {
+    Element(ElRef),
+}
+
+impl LayoutRef {
+    /// The single element reference, if this refers to exactly one element.
+    #[allow(dead_code)] // for callers needing an actual element; none yet
+    pub fn elref(&self) -> Option<&ElRef> {
+        match self {
+            LayoutRef::Element(elref) => Some(elref),
+        }
+    }
+
+    /// Bounding box of the referenced layout, if it has one.
+    pub fn bbox(&self, ctx: &(impl ElementMap + ?Sized)) -> Result<Option<BoundingBox>> {
+        match self {
+            LayoutRef::Element(elref) => {
+                let el = ctx
+                    .get_element(elref)
+                    .ok_or_else(|| Error::Reference(elref.clone()))?;
+                ctx.get_element_bbox(el)
+            }
+        }
+    }
+
+    /// Bounding box of the referenced layout, failing if it has none.
+    pub fn require_bbox(&self, ctx: &(impl ElementMap + ?Sized)) -> Result<BoundingBox> {
+        self.bbox(ctx)?
+            .ok_or_else(|| Error::MissingBBox(self.to_string()))
+    }
+
+    /// Bounding box of a `target_shape` inscribed within the referenced layout.
+    pub fn inscribed_bbox(
+        &self,
+        ctx: &(impl ElementMap + ?Sized),
+        target_shape: &str,
+    ) -> Result<Option<BoundingBox>> {
+        match self {
+            LayoutRef::Element(elref) => ctx
+                .get_element(elref)
+                .ok_or_else(|| Error::Reference(elref.clone()))?
+                .inscribed_bbox(target_shape),
+        }
+    }
+
+    /// Coordinate of the given location on the referenced layout.
+    pub fn loc_coord(
+        &self,
+        ctx: &(impl ElementMap + ?Sized),
+        loc: ElementLoc,
+    ) -> Result<(f32, f32)> {
+        match self {
+            LayoutRef::Element(elref) => ctx
+                .get_element(elref)
+                .ok_or_else(|| Error::Reference(elref.clone()))?
+                .get_element_loc_coord(ctx, loc),
+        }
+    }
+}
+
+impl From<ElRef> for LayoutRef {
+    fn from(elref: ElRef) -> Self {
+        LayoutRef::Element(elref)
+    }
+}
+
+impl FromStr for LayoutRef {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        s.parse().map(LayoutRef::Element)
+    }
+}
+
+impl Display for LayoutRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LayoutRef::Element(elref) => write!(f, "{elref}"),
+        }
+    }
+}
+
+/// return LayoutRef and remaining string
+pub fn extract_layoutref(s: &str) -> Result<(LayoutRef, &str)> {
+    extract_elref(s).map(|(elref, remain)| (LayoutRef::Element(elref), remain))
+}
+
 /// A valid variable name: a non-empty string starting with a letter or underscore,
 /// followed by letters, digits, or underscores.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1091,6 +1184,16 @@ mod test {
         assert_eq!(extract_elref("++++").unwrap(), (ElRef::Next(nz(4)), ""));
         assert_eq!(extract_elref("++3+").unwrap(), (ElRef::Next(nz(2)), "3+"));
         assert!(extract_elref("id").is_err());
+    }
+
+    #[test]
+    fn test_extract_layoutref() {
+        let (lr, remain) = extract_layoutref("#id@tl").unwrap();
+        assert_eq!(lr, LayoutRef::Element(ElRef::Id("id".to_string())));
+        assert_eq!(lr.elref(), Some(&ElRef::Id("id".to_string())));
+        assert_eq!(remain, "@tl");
+        assert_eq!("#id".parse::<LayoutRef>().unwrap().to_string(), "#id");
+        assert!(extract_layoutref("id").is_err());
     }
 
     #[test]

@@ -13,7 +13,8 @@ use crate::geometry::{
     TrblLength, parse_elref_suffix, strp_length,
 };
 use crate::types::{
-    attr_split, extract_elref, extract_elref_token, fstr, parse_float, split_compound_attr,
+    LayoutRef, attr_split, extract_elref, extract_elref_token, fstr, parse_float,
+    split_compound_attr,
 };
 
 /// Replace all refspec entries in a string with lookup results
@@ -242,26 +243,21 @@ impl SvgElement {
 
         let mut bbox_list = vec![];
 
-        for elref in attr_split(ref_list) {
-            let elref = elref.parse()?;
-            let el = ctx
-                .get_element(&elref)
-                .ok_or_else(|| Error::Reference(elref.clone()))?;
-            {
-                let bb = if is_surround {
-                    ctx.get_element_bbox(el)
-                } else {
-                    // TODO: this doesn't handle various cases when at least one
-                    // circle/ellipses are is present and ref_list.len() > 1.
-                    // Should probably fold the list and provide next element type
-                    // as the target shape here
-                    el.inscribed_bbox(self.name())
-                };
-                if let Ok(Some(el_bb)) = bb {
-                    bbox_list.push(el_bb);
-                } else {
-                    return Err(Error::MissingBBox(el.to_string()));
-                }
+        for layout_ref in attr_split(ref_list) {
+            let layout_ref: LayoutRef = layout_ref.parse()?;
+            let bb = if is_surround {
+                layout_ref.bbox(ctx)
+            } else {
+                // TODO: this doesn't handle various cases when at least one
+                // circle/ellipses are is present and ref_list.len() > 1.
+                // Should probably fold the list and provide next element type
+                // as the target shape here
+                layout_ref.inscribed_bbox(ctx, self.name())
+            };
+            if let Ok(Some(el_bb)) = bb {
+                bbox_list.push(el_bb);
+            } else {
+                return Err(Error::MissingBBox(layout_ref.to_string()));
             }
         }
         let mut bbox = if is_surround {
@@ -290,7 +286,7 @@ impl SvgElement {
     }
 
     /// Calculate bounding box of target_shape inside self
-    fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
+    pub(crate) fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
         let zstr = "0";
         match (target_shape, self.name()) {
             // rect inside circ
