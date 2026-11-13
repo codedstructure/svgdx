@@ -11,7 +11,7 @@ use crate::constants::{
 use crate::context::{ContextView, VariableMap};
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, ScalarSpec, parse_elref_suffix};
-use crate::types::{VarName, extract_elref, fstr};
+use crate::types::{VarName, extract_layoutref, fstr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprValue {
@@ -409,7 +409,7 @@ fn tokenize_atom(input: &str) -> Result<Token> {
         // using delimited-atoms strings (e.g. `["hello world"]`) allows
         // unescaped quote chars within the string
         Ok(Token::String(content))
-    } else if extract_elref(input).is_ok() {
+    } else if extract_layoutref(input).is_ok() {
         Ok(Token::ElementRef(input.to_owned()))
     } else if let Ok(num) = input.parse::<f32>() {
         Ok(Token::Number(num))
@@ -661,21 +661,14 @@ impl<'a> EvalState<'a> {
     ///  `#abc@bl` - `x, y` coord of bottom left corner of element #abc
     ///  `#abc` - `x1, y1, x2, y2` bounding box of element #abc
     fn element_ref(&self, v: &str) -> Result<ExprValue> {
-        let (elref, remain) = extract_elref(v)?;
-        let elem = self
-            .context
-            .get_element(&elref)
-            .ok_or_else(|| Error::Reference(elref))?;
-        let bb = self
-            .context
-            .get_element_bbox(elem)?
-            .ok_or_else(|| Error::MissingBBox(elem.to_string()))?;
+        let (layout_ref, remain) = extract_layoutref(v)?;
+        let bb = layout_ref.require_bbox(self.context)?;
         if remain.is_empty() {
             return Ok([bb.x1(), bb.y1(), bb.x2(), bb.y2()].into());
         } else if let Some(ss) = remain.strip_prefix(SCALARSPEC_SEP) {
             return Ok(bb.scalarspec(ScalarSpec::from_str(ss)?).into());
         } else if let Some(loc) = parse_elref_suffix(remain)? {
-            let (x, y) = elem.get_element_loc_coord(self.context, loc)?;
+            let (x, y) = layout_ref.loc_coord(self.context, loc)?;
             return Ok([x, y].into());
         }
         Err(Error::Parse(format!(

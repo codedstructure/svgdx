@@ -5,7 +5,7 @@ use crate::elements::SvgElement;
 use crate::elements::containers::is_graphics_element;
 use crate::errors::Result;
 use crate::geometry::{DirSpec, LocSpec};
-use crate::types::extract_elref;
+use crate::types::extract_layoutref;
 
 pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Result<SvgElement> {
     let next = apply_defaults(el, context);
@@ -106,7 +106,7 @@ fn set_associated_text_anchor(el: SvgElement) -> Result<SvgElement> {
     }
     let mut el = el;
     if let Some(pos_attr) = el.get_attr("xy").or_else(|| el.get_attr("relpos"))
-        && let Ok((_, tail)) = extract_elref(pos_attr)
+        && let Ok((_, tail)) = extract_layoutref(pos_attr)
         && let Some(loc) = eval_text_anchor(tail)?
     {
         el.set_default_attr("text-loc", text_loc_anchor(loc));

@@ -13,7 +13,8 @@ use crate::geometry::{
     TrblLength, parse_elref_suffix, strp_length,
 };
 use crate::types::{
-    attr_split, extract_elref, extract_elref_token, fstr, parse_float, split_compound_attr,
+    LayoutRef, attr_split, extract_elref, extract_elref_token, extract_layoutref, fstr,
+    layoutref_split, parse_float, split_compound_attr,
 };
 
 /// Replace all refspec entries in a string with lookup results
@@ -242,26 +243,21 @@ impl SvgElement {
 
         let mut bbox_list = vec![];
 
-        for elref in attr_split(ref_list) {
-            let elref = elref.parse()?;
-            let el = ctx
-                .get_element(&elref)
-                .ok_or_else(|| Error::Reference(elref.clone()))?;
-            {
-                let bb = if is_surround {
-                    ctx.get_element_bbox(el)
-                } else {
-                    // TODO: this doesn't handle various cases when at least one
-                    // circle/ellipses are is present and ref_list.len() > 1.
-                    // Should probably fold the list and provide next element type
-                    // as the target shape here
-                    el.inscribed_bbox(self.name())
-                };
-                if let Ok(Some(el_bb)) = bb {
-                    bbox_list.push(el_bb);
-                } else {
-                    return Err(Error::MissingBBox(el.to_string()));
-                }
+        for layout_ref in layoutref_split(ref_list) {
+            let layout_ref: LayoutRef = layout_ref.parse()?;
+            let bb = if is_surround {
+                layout_ref.bbox(ctx)
+            } else {
+                // TODO: this doesn't handle various cases when at least one
+                // circle/ellipses are is present and ref_list.len() > 1.
+                // Should probably fold the list and provide next element type
+                // as the target shape here
+                layout_ref.inscribed_bbox(ctx, self.name())
+            };
+            if let Ok(Some(el_bb)) = bb {
+                bbox_list.push(el_bb);
+            } else {
+                return Err(Error::MissingBBox(layout_ref.to_string()));
             }
         }
         let mut bbox = if is_surround {
@@ -290,7 +286,7 @@ impl SvgElement {
     }
 
     /// Calculate bounding box of target_shape inside self
-    fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
+    pub(crate) fn inscribed_bbox(&self, target_shape: &str) -> Result<Option<BoundingBox>> {
         let zstr = "0";
         match (target_shape, self.name()) {
             // rect inside circ
@@ -623,13 +619,12 @@ impl SvgElement {
         }
         // element-relative position can only be applied via xy attribute
         // containing RELPOS_SEP.
-        let (ref_el, remain) = split_relspec(input, ctx)?;
-        let ref_el = match ref_el {
-            Some(el) => el,
-            None => return Ok(None),
+        let (layout_ref, remain) = match extract_layoutref(input) {
+            Ok(parsed) => parsed,
+            Err(_) => return Ok(None),
         };
         let remain = remain.trim_start_matches(RELPOS_SEP);
-        if let Some(bbox) = ctx.get_element_bbox(ref_el)? {
+        if let Some(bbox) = layout_ref.bbox(ctx)? {
             let parts = remain.find(|c: char| c.is_whitespace());
             let (reldir, remain) = if let Some(split_idx) = parts {
                 let (a, b) = remain.split_at(split_idx);
@@ -756,9 +751,13 @@ fn resolve_size_delta(element: &mut SvgElement) {
 
 fn eval_size_attr(name: &str, value: &str, ctx: &impl ElementMap) -> Result<String> {
     if let Ok(attr_ss) = ScalarSpec::from_str(name)
-        && let (Some(el), remain) = split_relspec(value, ctx)?
-        && let Ok(Some(bbox)) = ctx.get_element_bbox(el)
+        && let Ok((layout_ref, remain)) = extract_layoutref(value)
     {
+        let bbox = match layout_ref.bbox(ctx) {
+            Ok(Some(bbox)) => bbox,
+            Err(e @ Error::Reference(_)) => return Err(e),
+            _ => return Ok(value.to_owned()),
+        };
         // default value - same 'type' as attr name, e.g. y2 => ymax
         let mut v = bbox.scalarspec(attr_ss);
         // "[~scalarspec][ delta]"
@@ -782,17 +781,29 @@ fn eval_pos_attr(
     force_origin: bool,
 ) -> Result<String> {
     if let Ok(attr_ss) = ScalarSpec::from_str(name)
-        && let (Some(el), remain) = split_relspec(value, ctx)?
-        && let Ok(Some(bbox)) = ctx.get_element_bbox(el)
+        && let Ok((layout_ref, remain)) = extract_layoutref(value)
     {
-        return pos_attr_helper(element, el, ctx, remain, &bbox, attr_ss, force_origin);
+        let bbox = match layout_ref.bbox(ctx) {
+            Ok(Some(bbox)) => bbox,
+            Err(e @ Error::Reference(_)) => return Err(e),
+            _ => return Ok(value.to_owned()),
+        };
+        return pos_attr_helper(
+            element,
+            &layout_ref,
+            ctx,
+            remain,
+            &bbox,
+            attr_ss,
+            force_origin,
+        );
     }
     Ok(value.to_owned())
 }
 
 fn pos_attr_helper(
     element: &SvgElement,
-    ref_el: &SvgElement,
+    ref_layout: &LayoutRef,
     ctx: &impl ElementMap,
     remain: &str,
     bbox: &BoundingBox,
@@ -839,7 +850,7 @@ fn pos_attr_helper(
                 "could not parse '{loc_str}' in this context",
             )));
         }
-        let (x, y) = ref_el.get_element_loc_coord(ctx, loc)?;
+        let (x, y) = ref_layout.loc_coord(ctx, loc)?;
         use ScalarSpec::*;
         let (base, dim) = match attr_ss {
             Minx | Maxx | Cx => (x, bbox.width()),
@@ -999,13 +1010,13 @@ mod tests {
 
     use super::*;
 
-    struct FixedBBoxContext(BoundingBox);
+    struct FixedBBoxContext(BoundingBox, SvgElement);
 
     impl ElementMap for FixedBBoxContext {
         fn set_current_element(&mut self, _el: &SvgElement) {}
 
         fn get_element(&self, _id: &ElRef) -> Option<&SvgElement> {
-            None
+            Some(&self.1)
         }
 
         fn get_element_bbox(&self, _el: &SvgElement) -> Result<Option<BoundingBox>> {
@@ -1024,8 +1035,17 @@ mod tests {
         attr_ss: ScalarSpec,
         force_origin: bool,
     ) -> Result<String> {
-        let ctx = FixedBBoxContext(*bbox);
-        super::pos_attr_helper(element, element, &ctx, remain, bbox, attr_ss, force_origin)
+        let ctx = FixedBBoxContext(*bbox, element.clone());
+        let layout_ref = LayoutRef::Element(ElRef::Id("ref".to_owned()));
+        super::pos_attr_helper(
+            element,
+            &layout_ref,
+            &ctx,
+            remain,
+            bbox,
+            attr_ss,
+            force_origin,
+        )
     }
 
     #[test]

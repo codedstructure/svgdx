@@ -15,6 +15,10 @@ pub const ELREF_PREVIOUS: char = '^';
 pub const ELREF_NEXT: char = '+';
 /// ElRef referencing element with the given id, e.g. `#abc`
 pub const ELREF_ID_PREFIX: char = '#';
+/// Opens a union of ElRefs, e.g. `[#a #b]`
+pub const LAYOUT_UNION_START: char = '[';
+/// Closes a union of ElRefs
+pub const LAYOUT_UNION_END: char = ']';
 
 /// Initial character of a variable reference, e.g. `$var`
 pub const VAR_PREFIX: char = '$';
