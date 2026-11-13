@@ -1,8 +1,9 @@
 use crate::constants::{
-    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LOCSPEC_SEP, RELPOS_SEP,
-    SCALARSPEC_SEP,
+    EDGESPEC_SEP, ELREF_ID_PREFIX, ELREF_NEXT, ELREF_PREVIOUS, LAYOUT_UNION_END,
+    LAYOUT_UNION_START, LOCSPEC_SEP, RELPOS_SEP, SCALARSPEC_SEP,
 };
 use crate::context::ElementMap;
+use crate::elements::SvgElement;
 use crate::errors::{Error, Result};
 use crate::geometry::{BoundingBox, ElementLoc, Length};
 use std::fmt::{self, Display};
@@ -99,10 +100,9 @@ pub fn split_compound_attr(value: &str) -> (String, String) {
             .nth(1)
             .map(|c| !c.is_ascii_digit())
             .unwrap_or(true);
-    if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS]) || is_elref_next {
-        let mut parts = value.splitn(2, char::is_whitespace);
-        let prefix = parts.next().expect("nonempty");
-        if let Some(remain) = parts.next() {
+    if value.starts_with([ELREF_ID_PREFIX, ELREF_PREVIOUS, LAYOUT_UNION_START]) || is_elref_next {
+        let (prefix, rest) = value.split_at(layoutref_token_len(value));
+        if let Some(remain) = rest.strip_prefix(char::is_whitespace) {
             let mut parts = attr_split_cycle(remain);
             let x = if let Some(dx) = parts.next() {
                 format!("{prefix} {dx}")
@@ -134,9 +134,10 @@ pub fn extract_urlref(input: &str) -> Option<ElRef> {
         .map(|id| ElRef::Id(id.to_string()))
 }
 
-/// Returns iterator *cycling* over whitespace-or-comma separated values
+/// Returns iterator *cycling* over whitespace-or-comma separated values,
+/// keeping `[...]` layout unions intact.
 pub fn attr_split_cycle(input: &str) -> impl Iterator<Item = String> + '_ {
-    let x: Vec<String> = attr_split(input).collect();
+    let x: Vec<String> = layoutref_split(input).collect();
     x.into_iter().cycle()
 }
 
@@ -790,6 +791,16 @@ pub fn extract_elref(s: &str) -> Result<(ElRef, &str)> {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LayoutRef {
     Element(ElRef),
+    /// Bounding box union of several elements, e.g. `[#a #b ^]`
+    Union(Vec<ElRef>),
+}
+
+fn lookup_element<'a>(
+    ctx: &'a (impl ElementMap + ?Sized),
+    elref: &ElRef,
+) -> Result<&'a SvgElement> {
+    ctx.get_element(elref)
+        .ok_or_else(|| Error::Reference(elref.clone()))
 }
 
 impl LayoutRef {
@@ -798,17 +809,23 @@ impl LayoutRef {
     pub fn elref(&self) -> Option<&ElRef> {
         match self {
             LayoutRef::Element(elref) => Some(elref),
+            LayoutRef::Union(_) => None,
         }
     }
 
     /// Bounding box of the referenced layout, if it has one.
     pub fn bbox(&self, ctx: &(impl ElementMap + ?Sized)) -> Result<Option<BoundingBox>> {
         match self {
-            LayoutRef::Element(elref) => {
-                let el = ctx
-                    .get_element(elref)
-                    .ok_or_else(|| Error::Reference(elref.clone()))?;
-                ctx.get_element_bbox(el)
+            LayoutRef::Element(elref) => ctx.get_element_bbox(lookup_element(ctx, elref)?),
+            LayoutRef::Union(elrefs) => {
+                let mut bboxes = Vec::with_capacity(elrefs.len());
+                for elref in elrefs {
+                    match ctx.get_element_bbox(lookup_element(ctx, elref)?)? {
+                        Some(bb) => bboxes.push(bb),
+                        None => return Ok(None),
+                    }
+                }
+                Ok(BoundingBox::union(bboxes))
             }
         }
     }
@@ -826,10 +843,9 @@ impl LayoutRef {
         target_shape: &str,
     ) -> Result<Option<BoundingBox>> {
         match self {
-            LayoutRef::Element(elref) => ctx
-                .get_element(elref)
-                .ok_or_else(|| Error::Reference(elref.clone()))?
-                .inscribed_bbox(target_shape),
+            LayoutRef::Element(elref) => lookup_element(ctx, elref)?.inscribed_bbox(target_shape),
+            // Other layouts only have a bbox, so are treated as rectangles
+            _ => self.bbox(ctx),
         }
     }
 
@@ -839,11 +855,17 @@ impl LayoutRef {
         ctx: &(impl ElementMap + ?Sized),
         loc: ElementLoc,
     ) -> Result<(f32, f32)> {
-        match self {
-            LayoutRef::Element(elref) => ctx
-                .get_element(elref)
-                .ok_or_else(|| Error::Reference(elref.clone()))?
-                .get_element_loc_coord(ctx, loc),
+        match (self, loc) {
+            (LayoutRef::Element(elref), loc) => {
+                lookup_element(ctx, elref)?.get_element_loc_coord(ctx, loc)
+            }
+            (LayoutRef::Union(_), ElementLoc::LocSpec(spec)) => {
+                Ok(self.require_bbox(ctx)?.locspec(spec))
+            }
+            (LayoutRef::Union(_), ElementLoc::LineOffset(_)) => Err(Error::InvalidValue(
+                "line offset".to_owned(),
+                self.to_string(),
+            )),
         }
     }
 }
@@ -857,7 +879,12 @@ impl From<ElRef> for LayoutRef {
 impl FromStr for LayoutRef {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self> {
-        s.parse().map(LayoutRef::Element)
+        let (layout_ref, remain) = extract_layoutref(s)?;
+        if remain.is_empty() {
+            Ok(layout_ref)
+        } else {
+            Err(Error::Parse(format!("invalid layoutref format '{s}'")))
+        }
     }
 }
 
@@ -865,12 +892,70 @@ impl Display for LayoutRef {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LayoutRef::Element(elref) => write!(f, "{elref}"),
+            LayoutRef::Union(elrefs) => {
+                write!(f, "[")?;
+                for (idx, elref) in elrefs.iter().enumerate() {
+                    if idx > 0 {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{elref}")?;
+                }
+                write!(f, "]")
+            }
         }
     }
 }
 
+/// Length of the leading whitespace-delimited token of `s`, treating `[...]` as unbroken.
+pub fn layoutref_token_len(s: &str) -> usize {
+    let mut in_brackets = false;
+    for (idx, ch) in s.char_indices() {
+        match ch {
+            LAYOUT_UNION_START => in_brackets = true,
+            LAYOUT_UNION_END => in_brackets = false,
+            _ if ch.is_whitespace() && !in_brackets => return idx,
+            _ => (),
+        }
+    }
+    s.len()
+}
+
+/// Returns iterator over whitespace-or-comma separated values, keeping `[...]` unions intact.
+pub fn layoutref_split(input: &str) -> impl Iterator<Item = String> + '_ {
+    let mut rest = input;
+    std::iter::from_fn(move || {
+        rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == ',');
+        if rest.is_empty() {
+            return None;
+        }
+        let mut end = layoutref_token_len(rest);
+        if !rest.starts_with(LAYOUT_UNION_START) {
+            end = end.min(rest.find(',').unwrap_or(end));
+        }
+        let (token, tail) = rest.split_at(end);
+        rest = tail;
+        Some(token.to_owned())
+    })
+}
+
 /// return LayoutRef and remaining string
+///
+/// Accepts either a single elref, or a `[...]` union of space-separated
+/// elrefs. Unions do not nest.
 pub fn extract_layoutref(s: &str) -> Result<(LayoutRef, &str)> {
+    if let Some(inner) = s.strip_prefix(LAYOUT_UNION_START) {
+        let (members, remain) = inner
+            .split_once(LAYOUT_UNION_END)
+            .ok_or_else(|| Error::Parse(format!("missing '{LAYOUT_UNION_END}' in '{s}'")))?;
+        let elrefs = members
+            .split_whitespace()
+            .map(str::parse)
+            .collect::<Result<Vec<ElRef>>>()?;
+        if elrefs.is_empty() {
+            return Err(Error::Parse(format!("empty layoutref union '{s}'")));
+        }
+        return Ok((LayoutRef::Union(elrefs), remain));
+    }
     extract_elref(s).map(|(elref, remain)| (LayoutRef::Element(elref), remain))
 }
 
@@ -1194,6 +1279,53 @@ mod test {
         assert_eq!(remain, "@tl");
         assert_eq!("#id".parse::<LayoutRef>().unwrap().to_string(), "#id");
         assert!(extract_layoutref("id").is_err());
+    }
+
+    #[test]
+    fn test_extract_layoutref_union() {
+        let id = |s: &str| ElRef::Id(s.to_string());
+        let (lr, remain) = extract_layoutref("[#a #b ^]@tl 2").unwrap();
+        assert_eq!(
+            lr,
+            LayoutRef::Union(vec![
+                id("a"),
+                id("b"),
+                ElRef::Prev(NonZeroU8::new(1).unwrap())
+            ])
+        );
+        assert_eq!(lr.elref(), None);
+        assert_eq!(remain, "@tl 2");
+        assert_eq!(lr.to_string(), "[#a #b ^]");
+        assert_eq!(
+            "[ #a   #b ]".parse::<LayoutRef>().unwrap().to_string(),
+            "[#a #b]"
+        );
+
+        assert!(extract_layoutref("[]").is_err());
+        assert!(extract_layoutref("[#a #b").is_err());
+        assert!(extract_layoutref("[#a@tl]").is_err());
+        assert!(extract_layoutref("[[#a] #b]").is_err());
+        assert!("[#a] x".parse::<LayoutRef>().is_err());
+    }
+
+    #[test]
+    fn test_layoutref_split() {
+        let split = |s| layoutref_split(s).collect::<Vec<_>>();
+        assert_eq!(split("#a #b"), ["#a", "#b"]);
+        assert_eq!(split("#a,#b"), ["#a", "#b"]);
+        assert_eq!(split("[#a #b] #c"), ["[#a #b]", "#c"]);
+        assert_eq!(split("#c, [#a #b]@tl"), ["#c", "[#a #b]@tl"]);
+        assert!(split("  ").is_empty());
+    }
+
+    #[test]
+    fn test_split_compound_attr_union() {
+        let (x, y) = split_compound_attr("[#a #b]");
+        assert_eq!((x.as_str(), y.as_str()), ("[#a #b]", "[#a #b]"));
+        let (x, y) = split_compound_attr("[#a #b]@r 1 2");
+        assert_eq!((x.as_str(), y.as_str()), ("[#a #b]@r 1", "[#a #b]@r 2"));
+        let (x, y) = split_compound_attr("2 [#a #b]");
+        assert_eq!((x.as_str(), y.as_str()), ("2", "[#a #b]"));
     }
 
     #[test]

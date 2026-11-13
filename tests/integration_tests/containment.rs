@@ -425,3 +425,192 @@ fn test_nested_surround_with_defaults() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_surround_union() {
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2" wh="2 10" />
+<rect id="c" xy="8" wh="1" />
+<rect id="s" surround="[#a #b #c]" />
+"##;
+    let expected = r#"<rect id="s" x="0" y="0" width="9" height="12" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_surround_union_mixed() {
+    // unions may be combined with plain elrefs, and take a margin as normal
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2" wh="2 10" />
+<rect id="c" xy="8" wh="1" />
+<rect id="s" surround="[#a #b] #c" margin="1" />
+<rect id="t" surround="#c,[#a #b]" />
+"##;
+    let expected1 = r#"<rect id="s" x="-1" y="-1" width="11" height="14" class="d-surround"/>"#;
+    let expected2 = r#"<rect id="t" x="0" y="0" width="9" height="12" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_surround_union_previous_next() {
+    let input = r##"
+<rect id="a" wh="10" />
+<rect xy="20" wh="10" />
+<rect id="c" surround="[^ ^^ +]" />
+<rect xy="40 0" wh="5" />
+"##;
+    let expected = r#"<rect id="c" x="0" y="0" width="45" height="30" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_surround_union_of_union() {
+    // elements defined by a union may themselves be members of another union
+    let input = r##"
+<rect id="s" surround="[#u #c]" />
+<rect id="u" surround="[#a #b]" margin="1" />
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="10" wh="5" />
+<rect id="c" xy="20 0" wh="2" />
+"##;
+    let expected = r#"<rect id="s" x="-1" y="-1" width="23" height="17" class="d-surround"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_inside_union() {
+    let input = r##"
+<rect id="a" xy="0" wh="10" />
+<rect id="b" xy="5 0" wh="10" />
+<rect id="c" xy="0 5" wh="10" />
+<rect id="r" inside="[#a #b] #c" />
+"##;
+    let expected = r#"<rect id="r" x="0" y="5" width="10" height="5" class="d-inside"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_union_relpos() {
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2" wh="2 10" />
+<rect id="c" xy="8" wh="1" />
+<rect id="r1" xy="[#a #c]|h 2" wh="3" />
+<rect id="r2" xy="[#a #b #c]|v" wh="4" />
+"##;
+    let expected1 = r#"<rect id="r1" x="11" y="3" width="3" height="3"/>"#;
+    let expected2 = r#"<rect id="r2" x="2.5" y="12" width="4" height="4"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+}
+
+#[test]
+fn test_union_locspec() {
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="2" wh="2 10" />
+<rect id="c" xy="8" wh="1" />
+<rect id="r1" xy="[#a #b #c]@br" wh="3" />
+<rect id="r2" x="[#a #c]@r 1" y="[#a #c]@t" wh="1" />
+<rect id="r3" xy="[#a #c]@t:25%" wh="1" />
+"##;
+    let expected1 = r#"<rect id="r1" x="9" y="12" width="3" height="3"/>"#;
+    let expected2 = r#"<rect id="r2" x="10" y="0" width="1" height="1"/>"#;
+    let expected3 = r#"<rect id="r3" x="2.25" y="0" width="1" height="1"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+}
+
+#[test]
+fn test_union_size() {
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="c" xy="8" wh="1" />
+<rect id="r1" xy="20 0" wh="[#a #c]" />
+<rect id="r2" xy="20 20" wh="[#a #c] 50% 10" />
+<rect id="r3" xy="40 0" width="[#a #c]~w 2" height="1" />
+<rect id="r4" xy="[#a #c]|H 10" wh="2 [#a #c]" />
+"##;
+    let expected1 = r#"<rect id="r1" x="20" y="0" width="9" height="9"/>"#;
+    let expected2 = r#"<rect id="r2" x="20" y="20" width="4.5" height="19"/>"#;
+    let expected3 = r#"<rect id="r3" x="40" y="0" width="11" height="1"/>"#;
+    let expected4 = r#"<rect id="r4" x="-12" y="0" width="2" height="9"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected1);
+    assert_contains!(output, expected2);
+    assert_contains!(output, expected3);
+    assert_contains!(output, expected4);
+}
+
+#[test]
+fn test_union_connector() {
+    // a union layout is positioned as a normal element, so can be connected to
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="0 10" wh="5" />
+<rect id="g" surround="[#a #b]" margin="1" />
+<rect id="c" xy="[#a #b]|h 10" wh="5" />
+<line id="l" start="#g" end="#c" />
+"##;
+    let expected = r#"<line id="l" x1="6" y1="7.5" x2="15" y2="7.5"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, expected);
+}
+
+#[test]
+fn test_union_bad() {
+    // unknown element
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="s" surround="[#a #nothere]" />
+"##;
+    assert!(transform_str_default(input).is_err());
+
+    // unterminated
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="s" surround="[#a #a" />
+"##;
+    assert!(transform_str_default(input).is_err());
+
+    // empty
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="s" surround="[]" />
+"##;
+    assert!(transform_str_default(input).is_err());
+
+    // unions do not nest at the parser level
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="10" wh="5" />
+<rect id="s" surround="[[#a #b] #a]" />
+"##;
+    assert!(transform_str_default(input).is_err());
+
+    // members may not have suffixes
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="s" surround="[#a@tl #a]" />
+"##;
+    assert!(transform_str_default(input).is_err());
+
+    // line offsets need a single element
+    let input = r##"
+<rect id="a" xy="0" wh="5" />
+<rect id="b" xy="10" wh="5" />
+<rect id="s" xy="[#a #b]:25%" wh="1" />
+"##;
+    assert!(transform_str_default(input).is_err());
+}
