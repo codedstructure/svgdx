@@ -40,10 +40,22 @@ specified, many diagrams will not need _any_ absolute positions to be specified.
 The following concepts are defined, and can be combined to make a 'relative
 specifier', or 'relspec'.
 
-**Element Reference** - ('elref') may be either 'the previous element' (denoted with
-`^`) or an element referenced by its `id`, as `#<id>`, for example `#abc`.
+**Layout Reference** - ('layoutref') denotes something with a bounding box.
+This is typically another element, but may also be derived from several
+elements. The following forms are supported:
 
-**Location Spec** - ('locspec') a specific point on a given element,
+* An element reference ('elref') - either 'the previous element' (denoted with
+  `^`) or an element referenced by its `id`, as `#<id>`, for example `#abc`.
+* A union of element references, given as a space-separated list of elrefs
+  inside square brackets, for example `[#abc #def ^]`. The resulting bbox is
+  the union of the bounding boxes of every listed element.
+
+A union has a bounding box but no inherent shape, so any location or scalar
+value is derived from the bounding box. The elements in a union may themselves
+be positioned relative to other layout references, but unions cannot be nested
+directly (e.g. `[[#a #b] #c]` is not valid).
+
+**Location Spec** - ('locspec') a specific point on a given layoutref,
 for example 'top-left', 'center', or '75% along the top edge'.
 These are given by one of the following abbreviations:
 
@@ -57,10 +69,10 @@ These are given by one of the following abbreviations:
 * `l` - left, i.e. center of the left-hand edge of the bounding box
 * `c` - center of the bounding box
 
-Together an 'elref' and a 'locspec' denote a point in 2D user coordinates.
+Together a 'layoutref' and a 'locspec' denote a point in 2D user coordinates.
 
 **Edge-based LocSpec** - as a special case of 'locspec', those locations
-which define the edge of an element (i.e. t,r,b,l) may be followed by an offset to
+which define the edge of a layoutref (i.e. t,r,b,l) may be followed by an offset to
 vary the resulting point position along the edge. The offset is separated from the
 locspec by a colon (`:`), and may be either a number or a percentage.
 
@@ -85,10 +97,10 @@ join an element at `@b` for example, consider joining them at `@b:20%`, `@b:40%`
 **Direction Spec** - ('dirspec') denotes a directional relation between
 two objects. The following dirspec values are supported:
 
-* `h` - place horizontally to the right of the associated elref
-* `H` - place horizontally to the left of the associated elref
-* `v` - place vertically below the associated elref
-* `V` - place horizontally above the associated elref
+* `h` - place horizontally to the right of the associated layoutref
+* `H` - place horizontally to the left of the associated layoutref
+* `v` - place vertically below the associated layoutref
+* `V` - place horizontally above the associated layoutref
 
 ### Relspec
 
@@ -103,15 +115,18 @@ elref      := prevspec | ref
 prevspec   := ^
 ref        := # ident
 ident      := alphanumeric
+union      := [ elref { elref } ]
 
-relspec  := elref [dirspec | locspec]
+layoutref  := elref | union
+
+relspec  := layoutref [dirspec | locspec]
 ```
 
 Following the `relspec` as defined above, additional values may be given to define
 margins or deltas.
 
 When used as part of a dirspec (e.g. `#abc|H`), a single value defines the 'gap'
-between the referenced element and the one being positioned.
+between the referenced layoutref and the element being positioned.
 
 When used as part of a locspec (e.g. `@tl`), a pair of values may be provided which
 define the `dx` and `dy` offsets to apply.
@@ -127,3 +142,11 @@ Some simple examples:
   previous element.
 * `xy="#thing@tr 5 10"` - position this element at the top-right of
   element with `id="thing"`, offset by (5, 10).
+* `xy="[#a #b]|v 2"` - position this element 2 units below the bounding box
+  which contains both `#a` and `#b`.
+* `width="[#a #b]"` - make this element as wide as the bounding box which
+  contains both `#a` and `#b`.
+
+A layoutref can be used anywhere an element reference is accepted for layout
+purposes, including the `surround` and `inside` attributes. In the case of
+`inside`, a union is treated as a rectangle.

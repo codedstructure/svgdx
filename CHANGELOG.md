@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: layout references (i.e. elrefs used for layout) may now be a 'union' of
+  several elements, given as a space-separated list of element references in
+  square brackets, e.g. `[#a #b ^]`. The bounding box of the union is used for
+  layout, so `xy="[#a #b]|h 5"`, `width="[#a #b]"` and `surround="[#a #b] #c"`
+  are all valid.
+
 - Changed: connectors for shapes with overlapping bounding boxes are no longer
   omitted; for fully contained objects, a connector is rendered for the shortest
   link between edges. For partial overlaps, an intersection point is used for

@@ -145,3 +145,21 @@ There are some basic aliases for these 'scalarspec' values:
 * `w` == `width`
 * `h` == `height`
 
+## Layout references
+
+The examples so far have positioned elements relative to one other element, such as the previous element (`^`) or an element with a given `id` (`#abc`). These 'layout references' may also given as a list of (space-separated) element references inside square brackets, denoting the **union** of their bounding boxes.
+
+A union can be used anywhere a single element reference can, so `[#a #b]` has the same location and scalar value operations as any other bounding box.
+
+```svgdx-xml-inline
+<svg>
+ <rect id="a" xy="0" wh="20" text="a"/>
+ <rect id="b" xy="30 15" wh="20" text="b"/>
+ <rect xy="[#a #b]|v 5" width="[#a #b]" height="5" text="c"/>
+ <rect xy="[#a #b]|h 5" wh="5 [#a #b]" text="d"/>
+ <circle cxy="[#a #b]@tr" r="2"/>
+ <circle cxy="[#a #b]@bl" r="2"/>
+</svg>
+```
+
+Here element `c` is placed below the combined area of `a` and `b`, and is as wide as that area. Element `d` is placed to the right of it, and is as tall.
