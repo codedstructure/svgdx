@@ -1,9 +1,18 @@
 // themes for svgdx
 
-use std::rc::Rc;
+use std::sync::OnceLock;
 
-use crate::context::TransformerContext;
+use crate::builtin::themes_source;
+use crate::context::{TransformerContext, VariableMap};
+use crate::document::{EventKind, InputEvent, InputList};
+use crate::elements::{SvgElement, apply_theme_var};
 use crate::errors::{Error, Result};
+
+const THEME_FILL: &str = "_theme_fill";
+const THEME_STROKE: &str = "_theme_stroke";
+const THEME_STROKE_WIDTH: &str = "_theme_stroke_width";
+const THEME_BACKGROUND: &str = "_theme_background";
+const THEME_FONT_WEIGHT: &str = "_theme_font_weight";
 
 /// Auto-style themes for svgdx.
 #[derive(Default, Debug, Clone, PartialEq, Eq)]
@@ -21,6 +30,8 @@ pub enum ThemeType {
     Light,
     /// A dark theme inspired by solarized dark mode.
     Dark,
+    /// A theme with any other name; must be defined in a `<themes>` element.
+    Custom(String),
 }
 
 impl ThemeType {
@@ -72,146 +83,142 @@ impl std::fmt::Display for ThemeType {
             ThemeType::Glass => "glass",
             ThemeType::Light => "light",
             ThemeType::Dark => "dark",
+            ThemeType::Custom(name) => name,
         };
         f.write_str(s)
     }
 }
 
-pub(super) trait Theme {
-    fn default_fill(&self) -> String {
-        String::from("white")
-    }
-    fn default_stroke(&self) -> String {
-        String::from("black")
-    }
-    fn default_background(&self) -> String {
-        String::from("none")
-    }
-    fn default_stroke_width(&self) -> f32 {
-        0.5
-    }
-    fn default_font_weight(&self) -> Option<String> {
-        None
+/// Theme attributes; each sets the corresponding `_theme_*` variable, e.g.
+/// `stroke-width` sets `_theme_stroke_width`.
+const THEME_ATTRS: &[&str] = &[
+    "fill",
+    "stroke",
+    "stroke-width",
+    "background",
+    "font-weight",
+];
+
+/// A named theme, stored as the attributes of its `<theme>` element.
+#[derive(Debug, Clone, Default)]
+pub struct ThemeDef {
+    pub name: String,
+    attrs: Vec<(String, String)>,
+}
+
+impl ThemeDef {
+    /// Evaluate the theme in the given context, setting its (global) variables.
+    pub fn apply(&self, context: &mut TransformerContext) -> Result<()> {
+        let mut vars = Vec::with_capacity(self.attrs.len());
+        for (key, value) in &self.attrs {
+            if !THEME_ATTRS.contains(&key.as_str()) {
+                return Err(Error::InvalidAttr(key.clone()));
+            }
+            vars.push((format!("_theme_{}", key.replace('-', "_")), value.clone()));
+        }
+        apply_theme_var(&SvgElement::new("var", &vars), context)
     }
 }
 
+/// Extract all `<theme>` definitions from a sequence of events.
+///
+/// `base_level` is the element nesting level at which `<theme>` elements appear
+/// in the given events, e.g. 1 for a complete document with a root `<themes>`
+/// element, and 0 for the inner events of a `<themes>` element.
+pub fn extract_themes<'a>(
+    events: impl IntoIterator<Item = &'a InputEvent>,
+    base_level: usize,
+) -> Vec<ThemeDef> {
+    let mut themes = Vec::new();
+    let mut level = 0;
+    for ev in events {
+        match &ev.event {
+            EventKind::Start(e) | EventKind::Empty(e) => {
+                if level == base_level && e.name() == "theme" {
+                    let attrs = e.get_attrs();
+                    if let Some((_, name)) = attrs.iter().find(|(k, _)| k == "name") {
+                        themes.push(ThemeDef {
+                            name: name.clone(),
+                            attrs: attrs.iter().filter(|(k, _)| k != "name").cloned().collect(),
+                        });
+                    }
+                }
+                if matches!(ev.event, EventKind::Start(_)) {
+                    level += 1;
+                }
+            }
+            EventKind::End(_) => level = level.saturating_sub(1),
+            _ => {}
+        }
+    }
+    themes
+}
+
+fn builtin_themes() -> &'static [ThemeDef] {
+    static THEMES: OnceLock<Vec<ThemeDef>> = OnceLock::new();
+    THEMES.get_or_init(|| {
+        let events: InputList = themes_source().parse().expect("themes parse");
+        extract_themes(events.iter(), 1)
+    })
+}
+
+/// Find a built-in theme definition by name.
+pub fn builtin_theme(name: &str) -> Option<&'static ThemeDef> {
+    builtin_themes().iter().find(|t| t.name == name)
+}
+
+/// Resolved theme values used when generating auto-styles and the background.
 #[derive(Clone)]
 pub struct ContextTheme {
-    // local_style_id: Option<String>,
     pub font_size: f32,
     pub font_family: String,
     pub(super) background: String,
-    pub(super) theme: Rc<Box<dyn Theme>>,
+    pub(super) fill: String,
+    pub(super) stroke: String,
+    pub(super) stroke_width: String,
+    pub(super) font_weight: Option<String>,
 }
 
 impl Default for ContextTheme {
     fn default() -> Self {
         Self {
-            // local_style_id: None,
             font_size: 3.0,
             font_family: String::from("sans-serif"),
-            background: String::from("default"),
-            theme: Rc::new(Box::new(DefaultTheme {})),
+            background: String::from("none"),
+            fill: String::from("white"),
+            stroke: String::from("black"),
+            stroke_width: String::from("0.5"),
+            font_weight: None,
         }
     }
 }
 
 impl ContextTheme {
-    // Should every theme type be overridable?
+    /// Build from the `_theme_*` variables set when the current theme was evaluated.
     pub fn from_context(context: &TransformerContext) -> Self {
-        let theme: Rc<Box<dyn Theme>> = Rc::new(match context.config.theme {
-            ThemeType::Default => Box::new(DefaultTheme {}) as Box<dyn Theme>,
-            ThemeType::Bold => Box::new(BoldTheme {}) as Box<dyn Theme>,
-            ThemeType::Fine => Box::new(FineTheme {}) as Box<dyn Theme>,
-            ThemeType::Glass => Box::new(GlassTheme {}) as Box<dyn Theme>,
-            ThemeType::Light => Box::new(LightTheme {}) as Box<dyn Theme>,
-            ThemeType::Dark => Box::new(DarkTheme {}) as Box<dyn Theme>,
-        });
+        let fallback = Self::default();
+        let var = |name: &str, default: &str| {
+            context.get_var(name).unwrap_or_else(|| default.to_string())
+        };
+        let theme_background = var(THEME_BACKGROUND, &fallback.background);
         Self {
-            // TODO: style refactor doesn't support local_style_id anymore
-            // local_style_id: context.local_style_id.clone(),
             font_size: context.config.font_size,
             font_family: context.config.font_family.clone(),
             background: if context.config.background == "default" {
-                theme.default_background()
+                theme_background
             } else {
                 context.config.background.clone()
             },
-            theme,
+            fill: var(THEME_FILL, &fallback.fill),
+            stroke: var(THEME_STROKE, &fallback.stroke),
+            stroke_width: var(THEME_STROKE_WIDTH, &fallback.stroke_width),
+            font_weight: context
+                .get_var(THEME_FONT_WEIGHT)
+                .filter(|w| !w.trim().is_empty()),
         }
     }
 
     pub fn background(&self) -> &str {
         &self.background
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct DefaultTheme;
-
-impl Theme for DefaultTheme {}
-
-#[derive(Debug, Clone)]
-pub struct FineTheme;
-
-impl Theme for FineTheme {
-    fn default_font_weight(&self) -> Option<String> {
-        Some(String::from("100"))
-    }
-    fn default_stroke_width(&self) -> f32 {
-        0.2
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct BoldTheme;
-impl Theme for BoldTheme {
-    fn default_font_weight(&self) -> Option<String> {
-        Some(String::from("900"))
-    }
-    fn default_stroke_width(&self) -> f32 {
-        1.
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GlassTheme;
-impl Theme for GlassTheme {
-    // TODO: consider opacity: 0.7 for enclosed elements; though
-    // maybe just having the default fill translucent is enough.
-    // (and possibly any additional colour styles we introduce)
-    fn default_fill(&self) -> String {
-        String::from("rgba(0, 30, 50, 0.15)")
-    }
-    fn default_background(&self) -> String {
-        String::from("rgba(200, 230, 220, 0.5)")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct LightTheme;
-impl Theme for LightTheme {
-    fn default_stroke(&self) -> String {
-        String::from("#657b83")
-    }
-    fn default_fill(&self) -> String {
-        String::from("#fdf6e3")
-    }
-    fn default_background(&self) -> String {
-        String::from("#eee8d5")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct DarkTheme;
-impl Theme for DarkTheme {
-    fn default_stroke(&self) -> String {
-        String::from("#93a1a1")
-    }
-    fn default_fill(&self) -> String {
-        String::from("#002b36")
-    }
-    fn default_background(&self) -> String {
-        String::from("#073642")
     }
 }

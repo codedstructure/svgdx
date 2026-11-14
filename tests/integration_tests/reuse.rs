@@ -968,10 +968,24 @@ fn test_reuse_builtin_standard_library() {
     let input = r##"<svg><reuse href="#d:document" wh="10 20"/></svg>"##;
     let output = transform_str(input, &TransformConfig::default().with_stdlib()).unwrap();
 
-    assert_contains!(output, r#"<g class="document">"#);
     assert_contains!(
         output,
-        r#"<path d="M 0 0 H 7.5 L 10 2.5 V 20 H 0 Z M 7.5 0 V 2.5 H 10"/>"#
+        r#"<g stroke="black" fill="white" stroke-width="0.5" class="document">"#
+    );
+    assert_contains!(
+        output,
+        r#"<path d="M 0 0 H 7.5 L 10 2.5 V 20 H 0 Z M 7.5 0 V 2.5 H 10" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>"#
+    );
+}
+
+#[test]
+fn test_reuse_builtin_standard_library_theme() {
+    let input = r##"<svg><config theme="dark"/><reuse href="#d:document" wh="10 20"/></svg>"##;
+    let output = transform_str(input, &TransformConfig::default().with_stdlib()).unwrap();
+
+    assert_contains!(
+        output,
+        r##"<g stroke="#93a1a1" fill="#002b36" stroke-width="0.5" class="document">"##
     );
 }
 

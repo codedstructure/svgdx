@@ -1,0 +1,45 @@
+<themes>
+  <!--
+  svgdx built-in themes.
+
+  When selected, each attribute of the `<theme>` element sets a global variable
+  named `_theme_` followed by the attribute name (with '-' replaced by '_'),
+  which is used both by the standard library and by auto-styles:
+
+    fill          _theme_fill          default fill colour of shapes
+    stroke        _theme_stroke        default stroke colour of shapes and lines
+    stroke-width  _theme_stroke_width  default stroke width
+    background    _theme_background    colour of the background rectangle;
+                                       'none' for no background
+    font-weight   _theme_font_weight   default font-weight of text;
+                                       empty for no explicit weight
+
+  Any attribute not given by a theme takes its value from the 'default' theme,
+  which is always evaluated first, so every variable is defined even when no
+  theme is explicitly selected.
+
+  To create a custom theme, copy one of the themes below into a `<themes>`
+  element in a document, change its `name`, and adjust the values. Themes defined
+  in a document take priority over built-in themes with the same name, and must
+  appear before the `<config>` element selecting them.
+  -->
+
+  <theme name="default"
+    fill="white" stroke="black" stroke-width="0.5"
+    background="none" font-weight=""/>
+
+  <theme name="bold"
+    stroke-width="1" font-weight="900"/>
+
+  <theme name="fine"
+    stroke-width="0.2" font-weight="100"/>
+
+  <theme name="glass"
+    fill="rgba(0, 30, 50, 0.15)" background="rgba(200, 230, 220, 0.5)"/>
+
+  <theme name="light"
+    fill="#fdf6e3" stroke="#657b83" background="#eee8d5"/>
+
+  <theme name="dark"
+    fill="#002b36" stroke="#93a1a1" background="#073642"/>
+</themes>
