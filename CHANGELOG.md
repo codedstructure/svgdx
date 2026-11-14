@@ -7,17 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.0 - 2026-11-14]
+
 - Changed: themes are now defined in XML and may be output using the CLI flag
   `--output-builtin themes`. Selecting a theme (e.g. `<config theme="dark"/>`)
   sets various global variables (all prefixed `_theme_`) that are used in
   auto-styles and standard library definitions.
 
-- Added: support for `fill`, `stroke` and `stroke-width` styles for stdlib shape
-  instances.
+- Changed: connectors for shapes with overlapping bounding boxes are no longer
+  omitted; for fully contained objects, a connector is rendered for the shortest
+  link between edges. For partial overlaps, an intersection point is used for
+  the zero-length connector element.
 
 - Added: new builtin stdlib shapes: `gear` (takes `size` and `teeth`), `key`,
   `cert`, `server`, `switch`, `firewall` and `router`. See the
   [network-stdlib.xml](examples/network-stdlib.xml) example.
+
+- Added: support for `fill`, `stroke` and `stroke-width` styles for stdlib shape
+  instances.
 
 - Added: layout references (i.e. elrefs used for layout) may now be a 'union' of
   several elements, given as a space-separated list of element references in
@@ -25,10 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   layout, so `xy="[#a #b]|h 5"`, `width="[#a #b]"` and `surround="[#a #b] #c"`
   are all valid.
 
-- Changed: connectors for shapes with overlapping bounding boxes are no longer
-  omitted; for fully contained objects, a connector is rendered for the shortest
-  link between edges. For partial overlaps, an intersection point is used for
-  the zero-length connector element.
+- Added: a builtin [pandoc](https://pandoc.org) lua filter, available with the
+  `--output-builtin pandoc-filter` command line argument.
+  See [docs/pandoc.md](docs/pandoc.md) for more information.
 
 - Changed (CLI): for both the `svgdx` and `svgdx-server` CLIs, the
   `--output-...` options have been unified as `--output-builtin <ITEM>`, so
@@ -36,9 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for export as `--output-builtin example`, also available via the exported
   `example_document()` function.
 
-- Added: a builtin [pandoc](https://pandoc.org) lua filter, available with the
-  `--output-builtin pandoc-filter` command line argument.
-  See [docs/pandoc.md](docs/pandoc.md) for more information.
+- Fixed (editor): use per-tab undo buffers.
 
 ## [0.33.1 - 2026-09-27]
 
