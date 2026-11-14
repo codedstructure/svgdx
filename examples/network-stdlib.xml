@@ -4,6 +4,7 @@
     <line gap="2" class="d-arrow"/>
     <text class="d-text-small"/>
   </defaults>
+  <config theme="glass"/>
 
   <!-- network -->
   <reuse id="net" href="#d:cloud" wh="30 20"/>

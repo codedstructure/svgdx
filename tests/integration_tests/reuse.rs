@@ -974,7 +974,7 @@ fn test_reuse_builtin_standard_library() {
     );
     assert_contains!(
         output,
-        r#"<path d="M 0 0 H 7.5 L 10 2.5 V 20 H 0 Z M 7.5 0 V 2.5 H 10" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>"#
+        r#"<path d="M 7.5 0 v 2.5 h 2.5 v 17.5 h -10 v -20 h 7.5 l 2.5 2.5 h -2.5 z" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>"#
     );
 }
 

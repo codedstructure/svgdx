@@ -15,8 +15,8 @@
       <varTryDefault width="{{ $height * 0.7 }}" height="{{ $width * 10/7 }}"/>
       <varDefault width="7" height="10"/>
       <var fold="{{min($width, $height) / 4}}"/>
-      <path d="M 0 0 H {{$width - $fold}} L $width $fold V $height H 0 Z M {{$width - $fold}} 0 V $fold H $width"
-        style="stroke:inherit;fill:inherit;stroke-width:inherit"/>
+      <path d="M {{$width - $fold}} 0 v $fold h $fold v {{$height - $fold}} h {{-$width}} v {{-$height}} h {{$width - $fold}} l $fold $fold h {{-$fold}} z"
+        style="stroke-linejoin:round;stroke:inherit;fill:inherit;stroke-width:inherit"/>
     </g>
 
     <g id="store" stroke="$_theme_stroke" fill="$_theme_fill" stroke-width="$_theme_stroke_width">
@@ -35,10 +35,10 @@
       <varDefault width="15" height="7"/>
       <var cap="{{min($width / 5, $height / 4)}}"/>
       <path d="M $cap 0
-        a $cap {{$height / 2}} 0 0 0 0 $height
         a $cap {{$height / 2}} 0 0 0 0 {{-$height}}
+        a $cap {{$height / 2}} 0 0 0 0 {{$height}}
         h {{$width - 2 * $cap}}
-        a $cap {{$height / 2}} 0 0 1 0 $height
+        a $cap {{$height / 2}} 0 0 0 0 {{-$height}}
         h {{-($width - 2 * $cap)}}"
         style="stroke:inherit;fill:inherit;stroke-width:inherit"/>
     </g>
@@ -75,7 +75,7 @@
       <varTryDefault width="{{ $height * 4/3 }}" height="{{ $width * 3/4 }}"/>
       <varDefault width="8" height="6"/>
       <var wby2="{{ $width / 2 }}" hby2="{{ $height / 2 }}"/>
-      <path d="M0 0 h$width v$height h-${width} v-${height} l$wby2 $hby2 $wby2 -$hby2"
+      <path d="M0 0 l$wby2 $hby2 $wby2 -$hby2 h-$width v$height h$width v-$height"
         style="stroke-linejoin:round;stroke:inherit;fill:inherit;stroke-width:inherit"/>
     </g>
 
