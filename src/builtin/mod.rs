@@ -1,23 +1,26 @@
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
 #[cfg(any(feature = "cli", feature = "server"))]
 pub use items::*;
 
-pub fn stdlib_source() -> &'static str {
-    include_str!("stdlib.xml")
+pub fn stdlib_source() -> String {
+    include_str!("stdlib.xml").into()
 }
 
-pub fn themes_source() -> &'static str {
-    include_str!("themes.xml")
+pub fn themes_source() -> String {
+    include_str!("themes.xml").into()
 }
 
 #[cfg(feature = "cli")]
-pub fn pandoc_filter_source() -> &'static str {
-    include_str!("pandoc_filter.lua")
+pub fn pandoc_filter_source() -> String {
+    include_str!("pandoc_filter.lua").into()
 }
 
 // #[cfg(any(feature = "cli", feature = "server"))]
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
-pub fn example_document() -> &'static str {
-    include_str!("example.xml")
+pub fn example_document() -> String {
+    include_str!("example.xml").into()
 }
 
 #[cfg(any(feature = "cli", feature = "server"))]
@@ -63,7 +66,7 @@ mod items {
         }
     }
 
-    pub fn builtin_item(item: BuiltinItem) -> &'static str {
+    pub fn builtin_item(item: BuiltinItem) -> String {
         match item {
             BuiltinItem::Stdlib => super::stdlib_source(),
             BuiltinItem::Themes => super::themes_source(),
