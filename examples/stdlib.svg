@@ -14,42 +14,42 @@
   </style>
   <!-- requires builtin stdlib -->
   <g>
-    <g id="d1" stroke="black" fill="none" class="document">
-      <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20" style="stroke: inherit; fill: inherit;"/>
+    <g id="d1" stroke="black" fill="white" stroke-width="0.5" class="document">
+      <path d="M 15 0 v 5 h 5 v 25 h -20 v -30 h 15 l 5 5 h -5 z" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
     </g>
-    <g stroke="black" fill="none" transform="translate(5, 5)" class="actor">
-      <path d="M5 8 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6" style="stroke: inherit; fill: inherit;"/>
+    <g stroke="black" fill="white" stroke-width="0.5" transform="translate(5, 5)" class="actor">
+      <path d="M5 8 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>
     </g>
-    <g id="d2" stroke="black" fill="none" transform="translate(0, 35)" class="document">
-      <path d="M 0 0 H 15 L 20 5 V 30 H 0 Z M 15 0 V 5 H 20" style="stroke: inherit; fill: inherit;"/>
+    <g id="d2" stroke="black" fill="white" stroke-width="0.5" transform="translate(0, 35)" class="document">
+      <path d="M 15 0 v 5 h 5 v 25 h -20 v -30 h 15 l 5 5 h -5 z" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
     </g>
-    <g stroke="black" fill="none" transform="translate(5, 40)" class="actor">
-      <path d="M5 8 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6" style="stroke: inherit; fill: inherit;"/>
+    <g stroke="black" fill="white" stroke-width="0.5" transform="translate(5, 40)" class="actor">
+      <path d="M5 8 a 0.1 0.1 0 0 0 0 -8 0.1 0.1 0 0 0 0 8 v 6 m -5 -3 h10 m-5 3 l -5 6 m5-6 l5 6" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>
     </g>
   </g>
-  <g id="c" stroke="black" fill="none" transform="translate(48.313885, 17.814152)" class="cloud">
-    <path d="M 8 23.4 C 2 23.4 0 18.6 3.2 15 C 2 8.4 8.8 3.6 15.2 5.4 C 18 0.6 28 0 31.2 5.4 C 37.6 5.4 40 10.2 37.6 14.4 C 40 16.8 38 23.4 31.2 23.4 C 28 30 12 30 8 23.4 Z" style="stroke: inherit; fill: inherit;"/>
+  <g id="c" stroke="black" fill="white" stroke-width="0.5" transform="translate(48.313885, 17.814152)" class="cloud">
+    <path d="M 8 23.4 C 2 23.4 0 18.6 3.2 15 C 2 8.4 8.8 3.6 15.2 5.4 C 18 0.6 28 0 31.2 5.4 C 37.6 5.4 40 10.2 37.6 14.4 C 40 16.8 38 23.4 31.2 23.4 C 28 30 12 30 8 23.4 Z" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
-  <g id="p" stroke="black" fill="none" transform="translate(101.88776, 27.5)" class="pipeline">
-    <path d="M 2.5 0 a 2.5 5 0 0 0 0 10 a 2.5 5 0 0 0 0 -10 h 25 a 2.5 5 0 0 1 0 10 h -25" style="stroke: inherit; fill: inherit;"/>
+  <g id="p" stroke="black" fill="white" stroke-width="0.5" transform="translate(101.88776, 37.5)" class="pipeline">
+    <path d="M 2.5 0 a 2.5 5 0 0 0 0 -10 a 2.5 5 0 0 0 0 10 h 25 a 2.5 5 0 0 0 0 -10 h -25" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
-  <g id="s" stroke="black" fill="none" transform="translate(146.88776, 17.5)" class="store">
-    <path d="M 0 6 a 15 6 0 0 0 30 0 a 15 6 0 0 0 -30 0 v 18 a 15 6 0 0 0 30 0 v -18" style="stroke: inherit; fill: inherit;"/>
+  <g id="s" stroke="black" fill="white" stroke-width="0.5" transform="translate(146.88776, 17.5)" class="store">
+    <path d="M 0 6 a 15 6 0 0 0 30 0 a 15 6 0 0 0 -30 0 v 18 a 15 6 0 0 0 30 0 v -18" style="stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
 
   <line x1="21.851" y1="15.756" x2="48.149" y2="26.498" class="d-arrow d-dash"/>
-  <g stroke="black" fill="none" transform="translate(32.5, 14.252001)" class="message">
-    <path d="M0 0 h5 v3.75 h-5 v-3.75 l2.5 1.875 2.5 -1.875" style="stroke-linejoin: round; stroke: inherit; fill: inherit;"/>
+  <g stroke="black" fill="white" stroke-width="0.5" transform="translate(32.5, 14.252001)" class="message">
+    <path d="M0 0 l2.5 1.875 2.5 -1.875 h-5 v3.75 h5 v-3.75" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
-  <g stroke="black" fill="none" transform="translate(43.019, 18.549)" class="message">
-    <path d="M0 0 h5 v3.75 h-5 v-3.75 l2.5 1.875 2.5 -1.875" style="stroke-linejoin: round; stroke: inherit; fill: inherit;"/>
+  <g stroke="black" fill="white" stroke-width="0.5" transform="translate(43.019, 18.549)" class="message">
+    <path d="M0 0 l2.5 1.875 2.5 -1.875 h-5 v3.75 h5 v-3.75" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
   <line x1="21.851" y1="49.244" x2="48.149" y2="38.502" class="d-arrow d-dash"/>
-  <g stroke="black" fill="none" transform="translate(25.361, 39.596)" class="document">
-    <path d="M 0 0 H 2.625 L 3.5 0.875 V 5 H 0 Z M 2.625 0 V 0.875 H 3.5" style="stroke: inherit; fill: inherit;"/>
+  <g stroke="black" fill="white" stroke-width="0.5" transform="translate(25.361, 39.596)" class="document">
+    <path d="M 2.625 0 v 0.875 h 0.875 v 4.125 h -3.5 v -5 h 2.625 l 0.875 0.875 h -0.875 z" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
-  <g stroke="black" fill="none" transform="translate(35.88, 35.299)" class="document">
-    <path d="M 0 0 H 2.625 L 3.5 0.875 V 5 H 0 Z M 2.625 0 V 0.875 H 3.5" style="stroke: inherit; fill: inherit;"/>
+  <g stroke="black" fill="white" stroke-width="0.5" transform="translate(35.88, 35.299)" class="document">
+    <path d="M 2.625 0 v 0.875 h 0.875 v 4.125 h -3.5 v -5 h 2.625 l 0.875 0.875 h -0.875 z" style="stroke-linejoin: round; stroke: inherit; fill: inherit; stroke-width: inherit;"/>
   </g>
   <line x1="88.888" y1="32.5" x2="99.888" y2="32.5" class="d-arrow d-dash"/>
   <line x1="133.888" y1="32.5" x2="144.888" y2="32.5" class="d-arrow d-dash"/>

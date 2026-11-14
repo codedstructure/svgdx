@@ -16,7 +16,7 @@ pub use crate::style::types::{Selectable, Stylable};
 use autostyle::StyleProvider;
 
 pub use autostyle::StyleRegistry;
-pub use themes::{ContextTheme, ThemeType};
+pub use themes::{ContextTheme, ThemeDef, ThemeType, builtin_theme, extract_themes};
 
 /// Auto-style processing mode.
 ///

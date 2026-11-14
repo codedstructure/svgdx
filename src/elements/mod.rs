@@ -17,7 +17,9 @@ use containers::{Container, GroupElement};
 use gradient::GradientElement;
 use loops::{ForElement, IfElement, LoopElement};
 use reuse::ReuseElement;
-use special::{ConfigElement, DefaultsElement, SpecsElement, VarElement};
+use special::{ConfigElement, DefaultsElement, SpecsElement, ThemesElement, VarElement};
+
+pub(crate) use special::apply_theme_var;
 use text::process_text_attr;
 
 pub use element::SvgElement;

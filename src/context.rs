@@ -5,6 +5,7 @@ use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
 use crate::geometry::{BoundingBox, BoundingBoxBuilder, Size, TransformAttr};
 use crate::scope::ScopeStack;
+use crate::style::{ThemeDef, ThemeType, builtin_theme};
 use crate::types::{ElRef, OrderIndex, extract_urlref, parse_float};
 
 use std::cell::RefCell;
@@ -41,11 +42,13 @@ pub struct TransformerContext {
     libraries: Vec<Library>,
     /// Set of custom element names registered via `<specs element="...">`
     named_spec_map: HashSet<String>,
+    /// Themes registered via `<themes>` elements
+    themes: HashMap<String, ThemeDef>,
 }
 
 impl Default for TransformerContext {
     fn default() -> Self {
-        Self {
+        let mut ctx = Self {
             original_map: HashMap::new(),
             index_map: BTreeMap::new(),
             id_map: HashMap::new(),
@@ -59,7 +62,12 @@ impl Default for TransformerContext {
             config: TransformConfig::default(),
             libraries: Vec::new(),
             named_spec_map: HashSet::new(),
-        }
+            themes: HashMap::new(),
+        };
+        // Evaluate the default theme so theme variables are always set.
+        ctx.apply_theme(&ThemeType::default())
+            .expect("default theme must be built-in");
+        ctx
     }
 }
 
@@ -239,11 +247,45 @@ impl TransformerContext {
     /// Note the config object is cloned and stored in the context.
     pub fn from_config(config: &TransformConfig) -> Self {
         let mut ctx = Self::default();
-        ctx.set_config(config.clone());
+        // Only a custom theme (which cannot be resolved before any
+        // `<themes>` element is processed) can fail; keep the default theme.
+        let _ = ctx.set_config(config.clone());
         ctx
     }
 
-    pub fn set_config(&mut self, config: TransformConfig) {
+    pub fn register_theme(&mut self, theme: ThemeDef) {
+        self.themes.insert(theme.name.clone(), theme);
+    }
+
+    fn find_theme(&self, name: &str) -> Option<ThemeDef> {
+        self.themes
+            .get(name)
+            .cloned()
+            .or_else(|| builtin_theme(name).cloned())
+    }
+
+    /// Evaluate the named theme, setting the `_theme_*` variables.
+    ///
+    /// Values not specified by the theme are taken from the 'default' theme.
+    pub fn apply_theme(&mut self, theme: &ThemeType) -> Result<()> {
+        let name = theme.to_string();
+        let def = self
+            .find_theme(&name)
+            .ok_or_else(|| Error::InvalidValue("unknown theme".into(), name.clone()))?;
+        if name != ThemeType::Default.to_string()
+            && let Some(default_def) = self.find_theme(&ThemeType::Default.to_string())
+        {
+            default_def.apply(self)?;
+        }
+        def.apply(self)
+    }
+
+    /// Update the config; if the theme has changed it is evaluated, before
+    /// any `vars` from the config are set so these may override theme values.
+    pub fn set_config(&mut self, config: TransformConfig) -> Result<()> {
+        if config.theme != self.config.theme {
+            self.apply_theme(&config.theme)?;
+        }
         self.seed_rng(config.seed);
         for (k, v) in &config.vars {
             self.set_var(k.as_str(), v.as_str());
@@ -262,6 +304,7 @@ impl TransformerContext {
                 .insert(Some(library.name.clone()), library.events.events.clone());
         }
         self.config = config;
+        Ok(())
     }
 
     pub fn set_events(&mut self, events: Vec<InputEvent>) {
@@ -317,6 +360,10 @@ impl TransformerContext {
 
     pub fn set_var(&mut self, name: &str, value: &str) {
         self.scope_stack.set_var(name, value);
+    }
+
+    pub fn set_global_var(&mut self, name: &str, value: &str) {
+        self.scope_stack.set_global_var(name, value);
     }
 
     pub fn set_var_default(&mut self, name: &str, value: &str) {

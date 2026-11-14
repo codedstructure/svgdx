@@ -158,3 +158,73 @@ fn test_config_font_family() {
     let output = transform_str_default(input).unwrap();
     assert_contains!(output, expected);
 }
+
+#[test]
+fn test_theme_sets_variables() {
+    let input = r#"
+<svg>
+<config theme="bold"/>
+<text text="$_theme_stroke_width/$_theme_fill/$_theme_font_weight"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, ">1/white/900</text>");
+}
+
+#[test]
+fn test_theme_default_variables() {
+    let input = r#"<text text="$_theme_stroke_width/$_theme_stroke"/>"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, ">0.5/black</text>");
+}
+
+#[test]
+fn test_theme_custom() {
+    let input = r#"
+<svg>
+<themes>
+  <theme name="mine" fill="red" stroke="blue" stroke-width="2" background="yellow"/>
+</themes>
+<config theme="mine"/>
+<rect xy="0" wh="5"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, "fill: yellow;");
+    assert_contains!(output, "stroke-width: 2;");
+    assert_contains!(output, "fill: red;");
+    assert_contains!(output, "stroke: blue;");
+}
+
+#[test]
+fn test_theme_unknown() {
+    let input = r#"<config theme="nonesuch"/>"#;
+    assert!(transform_str_default(input).is_err());
+}
+
+#[test]
+fn test_theme_unspecified_values_use_default() {
+    let input = r#"
+<svg>
+<themes>
+  <theme name="mine" stroke="blue"/>
+</themes>
+<config theme="bold"/>
+<config theme="mine"/>
+<text text="$_theme_stroke/$_theme_stroke_width/$_theme_font_weight/$_theme_fill"/>
+</svg>
+"#;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, ">blue/0.5//white</text>");
+}
+
+#[test]
+fn test_theme_unknown_attribute() {
+    let input = r#"
+<svg>
+<themes><theme name="mine" colour="red"/></themes>
+<config theme="mine"/>
+</svg>
+"#;
+    assert!(transform_str_default(input).is_err());
+}

@@ -7,11 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Changed: themes are now defined in XML and may be output using the CLI flag
+  `--output-builtin themes`. Selecting a theme (e.g. `<config theme="dark"/>`)
+  sets various global variables (all prefixed `_theme_`) that are used in
+  auto-styles and standard library definitions.
+
+- Added: support for `fill`, `stroke` and `stroke-width` styles for stdlib shape
+  instances.
+
 - Added: new builtin stdlib shapes: `gear` (takes `size` and `teeth`), `key`,
   `cert`, `server`, `switch`, `firewall` and `router`. See the
   [network-stdlib.xml](examples/network-stdlib.xml) example.
-
-- Added: support for `fill` and `stroke` styles for stdlib shape instances.
 
 - Added: layout references (i.e. elrefs used for layout) may now be a 'union' of
   several elements, given as a space-separated list of element references in

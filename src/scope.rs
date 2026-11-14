@@ -264,6 +264,10 @@ impl ScopeStack {
             .insert(name.to_string(), value.to_string());
     }
 
+    pub fn set_global_var(&mut self, name: &str, value: &str) {
+        self.global.vars.insert(name.to_string(), value.to_string());
+    }
+
     pub fn update_current_scope(&mut self, el: &SvgElement) {
         if let Some(scope) = self.stack.last_mut() {
             *scope = Scope::from_element(el);

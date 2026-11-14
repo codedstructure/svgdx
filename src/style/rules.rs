@@ -19,10 +19,10 @@ impl StyleProvider for DefaultStyles {
     }
 
     fn get_rules(&self) -> Vec<Rule> {
-        let fill = self.theme.theme.default_fill();
-        let stroke = self.theme.theme.default_stroke();
-        let stroke_width = self.theme.theme.default_stroke_width();
-        let font_weight = self.theme.theme.default_font_weight();
+        let fill = self.theme.fill.clone();
+        let stroke = self.theme.stroke.clone();
+        let stroke_width = self.theme.stroke_width.clone();
+        let font_weight = self.theme.font_weight.clone();
 
         let mut text_styles = vec![
             Style::new("stroke-width", "0"),
@@ -39,7 +39,7 @@ impl StyleProvider for DefaultStyles {
             Rule {
                 selector: Selector::BasicShape(MatchType::Any),
                 styles: vec![
-                    Style::new("stroke-width", stroke_width.to_string()),
+                    Style::new("stroke-width", &stroke_width),
                     Style::new("fill", &fill),
                     Style::new("stroke", &stroke),
                 ],
@@ -47,7 +47,7 @@ impl StyleProvider for DefaultStyles {
             Rule {
                 selector: Selector::LineLike(MatchType::Any),
                 styles: vec![
-                    Style::new("stroke-width", stroke_width.to_string()),
+                    Style::new("stroke-width", &stroke_width),
                     Style::new("fill", "none"),
                     Style::new("stroke", &stroke),
                 ],
@@ -150,8 +150,8 @@ impl StyleProvider for ColourStyles {
         if let Some(colour) = s.match_result().and_then(|mr| mr.colour()) {
             let is_dark = DARK_COLOURS.binary_search(&colour.as_str()).is_ok();
             let mut value = value.to_string();
-            let text_light = self.theme.theme.default_fill();
-            let text_dark = self.theme.theme.default_stroke();
+            let text_light = self.theme.fill.clone();
+            let text_dark = self.theme.stroke.clone();
             value = value.replace("$COLOUR", &colour.to_string());
             value = value.replace(
                 "$TEXT_ALT_COLOUR",
@@ -620,7 +620,7 @@ impl StyleProvider for PatternStyles {
     }
 
     fn group_defs(&self) -> Vec<String> {
-        let stroke = self.theme.theme.default_stroke();
+        let stroke = self.theme.stroke.clone();
         let mut defs = Vec::new();
         for (pattern_name, spacing) in &self.def_list {
             let (pattern_type, rotate) = if let Some((_, ptype, rot)) = Self::PATTERN_TYPES

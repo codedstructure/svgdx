@@ -3,6 +3,7 @@ use crate::context::TransformerContext;
 use crate::document::OutputList;
 use crate::errors::{Error, Result};
 use crate::expr::eval_attr;
+use crate::style::{ThemeType, extract_themes};
 use crate::transform::{EventGen, process_events};
 use crate::types::{parse_bool, parse_float, parse_int};
 
@@ -44,13 +45,17 @@ impl EventGen for ConfigElement<'_> {
                 "font-size" => new_config.font_size = parse_float(value)?,
                 "font-family" => new_config.font_family = value,
                 "seed" => new_config.seed = parse_int(value)?,
-                "theme" => new_config.theme = value.parse()?,
+                "theme" => {
+                    new_config.theme = value
+                        .parse()
+                        .unwrap_or_else(|_| ThemeType::Custom(value.clone()))
+                }
                 "svg-style" => new_config.svg_style = Some(value.clone()),
                 "error-mode" => new_config.error_mode = value.parse()?,
                 _ => return Err(Error::InvalidAttr(key)),
             }
         }
-        context.set_config(new_config);
+        context.set_config(new_config)?;
         Ok(OutputList::new())
     }
 }
@@ -71,6 +76,7 @@ const SPECS_RESERVED_ELEMENT_NAMES: &[&str] = &[
     "if",
     "defaults",
     "for",
+    "themes",
 ];
 
 impl EventGen for SpecsElement<'_> {
@@ -146,18 +152,47 @@ where
     Ok(())
 }
 
+/// A `<themes>` element registers the `<theme>` elements it contains
+/// for later selection, generating no output.
+#[derive(Debug, Clone)]
+pub struct ThemesElement<'a>(pub &'a SvgElement);
+
+impl EventGen for ThemesElement<'_> {
+    fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
+        if let Some(inner_events) = self.0.inner_events(context) {
+            for theme in extract_themes(inner_events.iter(), 0) {
+                context.register_theme(theme);
+            }
+        }
+        Ok(OutputList::new())
+    }
+}
+
+fn var_element_kind(name: &str) -> (bool, bool) {
+    // (ignore_fail, is_default)
+    match name {
+        "var" => (false, false),
+        "varTry" => (true, false),
+        "varDefault" => (false, true),
+        "varTryDefault" => (true, true),
+        _ => (false, false),
+    }
+}
+
+/// Evaluate a `<var>` element generated from a theme, setting variables in
+/// the global scope regardless of where the theme was selected from.
+pub fn apply_theme_var(element: &SvgElement, context: &mut TransformerContext) -> Result<()> {
+    process_var_attrs(element, context, false, |ctx, k, v| {
+        ctx.set_global_var(k, v);
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct VarElement<'a>(pub &'a SvgElement);
 
 impl EventGen for VarElement<'_> {
     fn generate_events(&self, context: &mut TransformerContext) -> Result<OutputList> {
-        let (ignore_fail, is_default) = match self.0.name() {
-            "var" => (false, false),
-            "varTry" => (true, false),
-            "varDefault" => (false, true),
-            "varTryDefault" => (true, true),
-            _ => (false, false), // shouldn't happen
-        };
+        let (ignore_fail, is_default) = var_element_kind(self.0.name());
         process_var_attrs(self.0, context, ignore_fail, |ctx, k, v| {
             if is_default {
                 ctx.set_var_default(k, v);

@@ -5,6 +5,10 @@ pub fn stdlib_source() -> &'static str {
     include_str!("stdlib.xml")
 }
 
+pub fn themes_source() -> &'static str {
+    include_str!("themes.xml")
+}
+
 #[cfg(feature = "cli")]
 pub fn pandoc_filter_source() -> &'static str {
     include_str!("pandoc_filter.lua")
@@ -27,6 +31,7 @@ mod items {
         #[cfg(feature = "cli")]
         PandocFilter,
         Stdlib,
+        Themes,
         Example,
     }
 
@@ -38,6 +43,7 @@ mod items {
                 #[cfg(feature = "cli")]
                 "pandoc-filter" => Ok(BuiltinItem::PandocFilter),
                 "stdlib" => Ok(BuiltinItem::Stdlib),
+                "themes" => Ok(BuiltinItem::Themes),
                 "example" => Ok(BuiltinItem::Example),
                 _ => Err(Error::Parse(format!("invalid BuiltinItem: {s}"))),
             }
@@ -50,6 +56,7 @@ mod items {
                 #[cfg(feature = "cli")]
                 BuiltinItem::PandocFilter => "pandoc-filter",
                 BuiltinItem::Stdlib => "stdlib",
+                BuiltinItem::Themes => "themes",
                 BuiltinItem::Example => "example",
             };
             write!(f, "{}", s)
@@ -59,6 +66,7 @@ mod items {
     pub fn builtin_item(item: BuiltinItem) -> &'static str {
         match item {
             BuiltinItem::Stdlib => super::stdlib_source(),
+            BuiltinItem::Themes => super::themes_source(),
             #[cfg(feature = "cli")]
             BuiltinItem::PandocFilter => super::pandoc_filter_source(),
             BuiltinItem::Example => super::example_document(),
@@ -74,6 +82,7 @@ mod items {
                     "pandoc Lua filter".into(),
                 ),
                 (BuiltinItem::Stdlib.to_string(), "standard library".into()),
+                (BuiltinItem::Themes.to_string(), "built-in themes".into()),
                 (
                     BuiltinItem::Example.to_string(),
                     "example svgdx document".into(),
