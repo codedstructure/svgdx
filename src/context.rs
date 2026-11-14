@@ -346,6 +346,11 @@ impl TransformerContext {
         self.scope_stack.in_specs()
     }
 
+    /// Are we in a `<defaults>` block?
+    pub fn in_defaults(&self) -> bool {
+        self.scope_stack.in_defaults()
+    }
+
     pub fn seed_rng(&mut self, seed: u64) {
         self.rng = RefCell::new(Pcg32::seed_from_u64(seed));
     }

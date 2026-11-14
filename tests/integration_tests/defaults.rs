@@ -311,3 +311,19 @@ fn test_defaults_nonempty() {
     assert_contains!(output, expected1);
     assert_contains!(output, expected2);
 }
+
+#[test]
+fn test_defaults_relpos_empty() {
+    let input = r##"
+<svg>
+  <defaults xy="^|h 2" wh="10"/>
+  <rect xy="0" text="1"/>
+  <circle text="2"/>
+  <rect text="3"/>
+</svg>
+"##;
+    let output = transform_str_default(input).unwrap();
+    assert_contains!(output, r#"<rect x="0" y="0" width="10" height="10"/>"#);
+    assert_contains!(output, r#"<circle cx="17" cy="5" r="5"/>"#);
+    assert_contains!(output, r#"<rect x="24" y="0" width="10" height="10"/>"#);
+}

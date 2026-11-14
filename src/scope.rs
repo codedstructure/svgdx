@@ -84,6 +84,8 @@ struct Scope {
     pseudo: bool,
     /// indicates whether this scope is a `<specs>` block
     is_specs: bool,
+    /// indicates whether this scope is a `<defaults>` block
+    is_defaults: bool,
 }
 
 impl Scope {
@@ -95,12 +97,14 @@ impl Scope {
             "var" | "varDefault" | "varTry" | "varTryDefault" | "defaults" | "loop"
         );
         let is_specs = el.name() == "specs";
+        let is_defaults = el.name() == "defaults";
         let vars = el.get_attrs().into_iter().collect();
         Self {
             vars,
             defaults: Vec::new(),
             pseudo,
             is_specs,
+            is_defaults,
         }
     }
 }
@@ -121,6 +125,10 @@ impl ScopeStack {
 
     pub fn in_specs(&self) -> bool {
         self.stack.iter().any(|s| s.is_specs)
+    }
+
+    pub fn in_defaults(&self) -> bool {
+        self.stack.iter().any(|s| s.is_defaults)
     }
 
     fn iter(&self) -> impl DoubleEndedIterator<Item = &Scope> + '_ {

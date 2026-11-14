@@ -9,6 +9,11 @@ use crate::types::extract_layoutref;
 
 pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Result<SvgElement> {
     let next = apply_defaults(el, context);
+    // Elements which set defaults (and any elements nested within them) are
+    // templates for later elements, and must not be resolved or positioned.
+    if in_defaults(&next, context) {
+        return Ok(next);
+    }
     let next = inner_text_to_attr(next, context);
     let next = apply_auto_id(next, context);
     let next = convert_dirspec(next);
@@ -17,6 +22,14 @@ pub fn element_pipeline(el: SvgElement, context: &mut TransformerContext) -> Res
     let next = prepare_element(next, context)?;
 
     Ok(next)
+}
+
+/// Is this element a `<defaults>` element, or nested within one?
+///
+/// The scope stack alone isn't enough, since an empty `<defaults/>` element
+/// never gets a scope of its own.
+fn in_defaults(el: &SvgElement, context: &TransformerContext) -> bool {
+    el.name() == "defaults" || context.in_defaults()
 }
 
 /// Apply the current default scope to an element without mutating the caller's input.
