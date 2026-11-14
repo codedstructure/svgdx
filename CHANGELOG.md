@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.34.1 - 2026-11-14]
+
+- Fixed: wasm32 builds were broken in 0.34.0
+
 ## [0.34.0 - 2026-11-14]
 
 - Changed: themes are now defined in XML and may be output using the CLI flag
