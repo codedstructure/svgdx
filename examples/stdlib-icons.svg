@@ -1,0 +1,59 @@
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="170mm" height="28mm" viewBox="-4 -4 170 28">
+  <defs>
+    <marker id="d-arrow" refX="1" refY="0.5" orient="auto-start-reverse" markerWidth="6" markerHeight="5" viewBox="0 0 1 1">
+      <path d="M 0 0 1 0.4 1 0.6 0 1" style="stroke: none; fill: context-stroke;"/>
+    </marker>
+  </defs>
+  <style>
+    <![CDATA[
+    line, polyline, path { stroke-width: 0.5; fill: none; stroke: black; }
+    text { stroke-width: 0; font-family: sans-serif; font-size: 3px; fill: black; stroke: white; }
+    text { stroke-linejoin: round; paint-order: stroke; }
+    text.d-text, tspan.d-text { text-anchor: middle; dominant-baseline: central; }
+    text.d-text-top, tspan.d-text-top { dominant-baseline: text-before-edge; }
+    text.d-text-small, tspan.d-text-small { font-size: 2px; }
+    marker path { fill: inherit; }
+    line.d-arrow, polyline.d-arrow, path.d-arrow { marker-end: url(#d-arrow); }
+    .d-dash { stroke-dasharray: 1 1.5; }
+  ]]>
+  </style>
+  <!-- requires builtin stdlib -->
+
+  <!-- network -->
+  <g id="net" class="cloud">
+    <path d="M 6 15.6 C 1.5 15.6 0 12.4 2.4 10 C 1.5 5.6 6.6 2.4 11.4 3.6 C 13.5 0.4 21 0 23.4 3.6 C 28.2 3.6 30 6.8 28.2 9.6 C 30 11.2 28.5 15.6 23.4 15.6 C 21 20 9 20 6 15.6 Z"/>
+  </g>
+  <g id="fw" transform="translate(42.93039, 4.3739)" class="firewall">
+    <!-- brick wall: four courses, alternate courses offset by half a brick -->
+    <path d="M0 0 h14 v11.2 h-14 z M 0 2.8 h 14 m -14 2.8h 14 m -14 2.8h 14 m -14 2.8M 7 0 v 2.8 m -3.5 0 v 2.8 m 7 0 v -2.8 m -3.5 2.8v 2.8 m -3.5 0 v 2.8 m 7 0 v -2.8 m -3.5 2.8"/>
+  </g>
+  <g id="rt" transform="translate(70.93042, 3.9739075)" class="router">
+    <!-- circle with four arrows, one per axis direction; each arm is drawn along the current bearing -->
+    <path d="M 0 6 a 6 6 0 1 0 12 0 a 6 6 0 1 0 -12 0 M 6 6 l0 4.2m-1.2 -1.2l1.2 1.2l1.2 -1.2M 6 6l-4.2 0m1.2 1.2l-1.2 -1.2l1.2 -1.2M 6 6l0 -4.2m1.2 1.2l-1.2 -1.2l-1.2 1.2M 6 6l4.2 0m-1.2 -1.2l1.2 1.2l-1.2 1.2M 6 6" style="stroke-linejoin: round; stroke-linecap: round;"/>
+  </g>
+  <g id="sw" transform="translate(96.93042, 3.973938)" class="switch">
+    <!-- a pair of opposed arrows; arrowheads are separate subpaths so their tips join cleanly -->
+    <path d="M0 0 h16 v12 h-16 z M 3.2 4.2 h 9.6 m -1.44 -1.44 l 1.44 1.44 l -1.44 1.44 M 12.8 7.8 h -9.6 m 1.44 -1.44 l -1.44 1.44 l 1.44 1.44" style="stroke-linejoin: round; stroke-linecap: round;"/>
+  </g>
+  <g id="srv1" transform="translate(126.93042, 1.973938)" class="server">
+    <!-- three stacked units, each with a drive slot and a status LED -->
+    <path d="M0 0 h12.8 v16 h-12.8 z M 0 5.333 h 12.8 m -12.8 5.333h 12.8 m -12.8 5.333M 1.92 2.667 h 6.4 M 9.76 2.667 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0 M 1.92 8 h 6.4 M 9.76 8 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0 M 1.92 13.333 h 6.4 M 9.76 13.333 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0"/>
+  </g>
+  <g id="srv2" transform="translate(147.73041, 1.973938)" class="server">
+    <!-- three stacked units, each with a drive slot and a status LED -->
+    <path d="M0 0 h12.8 v16 h-12.8 z M 0 5.333 h 12.8 m -12.8 5.333h 12.8 m -12.8 5.333M 1.92 2.667 h 6.4 M 9.76 2.667 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0 M 1.92 8 h 6.4 M 9.76 8 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0 M 1.92 13.333 h 6.4 M 9.76 13.333 a 0.48 0.48 0 1 0 0.96 0 a 0.48 0.48 0 1 0 -0.96 0"/>
+  </g>
+
+  <line x1="30.93" y1="9.974" x2="40.93" y2="9.974" class="d-arrow"/>
+  <line x1="58.93" y1="9.974" x2="68.93" y2="9.974" class="d-arrow"/>
+  <line x1="84.93" y1="9.974" x2="94.93" y2="9.974" class="d-arrow"/>
+  <line x1="114.93" y1="9.974" x2="124.93" y2="9.974" class="d-arrow"/>
+  <line x1="141.73" y1="9.974" x2="145.73" y2="9.974" class="d-arrow d-dash"/>
+
+  <text x="15.097" y="19.9" dy="2" class="d-text d-text-top d-text-small">Internet</text>
+  <text x="49.93" y="16.574" dy="2" class="d-text d-text-top d-text-small">Firewall</text>
+  <text x="76.93" y="16.974" dy="2" class="d-text d-text-top d-text-small">Router</text>
+  <text x="104.93" y="16.974" dy="2" class="d-text d-text-top d-text-small">Switch</text>
+  <text x="133.33" y="18.974" dy="2" class="d-text d-text-top d-text-small">Server</text>
+  <text x="154.13" y="18.974" dy="2" class="d-text d-text-top d-text-small">Server</text>
+</svg>

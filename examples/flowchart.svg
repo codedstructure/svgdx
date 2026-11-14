@@ -34,8 +34,8 @@
   <text x="92.32" y="0" class="d-text">ok then</text>
 
   <line x1="17.321" y1="-20" x2="17.321" y2="-10" text-loc="t" class="d-arrow"/>
-  <line x1="34.642" y1="0" x2="50" y2="0" class="d-arrow"/>
-  <text x="42.321" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
+  <line x1="34.641" y1="0" x2="50" y2="0" class="d-arrow"/>
+  <text x="42.32" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
   <line x1="67.32" y1="0" x2="82.32" y2="0" class="d-arrow"/>
   <text x="74.82" y="-1" class="d-text d-text-bottom d-arrow">yes</text>
   <polyline points="58.66 5, 58.66 17, 17.321 17, 17.321 10" class="d-arrow"/>
