@@ -1,0 +1,28 @@
+<svg>
+  <!-- requires builtin stdlib -->
+  <defaults>
+    <line gap="2" class="d-arrow"/>
+    <text class="d-text-small"/>
+  </defaults>
+
+  <!-- network -->
+  <reuse id="net" href="#d:cloud" wh="30 20"/>
+  <reuse id="fw" href="#d:firewall" size="14" xy="^|h 14"/>
+  <reuse id="rt" href="#d:router" size="12" xy="^|h 14"/>
+  <reuse id="sw" href="#d:switch" size="16" xy="^|h 14"/>
+  <reuse id="srv1" href="#d:server" size="16" xy="^|h 14"/>
+  <reuse id="srv2" href="#d:server" size="16" xy="^|h 14"/>
+
+  <line start="#net" end="#fw"/>
+  <line start="#fw" end="#rt"/>
+  <line start="#rt" end="#sw"/>
+  <line start="#sw" end="#srv1"/>
+  <line start="#srv1" end="#srv2"/>
+
+  <text xy="#net@b" dy="2" text="Internet"/>
+  <text xy="#fw@b" dy="2" text="Firewall"/>
+  <text xy="#rt@b" dy="2" text="Router"/>
+  <text xy="#sw@b" dy="2" text="Switch"/>
+  <text xy="#srv1@b" dy="2" text="Server"/>
+  <text xy="#srv2@b" dy="2" text="Server"/>
+</svg>

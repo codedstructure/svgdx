@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Added: new builtin stdlib shapes: `gear` (takes `size` and `teeth`), `key`,
+  `cert`, `server`, `switch`, `firewall` and `router`. See the
+  [network-stdlib.xml](examples/network-stdlib.xml) example.
+
 - Added: layout references (i.e. elrefs used for layout) may now be a 'union' of
   several elements, given as a space-separated list of element references in
   square brackets, e.g. `[#a #b ^]`. The bounding box of the union is used for

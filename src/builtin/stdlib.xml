@@ -62,5 +62,106 @@
       <var wby2="{{ $width / 2 }}" hby2="{{ $height / 2 }}"/>
       <path d="M0 0 h$width v$height h-${width} v-${height} l$wby2 $hby2 $wby2 -$hby2" style="stroke-linejoin:round"/>
     </g>
+
+    <g id="gear">
+      <varDefault size="5" teeth="6"/>
+      <var outer="{{$size / 2}}" root="{{$size * 0.35}}" hole="{{$size * 0.15}}" pitch="{{360 / $teeth}}"/>
+      <!-- angles in degrees clockwise from 12 o'clock; each tooth is a root arc, a flank
+           up to the tip, a tip arc and a flank back down to the root circle -->
+      <path d="M $outer {{$outer - $root}} :a 0
+          r $teeth[
+            A $root $root 0 0 1 {{$outer + $root * sin($a + 0.3 * $pitch)}} {{$outer - $root * cos($a + 0.3 * $pitch)}}
+            L {{$outer + $outer * sin($a + 0.5 * $pitch)}} {{$outer - $outer * cos($a + 0.5 * $pitch)}}
+            A $outer $outer 0 0 1 {{$outer + $outer * sin($a + 0.8 * $pitch)}} {{$outer - $outer * cos($a + 0.8 * $pitch)}}
+            L {{$outer + $root * sin($a + $pitch)}} {{$outer - $root * cos($a + $pitch)}}
+            :a {{$a + $pitch}}
+          ] z
+          M {{$outer - $hole}} $outer a $hole $hole 0 1 0 {{2 * $hole}} 0 a $hole $hole 0 1 0 {{-2 * $hole}} 0"
+        fill-rule="evenodd" style="stroke-linejoin:round"/>
+    </g>
+
+    <g id="key">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 5/12 }}"/>
+      <varTryDefault width="{{ $height * 12/5 }}" height="{{ $width * 5/12 }}"/>
+      <varDefault width="12" height="5"/>
+      <var r="{{$height / 2}}" thick="{{$height * 0.25}}" tooth="{{$height * 0.18}}" hole="{{$height * 0.2}}"/>
+      <var top="{{$r - $thick / 2}}" bottom="{{$r + $thick / 2}}"/>
+      <var edge="{{$r + sqrt($r * $r - $thick * $thick / 4)}}"/>
+      <!-- shaft with two teeth, then a large arc round the bow back to the start; the hole is a cutout -->
+      <path d="M $edge $top H $width V {{$bottom + 0.26 * $height}} H {{$width - $tooth}} V $bottom
+          H {{$width - 2 * $tooth}} V {{$bottom + 0.18 * $height}} H {{$width - 3 * $tooth}} V $bottom
+          H $edge A $r $r 0 1 1 $edge $top z
+          M {{$r - $hole}} $r a $hole $hole 0 1 0 {{2 * $hole}} 0 a $hole $hole 0 1 0 {{-2 * $hole}} 0"
+        fill-rule="evenodd" style="stroke-linejoin:round"/>
+    </g>
+
+    <g id="cert">
+      <varTryDefault width="{{ $size * 3/4 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 3/4 }}" height="{{ $width * 4/3 }}"/>
+      <varDefault width="9" height="12"/>
+      <var sx="{{$width * 0.7}}" sy="{{$height * 0.7}}" sr="{{$width * 0.12}}"/>
+      <path d="M0 0 h$width v$height h-$width z
+          M {{$width * 0.3}} {{$height * 0.12}} h {{$width * 0.4}} // title
+          M {{$width * 0.15}} {{$height * 0.26}} h {{$width * 0.7}} // body text
+          m {{-$width * 0.7}} {{$height * 0.1}} h {{$width * 0.7}}
+          m {{-$width * 0.7}} {{$height * 0.1}} h {{$width * 0.7}}
+          M {{$width * 0.12}} {{$height * 0.8}} h {{$width * 0.3}} // signature"/>
+      <!-- ribbon tails first, so the seal is drawn over them -->
+      <path d="M {{$sx - 0.7 * $sr}} {{$sy + 0.7 * $sr}} v {{1.3 * $sr}}
+          r2[l {{0.35 * $sr}} {{-0.3 * $sr}} l {{0.35 * $sr}} {{0.3 * $sr}}] v {{-1.3 * $sr}}"/>
+      <circle cxy="$sx $sy" r="$sr"/>
+    </g>
+
+    <g id="server">
+      <varTryDefault width="{{ $size * 0.8 }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height * 0.8 }}" height="{{ $width * 5/4 }}"/>
+      <varDefault width="6" height="7.5"/>
+      <var unit="{{$height / 3}}" led="{{$height * 0.03}}"/>
+      <!-- three stacked units, each with a drive slot and a status LED -->
+      <path d="M0 0 h$width v$height h-$width z
+          M 0 $unit r2[h $width m {{-$width}} $unit]
+          :y {{$unit / 2}}
+          r3[
+            M {{$width * 0.15}} $y h {{$width * 0.5}}
+            M {{$width * 0.8 - $led}} $y a $led $led 0 1 0 {{2 * $led}} 0 a $led $led 0 1 0 {{-2 * $led}} 0
+            :y {{$y + $unit}}
+          ]"/>
+    </g>
+
+    <g id="switch">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 3/4 }}"/>
+      <varTryDefault width="{{ $height * 4/3 }}" height="{{ $width * 3/4 }}"/>
+      <varDefault width="8" height="6"/>
+      <var head="{{$height * 0.12}}" arrow="{{$width * 0.6}}"/>
+      <!-- a pair of opposed arrows; arrowheads are separate subpaths so their tips join cleanly -->
+      <path d="M0 0 h$width v$height h-$width z
+          M {{$width * 0.2}} {{$height * 0.35}} h $arrow m {{-$head}} {{-$head}} l $head $head l {{-$head}} $head
+          M {{$width * 0.8}} {{$height * 0.65}} h {{-$arrow}} m $head {{-$head}} l {{-$head}} $head l $head $head"
+        style="stroke-linejoin:round;stroke-linecap:round"/>
+    </g>
+
+    <g id="firewall">
+      <varTryDefault width="{{ $size }}" height="{{ $size * 4/5 }}"/>
+      <varTryDefault width="{{ $height * 5/4 }}" height="{{ $width * 4/5 }}"/>
+      <varDefault width="10" height="8"/>
+      <var row="{{$height / 4}}" half="{{$width / 2}}" qtr="{{$width / 4}}"/>
+      <!-- brick wall: four courses, alternate courses offset by half a brick -->
+      <path d="M0 0 h$width v$height h-$width z
+          M 0 $row r3[h $width m {{-$width}} $row]
+          M $half 0 r2[v $row m -$qtr 0 v $row m $half 0 v {{-$row}} m -$qtr $row]"/>
+    </g>
+
+    <g id="router">
+      <varTryDefault width="{{ $size }}" height="{{ $size }}"/>
+      <varTryDefault width="{{ $height }}" height="{{ $width }}"/>
+      <varDefault width="8" height="8"/>
+      <var r="{{min($width, $height) / 2}}" cx="{{$width / 2}}" cy="{{$height / 2}}"/>
+      <var arm="{{$r * 0.7}}" head="{{$r * 0.2}}"/>
+      <!-- circle with four arrows, one per axis direction; each arm is drawn along the current bearing -->
+      <path d="M {{$cx - $r}} $cy a $r $r 0 1 0 {{2 * $r}} 0 a $r $r 0 1 0 {{-2 * $r}} 0
+          M $cx $cy
+          r4[b 90 h $arm m {{-$head}} {{-$head}} l $head $head l {{-$head}} $head M $cx $cy]"
+        style="stroke-linejoin:round;stroke-linecap:round"/>
+    </g>
   </specs>
 </svg>
